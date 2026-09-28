@@ -88,6 +88,9 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     public LogEntry? SelectedEntry
         => SelectedIndex >= 0 && SelectedIndex < Entries.Count ? Entries[SelectedIndex] : null;
 
+    /// <summary>True when a list row is selected — drives「复制选中」enabled state.</summary>
+    public bool HasSelectedEntry => SelectedEntry is not null;
+
     /// <summary>Text filter active and not broken → match navigation is meaningful.</summary>
     public bool HasTextFilter => !string.IsNullOrEmpty(FilterText) && !_regexInvalid;
 
@@ -290,6 +293,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     partial void OnSelectedIndexChanged(int value)
     {
         OnPropertyChanged(nameof(SelectedEntry));
+        OnPropertyChanged(nameof(HasSelectedEntry));
         OnPropertyChanged(nameof(CanGoPrevMatch));
         OnPropertyChanged(nameof(CanGoNextMatch));
     }
@@ -463,6 +467,25 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         }
         await _copyToClipboard(BuildVisibleText());
         StatusText = $"已复制 {Entries.Count} 行";
+    }
+
+    /// <summary>Copy the currently selected log row (absolute <see cref="FormatLine"/>) to the clipboard.
+    /// Soft-fails with a status note when nothing is selected or the clipboard hook is missing.</summary>
+    [RelayCommand]
+    private async Task CopySelectedAsync()
+    {
+        if (SelectedEntry is null)
+        {
+            StatusText = "没有选中的日志行";
+            return;
+        }
+        if (_copyToClipboard is null)
+        {
+            StatusText = "剪贴板不可用";
+            return;
+        }
+        await _copyToClipboard(FormatLine(SelectedEntry));
+        StatusText = "已复制选中行";
     }
 
     /// <summary>Dismiss the current filter results — the visible lines are removed
