@@ -882,6 +882,86 @@ public class DeployDockTests
     }
 
     [AvaloniaFact]
+    public async Task ActiveProfileLabel_UpdatesOnSwitch_AndClearLastResult_ResetsBadge()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: true);
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var window = new MainWindow(new SettingsStore(settingsPath)) { Width = 1200, Height = 800 };
+        MainWindowViewModel? vm = null;
+        try
+        {
+            window.Show();
+            await FlushUi();
+            vm = (MainWindowViewModel)window.DataContext!;
+            Assert.Equal("", vm.ActivePublishProfileLabel);
+            Assert.False(vm.HasActivePublishProfileLabel);
+            Assert.False(vm.CanClearLastPublishResult);
+
+            Assert.True(vm.SavePublishProfile("默认", root, "linux-x64", ""));
+            Assert.Equal("默认 · linux-x64", vm.ActivePublishProfileLabel);
+            Assert.True(vm.HasActivePublishProfileLabel);
+            Assert.Contains("配置档：默认 · linux-x64", vm.DeployDockTip);
+            await WaitFor(() => window.FindControl<Button>("DeployDockButton")!
+                .GetVisualDescendants().OfType<TextBlock>()
+                .Any(t => t.IsVisible && t.Text == "默认 · linux-x64"));
+
+            Assert.True(vm.SavePublishProfile("win box", root, "win-x64", ""));
+            Assert.Equal("win box · win-x64", vm.ActivePublishProfileLabel);
+            Assert.True(vm.ActivatePublishProfile("默认"));
+            Assert.Equal("默认 · linux-x64", vm.ActivePublishProfileLabel);
+
+            LastPublishResults.Record(
+                vm.Settings, LastPublishResults.Success, 0,
+                DateTimeOffset.UtcNow, 42_000, root,
+                Path.Combine(root, "artifacts", "publish", "linux-x64"));
+            vm.PersistSettings();
+            Assert.True(vm.CanClearLastPublishResult);
+            Assert.StartsWith("成功", vm.LastPublishBadge);
+            Assert.True(vm.CanOpenLastSuccessfulArtifact);
+
+            window.RefreshDeployContextMenu();
+            var deploy = window.FindControl<Button>("DeployDockButton");
+            Assert.NotNull(deploy);
+            var flyout = Assert.IsType<MenuFlyout>(deploy!.ContextFlyout);
+            var clear = MenuByHeader(flyout, "清除上次发布结果");
+            Assert.Contains("Clear last result", clear.Header?.ToString());
+            Assert.True(clear.IsEnabled);
+
+            clear.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await FlushUi();
+            Assert.Null(vm.Settings.LastPublishResult);
+            Assert.Equal("", vm.LastPublishBadge);
+            Assert.False(vm.HasLastPublishBadge);
+            Assert.False(vm.CanClearLastPublishResult);
+            Assert.False(vm.CanOpenLastSuccessfulArtifact);
+            Assert.False(vm.CanCopyLastSuccessfulArtifact);
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Level == "info"
+                && l.Message.Contains("已清除上次发布结果"));
+
+            window.RefreshDeployContextMenu();
+            Assert.False(clear.IsEnabled);
+
+            var loaded = new SettingsStore(settingsPath).Load();
+            Assert.Null(loaded.LastPublishResult);
+            Assert.Equal("默认", PublishProfiles.Active(loaded)!.Name);
+
+            Assert.True(vm.DeletePublishProfile("默认"));
+            Assert.Equal("", vm.ActivePublishProfileName);
+            Assert.Equal("", vm.ActivePublishProfileLabel);
+            Assert.False(vm.HasActivePublishProfileLabel);
+        }
+        finally
+        {
+            vm?.Dispose();
+            window.Close();
+            Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
+        }
+    }
+
+    [AvaloniaFact]
     public void PublishProfileWindow_ApplyDraft_RoundTripsFields()
     {
         var dialog = new PublishProfileWindow();

@@ -1245,8 +1245,8 @@
         </Button>
         <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
              Right-click also switches publish profiles, opens recent artifacts, opens the last
-             successful artifact, copy its path, and cancels a running publish. The line under
-             Deploy is the last exit when idle, or live packing elapsed while running. -->
+             successful artifact, copies its path, clears last result, and cancels a running publish.
+             Under Deploy: last exit (or live packing elapsed) then the active profile name · RID. -->
         <Button x:Name="DeployDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4"
@@ -1269,6 +1269,8 @@
                         IsEnabled="False"/>
               <MenuItem Header="复制上次成功产物路径 Copy last artifact path" Click="OnCopyLastSuccessPathClick"
                         IsEnabled="False"/>
+              <MenuItem Header="清除上次发布结果 Clear last result" Click="OnClearLastPublishResultClick"
+                        IsEnabled="False"/>
               <MenuItem Header="最近产物 Recent">
                 <MenuItem Header="（暂无产物）" IsEnabled="False"/>
               </MenuItem>
@@ -1280,6 +1282,11 @@
             <TextBlock Text="{Binding LastPublishBadge}" FontSize="9"
                        HorizontalAlignment="Center" Margin="0,1,0,0"
                        IsVisible="{Binding HasLastPublishBadge}"
+                       TextWrapping="NoWrap"/>
+            <!-- Quiet active-profile line under the last-publish badge (name · RID). -->
+            <TextBlock Text="{Binding ActivePublishProfileLabel}" FontSize="8"
+                       HorizontalAlignment="Center" Margin="0,1,0,0" Opacity="0.72"
+                       IsVisible="{Binding HasActivePublishProfileLabel}"
                        TextWrapping="NoWrap"/>
           </StackPanel>
         </Button>

@@ -86,6 +86,14 @@ public static class LastPublishResults
         return result;
     }
 
+
+    /// <summary>Drop the stored outcome so the dock badge and clear/open/copy gates reset.</summary>
+    public static void Clear(AppSettings settings) =>
+        settings.LastPublishResult = null;
+
+    /// <summary>True when a known outcome is stored (badge would be non-empty when idle).</summary>
+    public static bool HasRecord(LastPublishResult? result) => IsKnown(result);
+
     /// <summary>Short dock line. Empty when no real outcome has been recorded.</summary>
     public static string FormatBadge(LastPublishResult? result)
     {

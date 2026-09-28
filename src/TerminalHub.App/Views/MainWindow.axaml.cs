@@ -117,6 +117,9 @@ public partial class MainWindow : Window
     private void OnCopyLastSuccessPathClick(object? sender, RoutedEventArgs e)
         => Vm.CopyLastSuccessfulArtifactPath();
 
+    private void OnClearLastPublishResultClick(object? sender, RoutedEventArgs e)
+        => Vm.ClearLastPublishResult();
+
     /// <summary>Split panes: a press on a pane focuses it — its session becomes
     /// active so the middle input row, Output and Search follow it.</summary>
     private void OnLeftPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(0);
@@ -139,6 +142,8 @@ public partial class MainWindow : Window
             last.IsEnabled = Vm.CanOpenLastSuccessfulArtifact;
         if (FindDeployMenu(flyout, static h => h.StartsWith("复制上次成功产物路径", StringComparison.Ordinal)) is { } copy)
             copy.IsEnabled = Vm.CanCopyLastSuccessfulArtifact;
+        if (FindDeployMenu(flyout, static h => h.StartsWith("清除上次发布结果", StringComparison.Ordinal)) is { } clear)
+            clear.IsEnabled = Vm.CanClearLastPublishResult;
         if (FindDeployMenu(flyout, static h => h.StartsWith("配置档", StringComparison.Ordinal)) is { } profiles)
             FillProfileMenu(profiles, activate: true);
         if (FindDeployMenu(flyout, static h => h.StartsWith("删除配置档", StringComparison.Ordinal)) is { } deletes)

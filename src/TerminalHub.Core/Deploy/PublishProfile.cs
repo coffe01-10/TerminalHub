@@ -163,6 +163,21 @@ public static class PublishProfiles
     public static string HostRid(PublishPlatform platform) =>
         platform == PublishPlatform.Windows ? WindowsRid : LinuxRid;
 
+
+    /// <summary>
+    /// Short Deploy-dock line for the active profile: <c>Name</c>, or <c>Name · rid</c>
+    /// when RID is set. Empty when there is no meaningful name (hide the line).
+    /// </summary>
+    public static string FormatDockLabel(PublishProfile? profile)
+    {
+        if (profile is null) return "";
+        var name = (profile.Name ?? "").Trim();
+        if (name.Length == 0) return "";
+        var rid = (profile.Rid ?? "").Trim();
+        return rid.Length == 0 ? name : $"{name} · {rid}";
+    }
+
+
     /// <summary>Unique display name, preferring <paramref name="rid"/> then <c>profile</c>, then <c>-2</c>, <c>-3</c>, …</summary>
     public static string SuggestName(Settings.AppSettings settings, string? rid)
     {

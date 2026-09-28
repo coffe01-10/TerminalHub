@@ -4,7 +4,21 @@
 
 ## 2026-09-28
 
-### pending — Logs 级别 chip 活计数 (`feat/logs-level-counts`) · PR #42
+### pending / next Deploy slice — 坞上当前配置档 + 清除上次发布结果 (`feat/deploy-active-profile-clear-result`)
+- **配置档标签**: Deploy 坞在上次发布徽章下增加安静一行 `ActivePublishProfileLabel`
+  （`PublishProfiles.FormatDockLabel`：名称，非空 RID 时 `名称 · linux-x64`）。无激活/
+  无有效名称时隐藏。Activate / Save / Delete / TouchActive 后 `NotifyActivePublishProfile`
+  刷新；Tooltip 附「配置档：…」。
+- **清除上次结果**: 右键「清除上次发布结果 Clear last result」，在打开/复制上次旁；
+  `CanClearLastPublishResult` 在有已知 outcome 时启用（产物目录已删仍可清）。
+  `LastPublishResults.Clear` → 持久化 → 刷新徽章/打开/复制/清除门控；Output
+  `source=deploy` 记「已清除上次发布结果」。
+- **验证**: `dotnet test -c Release`；不动 Files/Logs/SSH。
+- 截图 `docs/screenshots/deploy-active-profile-clear-result.png`（Deploy 右键「清除上次发布结果」可见）。
+- 布局选择：徽章下第二安静行（FontSize 8 · Opacity 0.72），而非仅 tooltip。
+- 基线 `origin/main` @ `2c6998c`（含 #42）。
+
+### PR #42 — Logs 级别 chip 活计数 (`feat/logs-level-counts`)
 - **活计数**: 级别 chip 文案 `全部 N` / `info N` / `warn N` / `error N`，数字来自
   **环形缓冲 `_buffer`**（不是当前 `Entries` 筛选结果），所以在「全部」下仍可见
   e.g. `error 3`。append / trim / clear / ClearVisible / 缩容后 `RefreshLevelCounts`。
@@ -14,13 +28,13 @@
 - **验证**: 224 tests green（+4：helpers、缓冲 vs 筛选、trim/clear、MainWindow
   chip 文案 + 截图）。worktree `/workspace/TerminalHub-logs2`；工具 Grok Build /
   Claude Code OK。
-- 截图 `docs/screenshots/logs-level-counts.png`（chip 带计数可见）。
+- 截图 `docs/screenshots/logs-level-counts.png`（chip 带计数可见）。已合 `main@2c6998c`。
 
 ### PR #40 — Logs 紧凑密度 toggle (`feat/logs-compact-density`)
 - **「紧凑」chip**: 「换行」旁 `timechip`；关（默认）FontSize 9.5 / Padding 4,1；
   开 ≈8.5 / 2,0。`Classes.compact` + `BoolToLogsFontSizeConverter`。
 - **持久化**: 全局 `AppSettings.LogsCompactDensity`；经 `PersistLogsFilters`。
-- **验证**: 220 tests green。截图 `docs/screenshots/logs-compact-density.png`。
+- **验证**: 220 tests green。截图 `docs/screenshots/logs-compact-density.png`。已合 `main@ecc5da1`。
   已合 `main@ecc5da1`。
 
 ### PR #37 — Deploy 打包中实时耗时 + 复制上次成功产物路径 (`feat/deploy-live-elapsed-copy-path`)
