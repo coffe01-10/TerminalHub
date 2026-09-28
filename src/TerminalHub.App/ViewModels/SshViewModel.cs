@@ -1,0 +1,126 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using TerminalHub.Core.Ssh;
+
+namespace TerminalHub.App.ViewModels;
+
+/// <summary>
+/// Right-rail SSH tab: editable saved-host list + connect via the local
+/// `ssh` binary (password/key interaction happens inside the terminal).
+/// </summary>
+public partial class SshViewModel : ViewModelBase
+{
+    private readonly List<SshHost> _hosts; // == AppSettings.SshHosts (persisted list)
+    private readonly Action _persist;
+    private readonly Action<SshHost> _connect;
+    private readonly Func<bool> _sshAvailable;
+
+    public ObservableCollection<SshHost> Hosts { get; } = [];
+
+    [ObservableProperty] private string _editName = "";
+    [ObservableProperty] private string _editUser = "";
+    [ObservableProperty] private string _editHost = "";
+    [ObservableProperty] private string _editPort = "22";
+    [ObservableProperty] private string _statusText = "";
+    [ObservableProperty] private SshHost? _selected;
+
+    public SshViewModel(
+        List<SshHost> hosts,
+        Action<SshHost> connect,
+        Action persist,
+        Func<bool>? sshAvailable = null)
+    {
+        _hosts = hosts;
+        _connect = connect;
+        _persist = persist;
+        _sshAvailable = sshAvailable ?? SshLocator.Available;
+        foreach (var h in _hosts) Hosts.Add(h);
+    }
+
+    /// <summary>Selecting a row fills the edit form (edit → 添加/更新 to save).</summary>
+    partial void OnSelectedChanged(SshHost? value)
+    {
+        if (value is null) return;
+        EditName = value.Name;
+        EditUser = value.User;
+        EditHost = value.Host;
+        EditPort = value.Port.ToString();
+    }
+
+    /// <summary>Add a new host, or update the row whose Name/Target matches.</summary>
+    [RelayCommand]
+    private void AddOrUpdate()
+    {
+        var host = EditHost.Trim();
+        if (string.IsNullOrEmpty(host))
+        {
+            StatusText = "主机地址不能为空";
+            return;
+        }
+        if (!int.TryParse(EditPort.Trim(), out var port) || port is < 1 or > 65535)
+        {
+            StatusText = "端口无效 (1-65535)";
+            return;
+        }
+
+        var entry = new SshHost
+        {
+            Name = EditName.Trim(),
+            User = EditUser.Trim(),
+            Host = host,
+            Port = port,
+        };
+
+        // Update in place when the same display name or target already exists.
+        var idx = -1;
+        for (var i = 0; i < Hosts.Count; i++)
+        {
+            var h = Hosts[i];
+            if ((!string.IsNullOrEmpty(entry.Name) && h.Name == entry.Name) || h.Target == entry.Target)
+            { idx = i; break; }
+        }
+
+        if (idx >= 0)
+        {
+            Hosts[idx] = entry;
+            _hosts[idx] = entry;
+        }
+        else
+        {
+            Hosts.Add(entry);
+            _hosts.Add(entry);
+        }
+        _persist();
+        StatusText = idx >= 0 ? $"已更新 {entry.DisplayName}" : $"已添加 {entry.DisplayName}";
+        Selected = entry;
+    }
+
+    [RelayCommand]
+    private void Remove(SshHost? host)
+    {
+        if (host is null) return;
+        var idx = Hosts.IndexOf(host);
+        if (idx >= 0)
+        {
+            Hosts.RemoveAt(idx);
+            _hosts.RemoveAt(idx);
+            _persist();
+        }
+        if (ReferenceEquals(Selected, host)) Selected = null;
+    }
+
+    /// <summary>Spawn a new terminal session running `ssh -p port user@host`.</summary>
+    [RelayCommand]
+    private void Connect(SshHost? host)
+    {
+        if (host is null) return;
+        if (!_sshAvailable())
+        {
+            StatusText = "未检测到 ssh 命令 — 请先安装 openssh-client";
+            return;
+        }
+        StatusText = $"连接 {host.CommandLine} …";
+        _connect(host);
+    }
+}

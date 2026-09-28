@@ -44,6 +44,23 @@
 - Headless UI test renders both dashboard + Codex frames to PNG.
 - Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
 
+### PR #8 — SSH panel: saved hosts + ssh sessions (`feat/ssh-panel`)
+- Right-rail **SSH** tab: 新建/编辑连接 form (名称/用户/主机/端口 + validation)
+  + saved-host list (显示 `ssh -p port user@host` command line) + per-row
+  连接 / ✕ delete; selecting a row refills the form for editing.
+- Hosts persist in `settings.json` (`AppSettings.SshHosts`, derived props
+  `[JsonIgnore]`ed). Add-or-update dedups on same name or same target;
+  different user on same host is a separate entry by design.
+- **连接** spawns a real session: `SessionManager.CreateAsync` with
+  `Shell="ssh"` + `Arguments="-p <port> <user@host>"`, tagged orange `SSH`.
+  Verified live: `ssh -p 2222 tester@127.0.0.1` → real
+  `ssh: connect to host 127.0.0.1 port 2222: Connection refused` in-terminal.
+- Graceful degrade when `ssh` isn't on PATH (`SshLocator` → status text).
+- Limits documented in-panel: auth (password/keys) happens inside the
+  terminal itself; use ssh-agent / ~/.ssh/config for keys.
+- `docs/screenshots/ssh-panel.png`. 61 tests green.
+- Installed `openssh-client` on this box for real-binary verification.
+
 ### PR #7 — Logs panel + file sink (`feat/logs-panel`)
 - Right-rail **Logs** tab over the real session stream: text filter + level
   filter (info/warn/error) + per-session filter (rebuilt on tab open);
