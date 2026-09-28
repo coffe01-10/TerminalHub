@@ -187,8 +187,50 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             case 1: SelectedRightTab = 0; break;
             case 2: SelectedRightTab = 3; break;
             case 3: SelectedRightTab = 2; break;
-            case 4: Dashboard.AppendOutput("info", "Deploy: 部署功能即将上线 (stub)"); break;
+            case 4: DeployArtifacts(); break;
             case 5: SettingsOpen = !SettingsOpen; break;
+        }
+    }
+
+    /// <summary>
+    /// Deploy dock button: open the publish artifacts folder if it exists,
+    /// otherwise print publish instructions to Output.
+    /// </summary>
+    private void DeployArtifacts()
+    {
+        var found = TerminalHub.Core.Deploy.ArtifactLocator.Find(Directory.GetCurrentDirectory());
+        if (found.Count > 0)
+        {
+            foreach (var d in found)
+            {
+                Dashboard.AppendOutput("info", $"Deploy: 产物目录 {d.Path}", "deploy");
+                foreach (var f in d.Files)
+                {
+                    var fi = new FileInfo(f);
+                    Dashboard.AppendOutput("info", $"  {fi.Name}  ({FmtBytes(fi.Length)})", "deploy");
+                }
+            }
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found[0].Path)
+                    { UseShellExecute = true });
+                Dashboard.AppendOutput("info", "Deploy: 已在文件管理器中打开产物目录", "deploy");
+            }
+            catch
+            {
+                Dashboard.AppendOutput("warn", "Deploy: 无法打开文件管理器 — 请手动访问上面目录", "deploy");
+            }
+        }
+        else
+        {
+            Dashboard.AppendOutput("info", "Deploy: 尚未发现发布产物 (artifacts/publish)", "deploy");
+            Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
+                ? "  打包 Windows: scripts\\publish-windows.ps1 (需 Inno Setup)"
+                : "  打包 Linux:   ./scripts/publish-linux.sh  → artifacts/publish/linux-x64/", "deploy");
+            Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
+                ? "  打包 Linux:   ./scripts/publish-linux.sh"
+                : "  打包 Windows: scripts\\publish-windows.ps1 (需在 Windows + Inno Setup)", "deploy");
+            Dashboard.AppendOutput("info", "  发布完成后再次点击 Deploy 打开产物目录", "deploy");
         }
     }
 

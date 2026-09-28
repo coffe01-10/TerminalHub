@@ -101,9 +101,15 @@
                         </Border>
                       </Grid>
                       <Border CornerRadius="6" Background="#F20A0D14" Padding="5" MinHeight="88">
-                        <TextBlock Text="{Binding PreviewText}"
-                                   FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
-                                   FontSize="7" Foreground="#7C8AA5" TextWrapping="NoWrap"/>
+                        <ItemsControl ItemsSource="{Binding PreviewLines}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}"
+                                         FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
+                                         FontSize="7" TextWrapping="NoWrap"/>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                       </Border>
                     </StackPanel>
                   </Border>
