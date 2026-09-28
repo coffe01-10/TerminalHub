@@ -192,7 +192,9 @@
               <Button Grid.Column="3" Content="◫ 分屏" Background="Transparent" BorderThickness="0"
                       Foreground="#94A3B8" FontSize="11" Padding="6,0"/>
               <Button Grid.Column="4" Content="↗ 在新窗口打开" Background="Transparent" BorderThickness="0"
-                      Foreground="#94A3B8" FontSize="11" Padding="6,0"/>
+                      Foreground="#94A3B8" FontSize="11" Padding="6,0"
+                      Command="{Binding OpenInNewWindowCommand}"
+                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）"/>
               <Button Grid.Column="5" Content="•••" Background="Transparent" BorderThickness="0"
                       Foreground="#94A3B8" Padding="6,0"/>
             </Grid>

@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TerminalHub.App.ViewModels"
+        xmlns:ctl="using:TerminalHub.App.Controls"
+        x:Class="TerminalHub.App.Views.SessionWindow"
+        x:DataType="vm:SessionWindowViewModel"
+        Title="{Binding Title}"
+        Width="860" Height="540" MinWidth="420" MinHeight="260"
+        WindowStartupLocation="Manual"
+        Background="#FF0A0D14"
+        TransparencyLevelHint="AcrylicBlur">
+
+  <Grid RowDefinitions="30,*" Margin="8,6,8,8">
+
+    <!-- Header: status dot + name + tag + return-to-main -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="4,0,4,4">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                   Foreground="#E2E8F0" VerticalAlignment="Center"/>
+        <Border IsVisible="{Binding HasTag}" CornerRadius="7" Padding="8,2"
+                Background="{Binding TagPillBrush}" VerticalAlignment="Center">
+          <TextBlock Text="{Binding TagText}" FontSize="9" FontWeight="SemiBold"
+                     Foreground="{Binding TagBrush}"/>
+        </Border>
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <TextBlock Text="关闭窗口即收回主窗" FontSize="10" Foreground="#64748B"
+                   VerticalAlignment="Center"/>
+        <Button Content="↩ 收回" FontSize="10" Padding="10,2" CornerRadius="6"
+                Background="#1A2438" BorderBrush="#3B82F6" BorderThickness="1"
+                Foreground="#E2E8F0" VerticalAlignment="Center"
+                Click="OnReturnClick"
+                ToolTip.Tip="关闭本窗口，会话回到主窗口（快捷键 Esc）"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Terminal viewport -->
+    <Border Grid.Row="1" CornerRadius="8" Background="#F20A0D14"
+            BorderBrush="#332A3142" BorderThickness="1" ClipToBounds="True">
+      <ctl:TerminalView x:Name="PopoutTerminal"
+                        Emulator="{Binding Emulator}"
+                        TerminalFontSize="{Binding FontSize}"/>
+    </Border>
+  </Grid>
+</Window>
