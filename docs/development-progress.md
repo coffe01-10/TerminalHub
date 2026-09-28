@@ -4,7 +4,22 @@
 
 ## 2026-09-28
 
-### pending / PR #38 — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
+### pending — Logs 环形缓冲容量 presets (`feat/logs-buffer-capacity`)
+- **「容量」chips**: 级别 /「相对」/「换行」旁（同 WrapPanel）`capchip` ToggleButton
+  条 **500 / 2000 / 5000**；默认 **2000**。缩小容量会丢弃最旧行并刷新
+  `Entries`；`StatusText`「缓冲容量 → N」。
+- **持久化**: 全局 `AppSettings.LogsBufferCapacity`（int）；经同一
+  `PersistLogsFilters` 落盘（与 wrap/relative 同路）。启动时
+  `NormalizeSavedBufferCapacity` 把非预设值吸到最近档；`MainWindowViewModel`
+  ctor 把已存容量传入 `LogsViewModel`。
+- **边界**: 只动 Logs + AppSettings；不动 Deploy/Files/SSH/Core PTY。
+- **验证**: 216 tests green（+4：Normalize、shrink trim、SettingsStore 往返、
+  MainWindow capchip 绑定 + 截图）。worktree `/workspace/TerminalHub-logs2`；
+  工具 Grok Build / Claude Code OK。
+- 截图 `docs/screenshots/logs-buffer-capacity.png`（「容量」+ 500/2000/5000 可见；
+  500 选中 + StatusText）。已对齐 `origin/main` @ `ace56d9`（含 #38）。
+
+### PR #38 — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
 - **「换行」chip**: 级别 chip /「相对」旁 `timechip` ToggleButton；开（默认）=
   `TextWrapping.Wrap`（现行行为）；关 = `NoWrap` + `LogsList`
   `ScrollViewer.HorizontalScrollBarVisibility=Auto`，便于密扫长行。

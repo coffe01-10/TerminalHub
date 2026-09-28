@@ -19,6 +19,10 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 {
     /// <summary>Logs history depth; the bottom Output panel caps at 500 shown lines.</summary>
     public const int DefaultBufferCapacity = 2000;
+
+    /// <summary>User-selectable ring-buffer presets shown in the toolbar (容量 chips).</summary>
+    public static readonly int[] BufferCapacityPresets = [500, 2000, 5000];
+
     private static readonly string[] LevelNames = ["info", "warn", "error"];
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
 
@@ -32,7 +36,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     private readonly Action? _persistFilters;
     /// <summary>Host activates a session by card name; returns false when unknown.</summary>
     private readonly Func<string, bool>? _activateSession;
-    private readonly int _capacity;
+    private int _capacity;
 
     /// <summary>True while saved values are being replayed (<see cref="ApplyPersistedFilters"/>
     /// or a session-switch restore) — suppresses the write-back so a load never triggers a save.</summary>
@@ -78,6 +82,33 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// <summary>On (default): wrap long Message lines in the Logs list.
     /// Off: NoWrap for dense one-line scanning (list gains horizontal scroll). Global preference.</summary>
     [ObservableProperty] private bool _wrapLines = true;
+
+    /// <summary>Ring-buffer capacity (any ≥1; toolbar chips offer 500/2000/5000).
+    /// Changing trims oldest lines when over the new limit and refreshes <see cref="Entries"/>.</summary>
+    public int BufferCapacity
+    {
+        get => _capacity;
+        set => ApplyBufferCapacity(value, announce: true);
+    }
+
+    /// <summary>Chip bar for capacity presets — exclusive like the level chips.</summary>
+    public bool Capacity500Selected
+    {
+        get => BufferCapacity == 500;
+        set => SelectCapacityChip(500, value);
+    }
+
+    public bool Capacity2000Selected
+    {
+        get => BufferCapacity == 2000;
+        set => SelectCapacityChip(2000, value);
+    }
+
+    public bool Capacity5000Selected
+    {
+        get => BufferCapacity == 5000;
+        set => SelectCapacityChip(5000, value);
+    }
 
     /// <summary>On (default): the list stays pinned to the newest line — new lines auto-scroll
     /// to the bottom. User scroll-up pauses it; the「⬇ 跟随」button or scrolling back to
@@ -145,6 +176,62 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         // Clicking the checked chip tries to uncheck it — re-assert instead so the
         // bar always has exactly one selection.
         if (LevelFilterIndex == index) OnPropertyChanged(LevelChipProps[index]);
+    }
+
+    /// <summary>Snap a persisted capacity to the nearest toolbar preset (or default when &lt;1).
+    /// Unit tests may still construct with any ≥1 capacity; this is for settings load.</summary>
+    public static int NormalizeSavedBufferCapacity(int value)
+    {
+        if (value < 1) return DefaultBufferCapacity;
+        if (BufferCapacityPresets.Contains(value)) return value;
+        return BufferCapacityPresets.MinBy(p => Math.Abs(p - value));
+    }
+
+    private void SelectCapacityChip(int capacity, bool selected)
+    {
+        if (selected) { BufferCapacity = capacity; return; }
+        if (BufferCapacity == capacity)
+            OnPropertyChanged(CapacityChipPropName(capacity));
+    }
+
+    private static string CapacityChipPropName(int capacity) => capacity switch
+    {
+        500 => nameof(Capacity500Selected),
+        2000 => nameof(Capacity2000Selected),
+        5000 => nameof(Capacity5000Selected),
+        _ => nameof(BufferCapacity),
+    };
+
+    private void NotifyCapacityChips()
+    {
+        OnPropertyChanged(nameof(Capacity500Selected));
+        OnPropertyChanged(nameof(Capacity2000Selected));
+        OnPropertyChanged(nameof(Capacity5000Selected));
+    }
+
+    /// <summary>Apply a new ring-buffer capacity: trim oldest if over limit, refresh
+    /// visible Entries, soft status note, persist via <see cref="SaveCurrentFilters"/>.</summary>
+    private void ApplyBufferCapacity(int value, bool announce)
+    {
+        var next = Math.Max(1, value);
+        if (next == _capacity)
+        {
+            NotifyCapacityChips();
+            return;
+        }
+        _capacity = next;
+        var trimmed = false;
+        while (_buffer.Count > _capacity)
+        {
+            _buffer.RemoveAt(0);
+            trimmed = true;
+        }
+        if (trimmed) Refilter();
+        OnPropertyChanged(nameof(BufferCapacity));
+        NotifyCapacityChips();
+        if (announce)
+            StatusText = $"缓冲容量 → {_capacity}";
+        SaveCurrentFilters();
     }
 
     public LogsViewModel(

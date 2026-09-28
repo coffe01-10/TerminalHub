@@ -1666,5 +1666,137 @@ public class LogsPanelTests
         }
     }
 
+    // ===== ring-buffer capacity presets (500 / 2000 / 5000) =====
+
+    [Fact]
+    public void NormalizeSavedBufferCapacity_PresetsAndNearest()
+    {
+        Assert.Equal(2000, LogsViewModel.NormalizeSavedBufferCapacity(0));
+        Assert.Equal(2000, LogsViewModel.NormalizeSavedBufferCapacity(-5));
+        Assert.Equal(500, LogsViewModel.NormalizeSavedBufferCapacity(500));
+        Assert.Equal(2000, LogsViewModel.NormalizeSavedBufferCapacity(2000));
+        Assert.Equal(5000, LogsViewModel.NormalizeSavedBufferCapacity(5000));
+        Assert.Equal(500, LogsViewModel.NormalizeSavedBufferCapacity(600));   // nearer 500 than 2000
+        Assert.Equal(2000, LogsViewModel.NormalizeSavedBufferCapacity(1800));
+        Assert.Equal(5000, LogsViewModel.NormalizeSavedBufferCapacity(4000));
+    }
+
+    [AvaloniaFact]
+    public async Task BufferCapacity_Shrink_TrimsOldest_AndRefreshesEntries()
+    {
+        var (dash, logs, _) = MakeLogs(bufferCapacity: 8);
+        for (var i = 0; i < 8; i++)
+            dash.AppendOutput("info", $"cap-{i}", "Terminal 01");
+        await Until(() => logs.Entries.Count == 8);
+        Assert.Equal(8, logs.BufferCapacity);
+        Assert.Equal("cap-0", logs.Entries[0].Message);
+
+        logs.BufferCapacity = 3; // shrink → drop oldest 5
+        Assert.Equal(3, logs.BufferCapacity);
+        Assert.Equal(3, logs.Entries.Count);
+        Assert.Equal("cap-5", logs.Entries[0].Message);
+        Assert.Equal("cap-7", logs.Entries[^1].Message);
+        Assert.Contains("缓冲容量 → 3", logs.StatusText);
+
+        // Growing again does not resurrect trimmed lines.
+        logs.BufferCapacity = 8;
+        Assert.Equal(3, logs.Entries.Count);
+        Assert.Equal("cap-5", logs.Entries[0].Message);
+    }
+
+    [AvaloniaFact]
+    public async Task BufferCapacity_Preference_SurvivesRestart_ViaSettingsStore()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        try
+        {
+            var vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.Equal(LogsViewModel.DefaultBufferCapacity, vm.Logs.BufferCapacity); // default 2000
+            Assert.True(vm.Logs.Capacity2000Selected);
+            vm.Logs.BufferCapacity = 500;
+
+            var onDisk = new SettingsStore(settingsPath).Load();
+            Assert.Equal(500, onDisk.LogsBufferCapacity);
+            vm.Dispose();
+
+            var vm2 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.Equal(500, vm2.Logs.BufferCapacity);
+            Assert.True(vm2.Logs.Capacity500Selected);
+            Assert.False(vm2.Logs.Capacity2000Selected);
+
+            // Restoring must not write back on its own — flip to 5000 and confirm save.
+            var savesBefore = File.ReadAllText(settingsPath);
+            vm2.Logs.Capacity5000Selected = true;
+            var onDisk2 = new SettingsStore(settingsPath).Load();
+            Assert.Equal(5000, onDisk2.LogsBufferCapacity);
+            Assert.NotEqual(savesBefore, File.ReadAllText(settingsPath));
+            vm2.Dispose();
+
+            // Stale / out-of-range saved value snaps to nearest preset on load.
+            var store = new SettingsStore(settingsPath);
+            var raw = store.Load();
+            raw.LogsBufferCapacity = 999;
+            store.Save(raw);
+            var vm3 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.Equal(500, vm3.Logs.BufferCapacity); // nearer 500 than 2000
+            vm3.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task BufferCapacity_UI_ChipsBind_Default2000()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2;
+            await Task.Delay(150);
+
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(),
+                t => t.Text == "容量");
+            var chips = window.GetVisualDescendants().OfType<ToggleButton>()
+                .Where(t => t.Classes.Contains("capchip")).ToList();
+            Assert.Equal(3, chips.Count);
+            Assert.All(new[] { "500", "2000", "5000" },
+                label => Assert.Contains(chips, c => (string?)c.Content == label));
+
+            Assert.Equal(2000, vm.Logs.BufferCapacity);
+            Assert.True(chips.Single(c => (string?)c.Content == "2000").IsChecked);
+            Assert.False(chips.Single(c => (string?)c.Content == "500").IsChecked);
+
+            for (var i = 0; i < 6; i++)
+                vm.Dashboard.AppendOutput("info", $"buf-cap-{i}", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 6);
+
+            chips.Single(c => (string?)c.Content == "500").IsChecked = true;
+            await Task.Delay(150);
+            Assert.Equal(500, vm.Logs.BufferCapacity);
+            Assert.True(chips.Single(c => (string?)c.Content == "500").IsChecked);
+            Assert.False(chips.Single(c => (string?)c.Content == "2000").IsChecked);
+            Assert.Contains("缓冲容量 → 500", vm.Logs.StatusText);
+
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-buffer-capacity.png"));
+        }
+        finally
+        {
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.BufferCapacity = LogsViewModel.DefaultBufferCapacity;
+            }
+            window.Close();
+        }
+    }
 
 }

@@ -222,6 +222,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
             v => _settings.SessionLogToFile = v,
+            bufferCapacity: LogsViewModel.NormalizeSavedBufferCapacity(_settings.LogsBufferCapacity),
             copyToClipboard: CopyTextToClipboardAsync,
             promptExportPath: PromptExportPathAsync,
             persistFilters: PersistLogsFilters,
@@ -1143,6 +1144,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settings.LogsRetainHistoryOnClear = global.RetainHistoryOnClear;
         _settings.LogsUseRelativeTimestamps = Logs.UseRelativeTimestamps;
         _settings.LogsWrapLines = Logs.WrapLines;
+        _settings.LogsBufferCapacity = Logs.BufferCapacity;
         _settings.LogsSessionFilters = Logs.SnapshotSessionFilters();
         SaveSettingsInternal();
     }
