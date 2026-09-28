@@ -12,11 +12,13 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TerminalHub.Core\TerminalHub.Core.csproj" />
     <ProjectReference Include="..\..\src\TerminalHub.Pty\TerminalHub.Pty.csproj" />
+    <ProjectReference Include="..\..\src\TerminalHub.App\TerminalHub.App.csproj" />
   </ItemGroup>
 
 </Project>

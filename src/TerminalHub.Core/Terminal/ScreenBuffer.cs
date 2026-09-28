@@ -479,19 +479,23 @@ public sealed class ScreenBuffer
         '~' => '·', _ => ch,
     };
 
-    /// <summary>Text of the last <paramref name="count"/> screen rows (for thumbnails).</summary>
+    /// <summary>
+    /// Text of the <paramref name="count"/> screen rows ending at the cursor row —
+    /// the interesting region for thumbnails (prompt + recent output).
+    /// </summary>
     public string TailText(int count)
     {
         var sb = new StringBuilder();
-        var start = Math.Max(0, Rows - count);
-        for (var r = start; r < Rows; r++)
+        var end = Math.Min(Rows - 1, CursorY);
+        var start = Math.Max(0, end - count + 1);
+        for (var r = start; r <= end; r++)
         {
             var row = GetScreenRow(r);
-            var end = row.Length;
-            while (end > 0 && (row[end - 1].Char == ' ' || row[end - 1].Char == '\0')) end--;
-            for (var c = 0; c < end; c++)
+            var len = row.Length;
+            while (len > 0 && (row[len - 1].Char == ' ' || row[len - 1].Char == '\0')) len--;
+            for (var c = 0; c < len; c++)
                 sb.Append(row[c].Char == '\0' ? ' ' : row[c].Char);
-            if (r < Rows - 1) sb.Append('\n');
+            if (r < end) sb.Append('\n');
         }
         return sb.ToString();
     }
