@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 16:35 CST（并行双 Devin + 派活） · 维护：Devin（PO）
+最后更新：2026-09-28 16:48 CST（Logs 行定分支 feat/logs-level-filter-persist） · 维护：Devin（PO）
 
 ## 分工
 
@@ -20,7 +20,7 @@
 
 
 - [ ] **会话新窗口** — **Devin B** · `feat/open-new-window` · `/workspace/TerminalHub-newwin` · 「↗ 在新窗口打开」
-- [ ] **Logs 级别筛选条 + 过滤持久化** — **GLM** · 新分支自 `main@77cbca8` · worktree `/workspace/TerminalHub-logs`
+- [ ] **Logs 级别筛选条 + 过滤持久化** — **GLM** · `feat/logs-level-filter-persist` · base `main@ce29090` · worktree `/workspace/TerminalHub-logs`
 - [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
