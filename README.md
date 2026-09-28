@@ -2,7 +2,7 @@
 
 Windows-first **Terminal Control Center** — a glassmorphic multi-session terminal host with process monitor, system widgets, bottom action dock, and an AI assistant side panel.
 
-> Platform: **Windows 10/11** (first-class). This repo is developed on Linux CI boxes with Windows TFMs / Avalonia fallback; run and package on Windows.
+> Platform: **Windows 10/11** (first-class). Built with **Avalonia 11** (`net8.0`) so the full app compiles and runs on both Windows and Linux; the Windows build ships ConPTY for real shells, Linux uses a real `forkpty` PTY (with a `--mock` fallback).
 
 ## Product vision
 
@@ -18,15 +18,14 @@ Layout regions: [`docs/design/DESIGN.md`](docs/design/DESIGN.md)
 
 ## Tech stack
 
-Preferred (in order):
+- **UI:** Avalonia 11 (`net8.0`), Fluent theme + custom dark glass resources
+- **PTY:** `IPtySession` abstraction in `src/TerminalHub.Core`
+  - Windows: `ConPtySession` (CreatePseudoConsole) — `src/TerminalHub.Pty`
+  - Linux/macOS: `LinuxPtySession` (`forkpty`) — real shells for dev/test
+  - `MockPtySession` for CI/`--mock`
+- **Logic/tests:** `TerminalHub.Core` + `TerminalHub.Pty` are fully testable on Linux
 
-1. **WinUI 3** (Windows App SDK) + ConPTY
-2. **WPF** (.NET 8 `net8.0-windows`) + ConPTY
-3. **Avalonia 11** (`net8.0`) if WinUI/WPF cannot iterate on Linux — still ship as a Windows app with a Windows packaging path
-
-PTY is abstracted behind an interface (`IPtySession`); Windows uses ConPTY, Linux uses a mock/stub for non-UI tests.
-
-## Build on Windows
+## Build & run on Windows
 
 ```powershell
 # Prerequisites: .NET 8 SDK, Windows 10/11
@@ -35,22 +34,24 @@ dotnet build -c Release
 dotnet run --project src/TerminalHub.App
 ```
 
-Installer (after scripts land):
+Package (Inno Setup script under `packaging/`):
 
 ```powershell
-# Inno Setup or NSIS — see scripts/installer/
-# or MSIX packaging under packaging/
+scripts\publish-windows.ps1   # publishes win-x64 + builds installer
 ```
 
-## Build / test on Linux (this box)
+## Build / test on Linux
 
 ```bash
 dotnet restore
-dotnet build   # may skip windows-only TFMs via conditional; non-UI tests should pass
+dotnet build
 dotnet test
+dotnet run --project src/TerminalHub.App           # runs with real Linux PTY
+dotnet run --project src/TerminalHub.App -- --mock # force mock PTY
 ```
 
-Windows-only ConPTY and WinUI/WPF UI require a Windows machine or CI runner.
+Linux runs the identical UI with a real `forkpty` shell; ConPTY code paths are
+Windows-only and compile-checked via the shared `IPtySession` abstraction.
 
 ## License
 
