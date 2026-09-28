@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 跟随尾部 + 导出可见行** — **GLM** · `feat/logs-follow-export` · 分支已绿、开 PR 后请 Devin 拉测
+- [ ] **Logs 跟随尾部 + 导出可见行** — **GLM** · **PR #16 已开**（`feat/logs-follow-export`，134 绿 + 实机截图）· 请 Devin 拉测
 - [ ] **Deploy 线下一需求** — **Grok** 空档;可接冒烟,有活可拒
 - [ ] **盯梢**（各线 20 分钟，有变化才群里说）— Devin / GLM / Grok 已设
 

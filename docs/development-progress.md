@@ -17,7 +17,7 @@
   工作空间·N 终端·M 运行中·CPU/内存 sparkline、N/M 任务 · x%)。
 - 截图 `walkthrough-dashboard.png`、`walkthrough-ai.png`;127 tests green。
 
-### PR — Logs 跟随尾部 + 导出可见行 (`feat/logs-follow-export`)
+### PR #16 — Logs 跟随尾部 + 导出可见行 (`feat/logs-follow-export`)
 - **自动跟随尾部 (Follow)**: `LogsViewModel.FollowTail`（默认开 = 列表钉在最新行）。
   视图侧取 ListBox 内层 `ScrollViewer`，在 `ScrollChanged` 里按事件语义分流：**只有位移
   变、extent 不变**的事件（滚轮/拖动/键盘）才算用户意图 —— 离开底部 →
