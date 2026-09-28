@@ -198,7 +198,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // Replay the filters saved from the previous run (never writes back):
         // the global combo for「全部会话」, plus each named session's own memory.
         Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
-            _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear);
+            _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear,
+            _settings.LogsUseRelativeTimestamps);
         Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
@@ -1028,6 +1029,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settings.LogsUseRegex = global.UseRegex;
         _settings.LogsLevelFilterIndex = global.LevelFilterIndex;
         _settings.LogsRetainHistoryOnClear = global.RetainHistoryOnClear;
+        _settings.LogsUseRelativeTimestamps = Logs.UseRelativeTimestamps;
         _settings.LogsSessionFilters = Logs.SnapshotSessionFilters();
         SaveSettingsInternal();
     }

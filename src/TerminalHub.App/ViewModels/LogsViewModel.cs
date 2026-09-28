@@ -71,6 +71,10 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// <summary>On: clearing the Output panel keeps this panel's buffered history. Off (default): follow the clear.</summary>
     [ObservableProperty] private bool _retainHistoryOnClear;
 
+    /// <summary>On: list timestamps use relative "ago from now" labels (刚刚/12s/3m/1h/昨天 HH:mm).
+    /// Off (default): absolute <c>HH:mm:ss</c>. Global preference (not per-session). Export always absolute.</summary>
+    [ObservableProperty] private bool _useRelativeTimestamps;
+
     /// <summary>On (default): the list stays pinned to the newest line — new lines auto-scroll
     /// to the bottom. User scroll-up pauses it; the「⬇ 跟随」button or scrolling back to
     /// the bottom resumes. New lines while paused never flip this back on.</summary>
@@ -168,7 +172,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// <summary>Restore the filter state saved from a previous run (level index clamped to
     /// the bar). The restore itself never writes back: <see cref="SaveCurrentFilters"/> is
     /// suppressed while applying, so loading cannot trigger a save.</summary>
-    public void ApplyPersistedFilters(string? filterText, bool useRegex, int levelFilterIndex, bool retainHistoryOnClear)
+    public void ApplyPersistedFilters(string? filterText, bool useRegex, int levelFilterIndex, bool retainHistoryOnClear,
+        bool useRelativeTimestamps = false)
     {
         _restoringFilters = true;
         try
@@ -177,6 +182,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             UseRegex = useRegex;
             LevelFilterIndex = Math.Clamp(levelFilterIndex, 0, LevelNames.Length);
             RetainHistoryOnClear = retainHistoryOnClear;
+            UseRelativeTimestamps = useRelativeTimestamps;
         }
         finally { _restoringFilters = false; }
         // These are「全部会话」's globals (startup always selects index 0) — remember
@@ -331,6 +337,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         SaveCurrentFilters();
     }
     partial void OnRetainHistoryOnClearChanged(bool value) => SaveCurrentFilters();
+    partial void OnUseRelativeTimestampsChanged(bool value) => SaveCurrentFilters();
 
     /// <summary>Session switch → swap the visible combo to the new selection's remembered
     /// state. Nothing needs saving on the way out: every filter change (and every
@@ -427,9 +434,14 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _persistFileLogging?.Invoke(value);
     }
 
-    /// <summary>One line as shown in the panel: HH:mm:ss [level] (source) message.</summary>
+    /// <summary>One line for export / clipboard: always absolute HH:mm:ss [level] (source) message.
+    /// Display in the list may use relative labels via <see cref="FormatDisplayTime"/>; export must not.</summary>
     public static string FormatLine(LogEntry e)
-        => $"{e.Time:HH:mm:ss} [{e.Level}]{(string.IsNullOrEmpty(e.Source) ? "" : $" ({e.Source})")} {e.Message}";
+        => $"{LogTimestampFormatter.FormatAbsolute(e.Time)} [{e.Level}]{(string.IsNullOrEmpty(e.Source) ? "" : $" ({e.Source})")} {e.Message}";
+
+    /// <summary>List-cell timestamp: relative or absolute per <see cref="UseRelativeTimestamps"/>.</summary>
+    public string FormatDisplayTime(DateTime time, DateTime? now = null)
+        => LogTimestampFormatter.Format(time, UseRelativeTimestamps, now);
 
     /// <summary>All currently visible (filtered) lines joined for export.</summary>
     public string BuildVisibleText()

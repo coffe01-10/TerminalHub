@@ -1380,4 +1380,170 @@ public class LogsPanelTests
         }
     }
 
+    // ===== relative / absolute timestamp toggle =====
+
+    [Fact]
+    public void LogTimestampFormatter_Absolute_AndRelative_AgoFromNow()
+    {
+        var now = new DateTime(2026, 9, 28, 17, 30, 0);
+
+        // Absolute mode always HH:mm:ss (export + default display).
+        Assert.Equal("17:30:00", LogTimestampFormatter.Format(now, relative: false, now));
+        Assert.Equal("09:05:07", LogTimestampFormatter.FormatAbsolute(new DateTime(2026, 1, 1, 9, 5, 7)));
+
+        // Relative: ago from now.
+        Assert.Equal("刚刚", LogTimestampFormatter.Format(now, relative: true, now));
+        Assert.Equal("刚刚", LogTimestampFormatter.Format(now.AddSeconds(-1), relative: true, now));
+        Assert.Equal("12s", LogTimestampFormatter.Format(now.AddSeconds(-12), relative: true, now));
+        Assert.Equal("3m", LogTimestampFormatter.Format(now.AddMinutes(-3), relative: true, now));
+        Assert.Equal("1h", LogTimestampFormatter.Format(now.AddHours(-1), relative: true, now));
+        Assert.Equal("23h", LogTimestampFormatter.Format(now.AddHours(-23), relative: true, now));
+
+        // Yesterday (calendar) → 昨天 HH:mm
+        var yesterday = new DateTime(2026, 9, 27, 14, 22, 0);
+        Assert.Equal("昨天 14:22", LogTimestampFormatter.Format(yesterday, relative: true, now));
+
+        // Older than yesterday → fall back to absolute.
+        var older = new DateTime(2026, 9, 26, 8, 0, 0);
+        Assert.Equal("08:00:00", LogTimestampFormatter.Format(older, relative: true, now));
+
+        // Future / clock skew → 刚刚 (clamped), never throws.
+        Assert.Equal("刚刚", LogTimestampFormatter.Format(now.AddMinutes(5), relative: true, now));
+
+        // Weird / default Time → soft absolute fallback, no crash.
+        Assert.Equal("00:00:00", LogTimestampFormatter.Format(default, relative: true, now));
+        Assert.Equal("00:00:00", LogTimestampFormatter.FormatAbsolute(DateTime.MinValue));
+    }
+
+    [AvaloniaFact]
+    public async Task RelativeTimestamps_Toggle_DoesNotAffectExportAbsolute()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var (dash, logs, _) = MakeLogs(exportDir: dir);
+        try
+        {
+            var fixedTime = DateTime.Now.AddMinutes(-3);
+            // Inject via AppendOutput (Time = DateTime.Now) then rely on FormatLine absolute.
+            dash.AppendOutput("info", "rel-export", "Terminal 01");
+            await Until(() => logs.Entries.Count == 1);
+
+            logs.UseRelativeTimestamps = true;
+            Assert.True(logs.UseRelativeTimestamps);
+            // Display helper follows the toggle; FormatLine / export stay absolute.
+            var display = logs.FormatDisplayTime(logs.Entries[0].Time, DateTime.Now);
+            Assert.False(string.IsNullOrEmpty(display));
+            var line = LogsViewModel.FormatLine(logs.Entries[0]);
+            Assert.Matches(@"^\d{2}:\d{2}:\d{2} \[info\] \(Terminal 01\) rel-export$", line);
+            Assert.DoesNotContain("刚刚", line);
+            Assert.DoesNotContain("m ", line + " "); // no "3m " style in export
+
+            await logs.ExportVisibleCommand.ExecuteAsync(null);
+            var path = Assert.Single(Directory.GetFiles(dir));
+            var content = File.ReadAllText(path);
+            Assert.Contains("[info] (Terminal 01) rel-export", content);
+            Assert.Matches(@"\d{2}:\d{2}:\d{2}", content.Split('\n')[0]);
+            Assert.DoesNotContain("刚刚", content);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task RelativeTimestamps_Preference_SurvivesRestart_ViaSettingsStore()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        try
+        {
+            var vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.False(vm.Logs.UseRelativeTimestamps); // default absolute
+            vm.Logs.UseRelativeTimestamps = true;
+
+            var onDisk = new SettingsStore(settingsPath).Load();
+            Assert.True(onDisk.LogsUseRelativeTimestamps);
+            vm.Dispose();
+
+            var vm2 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.True(vm2.Logs.UseRelativeTimestamps);
+            // Restoring must not write back on its own — flip off and confirm save.
+            var savesBefore = File.ReadAllText(settingsPath);
+            vm2.Logs.UseRelativeTimestamps = false;
+            var onDisk2 = new SettingsStore(settingsPath).Load();
+            Assert.False(onDisk2.LogsUseRelativeTimestamps);
+            Assert.NotEqual(savesBefore, File.ReadAllText(settingsPath));
+            vm2.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task RelativeTimestamps_UI_ToggleBinds_AndListShowsRelativeLabel()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2;
+            await Task.Delay(150);
+
+            var toggle = window.GetVisualDescendants().OfType<ToggleButton>()
+                .Single(t => (string?)t.Content == "相对");
+            Assert.False(toggle.IsChecked);
+            Assert.False(vm.Logs.UseRelativeTimestamps);
+
+            vm.Dashboard.AppendOutput("info", "ts-row", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 1);
+
+            toggle.IsChecked = true;
+            await Task.Delay(150);
+            Assert.True(vm.Logs.UseRelativeTimestamps);
+            Assert.True(toggle.IsChecked);
+
+            // VM display helper follows the toggle; list MultiBinding should show a relative label.
+            var shown = vm.Logs.FormatDisplayTime(vm.Logs.Entries[0].Time, DateTime.Now);
+            Assert.True(shown is "刚刚"
+                || System.Text.RegularExpressions.Regex.IsMatch(shown, @"^\d+[smh]$")
+                || shown.StartsWith("昨天 "));
+
+            await Task.Delay(100);
+            var labels = window.GetVisualDescendants().OfType<TextBlock>()
+                .Select(t => t.Text)
+                .Where(t => t is "刚刚"
+                    || (t is not null && (
+                        System.Text.RegularExpressions.Regex.IsMatch(t, @"^\d+[smh]$")
+                        || t.StartsWith("昨天 "))))
+                .ToList();
+            Assert.NotEmpty(labels);
+
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-timestamp-relative.png"));
+
+            toggle.IsChecked = false;
+            await Task.Delay(100);
+            Assert.False(vm.Logs.UseRelativeTimestamps);
+        }
+        finally
+        {
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
+                vmCleanup.Logs.UseRelativeTimestamps = false;
+            }
+            window.Close();
+        }
+    }
+
+
 }
