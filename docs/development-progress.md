@@ -11,7 +11,7 @@
 - **API**: 静态 `FindAdjacentLevel(entries, fromIndex, level, direction)`（warn 同 helpers
   可用；UI 仅 error）。`CanGoPrevError` / `CanGoNextError` + RelayCommands。
 - **边界**: 只动 Logs；不动 Deploy/Files/SSH/Core PTY。
-- **验证**: 228 tests green（+4：FindAdjacentLevel、跳转无环绕/暂停跟随、筛选门控、
+- **验证**: 231 tests green（+4：FindAdjacentLevel、跳转无环绕/暂停跟随、筛选门控、
   MainWindow 按钮绑定 + 截图）。worktree `/workspace/TerminalHub-logs2`；工具 Grok Build /
   Claude Code OK。
 - 截图 `docs/screenshots/logs-jump-level.png`（▲/▼ error 可见）。
