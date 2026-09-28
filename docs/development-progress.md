@@ -31,6 +31,7 @@
 - 发布流进 Output、取消、配置档、最近产物行为保持。
 - **验证**: `dotnet test -c Release` 204 tests green（本切片 +6：SettingsStore 往返与缺字段、
   失败/取消保留成功路径、坞菜单打开上次成功产物、目录缺失则禁用）。
+- 实机截图：`docs/screenshots/deploy-last-status-badge.png`（Deploy 坞「成功 · 42s」徽章 + 右键「打开上次成功产物」）。
 
 ### PR #31 — Files「在此打开终端」+「复制路径」 (`feat/files-open-in-terminal`)
 - **在此打开终端**: Files 工具行 ⇥ 按钮 + 条目右键菜单 —— 选中**目录** → 活动
