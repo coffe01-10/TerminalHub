@@ -6,8 +6,10 @@ using TerminalHub.Core.Pty;
 namespace TerminalHub.Pty;
 
 /// <summary>
-/// Real PTY on Linux/macOS via libc forkpty(). The forked child execs the shell
-/// immediately; no managed code runs between fork and exec.
+/// Real PTY on Linux/macOS via libc forkpty().
+/// All native allocations happen in the parent before fork; the child only calls
+/// pre-warmed libc functions (chdir / execve / kill) so no managed locks are needed
+/// between fork and exec.
 /// </summary>
 public sealed class LinuxPtySession : IPtySession
 {
@@ -15,7 +17,8 @@ public sealed class LinuxPtySession : IPtySession
     private int _childPid;
     private CancellationTokenSource? _readLoopCts;
     private Task? _readLoop;
-    private PtyOptions _options = new() { Shell = "bash" };
+    private IntPtr _argvBlock, _envpBlock;
+    private readonly List<IntPtr> _allocations = new();
 
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsRunning { get; private set; }
@@ -26,56 +29,104 @@ public sealed class LinuxPtySession : IPtySession
 
     public Task StartAsync(PtyOptions options, CancellationToken cancellationToken = default)
     {
-        _options = options;
-        var win = new Winsize
-        {
-            ws_row = (ushort)options.Rows,
-            ws_col = (ushort)options.Columns,
-        };
+        var parts = (options.Shell + " " + options.Arguments)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) throw new ArgumentException("Empty shell command");
 
+        var exeBytes = ToNativeString(ResolveExecutable(parts[0]));
+        var cwdBytes = string.IsNullOrEmpty(options.WorkingDirectory)
+            ? null : ToNativeString(options.WorkingDirectory);
+
+        _argvBlock = BuildPointerBlock(parts);
+        _envpBlock = BuildEnvironmentBlock(options);
+
+        // Warm every stub the child might invoke so no stub code is JIT-built post-fork.
+        WarmChildPath();
+
+        var win = new Winsize { ws_row = (ushort)options.Rows, ws_col = (ushort)options.Columns };
         int pid = Native.forkpty(out int master, IntPtr.Zero, IntPtr.Zero, ref win);
         if (pid < 0)
             throw new InvalidOperationException($"forkpty failed: errno={Marshal.GetLastWin32Error()}");
 
         if (pid == 0)
         {
-            // Child: exec the shell. Only async-signal-safe/libc calls allowed here.
-            ExecShell(options);
-            Native._exit(127); // exec failed
+            // CHILD — only pre-warmed libc calls, nothing that allocates managed objects.
+            if (cwdBytes is not null)
+                Native.chdir(cwdBytes);
+            Native.execve(exeBytes, _argvBlock, _envpBlock);
+            Native.kill(Native.getpid(), Native.SIGKILL); // exec failed
+            Native._exit(127);
         }
 
         _masterFd = master;
         _childPid = pid;
         IsRunning = true;
 
-        // Non-blocking-ish read loop on a dedicated thread.
         _readLoopCts = new CancellationTokenSource();
         _readLoop = Task.Run(() => ReadLoop(_readLoopCts.Token), CancellationToken.None);
-        Task.Run(WatchChild);
+        _ = Task.Run(WatchChild);
         return Task.CompletedTask;
     }
 
-    private static void ExecShell(PtyOptions options)
+    private static void WarmChildPath()
     {
-        if (!string.IsNullOrEmpty(options.WorkingDirectory))
-            Native.chdir(options.WorkingDirectory);
-
-        Native.setenv("TERM", "xterm-256color", 1);
-        Native.setenv("COLORTERM", "truecolor", 1);
-
-        var parts = (options.Shell + " " + options.Arguments)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var argv = BuildArgv(parts);
-        Native.execvp(parts[0], argv);
+        Native.getpid();
+        var dot = new byte[] { (byte)'.', 0 };
+        Native.chdir(dot);
+        var bad = new byte[] { (byte)'/', (byte)'x', 0 };
+        Native.execve(bad, IntPtr.Zero, IntPtr.Zero);
+        Native.kill(0, 0);
     }
 
-    private static IntPtr[] BuildArgv(string[] parts)
+    private static byte[] ToNativeString(string s) => Encoding.UTF8.GetBytes(s + '\0');
+
+    private IntPtr BuildPointerBlock(string[] argv)
     {
-        var argv = new IntPtr[parts.Length + 1];
-        for (var i = 0; i < parts.Length; i++)
-            argv[i] = Marshal.StringToHGlobalAnsi(parts[i]);
-        argv[^1] = IntPtr.Zero;
-        return argv;
+        var block = Marshal.AllocHGlobal((argv.Length + 1) * IntPtr.Size);
+        _allocations.Add(block);
+        var ptrs = new IntPtr[argv.Length + 1];
+        for (var i = 0; i < argv.Length; i++)
+        {
+            ptrs[i] = Marshal.StringToHGlobalAnsi(argv[i]);
+            _allocations.Add(ptrs[i]);
+        }
+        Marshal.Copy(ptrs, 0, block, ptrs.Length);
+        return block;
+    }
+
+    private IntPtr BuildEnvironmentBlock(PtyOptions options)
+    {
+        var env = new List<string>();
+        foreach (var key in Environment.GetEnvironmentVariables().Keys)
+            env.Add($"{key}={Environment.GetEnvironmentVariable(key.ToString()!)}");
+        env.RemoveAll(e => e.StartsWith("TERM=") || e.StartsWith("COLORTERM="));
+        env.Add("TERM=xterm-256color");
+        env.Add("COLORTERM=truecolor");
+        foreach (var kv in options.Environment)
+            env.Add($"{kv.Key}={kv.Value}");
+
+        var block = Marshal.AllocHGlobal((env.Count + 1) * IntPtr.Size);
+        _allocations.Add(block);
+        var ptrs = new IntPtr[env.Count + 1];
+        for (var i = 0; i < env.Count; i++)
+        {
+            ptrs[i] = Marshal.StringToHGlobalAnsi(env[i]);
+            _allocations.Add(ptrs[i]);
+        }
+        Marshal.Copy(ptrs, 0, block, ptrs.Length);
+        return block;
+    }
+
+    private static string ResolveExecutable(string name)
+    {
+        if (name.Contains('/')) return name;
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "/usr/bin:/bin";
+        foreach (var dir in path.Split(':', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(dir, name);
+            if (File.Exists(candidate)) return candidate;
+        }
+        return name; // let execve fail; child exits
     }
 
     private void ReadLoop(CancellationToken ct)
@@ -84,21 +135,15 @@ public sealed class LinuxPtySession : IPtySession
         while (!ct.IsCancellationRequested && IsRunning)
         {
             int n;
-            try
-            {
-                n = Native.read(_masterFd, buffer, buffer.Length);
-            }
+            try { n = Native.read(_masterFd, buffer, buffer.Length); }
             catch { break; }
 
             if (n <= 0)
             {
-                if (n < 0 && ct.IsCancellationRequested) break;
-                // EIO/EAGAIN: child may have exited; waitpid decides.
-                if (n == 0 || !IsRunning) break;
+                if (n == 0 || !IsRunning || ct.IsCancellationRequested) break;
                 Thread.Sleep(5);
                 continue;
             }
-
             var chunk = new byte[n];
             Array.Copy(buffer, chunk, n);
             OutputReceived?.Invoke(this, chunk);
@@ -115,8 +160,7 @@ public sealed class LinuxPtySession : IPtySession
             {
                 IsRunning = false;
                 ExitCode = Native.WIFEXITED(status) ? Native.WEXITSTATUS(status) : -1;
-                // Drain remaining output, then exit.
-                await Task.Delay(50);
+                await Task.Delay(50); // let the read loop drain
                 _readLoopCts?.Cancel();
                 Exited?.Invoke(this, ExitCode.Value);
                 return;
@@ -141,7 +185,7 @@ public sealed class LinuxPtySession : IPtySession
 
     public void Kill()
     {
-        if (!IsRunning) return;
+        if (!IsRunning || _childPid <= 0) return;
         try { Native.kill(_childPid, Native.SIGHUP); } catch { }
         try { Native.kill(_childPid, Native.SIGKILL); } catch { }
     }
@@ -155,7 +199,10 @@ public sealed class LinuxPtySession : IPtySession
             try { Native.close(_masterFd); } catch { }
             _masterFd = -1;
         }
-        try { _readLoop?.Wait(200); } catch { }
+        try { _readLoop?.Wait(300); } catch { }
+        foreach (var p in _allocations) Marshal.FreeHGlobal(p);
+        _allocations.Clear();
+        _argvBlock = _envpBlock = IntPtr.Zero;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -182,10 +229,10 @@ public sealed class LinuxPtySession : IPtySession
         [DllImport("libc")] public static extern int close(int fd);
         [DllImport("libc")] public static extern int ioctl(int fd, uint request, ref Winsize winp);
         [DllImport("libc")] public static extern int kill(int pid, int sig);
+        [DllImport("libc")] public static extern int getpid();
         [DllImport("libc")] public static extern int waitpid(int pid, ref int status, int options);
-        [DllImport("libc")] public static extern int chdir(string path);
-        [DllImport("libc")] public static extern int setenv(string name, string value, int overwrite);
-        [DllImport("libc")] public static extern int execvp(string file, IntPtr[] argv);
+        [DllImport("libc")] public static extern int chdir(byte[] path);
+        [DllImport("libc")] public static extern int execve(byte[] path, IntPtr argv, IntPtr envp);
         [DllImport("libc")] public static extern void _exit(int status);
 
         public static bool WIFEXITED(int status) => (status & 0x7f) == 0;
