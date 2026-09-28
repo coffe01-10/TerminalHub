@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using TerminalHub.Core.Logging;
 
 namespace TerminalHub.App.ViewModels;
@@ -8,29 +10,47 @@ namespace TerminalHub.App.ViewModels;
 /// <summary>
 /// Right-rail Logs tab: filtered view over the live session-output stream
 /// (the same lines shown in the bottom Output tab) + optional file sink.
+/// Keeps its own ring buffer (default <see cref="DefaultBufferCapacity"/>
+/// lines, deeper than the Output panel's 500-line cap) and replays filters
+/// over that buffer.
 /// </summary>
 public partial class LogsViewModel : ViewModelBase, IDisposable
 {
-    private const int MaxShown = 400;
+    /// <summary>Logs history depth; the bottom Output panel caps at 500 shown lines.</summary>
+    public const int DefaultBufferCapacity = 2000;
     private static readonly string[] LevelNames = ["info", "warn", "error"];
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
 
     private readonly DashboardViewModel _dashboard;
     private readonly SessionLogFile _file;
     private readonly string? _logDir;
     private readonly Func<IReadOnlyList<string>> _sessionNames;
     private readonly Action<bool>? _persistFileLogging;
+    private readonly Func<string, Task>? _copyToClipboard;
+    private readonly int _capacity;
 
-    /// <summary>Filtered view of <see cref="DashboardViewModel.OutputLog"/>.</summary>
+    /// <summary>Deep history of session lines; independent of Output's display cap.</summary>
+    private readonly List<LogEntry> _buffer = [];
+
+    private Regex? _regex;      // compiled when UseRegex && pattern valid
+    private bool _regexInvalid; // pattern present but broken → match nothing, show error
+
+    /// <summary>Filtered view of the internal buffer.</summary>
     public ObservableCollection<LogEntry> Entries { get; } = [];
 
     /// <summary>Session filter options; index 0 = all sessions.</summary>
     public ObservableCollection<string> SessionNames { get; } = ["全部会话"];
 
     [ObservableProperty] private string _filterText = "";
+    [ObservableProperty] private bool _useRegex;
+    [ObservableProperty] private string _filterError = "";
     [ObservableProperty] private int _levelFilterIndex;    // 0 all, 1 info, 2 warn, 3 error
     [ObservableProperty] private int _sessionFilterIndex;
     [ObservableProperty] private bool _fileLogging;
     [ObservableProperty] private string _fileStatus = "";
+    [ObservableProperty] private string _statusText = "";
+    /// <summary>On: clearing the Output panel keeps this panel's buffered history. Off (default): follow the clear.</summary>
+    [ObservableProperty] private bool _retainHistoryOnClear;
 
     public LogsViewModel(
         DashboardViewModel dashboard,
@@ -38,13 +58,17 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         Func<IReadOnlyList<string>> sessionNames,
         bool fileLogging = false,
         Action<bool>? persistFileLogging = null,
-        string? logDir = null)
+        string? logDir = null,
+        int bufferCapacity = DefaultBufferCapacity,
+        Func<string, Task>? copyToClipboard = null)
     {
         _dashboard = dashboard;
         _file = file;
         _logDir = logDir;
         _sessionNames = sessionNames;
         _persistFileLogging = persistFileLogging;
+        _capacity = Math.Max(1, bufferCapacity);
+        _copyToClipboard = copyToClipboard;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Refilter();
         if (fileLogging) FileLogging = true; // goes through OnFileLoggingChanged
@@ -52,21 +76,34 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems is not null)
+        switch (e.Action)
         {
-            foreach (LogEntry entry in e.NewItems)
-            {
-                if (Matches(entry)) Entries.Add(entry);
-            }
-            while (Entries.Count > MaxShown) Entries.RemoveAt(0);
-        }
-        else if (e.Action == NotifyCollectionChangedAction.Reset)
-        {
-            Entries.Clear();
-        }
-        else
-        {
-            Refilter();
+            case NotifyCollectionChangedAction.Add when e.NewItems is not null:
+                foreach (LogEntry entry in e.NewItems)
+                {
+                    _buffer.Add(entry);
+                    while (_buffer.Count > _capacity)
+                    {
+                        var evicted = _buffer[0];
+                        _buffer.RemoveAt(0);
+                        var shown = Entries.IndexOf(evicted);
+                        if (shown >= 0) Entries.RemoveAt(shown);
+                    }
+                    if (Matches(entry)) Entries.Add(entry);
+                }
+                break;
+            case NotifyCollectionChangedAction.Reset:
+                // Output panel cleared. Default: follow (drop our history too);
+                // 「保留历史」 keeps the deep buffer for later review.
+                if (!RetainHistoryOnClear)
+                {
+                    _buffer.Clear();
+                    Entries.Clear();
+                }
+                break;
+            default:
+                // Output trimmed its oldest line (Remove) — our buffer keeps its own copy.
+                break;
         }
     }
 
@@ -74,28 +111,57 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     {
         if (LevelFilterIndex > 0 && !string.Equals(e.Level, LevelNames[LevelFilterIndex - 1], StringComparison.OrdinalIgnoreCase))
             return false;
-        if (SessionFilterIndex > 0 && SessionFilterIndex - 1 < SessionNames.Count - 1)
+        if (SessionFilterIndex > 0 && SessionFilterIndex < SessionNames.Count
+            && !string.Equals(e.Source, SessionNames[SessionFilterIndex], StringComparison.Ordinal))
+            return false;
+        if (!string.IsNullOrEmpty(FilterText))
         {
-            if (!string.Equals(e.Source, SessionNames[SessionFilterIndex], StringComparison.Ordinal))
+            if (_regexInvalid) return false; // broken pattern matches nothing until fixed
+            if (UseRegex && _regex is not null)
+            {
+                if (!SafeIsMatch(_regex, e.Message) && !SafeIsMatch(_regex, e.Source)) return false;
+            }
+            else if (!e.Message.Contains(FilterText, StringComparison.OrdinalIgnoreCase)
+                     && !e.Source.Contains(FilterText, StringComparison.OrdinalIgnoreCase))
                 return false;
         }
-        if (!string.IsNullOrEmpty(FilterText)
-            && !e.Message.Contains(FilterText, StringComparison.OrdinalIgnoreCase)
-            && !e.Source.Contains(FilterText, StringComparison.OrdinalIgnoreCase))
-            return false;
         return true;
+    }
+
+    private static bool SafeIsMatch(Regex regex, string input)
+    {
+        try { return regex.IsMatch(input); }
+        catch (RegexMatchTimeoutException) { return false; } // catastrophic pattern → no match
     }
 
     private void Refilter()
     {
         Entries.Clear();
-        foreach (var e in _dashboard.OutputLog)
+        foreach (var e in _buffer)
             if (Matches(e)) Entries.Add(e);
     }
 
-    partial void OnFilterTextChanged(string value) => Refilter();
+    partial void OnFilterTextChanged(string value) { UpdateRegex(); Refilter(); }
+    partial void OnUseRegexChanged(bool value) { UpdateRegex(); Refilter(); }
     partial void OnLevelFilterIndexChanged(int value) => Refilter();
     partial void OnSessionFilterIndexChanged(int value) => Refilter();
+
+    private void UpdateRegex()
+    {
+        _regex = null;
+        _regexInvalid = false;
+        FilterError = "";
+        if (!UseRegex || string.IsNullOrEmpty(FilterText)) return;
+        try
+        {
+            _regex = new Regex(FilterText, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
+        }
+        catch (ArgumentException ex)
+        {
+            _regexInvalid = true;
+            FilterError = $"正则无效: {ex.Message}";
+        }
+    }
 
     partial void OnFileLoggingChanged(bool value)
     {
@@ -119,7 +185,46 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _persistFileLogging?.Invoke(value);
     }
 
-    /// <summary>Rebuild the session-name filter list (call when the Logs tab opens).</summary>
+    /// <summary>One line as shown in the panel: HH:mm:ss [level] (source) message.</summary>
+    public static string FormatLine(LogEntry e)
+        => $"{e.Time:HH:mm:ss} [{e.Level}]{(string.IsNullOrEmpty(e.Source) ? "" : $" ({e.Source})")} {e.Message}";
+
+    /// <summary>All currently visible (filtered) lines joined for export.</summary>
+    public string BuildVisibleText()
+        => string.Join(Environment.NewLine, Entries.Select(FormatLine));
+
+    /// <summary>Copy the currently visible (filtered) lines to the clipboard.</summary>
+    [RelayCommand]
+    private async Task CopyVisibleAsync()
+    {
+        if (Entries.Count == 0)
+        {
+            StatusText = "没有可复制的行";
+            return;
+        }
+        if (_copyToClipboard is null)
+        {
+            StatusText = "剪贴板不可用";
+            return;
+        }
+        await _copyToClipboard(BuildVisibleText());
+        StatusText = $"已复制 {Entries.Count} 行";
+    }
+
+    /// <summary>Dismiss the current filter results — the visible lines are removed
+    /// from the buffer as well, so they don't reappear when the filter changes.</summary>
+    [RelayCommand]
+    private void ClearVisible()
+    {
+        if (Entries.Count == 0) return;
+        var dismissed = new HashSet<LogEntry>(Entries, ReferenceEqualityComparer.Instance);
+        _buffer.RemoveAll(e => dismissed.Contains(e));
+        var n = Entries.Count;
+        Entries.Clear();
+        StatusText = $"已清空 {n} 行";
+    }
+
+    /// <summary>Rebuild the session-name filter list (call when sessions change).</summary>
     public void RefreshSessions()
     {
         var selected = SessionFilterIndex > 0 && SessionFilterIndex < SessionNames.Count
