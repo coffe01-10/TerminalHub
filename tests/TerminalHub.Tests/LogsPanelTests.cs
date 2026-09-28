@@ -203,6 +203,164 @@ public class LogsPanelTests
         }
     }
 
+    // ===== per-session filter memory（切换会话恢复各自筛选）=====
+
+    [AvaloniaFact]
+    public async Task SessionSwitch_RestoresEachSessions_FilterCombo()
+    {
+        var (dash, logs, _) = MakeLogs(); // SessionNames: 全部会话, Terminal 01, Terminal 02
+        dash.AppendOutput("info", "t1 line", "Terminal 01");
+        dash.AppendOutput("warn", "t2 line", "Terminal 02");
+        await Until(() => logs.Entries.Count == 2);
+
+        // Terminal 01 never configured → defaults, no restore hint.
+        logs.SessionFilterIndex = 1;
+        Assert.Equal("", logs.FilterText);
+        Assert.False(logs.UseRegex);
+        Assert.Equal(0, logs.LevelFilterIndex);
+        Assert.False(logs.RetainHistoryOnClear);
+        Assert.DoesNotContain("已恢复", logs.StatusText);
+
+        logs.FilterText = "err";
+        logs.UseRegex = true;
+        logs.LevelErrorSelected = true;
+        logs.RetainHistoryOnClear = true;
+
+        // Terminal 02 also never configured → defaults (Terminal 01's combo hid away).
+        logs.SessionFilterIndex = 2;
+        Assert.Equal("", logs.FilterText);
+        Assert.False(logs.UseRegex);
+        Assert.Equal(0, logs.LevelFilterIndex);
+        Assert.False(logs.RetainHistoryOnClear);
+        Assert.Single(logs.Entries); // session criterion still filters while at it
+        Assert.Equal("Terminal 02", logs.Entries[0].Source);
+
+        logs.FilterText = "warn-ish";
+        logs.LevelWarnSelected = true;
+
+        // Back to Terminal 01 → its combo returns, with the brief hint.
+        logs.SessionFilterIndex = 1;
+        Assert.Equal("err", logs.FilterText);
+        Assert.True(logs.UseRegex);
+        Assert.Equal(3, logs.LevelFilterIndex);
+        Assert.True(logs.RetainHistoryOnClear);
+        Assert.Contains("已恢复「Terminal 01」筛选", logs.StatusText);
+
+        // And Terminal 02 kept its own.
+        logs.SessionFilterIndex = 2;
+        Assert.Equal("warn-ish", logs.FilterText);
+        Assert.Equal(2, logs.LevelFilterIndex);
+        Assert.Contains("已恢复「Terminal 02」筛选", logs.StatusText);
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task AllSessionsCombo_GlobalSlot_IndependentOfSessionCombos()
+    {
+        var (dash, logs, _) = MakeLogs();
+
+        // 「全部会话」(index 0) owns the global fields.
+        logs.FilterText = "global-text";
+        logs.LevelWarnSelected = true;
+        logs.RetainHistoryOnClear = true;
+
+        logs.SessionFilterIndex = 1; // leaving 全部 → session defaults show
+        Assert.Equal("", logs.FilterText);
+        Assert.Equal(0, logs.LevelFilterIndex);
+        Assert.False(logs.RetainHistoryOnClear);
+        logs.FilterText = "t01-text";
+
+        logs.SessionFilterIndex = 0; // back to 全部会话 → global combo restored
+        Assert.Equal("global-text", logs.FilterText);
+        Assert.Equal(2, logs.LevelFilterIndex);
+        Assert.True(logs.RetainHistoryOnClear);
+
+        logs.SessionFilterIndex = 1; // session combo untouched by the global one
+        Assert.Equal("t01-text", logs.FilterText);
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task SessionFilterMap_SnapshotAndApply_RoundTripsAcrossVMs()
+    {
+        var (_, logs, _) = MakeLogs();
+        logs.SessionFilterIndex = 1;
+        logs.FilterText = "alpha";
+        logs.LevelInfoSelected = true;
+        var snapshot = logs.SnapshotSessionFilters();
+        var saved = snapshot["Terminal 01"];
+        Assert.Equal("alpha", saved.FilterText);
+        Assert.Equal(1, saved.LevelFilterIndex);
+
+        // A fresh VM seeded with the snapshot restores it on switch (clone, not alias).
+        var (_, logs2, _) = MakeLogs();
+        logs2.ApplySessionFilterMap(snapshot);
+        logs2.SessionFilterIndex = 1;
+        Assert.Equal("alpha", logs2.FilterText);
+        Assert.Equal(1, logs2.LevelFilterIndex);
+        Assert.Contains("已恢复「Terminal 01」筛选", logs2.StatusText);
+        // Corrupt entries (null state / empty name) are skipped, not thrown on.
+        logs2.ApplySessionFilterMap(new Dictionary<string, LogsSessionFilterState>
+        {
+            [""] = new(),
+            ["Terminal 02"] = null!, // what `"Terminal 02": null` in settings.json gives
+        });
+        logs2.SessionFilterIndex = 2; // → defaults
+        Assert.Equal("", logs2.FilterText);
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task SessionFilters_SurviveRestart_ViaSettingsStore()
+    {
+        PtySessionFactory.UseMock = true;
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        try
+        {
+            // First run: global combo on 全部会话, a different combo on Terminal 01.
+            var vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            await vm.SpawnStartupSessionsAsync();
+            await Until(() => vm.Logs.SessionNames.Count == 4); // 全部会话 + 3 startup cards
+            Assert.Equal("Terminal 01", vm.Logs.SessionNames[1]);
+
+            vm.Logs.FilterText = "global-combo"; // index 0 → global fields
+            vm.Logs.SessionFilterIndex = 1;
+            vm.Logs.FilterText = "t01-combo";
+            vm.Logs.UseRegex = true;
+            vm.Logs.LevelErrorSelected = true;
+            vm.Logs.RetainHistoryOnClear = true;
+
+            var onDisk = new SettingsStore(settingsPath).Load();
+            Assert.Equal("global-combo", onDisk.LogsFilterText); // globals = 全部会话's combo
+            Assert.Equal(["Terminal 01"], onDisk.LogsSessionFilters.Keys); // only the edited session
+            var t01 = onDisk.LogsSessionFilters["Terminal 01"];
+            Assert.Equal("t01-combo", t01.FilterText);
+            Assert.True(t01.UseRegex);
+            Assert.Equal(3, t01.LevelFilterIndex);
+            Assert.True(t01.RetainHistoryOnClear);
+            vm.Dispose();
+
+            // Second run: globals restore at startup, Terminal 01's combo on switch.
+            var vm2 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            await vm2.SpawnStartupSessionsAsync();
+            await Until(() => vm2.Logs.SessionNames.Count == 4);
+            Assert.Equal("global-combo", vm2.Logs.FilterText); // index 0 + globals
+            vm2.Logs.SessionFilterIndex = 1;
+            Assert.Equal("t01-combo", vm2.Logs.FilterText);
+            Assert.True(vm2.Logs.UseRegex);
+            Assert.True(vm2.Logs.LevelErrorSelected);
+            Assert.True(vm2.Logs.RetainHistoryOnClear);
+            vm2.Logs.SessionFilterIndex = 0;
+            Assert.Equal("global-combo", vm2.Logs.FilterText); // 全部会话 slot intact
+            vm2.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
     [AvaloniaFact]
     public async Task DeepBuffer_KeepsHistory_BeyondOutputCap()
     {
