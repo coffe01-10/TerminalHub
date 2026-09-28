@@ -500,6 +500,41 @@ public sealed class ScreenBuffer
         return sb.ToString();
     }
 
+    /// <summary>One preview line: trimmed text + hex of its dominant foreground (null = default).</summary>
+    public readonly record struct PreviewLine(string Text, string? FgHex);
+
+    /// <summary>
+    /// Same tail region as <see cref="TailText"/> but split per row with each line's
+    /// dominant (most frequent non-default) foreground color — for colored thumbnails.
+    /// </summary>
+    public List<PreviewLine> TailLines(int count)
+    {
+        var lines = new List<PreviewLine>();
+        var end = Math.Min(Rows - 1, CursorY);
+        var start = Math.Max(0, end - count + 1);
+        var hist = new Dictionary<TerminalColor, int>();
+        for (var r = start; r <= end; r++)
+        {
+            var row = GetScreenRow(r);
+            var len = row.Length;
+            while (len > 0 && (row[len - 1].Char == ' ' || row[len - 1].Char == '\0')) len--;
+            var sb = new StringBuilder(len);
+            hist.Clear();
+            for (var c = 0; c < len; c++)
+            {
+                sb.Append(row[c].Char == '\0' ? ' ' : row[c].Char);
+                if (!row[c].Fg.IsDefault && len > 0)
+                    hist[row[c].Fg] = hist.GetValueOrDefault(row[c].Fg) + 1;
+            }
+            TerminalColor dom = TerminalColor.Default;
+            var best = 0;
+            foreach (var kv in hist)
+                if (kv.Value > best) { best = kv.Value; dom = kv.Key; }
+            lines.Add(new PreviewLine(sb.ToString(), dom.ToRgbHex()));
+        }
+        return lines;
+    }
+
     /// <summary>Full text of a screen row, trimmed.</summary>
     public string RowText(int row)
     {

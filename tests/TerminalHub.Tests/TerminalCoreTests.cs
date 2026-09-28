@@ -276,4 +276,36 @@ public class TerminalCoreTests
         var tail = b.TailText(2);
         Assert.Contains("zzz", tail);
     }
+
+    [Fact]
+    public void TailLines_ColoredRows_GetDominantFg()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("\u001b[1;1H\u001b[31mred-line\u001b[0m \u001b[4;1Hplain");
+        var lines = b.TailLines(4);
+        var red = lines.First(l => l.Text.Contains("red-line"));
+        Assert.Equal("#CD0000", red.FgHex);
+        var plain = lines.First(l => l.Text.Contains("plain"));
+        Assert.Null(plain.FgHex);
+    }
+
+    [Fact]
+    public void TailLines_RgbAndIndexed_Colors()
+    {
+        var (p, b) = Make(20, 4);
+        // SGR 38;5;196 = indexed bright red; 38;2 = truecolor
+        p.Feed("\u001b[1;1H\u001b[38;5;196mi196 \u001b[4;1H\u001b[38;2;16;32;200mrgb");
+        var lines = b.TailLines(4);
+        Assert.Equal("#FF0000", lines.First(l => l.Text.Contains("i196")).FgHex);
+        Assert.Equal("#1020C8", lines.First(l => l.Text.Contains("rgb")).FgHex);
+    }
+
+    [Fact]
+    public void TerminalColor_ToRgbHex()
+    {
+        Assert.Null(TerminalColor.Default.ToRgbHex());
+        Assert.Equal("#FF0000", TerminalColor.Indexed(196).ToRgbHex());
+        Assert.Equal("#080808", TerminalColor.Indexed(232).ToRgbHex());
+        Assert.Equal("#010203", TerminalColor.Rgb(1, 2, 3).ToRgbHex());
+    }
 }

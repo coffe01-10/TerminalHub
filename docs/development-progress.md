@@ -44,6 +44,23 @@
 - Headless UI test renders both dashboard + Codex frames to PNG.
 - Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
 
+### PR #9 — Deploy action + colored thumbnails (`feat/deploy-thumbnails`)
+- **Deploy dock button** is real now (was stub):
+  `ArtifactLocator` walks up from CWD to find `artifacts/publish/<rid>/`
+  with files → lists each artifact (name + size) in Output and opens the
+  folder in the OS file manager (`UseShellExecute`); when nothing is
+  published it prints the publish commands for both platforms instead.
+- **Session-card thumbnails** now render per-line dominant foreground
+  colors: `ScreenBuffer.TailLines` + `TerminalColor.ToRgbHex`
+  (xterm 256-palette + truecolor) → each preview line gets its own brush —
+  much closer to the mockup's colored mini-terminals.
+- Verified live (DISPLAY=:7): `echo -e '\e[32m…\e[35m…'` + `ls --color`
+  show green/magenta/blue preview lines in the card. Deploy path verified
+  via headless test driving `DockSelectCommand` (artifacts dir exists here).
+- 70 tests green. Note: on this 1280x800 box the 1440x900 window's bottom
+  ~100px clips under xfwm4 — dock stays usable on normal displays.
+- `docs/screenshots/deploy-thumbnails.png`.
+
 ### PR #8 — SSH panel: saved hosts + ssh sessions (`feat/ssh-panel`)
 - Right-rail **SSH** tab: 新建/编辑连接 form (名称/用户/主机/端口 + validation)
   + saved-host list (显示 `ssh -p port user@host` command line) + per-row

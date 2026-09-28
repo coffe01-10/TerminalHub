@@ -85,6 +85,47 @@ public class UiSmokeTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public async Task DockSelect_Deploy_ReportsArtifactsOrInstructions()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(400);
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+
+        vm.DockSelectCommand.Execute(4);
+        await Task.Delay(200);
+
+        var deployLines = vm.Dashboard.OutputLog.Where(l => l.Message.Contains("Deploy")).ToList();
+        Assert.NotEmpty(deployLines);
+        Assert.Contains(deployLines, l =>
+            l.Message.Contains("产物目录") || l.Message.Contains("publish") || l.Message.Contains("打包"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task SessionCard_PreviewLines_Colored()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(400);
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+
+        FeedDemoOutput(vm);
+        await Task.Delay(300);
+
+        var card = vm.SessionCards.First(c => ReferenceEquals(c.Model, vm.ActiveSession));
+        card.Refresh();
+        Assert.NotEmpty(card.PreviewLines);
+        Assert.Contains(card.PreviewLines, l => l.Text.Contains("Ready"));
+        // Lines emitted with ANSI green/cyan/magenta foregrounds → non-default brushes.
+        var defaultBrush = card.PreviewLines.First(l => !l.Text.Contains("Ready")).Foreground;
+        Assert.Contains(card.PreviewLines, l => l.Foreground != defaultBrush);
+        window.Close();
+    }
+
     /// <summary>End-to-end: real Linux PTY through the UI pipeline (skipped off-Linux).</summary>
     [AvaloniaFact]
     public async Task RealPty_EndToEnd()
