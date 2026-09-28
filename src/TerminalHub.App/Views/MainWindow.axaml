@@ -6,6 +6,7 @@
         xmlns:ai="using:TerminalHub.Core.AI"
         xmlns:files="using:TerminalHub.Core.Files"
         xmlns:ssh="using:TerminalHub.Core.Ssh"
+        xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="TerminalHub.App.Views.MainWindow"
         x:Name="Root"
         x:DataType="vm:MainWindowViewModel"
@@ -190,7 +191,10 @@
               <TextBlock Grid.Column="2" Text="{Binding Breadcrumb}" FontSize="11"
                          Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,0,0"/>
               <Button Grid.Column="3" Content="◫ 分屏" Background="Transparent" BorderThickness="0"
-                      Foreground="#94A3B8" FontSize="11" Padding="6,0"/>
+                      Foreground="{Binding IsSplit, Converter={x:Static vm:BoolBrushConverter.Instance}}"
+                      FontSize="11" Padding="6,0"
+                      Command="{Binding ToggleSplitCommand}"
+                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。"/>
               <Button Grid.Column="4" Content="↗ 在新窗口打开" Background="Transparent" BorderThickness="0"
                       Foreground="#94A3B8" FontSize="11" Padding="6,0"/>
               <Button Grid.Column="5" Content="•••" Background="Transparent" BorderThickness="0"
@@ -199,8 +203,43 @@
 
             <!-- Terminal viewport -->
             <Border Grid.Row="2" CornerRadius="8" Background="#F20A0D14" Margin="2,4" ClipToBounds="True">
-              <ctl:TerminalView Emulator="{Binding ActiveSession.Emulator}"
-                                TerminalFontSize="{Binding FontSize}"/>
+              <Panel>
+                <!-- single view -->
+                <ctl:TerminalView IsVisible="{Binding !IsSplit}"
+                                  Emulator="{Binding ActiveSession.Emulator}"
+                                  TerminalFontSize="{Binding FontSize}"/>
+                <!-- split view: two independent sessions + draggable divider -->
+                <Grid IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*">
+                  <Border BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
+                          Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
+                    <Border.Styles>
+                      <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
+                      <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="#5538BDF8"/></Style>
+                    </Border.Styles>
+                    <ctl:TerminalView Emulator="{Binding LeftPane.Emulator}"
+                                      TerminalFontSize="{Binding FontSize}"
+                                      PointerPressed="OnLeftPanePressed"/>
+                  </Border>
+                  <GridSplitter Grid.Column="1" Width="5" Background="#221A2030"
+                                ResizeBehavior="BasedOnAlignment"/>
+                  <Border Grid.Column="2" BorderThickness="1.5" CornerRadius="6" Margin="3,0,0,0"
+                          Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}">
+                    <Border.Styles>
+                      <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
+                      <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="#5538BDF8"/></Style>
+                    </Border.Styles>
+                    <Panel PointerPressed="OnRightPanePressed" Background="Transparent">
+                      <ctl:TerminalView Emulator="{Binding RightPane.Emulator}"
+                                        TerminalFontSize="{Binding FontSize}"
+                                        IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
+                      <TextBlock Text="右栏暂无会话 — 点击左侧会话卡分配到这里"
+                                 Foreground="#64748B" FontSize="11" TextWrapping="Wrap"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"
+                                 IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                    </Panel>
+                  </Border>
+                </Grid>
+              </Panel>
             </Border>
 
             <!-- Assistant progress row -->
