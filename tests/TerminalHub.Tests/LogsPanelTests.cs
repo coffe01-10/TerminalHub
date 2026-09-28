@@ -2,6 +2,7 @@ using Avalonia.Headless.XUnit;
 using TerminalHub.App.ViewModels;
 using TerminalHub.Core.Logging;
 using TerminalHub.Core.Monitoring;
+using TerminalHub.Core.Settings;
 using Xunit;
 
 namespace TerminalHub.Tests;
@@ -20,11 +21,25 @@ public class LogsPanelTests
         public void Dispose() { }
     }
 
-    private static (DashboardViewModel dash, LogsViewModel logs, SessionLogFile file) MakeLogs()
+    /// <summary>Polls until <paramref name="condition"/> holds (OutputLog appends arrive via the UI dispatcher).</summary>
+    private static async Task Until(Func<bool> condition, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(8));
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition()) return;
+            await Task.Delay(25);
+        }
+    }
+
+    private static (DashboardViewModel dash, LogsViewModel logs, SessionLogFile file) MakeLogs(
+        int bufferCapacity = LogsViewModel.DefaultBufferCapacity,
+        Func<string, Task>? copyToClipboard = null)
     {
         var dash = new DashboardViewModel(new FakeMonitor());
         var file = new SessionLogFile();
-        var logs = new LogsViewModel(dash, file, () => ["Terminal 01", "Terminal 02"]);
+        var logs = new LogsViewModel(dash, file, () => ["Terminal 01", "Terminal 02"],
+            bufferCapacity: bufferCapacity, copyToClipboard: copyToClipboard);
         logs.RefreshSessions();
         return (dash, logs, file);
     }
@@ -71,6 +86,158 @@ public class LogsPanelTests
         await Task.Delay(20);
         Assert.Single(logs.Entries);
         Assert.Equal("Terminal 02", logs.Entries[0].Source);
+    }
+
+    [AvaloniaFact]
+    public async Task DeepBuffer_KeepsHistory_BeyondOutputCap()
+    {
+        var (dash, logs, _) = MakeLogs(); // default capacity 2000, Output caps at 500
+        for (var i = 0; i < 520; i++)
+            dash.AppendOutput("info", $"deep-{i:D4}", "Terminal 01");
+        await Until(() => dash.OutputLog.Count == 500 && logs.Entries.Count == 520);
+
+        Assert.Equal(500, dash.OutputLog.Count);
+        Assert.Equal(520, logs.Entries.Count);
+        Assert.Equal("deep-0000", logs.Entries[0].Message); // oldest line survived here
+        Assert.Equal("deep-0519", logs.Entries[^1].Message);
+    }
+
+    [AvaloniaFact]
+    public async Task BufferCapacity_IsConfigurable_AndTrimsOldest()
+    {
+        var (dash, logs, _) = MakeLogs(bufferCapacity: 5);
+        for (var i = 0; i < 8; i++)
+            dash.AppendOutput("info", $"l{i}", "Terminal 01");
+        await Until(() => logs.Entries.Count == 5);
+
+        Assert.Equal(5, logs.Entries.Count);
+        Assert.Equal("l3", logs.Entries[0].Message); // l0–l2 evicted
+        Assert.Equal("l7", logs.Entries[^1].Message);
+    }
+
+    [AvaloniaFact]
+    public async Task TrimmedOutputLine_StillFilterable_FromLogsBuffer()
+    {
+        var (dash, logs, _) = MakeLogs();
+        for (var i = 0; i < 520; i++)
+            dash.AppendOutput("info", $"deep-{i:D4}", "Terminal 01");
+        await Until(() => dash.OutputLog.Count == 500 && logs.Entries.Count == 520);
+        // Output has dropped deep-0000 (it only holds deep-0020..deep-0519)…
+        Assert.DoesNotContain(dash.OutputLog, e => e.Message == "deep-0000");
+        // …but the Logs filter can still find it by replaying its own buffer.
+        logs.FilterText = "deep-0000";
+        Assert.Single(logs.Entries);
+        Assert.Equal("deep-0000", logs.Entries[0].Message);
+    }
+
+    [AvaloniaFact]
+    public async Task OutputClear_Default_FollowsClear_AndDropsHistory()
+    {
+        var (dash, logs, _) = MakeLogs();
+        for (var i = 0; i < 3; i++)
+            dash.AppendOutput("info", $"line {i}", "Terminal 01");
+        await Until(() => logs.Entries.Count == 3);
+
+        dash.ClearOutputCommand.Execute(null);
+        Assert.Empty(logs.Entries);
+
+        dash.AppendOutput("info", "after clear", "Terminal 01");
+        await Until(() => logs.Entries.Count == 1);
+        logs.FilterText = "zzz";
+        logs.FilterText = ""; // replay must not resurrect the pre-clear lines
+        Assert.Single(logs.Entries);
+        Assert.Equal("after clear", logs.Entries[0].Message);
+    }
+
+    [AvaloniaFact]
+    public async Task OutputClear_WithRetainHistoryToggle_KeepsBuffer()
+    {
+        var (dash, logs, _) = MakeLogs();
+        logs.RetainHistoryOnClear = true;
+        for (var i = 0; i < 3; i++)
+            dash.AppendOutput("info", $"line {i}", "Terminal 01");
+        await Until(() => logs.Entries.Count == 3);
+
+        dash.ClearOutputCommand.Execute(null);
+        Assert.Equal(3, logs.Entries.Count); // retained
+
+        logs.FilterText = "zzz";
+        Assert.Empty(logs.Entries);
+        logs.FilterText = "";
+        Assert.Equal(3, logs.Entries.Count); // replay from retained buffer
+
+        dash.AppendOutput("info", "post-clear line", "Terminal 01");
+        await Until(() => logs.Entries.Count == 4);
+    }
+
+    [AvaloniaFact]
+    public async Task RegexFilter_Matches_And_BadPatternShowsErrorWithoutCrash()
+    {
+        var (dash, logs, _) = MakeLogs();
+        dash.AppendOutput("info", "GET /a 200", "Terminal 01");
+        dash.AppendOutput("info", "GET /b 404", "Terminal 01");
+        await Until(() => logs.Entries.Count == 2);
+
+        logs.UseRegex = true;
+        logs.FilterText = "404$";
+        Assert.Single(logs.Entries);
+        Assert.Equal("GET /b 404", logs.Entries[0].Message);
+
+        // Broken pattern: no crash, visible hint, nothing matches until fixed.
+        logs.FilterText = "([unclosed";
+        Assert.NotEmpty(logs.FilterError);
+        Assert.Empty(logs.Entries);
+
+        logs.FilterText = "G.T";
+        Assert.Empty(logs.FilterError);
+        Assert.Equal(2, logs.Entries.Count);
+
+        // Toggle off → literal substring semantics again.
+        logs.UseRegex = false;
+        logs.FilterText = "404$";
+        Assert.Empty(logs.Entries);
+        logs.FilterText = "404";
+        Assert.Single(logs.Entries);
+    }
+
+    [AvaloniaFact]
+    public async Task ClearVisible_RemovesMatches_FromBufferAndView()
+    {
+        var (dash, logs, _) = MakeLogs();
+        for (var i = 0; i < 3; i++)
+            dash.AppendOutput("info", $"fine {i}", "Terminal 01");
+        dash.AppendOutput("warn", "careful 1", "Terminal 02");
+        dash.AppendOutput("warn", "careful 2", "Terminal 02");
+        await Until(() => logs.Entries.Count == 5);
+
+        logs.LevelFilterIndex = 2; // warn only
+        Assert.Equal(2, logs.Entries.Count);
+        logs.ClearVisibleCommand.Execute(null);
+        Assert.Empty(logs.Entries);
+        Assert.Contains("已清空 2 行", logs.StatusText);
+
+        logs.LevelFilterIndex = 0; // warns are gone from the buffer, infos remain
+        Assert.Equal(3, logs.Entries.Count);
+        Assert.All(logs.Entries, e => Assert.Equal("info", e.Level));
+    }
+
+    [AvaloniaFact]
+    public async Task CopyVisible_FormatsAllFields_AndReportsStatus()
+    {
+        var captured = new List<string>();
+        var (dash, logs, _) = MakeLogs(copyToClipboard: t => { captured.Add(t); return Task.CompletedTask; });
+        dash.AppendOutput("info", "plain line", "Terminal 01");
+        dash.AppendOutput("warn", "watch out", "Terminal 02");
+        await Until(() => logs.Entries.Count == 2);
+
+        await logs.CopyVisibleCommand.ExecuteAsync(null);
+        var text = Assert.Single(captured);
+        Assert.Contains("[info]", text);
+        Assert.Contains("(Terminal 01) plain line", text);
+        Assert.Contains("[warn]", text);
+        Assert.Contains("(Terminal 02) watch out", text);
+        Assert.Equal(2, text.Split('\n').Length);
+        Assert.Contains("已复制 2 行", logs.StatusText);
     }
 
     [Fact]
@@ -180,5 +347,43 @@ public class LogsPanelTests
         await Task.Delay(50);
         Assert.Empty(dash.SearchHits);
         Assert.Equal("无匹配", dash.SearchStatus);
+    }
+
+    [AvaloniaFact]
+    public async Task SessionNames_LiveUpdate_OnCreateRenameClose()
+    {
+        if (!OperatingSystem.IsLinux()) return; // spawns a real PTY session
+
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var vm = new MainWindowViewModel(new FakeMonitor(),
+            new SettingsStore(Path.Combine(dir, "settings.json")));
+        try
+        {
+            await vm.SpawnStartupSessionsAsync(); // default settings spawn 3 startup sessions
+            await Until(() => vm.SessionCards.Count == 3);
+            Assert.Equal(4, vm.Logs.SessionNames.Count); // "全部会话" + 3 cards
+            Assert.All(vm.SessionCards, c => Assert.Contains(c.Name, vm.Logs.SessionNames));
+
+            var before = vm.SessionCards.Count;
+            await vm.NewSessionCommand.ExecuteAsync(null); // new session → live-added
+            await Until(() => vm.SessionCards.Count == before + 1);
+            Assert.Equal(before + 2, vm.Logs.SessionNames.Count);
+            var added = vm.SessionCards[^1]; // ObservableCollection appends → newest last
+            Assert.Contains(added.Name, vm.Logs.SessionNames);
+
+            vm.RenameSessionCommand.Execute((added, "Web 01"));
+            Assert.Equal(before + 2, vm.Logs.SessionNames.Count); // rename keeps the count
+            Assert.Single(vm.Logs.SessionNames, n => n == "Web 01"); // live swap to the new name
+            Assert.Equal("Web 01", added.Name);
+
+            vm.CloseSessionCommand.Execute(vm.SessionCards.First(c => c.Name == "Web 01"));
+            Assert.Equal(before + 1, vm.Logs.SessionNames.Count); // renamed card removed
+            Assert.DoesNotContain("Web 01", vm.Logs.SessionNames);
+        }
+        finally
+        {
+            vm.Dispose();
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
     }
 }

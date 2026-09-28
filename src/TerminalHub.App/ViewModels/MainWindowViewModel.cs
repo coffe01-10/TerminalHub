@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TerminalHub.Core.Logging;
@@ -89,8 +90,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs = new LogsViewModel(Dashboard, _sessionLog,
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
-            v => _settings.SessionLogToFile = v);
+            v => _settings.SessionLogToFile = v,
+            copyToClipboard: CopyTextToClipboardAsync);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
+
+        // Logs' session filter follows card adds/removes live, not just on tab open.
+        SessionCards.CollectionChanged += OnSessionCardsChanged;
 
         _sessions.SessionAdded += OnSessionAdded;
         _sessions.SessionRemoved += OnSessionRemoved;
@@ -181,6 +186,38 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, card.Model));
         _sessions.Close(card.Model);
         if (vm is not null) SessionCards.Remove(vm);
+    }
+
+    /// <summary>Rename a session (tab title); keeps Logs' session filter and output source names in sync.</summary>
+    [RelayCommand]
+    public void RenameSession((SessionCardViewModel Card, string Name) args)
+    {
+        var (card, name) = args;
+        if (card is null || string.IsNullOrWhiteSpace(name)) return;
+        name = name.Trim();
+        _sessions.Rename(card.Model, name);
+        _sessionNames[card.Model.Id] = name; // future output lines carry the new name
+        card.Refresh();
+        Logs.RefreshSessions();
+    }
+
+    private void OnSessionCardsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => Logs.RefreshSessions();
+
+    /// <summary>Best-effort clipboard copy (no-op when headless / clipboard locked).</summary>
+    private static async Task CopyTextToClipboardAsync(string text)
+    {
+        try
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                    is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow is { Clipboard: { } clipboard })
+                await clipboard.SetTextAsync(text);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            // Clipboard unavailable (headless / locked desktop) — copy stays best-effort.
+        }
     }
 
     [RelayCommand] private void ToggleAssistant() => AssistantMode = !AssistantMode;

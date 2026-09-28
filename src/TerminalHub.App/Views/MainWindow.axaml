@@ -640,13 +640,26 @@
 
               <!-- ===== Logs ===== -->
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
-                    RowDefinitions="Auto,Auto,*,Auto">
-                <!-- filter row -->
-                <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,4">
+                    RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+                <!-- filter row: text + regex toggle + file sink -->
+                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2,0,4">
                   <TextBox Text="{Binding Logs.FilterText}" Watermark="过滤日志…"
                            Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
                            Foreground="#E2E8F0" Padding="8,3" FontSize="10.5"/>
-                  <ToggleButton Grid.Column="1" Content="⬇ 写文件" Margin="6,0,0,0" Padding="8,3"
+                  <ToggleButton Grid.Column="1" Content=".*" Margin="4,0,0,0" Padding="6,3" MinWidth="30"
+                                CornerRadius="6" Background="#1A2030" BorderBrush="#2A3142"
+                                Foreground="#94A3B8" FontSize="10"
+                                FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                                IsChecked="{Binding Logs.UseRegex}"
+                                ToolTip.Tip="把过滤框内容当作正则表达式（忽略大小写）">
+                    <ToggleButton.Styles>
+                      <Style Selector="ToggleButton:checked">
+                        <Setter Property="Foreground" Value="#38BDF8"/>
+                        <Setter Property="BorderBrush" Value="#3B82F6"/>
+                      </Style>
+                    </ToggleButton.Styles>
+                  </ToggleButton>
+                  <ToggleButton Grid.Column="2" Content="⬇ 写文件" Margin="6,0,0,0" Padding="8,3"
                                 CornerRadius="6" Background="#1A2030" BorderBrush="#2A3142"
                                 Foreground="#94A3B8" FontSize="10"
                                 IsChecked="{Binding Logs.FileLogging}"
@@ -676,9 +689,35 @@
                             CornerRadius="6" Padding="8,2" Margin="6,0,0,0"
                             VerticalAlignment="Center"/>
                 </Grid>
+                <!-- actions: copy visible / clear results / retain history -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
+                  <Button Content="⧉ 复制可见行" Padding="8,3" CornerRadius="6"
+                          Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
+                          FontSize="10" Command="{Binding Logs.CopyVisibleCommand}"
+                          ToolTip.Tip="复制当前过滤结果到剪贴板"/>
+                  <Button Content="✕ 清空结果" Padding="8,3" CornerRadius="6"
+                          Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
+                          FontSize="10" Command="{Binding Logs.ClearVisibleCommand}"
+                          ToolTip.Tip="清除当前过滤结果（从缓冲中移除，不再出现）"/>
+                  <ToggleButton Content="📌 保留历史" Padding="8,3" CornerRadius="6"
+                                Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
+                                FontSize="10" IsChecked="{Binding Logs.RetainHistoryOnClear}"
+                                ToolTip.Tip="开启后：底部 Output 清空时 Logs 保留已缓冲历史；默认跟随清空">
+                    <ToggleButton.Styles>
+                      <Style Selector="ToggleButton:checked">
+                        <Setter Property="Foreground" Value="#38BDF8"/>
+                        <Setter Property="BorderBrush" Value="#3B82F6"/>
+                      </Style>
+                    </ToggleButton.Styles>
+                  </ToggleButton>
+                </StackPanel>
+                <!-- invalid-regex hint -->
+                <TextBlock Grid.Row="3" Text="{Binding Logs.FilterError}" Foreground="#F87171"
+                           FontSize="9.5" Margin="2,0,2,3" TextWrapping="Wrap"
+                           IsVisible="{Binding Logs.FilterError, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
 
                 <!-- log lines -->
-                <Border Grid.Row="2" CornerRadius="8" Background="#CC141B29"
+                <Border Grid.Row="4" CornerRadius="8" Background="#CC141B29"
                         BorderBrush="#332A3142" BorderThickness="1">
                   <ListBox ItemsSource="{Binding Logs.Entries}"
                            Background="Transparent" BorderThickness="0" Padding="4">
@@ -705,9 +744,14 @@
                   </ListBox>
                 </Border>
 
-                <TextBlock Grid.Row="3" Text="{Binding Logs.FileStatus}" Foreground="#34D399"
-                           FontSize="9" Margin="2,4,2,0" TextWrapping="Wrap"
-                           IsVisible="{Binding Logs.FileStatus, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="10" Margin="2,4,2,0">
+                  <TextBlock Text="{Binding Logs.FileStatus}" Foreground="#34D399"
+                             FontSize="9" TextWrapping="Wrap"
+                             IsVisible="{Binding Logs.FileStatus, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                  <TextBlock Text="{Binding Logs.StatusText}" Foreground="#94A3B8"
+                             FontSize="9" TextWrapping="Wrap"
+                             IsVisible="{Binding Logs.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                </StackPanel>
               </Grid>
 
               <!-- ===== SSH ===== -->

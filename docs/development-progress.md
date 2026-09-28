@@ -44,6 +44,28 @@
 - Headless UI test renders both dashboard + Codex frames to PNG.
 - Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
 
+### PR #10 — Logs deep session buffer + live session filter (`feat/logs-session-buffer`)
+- **深会话缓冲**: `LogsViewModel` 维护自己的环形缓冲
+  (`DefaultBufferCapacity = 2000`，构造参数可调)，不再依赖 Output 面板 500 行
+  展示上限；所有过滤（文本/级别/会话/正则）都在缓冲上重放 —— Output 已淘汰
+  的行在 Logs 仍可搜到（测试：追加 520 行后过滤首行命中，而 OutputLog 已无该行）。
+  缓冲淘汰最老条目时同步修剪显示列表。
+- **Output 清空策略**（明确并已测）：默认跟随清空（Logs 缓冲与视图一并清空，
+  清空后重放不复活旧行）；Logs 工具行新增「📌 保留历史」开关，开启后 Output
+  Clear 时 Logs 保留缓冲历史，后续行继续追加。Logs 自身的「清空结果」不受该开关影响。
+- **会话列表实时刷新**: `SessionCards.CollectionChanged → Logs.RefreshSessions()`，
+  新建/关闭终端即时更新会话下拉（此前仅切到 Logs tab 时刷新）；新增
+  `RenameSessionCommand`（改名同步 Output 来源名 `_sessionNames` 映射 + Logs 下拉；
+  tab 条重命名 UI 留待后续，命令路径已可用并测试）。
+- **UX**: 「⧉ 复制可见行」（格式 `HH:mm:ss [level] (source) msg`，剪贴板经
+  `MainWindowViewModel` 注入，完成显示「已复制 N 行」）、「✕ 清空结果」（从缓冲
+  移除当前匹配行，重放不再复活）、「.*」正则开关（忽略大小写 + 250ms 匹配超时
+  防灾难回溯；坏正则红色提示、零匹配、不崩溃）。
+- 验证（DISPLAY=:7 实机 + xdotool）：正则 `item-\d+` 过滤 20 行输出即刻生效；
+  面板布局如截图。截图 `docs/screenshots/logs-deep-buffer.png`。
+- 79 tests green（LogsPanelTests 14 个：深缓冲/容量/重放/清空两策略/正则好坏模式/
+  复制/清空/实时会话名增改删）。
+
 ### PR #9 — Deploy action + colored thumbnails (`feat/deploy-thumbnails`)
 - **Deploy dock button** is real now (was stub):
   `ArtifactLocator` walks up from CWD to find `artifacts/publish/<rid>/`
