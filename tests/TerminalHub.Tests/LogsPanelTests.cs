@@ -47,13 +47,15 @@ public class LogsPanelTests
         Func<string, Task>? copyToClipboard = null,
         string? exportDir = null,
         Func<Task<string?>>? promptExportPath = null,
-        Action? persistFilters = null)
+        Action? persistFilters = null,
+        Func<string, bool>? activateSession = null)
     {
         var dash = new DashboardViewModel(new FakeMonitor());
         var file = new SessionLogFile();
         var logs = new LogsViewModel(dash, file, () => ["Terminal 01", "Terminal 02"],
             bufferCapacity: bufferCapacity, copyToClipboard: copyToClipboard,
-            logDir: exportDir, promptExportPath: promptExportPath, persistFilters: persistFilters);
+            logDir: exportDir, promptExportPath: promptExportPath, persistFilters: persistFilters,
+            activateSession: activateSession);
         logs.RefreshSessions();
         return (dash, logs, file);
     }
@@ -1254,4 +1256,128 @@ public class LogsPanelTests
             window.Close();
         }
     }
+
+    [AvaloniaFact]
+    public async Task JumpToSession_ActivatesKnownSource_StatusNotes()
+    {
+        string? activated = null;
+        var (dash, logs, _) = MakeLogs(activateSession: name =>
+        {
+            activated = name;
+            return name is "Terminal 01" or "Terminal 02";
+        });
+        dash.AppendOutput("info", "from session", "Terminal 02");
+        dash.AppendOutput("info", "system line", "deploy"); // not a session card
+        await Until(() => logs.Entries.Count == 2);
+
+        logs.SelectedIndex = 0;
+        logs.JumpToSessionCommand.Execute(null);
+        Assert.Equal("Terminal 02", activated);
+        Assert.Equal("已跳到「Terminal 02」", logs.StatusText);
+
+        // Direct entry (double-click path) — works without changing SelectedIndex.
+        activated = null;
+        logs.JumpToSessionEntry(logs.Entries[0]);
+        Assert.Equal("Terminal 02", activated);
+        Assert.Equal("已跳到「Terminal 02」", logs.StatusText);
+    }
+
+    [AvaloniaFact]
+    public async Task JumpToSession_MissingOrUnknownSource_StatusOnly_NoCrash()
+    {
+        var calls = 0;
+        var (dash, logs, _) = MakeLogs(activateSession: _ => { calls++; return false; });
+        dash.AppendOutput("info", "orphan", "");          // empty Source
+        dash.AppendOutput("info", "ghost", "Terminal 99"); // unknown session
+        await Until(() => logs.Entries.Count == 2);
+
+        logs.JumpToSessionEntry(logs.Entries[0]);
+        Assert.Equal(0, calls); // never asked the host for an empty source
+        Assert.Equal("该行没有会话来源", logs.StatusText);
+
+        logs.SelectedIndex = 1;
+        logs.JumpToSessionCommand.Execute(null);
+        Assert.Equal(1, calls);
+        Assert.Equal("未找到会话「Terminal 99」", logs.StatusText);
+
+        logs.JumpToSessionEntry(null);
+        Assert.Equal("没有选中的日志行", logs.StatusText);
+
+        // No host hook → soft status, still no crash.
+        var (dash2, logs2, _) = MakeLogs(); // activateSession: null
+        dash2.AppendOutput("info", "x", "Terminal 01");
+        await Until(() => logs2.Entries.Count == 1);
+        logs2.JumpToSessionEntry(logs2.Entries[0]);
+        Assert.Equal("无法跳到「Terminal 01」", logs2.StatusText);
+    }
+
+    [AvaloniaFact]
+    public async Task JumpToSession_UI_KeepsLogsTab_ActivatesMatchingCard()
+    {
+        // Full MainWindow: jump activates the matching SessionCard / ActiveSession
+        // while SelectedRightTab stays on Logs (2). Button is wired to the command.
+        PtySessionFactory.UseMock = true;
+        var dir = Path.Combine(Path.GetTempPath(), "th-jump-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var store = new SettingsStore(Path.Combine(dir, "settings.json"));
+            store.Save(new AppSettings
+            {
+                StartupSessions =
+                [
+                    new StartupSession { Name = "Terminal 01", Tag = "dev" },
+                    new StartupSession { Name = "Terminal 03", Tag = "test" },
+                ],
+            });
+            var window = new MainWindow(store) { Width = 1200, Height = 800 };
+            try
+            {
+                window.Show();
+                await Task.Delay(500);
+                var vm = (MainWindowViewModel)window.DataContext!;
+                await Until(() => vm.SessionCards.Count >= 2);
+
+                // Start on Terminal 01; Logs tab open.
+                var card01 = Assert.Single(vm.SessionCards, c => c.Name == "Terminal 01");
+                var card03 = Assert.Single(vm.SessionCards, c => c.Name == "Terminal 03");
+                vm.ActivateSessionCommand.Execute(card01);
+                await Until(() => ReferenceEquals(vm.ActiveSession, card01.Model));
+                vm.SelectedRightTab = 2;
+                Assert.Equal(2, vm.SelectedRightTab);
+
+                vm.Dashboard.AppendOutput("warn", "boom on 03", "Terminal 03");
+                vm.Dashboard.AppendOutput("info", "noise", "deploy");
+                await Until(() => vm.Logs.Entries.Count >= 2);
+
+                var jumpBtn = window.GetVisualDescendants().OfType<Button>()
+                    .Single(b => ReferenceEquals(b.Command, vm.Logs.JumpToSessionCommand));
+                Assert.Equal("↗ 跳到会话", jumpBtn.Content);
+
+                // Select the Terminal 03 row and jump via the command (button / Enter).
+                vm.Logs.SelectedIndex = vm.Logs.Entries.ToList()
+                    .FindIndex(e => e.Source == "Terminal 03");
+                Assert.True(vm.Logs.SelectedIndex >= 0);
+                jumpBtn.Command!.Execute(null);
+                await Until(() => ReferenceEquals(vm.ActiveSession, card03.Model));
+
+                Assert.Equal(2, vm.SelectedRightTab); // Logs still open
+                Assert.True(card03.IsActive);
+                Assert.False(card01.IsActive);
+                Assert.Equal("已跳到「Terminal 03」", vm.Logs.StatusText);
+
+                // Unknown source → status note; active session unchanged.
+                vm.Logs.JumpToSessionEntry(vm.Logs.Entries.First(e => e.Source == "deploy"));
+                Assert.Equal("未找到会话「deploy」", vm.Logs.StatusText);
+                Assert.True(ReferenceEquals(vm.ActiveSession, card03.Model));
+                Assert.Equal(2, vm.SelectedRightTab);
+            }
+            finally { window.Close(); }
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
 }

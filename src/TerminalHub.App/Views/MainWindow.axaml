@@ -781,6 +781,10 @@
                           FontSize="10" Command="{Binding Logs.GoNextMatchCommand}"
                           IsEnabled="{Binding Logs.CanGoNextMatch}"
                           ToolTip.Tip="选中下一条匹配行并滚动到它（暂停跟随尾部）；到头即停，不循环"/>
+                  <Button Content="↗ 跳到会话" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
+                          FontSize="10" Command="{Binding Logs.JumpToSessionCommand}"
+                          ToolTip.Tip="激活选中日志行来源对应的终端会话（Logs 页保持打开；也可双击该行）"/>
                   <Button Content="⧉ 复制可见行" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
                           FontSize="10" Command="{Binding Logs.CopyVisibleCommand}"
@@ -816,6 +820,8 @@
                   <Panel>
                     <ListBox x:Name="LogsList" ItemsSource="{Binding Logs.Entries}"
                              SelectedIndex="{Binding Logs.SelectedIndex, Mode=TwoWay}"
+                             DoubleTapped="OnLogsEntryDoubleTapped"
+                             KeyDown="OnLogsListKeyDown"
                              Background="Transparent" BorderThickness="0" Padding="4">
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">

@@ -157,7 +157,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             v => _settings.SessionLogToFile = v,
             copyToClipboard: CopyTextToClipboardAsync,
             promptExportPath: PromptExportPathAsync,
-            persistFilters: PersistLogsFilters);
+            persistFilters: PersistLogsFilters,
+            activateSession: TryActivateSessionByName);
         // Replay the filters saved from the previous run (never writes back):
         // the global combo for「全部会话」, plus each named session's own memory.
         Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
@@ -316,6 +317,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (card is null) return;
         _sessions.Activate(card.Model);
+    }
+
+    /// <summary>Logs jump-to-session: activate the card whose name matches
+    /// <paramref name="name"/>. Keeps the Logs tab open (does not touch
+    /// <see cref="SelectedRightTab"/>). Unknown / missing → false.</summary>
+    private bool TryActivateSessionByName(string name)
+    {
+        var card = SessionCards.FirstOrDefault(c =>
+            string.Equals(c.Name, name, StringComparison.Ordinal));
+        if (card is null) return false;
+        _sessions.Activate(card.Model);
+        return true;
     }
 
     [RelayCommand]
