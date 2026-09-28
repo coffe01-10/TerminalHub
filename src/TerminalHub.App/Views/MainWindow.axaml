@@ -1231,8 +1231,8 @@
         </Button>
         <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
              Right-click also switches publish profiles, opens recent artifacts, opens the last
-             successful artifact, and cancels a running publish. The line under Deploy is the
-             real last exit (empty until one exists; hidden while a publish is running). -->
+             successful artifact, copy its path, and cancels a running publish. The line under
+             Deploy is the last exit when idle, or live packing elapsed while running. -->
         <Button x:Name="DeployDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4"
@@ -1252,6 +1252,8 @@
               </MenuItem>
               <Separator/>
               <MenuItem Header="打开上次成功产物 Open last success" Click="OnOpenLastSuccessClick"
+                        IsEnabled="False"/>
+              <MenuItem Header="复制上次成功产物路径 Copy last artifact path" Click="OnCopyLastSuccessPathClick"
                         IsEnabled="False"/>
               <MenuItem Header="最近产物 Recent">
                 <MenuItem Header="（暂无产物）" IsEnabled="False"/>
