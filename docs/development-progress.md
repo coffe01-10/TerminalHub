@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### pending — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
+### pending / PR #38 — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
 - **「换行」chip**: 级别 chip /「相对」旁 `timechip` ToggleButton；开（默认）=
   `TextWrapping.Wrap`（现行行为）；关 = `NoWrap` + `LogsList`
   `ScrollViewer.HorizontalScrollBarVisibility=Auto`，便于密扫长行。

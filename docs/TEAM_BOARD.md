@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:30 CST（Logs 换行 toggle 进行中，待 PR + Devin 拉测） · 维护：Devin（PO）
+最后更新：2026-09-28 18:32 CST（Logs 换行 toggle PR #38 待 Devin 拉测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 换行/不换行 toggle**（「换行」chip · Wrap 默认开 · NoWrap+横滚）— **Grok** · `feat/logs-wrap-toggle` · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Logs 换行/不换行 toggle**（「换行」chip · Wrap 默认开 · NoWrap+横滚）— **Grok** · PR #38 · `feat/logs-wrap-toggle` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **Deploy last-status 徽标 + 打开上次成功产物** — **Grok** · `feat/deploy-last-status-badge` · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
