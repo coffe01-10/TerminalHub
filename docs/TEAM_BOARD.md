@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:45 CST（Logs 紧凑密度 · PR 待开 · 请 Devin 拉测） · 维护：Devin（PO）
+最后更新：2026-09-28 18:45 CST（Logs 紧凑密度 PR #40 · 请 Devin 拉测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 紧凑密度 toggle**（「紧凑」chip · FontSize/Padding · 持久化）— **Grok** · `feat/logs-compact-density` · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Logs 紧凑密度 toggle**（「紧凑」chip · FontSize/Padding · 持久化）— **Grok** · PR #40 · `feat/logs-compact-density` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀

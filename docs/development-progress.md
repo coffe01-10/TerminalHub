@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### pending — Logs 紧凑密度 toggle (`feat/logs-compact-density`)
+### pending — Logs 紧凑密度 toggle (`feat/logs-compact-density`) · PR #40
 - **「紧凑」chip**: 「换行」旁 `timechip` ToggleButton；关（默认）= FontSize 9.5 /
   Padding 4,1；开 ≈ FontSize 8.5 / Padding 2,0。`Classes.compact` 绑
   `Logs.CompactDensity`，ListBoxItem 样式刷新；行内 TextBlock /
