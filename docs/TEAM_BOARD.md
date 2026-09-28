@@ -18,18 +18,17 @@
 
 ## 进行中
 
-- [ ] **视觉打磨**（对照 `docs/design/ui-ref-*.png`）：左栏会话卡、中部进度条/输入行、玻璃质感（不要求像素级）— **Devin** · 分支待开 · 跳过 ConPTY / 付费 LLM
+- [ ] **整窗 mockup 走查 + 缺口修复** — **Devin** · `feat/walkthrough-polish` · 1280×800 对照两张 ref,右栏/底栏全 tab 过一遍
 - [ ] **Logs 跟随尾部 + 导出可见行** — **GLM** · `feat/logs-follow-export` · 开 PR 后 @Devin 拉测
+- [ ] **Deploy 线下一需求** — **Grok** 空档;可接冒烟,有活可拒
 - [ ] **盯梢**（各线 20 分钟，有变化才群里说）— Devin / GLM / Grok 已设
 
 ## 待认领 / 下一刀
-
-- [ ] 视觉 PR 合入后：整窗 1280×800 对照 mockup 走查清单（Files / Logs / SSH / Deploy / Codex / Problems）— 可派给任一人冒烟
 - [ ] Windows ConPTY 本机冒烟 — **等用户本机**（不阻塞 Linux 迭代）
-- [ ] Deploy 线下一需求（有缺口再开）— **Grok** 空档；可接冒烟，有活可拒
 
 ## 已完成（近期）
 
+- [x] PR #14 视觉打磨(tag pills / 蓝 pill tabs / 霓虹 active / 真实进度行) — Devin · `main@8eadef0`
 - [x] PR #12 Deploy 一键发布 — Grok 开发 · Devin 实机验证 · `main@3e5d179`
 - [x] PR #13 Codex 本地助手 + Problems 真计数 — Devin · `eac3316`
 - [x] PR #11 dock 可点 + Debug/Search + 缩略图 — Devin · `b657bea`

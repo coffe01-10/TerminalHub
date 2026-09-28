@@ -4,6 +4,19 @@
 
 ## 2026-09-28
 
+### PR #15 — 整窗 mockup 走查 + 缺口修复 (`feat/walkthrough-polish`)
+- **缩略图再加密**: 12 行（原 10),`MinHeight` 80→92、行高收紧 —— 卡片更像
+  mockup 的迷你终端，保留每行 ANSI 主色。
+- **消空壳**: Codex 面板右上 ⚙ 接上设置抽屉（`DockSelectCommand 5`),
+  不再是无动作装饰。
+- **全 tab 实机走查**(DISPLAY=:7, 1280×800):Processes /proc 表、Files 面包屑
+  +目录列表、Logs 过滤+级别+来源标签、SSH 表单+持久化 host、Codex 清单/建议/
+  输入、Output 真流、Debug `␛[` 原始行、Problems `ls` 错误→徽章 1→清空、
+  Search `nonexistent`→2 命中黄高亮 —— 全部为真实数据，无 stub 回潮。
+- 标题栏/状态栏/中部进度行对照 ai-assistant ref 复核，均在位（OS 感知标签、
+  工作空间·N 终端·M 运行中·CPU/内存 sparkline、N/M 任务 · x%)。
+- 截图 `walkthrough-dashboard.png`、`walkthrough-ai.png`;127 tests green。
+
 ### PR #14 — 视觉打磨对照 mockup (`feat/visual-polish`)
 - 会话卡片：tag pill 改为着色底（`TagPillBrush` = 30% 透明度 tag 色，对照
   mockup 蓝/绿/粉药丸）；active 卡片加强霓虹（`#38BDF8` 边 + `0 0 22` 发光 +
