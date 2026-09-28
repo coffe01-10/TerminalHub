@@ -17,6 +17,7 @@ public partial class AiPanelViewModel : ViewModelBase
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private int? _progressPercent;
+    [ObservableProperty] private string _progressLabel = "";
     [ObservableProperty] private bool _hasProgress;
     [ObservableProperty] private bool _hasMessages;
     [ObservableProperty] private string _taskInput = "";
@@ -37,6 +38,9 @@ public partial class AiPanelViewModel : ViewModelBase
         StatusText = _assistant.StatusText;
         ProgressPercent = _assistant.ProgressPercent;
         HasProgress = _assistant.ProgressPercent is not null;
+        var done = _assistant.Checklist.Count(c => c.State == ChecklistState.Done);
+        ProgressLabel = _assistant.Checklist.Count == 0 ? ""
+            : $"{done} / {_assistant.Checklist.Count} 任务 · {_assistant.ProgressPercent}%";
         Checklist.Clear();
         foreach (var c in _assistant.Checklist) Checklist.Add(c);
         Suggestions.Clear();

@@ -4,6 +4,19 @@
 
 ## 2026-09-28
 
+### PR #14 — 视觉打磨对照 mockup (`feat/visual-polish`)
+- 会话卡片：tag pill 改为着色底（`TagPillBrush` = 30% 透明度 tag 色，对照
+  mockup 蓝/绿/粉药丸）；active 卡片加强霓虹（`#38BDF8` 边 + `0 0 22` 发光 +
+  更亮底色 `#E61A2233`)；名称字号/间距微调贴近参考卡片。
+- Tab chrome：右栏与底栏 tab 选中态改为 mockup 式蓝色 pill（`#3B82F6` 白字），
+  与 ai-assistant 参考图 Codex/Output 选中态一致；中央会话 tab 保持浮起卡片。
+- 中部：进度行改为「N / M 任务 · x%」(`Assistant.ProgressLabel`，仍由真实
+  清单驱动）；输入框与发送键圆角加大、蓝色发送钮贴近参考。
+- 半透明面板保持 `#66/#CC` 玻璃感；非 Windows 仍关闭 Acrylic（无黑屏回归）。
+- 实机截图：`dashboard-vs-ref.png`(tag pills + 霓虹 active + 蓝 pill tabs +
+  67% 进度）、`codex-layout-vs-ref.png`(Codex tab 蓝 pill + 清单/建议/输入）。
+- 127 tests green,无新增假数据/占位。
+
 ### PR #13 — Codex 本地助手 + Problems 真实计数 (`feat/codex-problems`)
 - **LocalAiAssistant** 替换 MockAiAssistant（删掉定时器假进度）：确定性规则
   回复、无网络/付费 API。清单是真实可变状态源 —— `ProgressPercent =
