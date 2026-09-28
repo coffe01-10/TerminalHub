@@ -274,6 +274,7 @@
               <TextBox Text="{Binding CommandInput}" Watermark="输入命令，或 ? 开头向 Codex 提问…"
                        Background="#1A2030" CornerRadius="10" BorderBrush="#2A3142" BorderThickness="1"
                        Foreground="#E2E8F0" Padding="12,6" FontSize="12"
+                       InputMethod.IsInputMethodEnabled="False"
                        KeyDown="OnCommandInputKeyDown"/>
               <Button Grid.Column="1" Content="➤" Margin="6,0,0,0" Width="38" CornerRadius="10"
                       Background="#3B82F6" Foreground="White"

@@ -54,6 +54,10 @@ public sealed class TerminalView : Control
     public TerminalView()
     {
         Focusable = true;
+        // A terminal takes raw keystrokes — an IME (e.g. Chinese pinyin) would
+        // swallow lowercase letters into composition candidates, turning "echo"
+        // into committed CJK text before it ever reaches the shell.
+        InputMethod.SetIsInputMethodEnabled(this, false);
         _blink = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(530) };
         _blink.Tick += (_, _) => { _cursorOn = !_cursorOn; if (_emulator is not null) InvalidateVisual(); };
         _blink.Start();

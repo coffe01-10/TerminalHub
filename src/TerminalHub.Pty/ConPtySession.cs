@@ -64,7 +64,10 @@ public sealed class ConPtySession : IPtySession
         };
 
         _readCts = new CancellationTokenSource();
-        Task.Run(() => ReadLoop(_readCts.Token));
+        // Dedicated thread: the read blocks in ReadFile until conhost emits data
+        // or the pipe breaks. LongRunning keeps it off the thread pool.
+        Task.Factory.StartNew(() => ReadLoop(_readCts.Token),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         return Task.CompletedTask;
     }
 
@@ -113,23 +116,25 @@ public sealed class ConPtySession : IPtySession
         }
     }
 
-    private async Task ReadLoop(CancellationToken ct)
+    private void ReadLoop(CancellationToken ct)
     {
-        var stream = new FileStream(_ptyOut!, FileAccess.Read, 64 * 1024, isAsync: true);
+        // CreatePipe handles are synchronous-only: an async FileStream over them
+        // throws in the ctor. Blocking ReadFile is what ConPTY expects anyway.
         var buffer = new byte[64 * 1024];
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                var n = await stream.ReadAsync(buffer, ct);
-                if (n == 0) break;
+                if (_ptyOut is null
+                    || !Native.ReadFile(_ptyOut, buffer, buffer.Length, out var n, IntPtr.Zero)
+                    || n == 0)
+                    break;
                 var chunk = new byte[n];
                 Array.Copy(buffer, chunk, n);
                 OutputReceived?.Invoke(this, chunk);
             }
         }
-        catch (OperationCanceledException) { }
-        catch { /* pipe closed */ }
+        catch (Exception ex) { Debug.WriteLine($"ConPTY ReadLoop ended: {ex.Message}"); }
     }
 
     public void Write(ReadOnlySpan<byte> data)
@@ -213,6 +218,9 @@ public sealed class ConPtySession : IPtySession
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool WriteFile(SafeFileHandle hFile, byte[] lpBuffer, int nNumberOfBytesToWrite, out int lpNumberOfBytesWritten, IntPtr lpOverlapped);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool ReadFile(SafeFileHandle hFile, byte[] lpBuffer, int nNumberOfBytesToRead, out int lpNumberOfBytesRead, IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern bool CreateProcessW(string? lpApplicationName, string lpCommandLine,
