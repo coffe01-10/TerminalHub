@@ -40,15 +40,25 @@ Package (Inno Setup script under `packaging/`):
 scripts\publish-windows.ps1   # publishes win-x64 + builds installer
 ```
 
-## Build / test on Linux
+## Build / run / test on Linux
+
+Fully runnable on Linux — real shells via `forkpty`, real `/proc` monitoring,
+identical Avalonia UI:
 
 ```bash
-dotnet restore
-dotnet build
-dotnet test
-dotnet run --project src/TerminalHub.App           # runs with real Linux PTY
-dotnet run --project src/TerminalHub.App -- --mock # force mock PTY
+# deps (Debian/Ubuntu): dotnet-sdk-8.0 libx11-6 libxcb1 libfontconfig1
+#                       libice6 libsm6 fonts-noto-cjk
+scripts/run-linux.sh              # open GUI on $DISPLAY
+scripts/run-linux.sh --headless   # run under Xvfb (no physical display)
+scripts/run-linux.sh --mock       # in-memory mock PTY
+
+dotnet test                       # unit + headless-rendered UI frames
+scripts/publish-linux.sh          # self-contained linux-x64 binary
 ```
+
+See [`docs/local-debugging.md`](docs/local-debugging.md) for the full
+guide (dependency matrix, Xvfb/xdotool automation, screenshot capture) and
+[`docs/screenshots/`](docs/screenshots/) for verified live runs.
 
 Linux runs the identical UI with a real `forkpty` shell; ConPTY code paths are
 Windows-only and compile-checked via the shared `IPtySession` abstraction.
