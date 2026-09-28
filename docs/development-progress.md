@@ -4,6 +4,19 @@
 
 ## 2026-09-28
 
+### PR — Logs 点击跳到会话 (`feat/logs-click-jump-session`)
+- **双击 / 「↗ 跳到会话」**: Logs 列表行的 `LogEntry.Source` 若是会话名，则激活对
+  应 `SessionCard` / `ActiveSession`（经 `MainWindowViewModel.TryActivateSessionByName`）；
+  **Logs 页保持打开**（不改 `SelectedRightTab`）。状态行 `已跳到「Terminal 03」`。
+- **健壮**: Source 空 → `该行没有会话来源`；未知名（如 `deploy`）→ `未找到会话「…」`；
+  无选中 → `没有选中的日志行`；不抛。优先双击，避免与上一条/下一条的单击选中冲突；
+  按钮 / Enter 走 `JumpToSessionCommand`（选中行）。
+- **接线**: `LogsViewModel` 注入 `Func<string, bool>? activateSession`；宿主只翻会话，
+  不碰 Deploy/Files/SSH/PTY/toolbar。
+- **验证**: 183 tests green（本 PR +3：已知 Source 激活 + 状态、缺失/未知软提示、
+  MainWindow 端到端保持 Logs tab）。worktree `/workspace/TerminalHub-logs2`；
+  工具 Claude Code · GLM-5.3。
+
 ### PR #26 — Logs 按会话筛选记忆 (`feat/logs-pin-session-filters`)
 - **per-session 记忆**: 会话下拉选中具名会话时，其筛选组合（FilterText /
   UseRegex / 级别 chip / 保留历史）按**会话名**记进

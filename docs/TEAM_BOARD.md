@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 17:25 CST（Logs #26 pin-session-filters 开 PR） · 维护：Devin（PO）
+最后更新：2026-09-28 17:32 CST（Logs click-jump-session 开 PR；#26 记完成） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 按会话筛选记忆（切换恢复各自筛选）** — **GLM** · `feat/logs-pin-session-filters` · PR #26 · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Logs 点击跳到会话（双击 / 「跳到会话」）** — **GLM** · `feat/logs-click-jump-session` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
@@ -29,6 +29,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #26 Logs 按会话筛选记忆（切换恢复各自筛选）— GLM · `feat/logs-pin-session-filters` · `main@fe75b42`
 - [x] PR #25 Logs 搜索高亮 + 上一条/下一条 — GLM · `feat/logs-search-nav` · `main@114eeb0`
 - [x] PR #21 工具栏 CWD 真动作（⟳刷新 + ←/→ 历史 + /proc 轮询 + OSC7)— GLM WIP · Devin 接管 · `feat/toolbar-cwd-nav` · `main@2613f93`
 - [x] PR #20 「↗ 在新窗口打开」会话弹出独立窗（detach/收回 + 弹出期输出保留）— Devin B · `feat/open-new-window` · `main@5cc06e9`
