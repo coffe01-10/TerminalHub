@@ -587,8 +587,8 @@
               <!-- ===== Files ===== -->
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                     RowDefinitions="Auto,Auto,5*,Auto,4*">
-                <!-- toolbar: up + breadcrumb + refresh + session dir -->
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,2,0,4">
+                <!-- toolbar: up + breadcrumb + open-in-terminal + copy-path + refresh + session dir -->
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,2,0,4">
                   <Button Content="↑" Padding="8,2" CornerRadius="6" Background="#1A2030"
                           Foreground="#94A3B8" BorderBrush="#2A3142"
                           IsEnabled="{Binding Files.CanGoUp}"
@@ -620,10 +620,18 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </ScrollViewer>
-                  <Button Grid.Column="2" Content="⟳" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
+                  <Button Grid.Column="2" Content="⇥" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
+                          Background="#1A2030" Foreground="#94A3B8" BorderBrush="#2A3142"
+                          Command="{Binding Files.OpenInTerminalCommand}"
+                          ToolTip.Tip="在此打开终端：目录→活动终端 cd 进入；文件→cd 所在目录"/>
+                  <Button Grid.Column="3" Content="⧉" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
+                          Background="#1A2030" Foreground="#94A3B8" BorderBrush="#2A3142"
+                          Command="{Binding Files.CopyPathCommand}"
+                          ToolTip.Tip="复制路径"/>
+                  <Button Grid.Column="4" Content="⟳" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="#1A2030" Foreground="#94A3B8" BorderBrush="#2A3142"
                           Command="{Binding Files.RefreshCommand}" ToolTip.Tip="刷新"/>
-                  <Button Grid.Column="3" Content="⌂" Padding="8,2" CornerRadius="6"
+                  <Button Grid.Column="5" Content="⌂" Padding="8,2" CornerRadius="6"
                           Background="#1A2030" Foreground="#38BDF8" BorderBrush="#2A3142"
                           Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="会话目录"/>
                 </Grid>
@@ -634,7 +642,7 @@
                 <!-- directory listing -->
                 <Border Grid.Row="2" CornerRadius="8" Background="#CC141B29"
                         BorderBrush="#332A3142" BorderThickness="1">
-                  <ListBox ItemsSource="{Binding Files.Entries}"
+                  <ListBox x:Name="FilesList" ItemsSource="{Binding Files.Entries}"
                            SelectedItem="{Binding Files.SelectedEntry}"
                            Background="Transparent" BorderThickness="0" Padding="4"
                            DoubleTapped="OnFileEntryDoubleTapped"
@@ -657,6 +665,16 @@
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="files:FileEntry">
                         <Grid ColumnDefinitions="14,*,Auto">
+                          <Grid.ContextMenu>
+                            <ContextMenu>
+                              <MenuItem Header="在此打开终端"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenInTerminalCommand}"
+                                        CommandParameter="{Binding}"/>
+                              <MenuItem Header="复制路径"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.CopyPathCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </ContextMenu>
+                          </Grid.ContextMenu>
                           <TextBlock Text="▸" Foreground="#38BDF8" IsVisible="{Binding IsDirectory}"/>
                           <TextBlock Text="·" Foreground="#475569" IsVisible="{Binding !IsDirectory}"/>
                           <TextBlock Grid.Column="1" Margin="2,0,0,0" Text="{Binding Name}"
