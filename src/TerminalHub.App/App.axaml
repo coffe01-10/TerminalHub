@@ -1,0 +1,46 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="TerminalHub.App.App"
+             RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+
+  <Application.Resources>
+    <!-- Glass theme palette (deep navy + neon blue) -->
+    <Color x:Key="GlassBackground">#FF0A0D14</Color>
+    <Color x:Key="GlassPanel">#FF11151F</Color>
+    <Color x:Key="GlassPanelLight">#FF1A2030</Color>
+    <Color x:Key="GlassBorder">#FF2A3142</Color>
+    <Color x:Key="NeonBlue">#FF3B82F6</Color>
+    <Color x:Key="NeonCyan">#FF38BDF8</Color>
+    <Color x:Key="AccentGreen">#FF34D399</Color>
+    <Color x:Key="AccentYellow">#FFFBBF24</Color>
+    <Color x:Key="AccentRed">#FFF87171</Color>
+    <Color x:Key="AccentViolet">#FFA78BFA</Color>
+    <Color x:Key="AccentPink">#FFF472B6</Color>
+    <Color x:Key="TextPrimary">#FFE2E8F0</Color>
+    <Color x:Key="TextSecondary">#FF94A3B8</Color>
+    <Color x:Key="TextDim">#FF64748B</Color>
+
+    <SolidColorBrush x:Key="GlassBackgroundBrush" Color="#FF0A0D14"/>
+    <SolidColorBrush x:Key="GlassPanelBrush" Color="#FF11151F"/>
+    <SolidColorBrush x:Key="GlassPanelLightBrush" Color="#FF1A2030"/>
+    <SolidColorBrush x:Key="GlassBorderBrush" Color="#FF2A3142"/>
+    <SolidColorBrush x:Key="NeonBlueBrush" Color="#FF3B82F6"/>
+    <SolidColorBrush x:Key="NeonCyanBrush" Color="#FF38BDF8"/>
+    <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF34D399"/>
+    <SolidColorBrush x:Key="AccentYellowBrush" Color="#FFFBBF24"/>
+    <SolidColorBrush x:Key="AccentRedBrush" Color="#FFF87171"/>
+    <SolidColorBrush x:Key="AccentVioletBrush" Color="#FFA78BFA"/>
+    <SolidColorBrush x:Key="AccentPinkBrush" Color="#FFF472B6"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFE2E8F0"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF94A3B8"/>
+    <SolidColorBrush x:Key="TextDimBrush" Color="#FF64748B"/>
+
+    <!-- Semi-transparent glass surfaces -->
+    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#B31A2030" Opacity="0.72"/>
+    <SolidColorBrush x:Key="GlassOverlayBrush" Color="#40111A2C"/>
+    <SolidColorBrush x:Key="DockGlassBrush" Color="#D91B2333" Opacity="0.85"/>
+  </Application.Resources>
+</Application>

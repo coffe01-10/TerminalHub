@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TerminalHub.App.Views.MainWindow"
+        Title="Terminal Hub · 终端控制中心"
+        Width="1440" Height="900" MinWidth="1024" MinHeight="640"
+        Background="{DynamicResource GlassBackgroundBrush}"
+        TransparencyLevelHint="AcrylicBlur">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Placeholder shell; full chrome lands in feat/dashboard-ui -->
+    <Border Grid.Row="0" Padding="12,8" Background="{DynamicResource GlassPanelBrush}">
+      <TextBlock Text="Terminal Hub · 终端控制中心" Foreground="{DynamicResource TextPrimaryBrush}"/>
+    </Border>
+    <TextBlock Grid.Row="1" Text="Terminal Hub" Foreground="{DynamicResource TextDimBrush}"
+               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Border Grid.Row="2" Padding="12,8" Background="{DynamicResource GlassPanelBrush}">
+      <TextBlock Text="工作空间" Foreground="{DynamicResource TextSecondaryBrush}"/>
+    </Border>
+  </Grid>
+</Window>
