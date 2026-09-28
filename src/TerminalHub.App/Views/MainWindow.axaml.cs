@@ -94,6 +94,11 @@ public partial class MainWindow : Window
     private void OnRepublishMenuClick(object? sender, RoutedEventArgs e)
         => Vm.DeployFromDock(forceRepublish: true);
 
+    /// <summary>Split panes: a press on a pane focuses it — its session becomes
+    /// active so the middle input row, Output and Search follow it.</summary>
+    private void OnLeftPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(0);
+    private void OnRightPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(1);
+
     private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)

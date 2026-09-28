@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **中部分屏** — **Devin A** · `feat/split-pane` · `/workspace/TerminalHub-split` · 工具栏「◫ 分屏」真双会话
+
 - [ ] **会话新窗口** — **Devin B** · `feat/open-new-window` · `/workspace/TerminalHub-newwin` · 「↗ 在新窗口打开」
 - [ ] **Logs 级别筛选条 + 过滤持久化** — **GLM** · `feat/logs-level-filter-persist` · base `main@ce29090` · worktree `/workspace/TerminalHub-logs`
 - [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
@@ -32,6 +32,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #18 「◫ 分屏」真双会话并排（双 PTY/Emulator + 窗格聚焦 + 卡片分配）— Devin A · `feat/split-pane`
 - [x] PR #15 整窗 mockup 走查（缩略图加密 + Codex ⚙）— Devin · `main@bf955fb`
 - [x] PR #14 视觉打磨(tag pills / 蓝 pill tabs / 霓虹 active / 真实进度行) — Devin · `main@8eadef0`
 - [x] PR #12 Deploy 一键发布 — Grok 开发 · Devin 实机验证 · `main@3e5d179`

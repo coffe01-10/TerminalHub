@@ -78,6 +78,17 @@ public sealed class StringNotEmptyConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>bool → accent brush when true, muted gray when false (e.g. split-toggle state).</summary>
+public sealed class BoolBrushConverter : IValueConverter
+{
+    public static readonly BoolBrushConverter Instance = new();
+    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#38BDF8"));
+    private static readonly IBrush Muted = new SolidColorBrush(Color.Parse("#94A3B8"));
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Accent : Muted;
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
 /// <summary>Checklist state → ring stroke color.</summary>
 public sealed class ChecklistRingConverter : IValueConverter
 {

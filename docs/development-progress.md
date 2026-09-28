@@ -4,6 +4,22 @@
 
 ## 2026-09-28
 
+### PR #18 — 「◫ 分屏」真双会话并排 (`feat/split-pane`)
+- **真分屏**:中部视口拆为 `GridSplitter` 左右双栏(可拖),各绑
+  `LeftPane`/`RightPane` 的 Emulator —— 两个会话、两套 PTY、两套
+  ANSI 解析器,输入零串扰;工具栏「◫ 分屏」接 `ToggleSplitCommand`,
+  IsSplit 时按钮着色,再点回单视图。
+- **会话选取**:进分屏 左=当前活动会话、右=下一个会话;仅一个会话时自动
+  新建第二个(不多建);会话被关闭时所属窗格自动换成幸存会话,双空自动退出。
+- **聚焦模型**:点窗格 → `FocusPane` → 该窗格会话成为 `ActiveSession`
+  (中部输入行/Output/Logs/Search/Breadcrumb 自动跟随);分屏中点左侧
+  会话卡 → 分配到聚焦的窗格,两侧保持不同会话;聚焦窗格霓虹描边。
+- **验证**:140 tests green(+6 `SplitPaneTests`:进出/双会话独立
+  Emulator/`LFT`/`RGT` 输入互不出现/聚焦切换/卡片分配/单会话自动补+
+  反复开关无泄漏/右栏关闭回落)。DISPLAY=:7 实机:双栏各 `echo`
+  独立标记不串扰、焦点描边与会话卡激活联动、退出回单视图。
+- 截图 `split-pane.png`。
+
 ### PR 待定 — Logs 级别筛选条 + 过滤持久化 (`feat/logs-level-filter-persist`)
 - **级别筛选条 (chip bar)**: 级别 ComboBox（All Levels/info/warn/error）换成与
   「.* / ⬇ 写文件 / 📌 保留历史」同款暗色 chip 的**互斥选中条**（`#1A2030` 底 +
