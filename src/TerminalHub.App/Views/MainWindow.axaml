@@ -1117,14 +1117,27 @@
             <TextBlock Text="Logs" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish. -->
+        <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
+             Right-click also switches publish profiles and opens recent artifacts. -->
         <Button x:Name="DeployDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4"
-                ToolTip.Tip="点击：有产物则打开目录，无产物则开始打包。Ctrl+点击或右键「重新打包」强制重新发布。">
+                ToolTip.Tip="点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物。">
           <Button.ContextFlyout>
-            <MenuFlyout>
+            <MenuFlyout Opening="OnDeployMenuOpening">
               <MenuItem Header="重新打包 Republish" Click="OnRepublishMenuClick"/>
+              <Separator/>
+              <MenuItem Header="配置档 Profiles">
+                <MenuItem Header="（无已存配置）" IsEnabled="False"/>
+              </MenuItem>
+              <MenuItem Header="保存当前配置 Save profile" Click="OnSavePublishProfileClick"/>
+              <MenuItem Header="删除配置档 Delete profile">
+                <MenuItem Header="（无已存配置）" IsEnabled="False"/>
+              </MenuItem>
+              <Separator/>
+              <MenuItem Header="最近产物 Recent">
+                <MenuItem Header="（暂无产物）" IsEnabled="False"/>
+              </MenuItem>
             </MenuFlyout>
           </Button.ContextFlyout>
           <StackPanel>

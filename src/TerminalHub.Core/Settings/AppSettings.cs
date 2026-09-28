@@ -42,6 +42,25 @@ public sealed class AppSettings
     public bool LogsRetainHistoryOnClear { get; set; }
     /// <summary>Saved SSH connections for the right-rail SSH tab.</summary>
     public List<TerminalHub.Core.Ssh.SshHost> SshHosts { get; set; } = [];
+
+    /// <summary>Named Deploy publish profiles. Persisted in settings.json.</summary>
+    public List<TerminalHub.Core.Deploy.PublishProfile> PublishProfiles
+    {
+        get => _publishProfiles;
+        set => _publishProfiles = value ?? [];
+    }
+    private List<TerminalHub.Core.Deploy.PublishProfile> _publishProfiles = [];
+
+    /// <summary>
+    /// Id of the publish profile applied to the next dock Deploy.
+    /// Empty = host platform and the process working directory.
+    /// </summary>
+    public string ActivePublishProfileId
+    {
+        get => _activePublishProfileId;
+        set => _activePublishProfileId = value ?? "";
+    }
+    private string _activePublishProfileId = "";
     public List<StartupSession> StartupSessions { get; set; } =
     [
         new StartupSession { Name = "Terminal 01", Tag = "开发环境" },

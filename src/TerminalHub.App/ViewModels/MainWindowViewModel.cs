@@ -107,6 +107,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>Publish sessions we spawned, so exit can be reported once.</summary>
     private readonly HashSet<Guid> _publishIds = new();
+    /// <summary>Repo root of each publish session, so a successful exit can rescan artifacts.</summary>
+    private readonly Dictionary<Guid, string> _publishRoots = new();
     private int _publishStarting;
 
     /// <summary>Per-session CWD back/forward stacks (keyed by session id).
@@ -123,6 +125,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Live popout windows, one per detached session (tests drive these).</summary>
     public IReadOnlyList<SessionWindow> Popouts => _popouts;
     private bool _disposed;
+
+    /// <summary>Last real scan of <c>artifacts/publish</c> (dock click, menu, or successful publish).</summary>
+    public IReadOnlyList<RecentArtifact> RecentArtifacts { get; private set; } = [];
 
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
@@ -465,7 +470,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// Plain click opens <c>artifacts/publish</c> when it has files, and starts the
     /// platform publish script when it does not. <paramref name="forceRepublish"/>
     /// (Ctrl+click, or the dock menu「重新打包」) always starts the script.
-    /// <paramref name="startDirectory"/> is the walk-up start; null uses the process working directory.
+    /// A non-empty <paramref name="startDirectory"/> is an explicit walk-up start and
+    /// skips the active publish profile (tests / programmatic callers).
+    /// The dock button passes null, so the active profile applies: its repo root
+    /// (or the process working directory when that is empty) and its RID
+    /// (<c>linux-x64</c> / <c>win-x64</c>, or the host platform when empty).
     /// </summary>
     public void DeployFromDock(bool forceRepublish, string? startDirectory = null)
     {
@@ -473,14 +482,159 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (forceRepublish)
             Dashboard.AppendOutput("info", "Deploy: 重新打包 / force republish", "deploy");
 
-        var start = string.IsNullOrWhiteSpace(startDirectory)
-            ? Directory.GetCurrentDirectory()
-            : startDirectory;
-        var found = ArtifactLocator.Find(start);
+        var profileDriven = string.IsNullOrWhiteSpace(startDirectory);
+        if (profileDriven && PublishProfiles.TouchActive(_settings) is { } used)
+        {
+            SaveSettingsInternal();
+            Dashboard.AppendOutput("info", DescribeProfile(used, "使用配置档 / profile"), "deploy");
+        }
+
+        var start = profileDriven
+            ? PublishProfiles.ResolveStartDirectory(_settings, null, Directory.GetCurrentDirectory())
+            : startDirectory!;
+        var platform = profileDriven
+            ? PublishProfiles.ResolvePlatform(_settings, PublishPlanner.CurrentPlatform)
+            : PublishPlanner.CurrentPlatform;
+
+        RefreshRecentArtifacts(start);
+
+        List<ArtifactLocator.ArtifactDir> found;
+        try
+        {
+            found = ArtifactLocator.Find(start);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or ArgumentException or NotSupportedException)
+        {
+            Dashboard.AppendOutput("warn", $"Deploy: 无法读取产物目录 — {ex.Message}", "deploy");
+            found = [];
+        }
+
         if (PublishPlanner.Decide(found.Count > 0, forceRepublish) == DeployAction.OpenArtifacts)
             OpenArtifactFolder(found);
         else
-            StartPublish(start);
+            StartPublish(start, platform);
+    }
+
+    public string ActivePublishProfileId => _settings.ActivePublishProfileId;
+    public string ActivePublishProfileName => PublishProfiles.Active(_settings)?.Name ?? "";
+
+    public IReadOnlyList<PublishProfile> ListPublishProfiles() => PublishProfiles.List(_settings);
+
+    public bool IsActivePublishProfile(string? id) =>
+        !string.IsNullOrEmpty(id)
+        && string.Equals(PublishProfiles.Active(_settings)?.Id, id, StringComparison.Ordinal);
+
+    /// <summary>Dialog seed: active profile, or a suggested name plus the repo discovered from CWD.</summary>
+    public PublishProfileDraft CurrentPublishDraft()
+    {
+        var active = PublishProfiles.Active(_settings);
+        var cwd = Directory.GetCurrentDirectory();
+        var discovered = PublishPlanner.FindRepoRoot(
+            !string.IsNullOrWhiteSpace(active?.RepoRoot) ? active!.RepoRoot : cwd) ?? "";
+        var name = string.IsNullOrWhiteSpace(active?.Name)
+            ? PublishProfiles.SuggestName(_settings, PublishProfiles.HostRid(PublishPlanner.CurrentPlatform))
+            : active!.Name;
+        var root = active is null ? discovered : active.RepoRoot;
+        return new PublishProfileDraft(name, root ?? "", active?.Rid ?? "", active?.Note ?? "");
+    }
+
+    /// <summary>Upsert by name, persist, and make it the profile the next dock Deploy uses.</summary>
+    public bool SavePublishProfile(string? name, string? repoRoot, string? rid, string? note)
+    {
+        var saved = PublishProfiles.Save(_settings, name, repoRoot, rid, note);
+        if (saved is null)
+        {
+            Dashboard.AppendOutput("warn", "Deploy: 配置档名称不能为空 / profile name required", "deploy");
+            return false;
+        }
+        SaveSettingsInternal();
+        Dashboard.AppendOutput("info",
+            DescribeProfile(saved, "已保存配置档 / profile saved") + " 下次 Deploy 使用该配置。",
+            "deploy");
+        return true;
+    }
+
+    /// <summary>Switch the active profile. The next dock Deploy uses its root and RID.</summary>
+    public bool ActivatePublishProfile(string? idOrName)
+    {
+        if (!PublishProfiles.Activate(_settings, idOrName))
+        {
+            Dashboard.AppendOutput("warn", $"Deploy: 找不到配置档 / profile not found {idOrName}", "deploy");
+            return false;
+        }
+        SaveSettingsInternal();
+        var active = PublishProfiles.Active(_settings)!;
+        Dashboard.AppendOutput("info",
+            DescribeProfile(active, "已切换配置档 / profile active") + " 下次 Deploy 使用该配置。",
+            "deploy");
+        return true;
+    }
+
+    public bool DeletePublishProfile(string? idOrName)
+    {
+        var existing = PublishProfiles.Find(_settings, idOrName);
+        if (existing is null || !PublishProfiles.Delete(_settings, idOrName))
+        {
+            Dashboard.AppendOutput("warn", $"Deploy: 找不到配置档 / profile not found {idOrName}", "deploy");
+            return false;
+        }
+        SaveSettingsInternal();
+        Dashboard.AppendOutput("info", $"Deploy: 已删除配置档 / profile deleted {existing.Name}", "deploy");
+        return true;
+    }
+
+    /// <summary>Rescan <c>artifacts/publish</c> from the active profile root, or CWD when it has none.</summary>
+    public IReadOnlyList<RecentArtifact> QueryRecentArtifacts()
+    {
+        var start = PublishProfiles.ResolveStartDirectory(_settings, null, Directory.GetCurrentDirectory());
+        return RefreshRecentArtifacts(start);
+    }
+
+    /// <summary>Open one recent artifact directory with the same file-manager path as a dock click.</summary>
+    public void OpenRecentArtifact(string? path)
+    {
+        Dashboard.SelectedBottomTab = 0;
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        {
+            Dashboard.AppendOutput("warn", "Deploy: 产物目录不存在 / artifact folder missing", "deploy");
+            QueryRecentArtifacts();
+            return;
+        }
+
+        string[] files;
+        try { files = Directory.GetFiles(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Dashboard.AppendOutput("warn", $"Deploy: 无法读取产物目录 — {ex.Message}", "deploy");
+            return;
+        }
+        OpenArtifactFolder([new ArtifactLocator.ArtifactDir(path, files)]);
+    }
+
+    private IReadOnlyList<RecentArtifact> RefreshRecentArtifacts(string? start)
+    {
+        RecentArtifacts = RecentArtifactList.List(start);
+        return RecentArtifacts;
+    }
+
+    private void AnnounceRecentArtifacts(string start)
+    {
+        var rows = RefreshRecentArtifacts(start);
+        Dashboard.AppendOutput("info",
+            $"Deploy: 最近产物已刷新 / recent artifacts ({rows.Count})", "deploy");
+        foreach (var row in rows)
+            Dashboard.AppendOutput("info",
+                $"  {row.Rid}  {FmtBytes(row.SizeBytes)}  {row.Modified.ToLocalTime():yyyy-MM-dd HH:mm}  {row.Path}",
+                "deploy");
+    }
+
+    private static string DescribeProfile(PublishProfile profile, string verb)
+    {
+        var root = string.IsNullOrWhiteSpace(profile.RepoRoot) ? "cwd" : profile.RepoRoot;
+        var rid = string.IsNullOrWhiteSpace(profile.Rid) ? "host" : profile.Rid;
+        var note = string.IsNullOrWhiteSpace(profile.Note) ? "" : $" · {profile.Note}";
+        return $"Deploy: {verb} {profile.Name} — root {root} · rid {rid}{note}.";
     }
 
     private void OpenArtifactFolder(IReadOnlyList<ArtifactLocator.ArtifactDir> found)
@@ -508,7 +662,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             "Deploy: 重新发布请按住 Ctrl 再点 Deploy，或右键菜单「重新打包」。", "deploy");
     }
 
-    private void StartPublish(string startDir)
+    private void StartPublish(string startDir, PublishPlatform platform)
     {
         if (PublishBusy())
         {
@@ -517,7 +671,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var platform = PublishPlanner.CurrentPlatform;
         var winShell = platform == PublishPlatform.Windows ? ResolveWindowsPublishShell() : null;
         var plan = PublishPlanner.TryPlan(startDir, platform, winShell);
         if (plan is null)
@@ -546,6 +699,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 "Publish",
                 SessionTag.Deploy);
             _publishIds.Add(session.Id);
+            _publishRoots[session.Id] = plan.RepoRoot;
             session.Pty.Exited += (_, code) => RunOnUi(() => ReportPublishExit(session.Id, code));
             if (!session.IsRunning)
                 ReportPublishExit(session.Id, session.Pty.ExitCode ?? -1);
@@ -571,11 +725,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ReportPublishExit(Guid id, int code)
     {
         if (!_publishIds.Remove(id)) return;
+        _publishRoots.TryGetValue(id, out var root);
+        _publishRoots.Remove(id);
         Dashboard.SelectedBottomTab = 0;
         if (code == 0)
+        {
             Dashboard.AppendOutput("info",
                 "Deploy: 打包成功 / publish succeeded。再次点击 Deploy 打开产物目录 artifacts/publish。",
                 "deploy");
+            if (!string.IsNullOrWhiteSpace(root))
+                AnnounceRecentArtifacts(root);
+        }
         else
             Dashboard.AppendOutput("error",
                 $"Deploy: 打包失败 / publish failed (exit {code})。请查看 Publish 终端输出。",
