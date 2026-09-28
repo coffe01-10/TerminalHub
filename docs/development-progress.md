@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### PR #12 — Codex 本地助手 + Problems 真实计数 (`feat/codex-problems`)
+### PR #13 — Codex 本地助手 + Problems 真实计数 (`feat/codex-problems`)
 - **LocalAiAssistant** 替换 MockAiAssistant（删掉定时器假进度）：确定性规则
   回复、无网络/付费 API。清单是真实可变状态源 —— `ProgressPercent =
   done/total` 直接驱动中部进度条；`Changed` 事件刷新 UI。
