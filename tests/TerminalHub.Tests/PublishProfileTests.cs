@@ -170,4 +170,17 @@ public class PublishProfileTests
         Assert.Equal(t1, saved!.LastUsedAt);
         Assert.Equal(t0, saved.CreatedAt);
     }
+
+    [Fact]
+    public void FormatDockLabel_NameAndOptionalRid()
+    {
+        Assert.Equal("", PublishProfiles.FormatDockLabel(null));
+        Assert.Equal("", PublishProfiles.FormatDockLabel(new PublishProfile { Name = "  " }));
+        Assert.Equal("", PublishProfiles.FormatDockLabel(new PublishProfile { Name = "", Rid = "linux-x64" }));
+        Assert.Equal("默认", PublishProfiles.FormatDockLabel(new PublishProfile { Name = "默认" }));
+        Assert.Equal("默认 · linux-x64",
+            PublishProfiles.FormatDockLabel(new PublishProfile { Name = " 默认 ", Rid = " linux-x64 " }));
+        Assert.Equal("win box · win-x64",
+            PublishProfiles.FormatDockLabel(new PublishProfile { Name = "win box", Rid = PublishProfiles.WindowsRid }));
+    }
 }

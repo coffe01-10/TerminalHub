@@ -225,4 +225,34 @@ public class LastPublishResultTests
             if (Directory.Exists(dir.FullName)) Directory.Delete(dir.FullName, true);
         }
     }
+
+    [Fact]
+    public void Clear_DropsRecord_AndEmptiesBadge()
+    {
+        var settings = new AppSettings();
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"th-clear-{Guid.NewGuid():N}"));
+        try
+        {
+            LastPublishResults.Record(
+                settings, LastPublishResults.Success, 0,
+                DateTimeOffset.UtcNow, 5_000, "/repo", dir.FullName);
+            Assert.True(LastPublishResults.HasRecord(settings.LastPublishResult));
+            Assert.Equal("成功 · 5s", LastPublishResults.FormatBadge(settings.LastPublishResult));
+            Assert.True(LastPublishResults.CanOpen(settings.LastPublishResult));
+
+            LastPublishResults.Clear(settings);
+            Assert.Null(settings.LastPublishResult);
+            Assert.False(LastPublishResults.HasRecord(settings.LastPublishResult));
+            Assert.Equal("", LastPublishResults.FormatBadge(settings.LastPublishResult));
+            Assert.False(LastPublishResults.CanOpen(settings.LastPublishResult));
+
+            // Clearing again is a no-op.
+            LastPublishResults.Clear(settings);
+            Assert.Null(settings.LastPublishResult);
+        }
+        finally
+        {
+            if (Directory.Exists(dir.FullName)) Directory.Delete(dir.FullName, true);
+        }
+    }
 }

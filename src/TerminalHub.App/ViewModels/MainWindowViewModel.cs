@@ -87,6 +87,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Same gate as open-last: success path exists on disk.</summary>
     public bool CanCopyLastSuccessfulArtifact => CanOpenLastSuccessfulArtifact;
 
+    /// <summary>
+    /// Quiet second line under the last-publish badge: active profile name,
+    /// optionally with RID (<c>默认 · linux-x64</c>). Empty when none / no name.
+    /// </summary>
+    public string ActivePublishProfileLabel =>
+        PublishProfiles.FormatDockLabel(PublishProfiles.Active(_settings));
+
+    public bool HasActivePublishProfileLabel => ActivePublishProfileLabel.Length > 0;
+
+    /// <summary>True when a stored last outcome exists (badge non-empty when idle), even if the artifact path is gone.</summary>
+    public bool CanClearLastPublishResult =>
+        LastPublishResults.HasRecord(_settings.LastPublishResult);
+
     partial void OnIsPublishRunningChanged(bool value)
     {
         if (value) StartPublishElapsedTimer();
@@ -141,8 +154,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             head = $"{head} 已耗时 {live}。";
         }
         var detail = LastPublishResults.FormatTooltip(_settings.LastPublishResult);
-        if (isRunning && detail == "尚未打包") return head;
-        return head + "\n" + detail;
+        var profile = ActivePublishProfileLabel;
+        var profileLine = profile.Length == 0 ? "" : "\n配置档：" + profile;
+        if (isRunning && detail == "尚未打包")
+            return head + profileLine;
+        return head + "\n" + detail + profileLine;
     }
 
     /// <summary>Title-bar OS label ("Windows System" in the mockup — follows the real OS).</summary>
@@ -654,6 +670,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (profileDriven && PublishProfiles.TouchActive(_settings) is { } used)
         {
             SaveSettingsInternal();
+            NotifyActivePublishProfile();
             Dashboard.AppendOutput("info", DescribeProfile(used, "使用配置档 / profile"), "deploy");
         }
 
@@ -717,6 +734,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return false;
         }
         SaveSettingsInternal();
+        NotifyActivePublishProfile();
         Dashboard.AppendOutput("info",
             DescribeProfile(saved, "已保存配置档 / profile saved") + " 下次 Deploy 使用该配置。",
             "deploy");
@@ -732,6 +750,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return false;
         }
         SaveSettingsInternal();
+        NotifyActivePublishProfile();
         var active = PublishProfiles.Active(_settings)!;
         Dashboard.AppendOutput("info",
             DescribeProfile(active, "已切换配置档 / profile active") + " 下次 Deploy 使用该配置。",
@@ -748,6 +767,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return false;
         }
         SaveSettingsInternal();
+        NotifyActivePublishProfile();
         Dashboard.AppendOutput("info", $"Deploy: 已删除配置档 / profile deleted {existing.Name}", "deploy");
         return true;
     }
@@ -817,6 +837,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         _ = CopyTextToClipboardAsync(path);
         Dashboard.AppendOutput("info", $"已复制产物路径 {path}", "deploy");
+    }
+
+    /// <summary>
+    /// Clear the persisted last-publish outcome. Enabled whenever a known result exists
+    /// (even if the artifact folder is gone). Refreshes badge / open / copy / clear gates.
+    /// </summary>
+    public void ClearLastPublishResult()
+    {
+        Dashboard.SelectedBottomTab = 0;
+        if (!CanClearLastPublishResult)
+        {
+            NotifyLastPublish();
+            return;
+        }
+        LastPublishResults.Clear(_settings);
+        PersistSettings();
+        NotifyLastPublish();
+        Dashboard.AppendOutput("info", "已清除上次发布结果", "deploy");
     }
 
     private IReadOnlyList<RecentArtifact> RefreshRecentArtifacts(string? start)
@@ -1133,6 +1171,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasLastPublishBadge));
         OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
         OnPropertyChanged(nameof(CanCopyLastSuccessfulArtifact));
+        OnPropertyChanged(nameof(CanClearLastPublishResult));
+        DeployDockTip = ComposeDeployDockTip();
+    }
+
+    private void NotifyActivePublishProfile()
+    {
+        OnPropertyChanged(nameof(ActivePublishProfileId));
+        OnPropertyChanged(nameof(ActivePublishProfileName));
+        OnPropertyChanged(nameof(ActivePublishProfileLabel));
+        OnPropertyChanged(nameof(HasActivePublishProfileLabel));
         DeployDockTip = ComposeDeployDockTip();
     }
 
