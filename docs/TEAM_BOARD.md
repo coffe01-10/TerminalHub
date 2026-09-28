@@ -28,7 +28,7 @@
 
 ## 已完成（近期）
 
-- [x] PR #31 Files「在此打开终端」+「复制路径」（dir→cd / file→父目录 / 剪贴板）— Devin B · `feat/files-open-in-terminal`
+- [x] PR #31 Files「在此打开终端」+「复制路径」（dir→cd / file→父目录 / 剪贴板）— Devin B · `feat/files-open-in-terminal` · `main@12defdf`
 - [x] PR #29 会话快捷键 + ••• 菜单（Ctrl+W 关会话 / Ctrl+Tab 双向循环 / 复制 CWD）— Devin · `feat/session-shortcuts` · `main@6cc8405`
 - [x] PR #27 Logs 点击跳到会话（双击 / 「跳到会话」）— GLM · `feat/logs-click-jump-session` · `main@779de78`
 - [x] PR #26 Logs 按会话筛选记忆（切换恢复各自筛选）— GLM · `feat/logs-pin-session-filters` · `main@fe75b42`
