@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 16:05 CST · 维护：Devin（PO）
+最后更新：2026-09-28 16:05 CST（规则：可拒测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -14,6 +14,7 @@
 | Deploy | **Grok** | Grok Build | `/workspace/TerminalHub-deploy` |
 
 互相可指派：冒烟、`dotnet test`、截图、rebase、审 PR。推自己分支 / `--force-with-lease` **不必问用户**。
+手上有活可以**拒绝**代跑测试/冒烟，让对方自己跑；空档再接。
 
 ## 进行中
 
@@ -25,7 +26,7 @@
 
 - [ ] 视觉 PR 合入后：整窗 1280×800 对照 mockup 走查清单（Files / Logs / SSH / Deploy / Codex / Problems）— 可派给任一人冒烟
 - [ ] Windows ConPTY 本机冒烟 — **等用户本机**（不阻塞 Linux 迭代）
-- [ ] Deploy 线下一需求（有缺口再开）— **Grok** 空档可接冒烟指派
+- [ ] Deploy 线下一需求（有缺口再开）— **Grok** 空档；可接冒烟，有活可拒
 
 ## 已完成（近期）
 
