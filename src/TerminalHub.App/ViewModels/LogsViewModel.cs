@@ -30,6 +30,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     private readonly Func<string, Task>? _copyToClipboard;
     private readonly Func<Task<string?>>? _promptExportPath;
     private readonly Action? _persistFilters;
+    /// <summary>Host activates a session by card name; returns false when unknown.</summary>
+    private readonly Func<string, bool>? _activateSession;
     private readonly int _capacity;
 
     /// <summary>True while saved values are being replayed (<see cref="ApplyPersistedFilters"/>
@@ -144,7 +146,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         int bufferCapacity = DefaultBufferCapacity,
         Func<string, Task>? copyToClipboard = null,
         Func<Task<string?>>? promptExportPath = null,
-        Action? persistFilters = null)
+        Action? persistFilters = null,
+        Func<string, bool>? activateSession = null)
     {
         _dashboard = dashboard;
         _file = file;
@@ -155,6 +158,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _copyToClipboard = copyToClipboard;
         _promptExportPath = promptExportPath;
         _persistFilters = persistFilters;
+        _activateSession = activateSession;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Entries.CollectionChanged += OnEntriesChanged;
         Refilter();
@@ -538,6 +542,39 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         {
             StatusText = $"导出失败: {ex.Message}";
         }
+    }
+
+
+    /// <summary>「跳到会话」: activate the session named in the selected entry's
+    /// <see cref="LogEntry.Source"/>. Missing/unknown source → status note, no crash.
+    /// The host keeps the Logs tab open (activation only flips ActiveSession/card).</summary>
+    [RelayCommand]
+    private void JumpToSession() => JumpToSessionEntry(SelectedEntry);
+
+    /// <summary>Double-click / Enter path — jump using the tapped entry (not just
+    /// the current selection), so a double-tap does not fight match-nav selection.</summary>
+    public void JumpToSessionEntry(LogEntry? entry)
+    {
+        if (entry is null)
+        {
+            StatusText = "没有选中的日志行";
+            return;
+        }
+        var source = entry.Source;
+        if (string.IsNullOrEmpty(source))
+        {
+            StatusText = "该行没有会话来源";
+            return;
+        }
+        if (_activateSession is null)
+        {
+            StatusText = $"无法跳到「{source}」";
+            return;
+        }
+        if (_activateSession(source))
+            StatusText = $"已跳到「{source}」";
+        else
+            StatusText = $"未找到会话「{source}」";
     }
 
     /// <summary>Rebuild the session-name filter list (call when sessions change). The
