@@ -802,20 +802,20 @@
                     </ToggleButton.Styles>
                   </ToggleButton>
                 </Grid>
-                <!-- level filter: exclusive chip bar (全部/info/warn/error) + timestamp / wrap / compact / 容量 -->
+                <!-- level filter: exclusive chip bar (全部/info/warn/error + live ring-buffer counts) + timestamp / wrap / compact / 容量 -->
                 <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
-                  <ToggleButton Classes="levelchip" Content="全部"
+                  <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelAllChipLabel}"
                                 IsChecked="{Binding Logs.LevelAllSelected}"
-                                ToolTip.Tip="显示所有级别 / show all levels"/>
-                  <ToggleButton Classes="levelchip" Content="info" Margin="4,0,0,0"
+                                ToolTip.Tip="显示所有级别 / show all levels（数字=环形缓冲总条数）"/>
+                  <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelInfoChipLabel}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.LevelInfoSelected}"
-                                ToolTip.Tip="只看 info 级行"/>
-                  <ToggleButton Classes="levelchip" Content="warn" Margin="4,0,0,0"
+                                ToolTip.Tip="只看 info 级行（数字=缓冲内 info 条数，不受当前筛选影响）"/>
+                  <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelWarnChipLabel}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.LevelWarnSelected}"
-                                ToolTip.Tip="只看 warn 级行"/>
-                  <ToggleButton Classes="levelchip" Content="error" Margin="4,0,0,0"
+                                ToolTip.Tip="只看 warn 级行（数字=缓冲内 warn 条数，不受当前筛选影响）"/>
+                  <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelErrorChipLabel}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.LevelErrorSelected}"
-                                ToolTip.Tip="只看 error 级行"/>
+                                ToolTip.Tip="只看 error 级行（数字=缓冲内 error 条数，不受当前筛选影响）"/>
                   <!-- timestamp mode: off=绝对 HH:mm:ss · on=相对「距现在」刚刚/12s/3m/1h/昨天 -->
                   <ToggleButton Classes="timechip" Content="相对" Margin="10,0,0,0"
                                 IsChecked="{Binding Logs.UseRelativeTimestamps}"

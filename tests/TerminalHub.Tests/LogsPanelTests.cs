@@ -805,8 +805,9 @@ public class LogsPanelTests
             var chips = window.GetVisualDescendants().OfType<ToggleButton>()
                 .Where(t => t.Classes.Contains("levelchip")).ToList();
             Assert.Equal(4, chips.Count);
+            // Captions carry live ring-buffer counts ("全部 0" / "info 0" …).
             Assert.All(new[] { "全部", "info", "warn", "error" },
-                label => Assert.Contains(chips, c => (string?)c.Content == label));
+                label => Assert.Contains(chips, c => ((string?)c.Content)?.StartsWith(label) == true));
 
             // Session filter is still the ComboBox it always was.
             Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(),
@@ -817,14 +818,25 @@ public class LogsPanelTests
                 vm.Dashboard.AppendOutput("info", $"chip-info-{i}", "Terminal 01");
             vm.Dashboard.AppendOutput("error", "chip-error", "Terminal 01");
             await Until(() => vm.Logs.Entries.Count >= 4);
+            await Until(() => vm.Logs.LevelAllCount >= 4);
 
-            chips.Single(c => (string?)c.Content == "error").IsChecked = true;
+            ToggleButton Chip(string prefix) =>
+                chips.Single(c => ((string?)c.Content)?.StartsWith(prefix) == true);
+
+            Chip("error").IsChecked = true;
             await Task.Delay(100);
             Assert.Equal(3, vm.Logs.LevelFilterIndex);
-            Assert.True(chips.Single(c => (string?)c.Content == "error").IsChecked);
-            Assert.False(chips.Single(c => (string?)c.Content == "全部").IsChecked);
+            Assert.True(Chip("error").IsChecked);
+            Assert.False(Chip("全部").IsChecked);
             await Until(() => vm.Logs.Entries.Count == 1); // …and really filters the list
             Assert.Equal("chip-error", vm.Logs.Entries[0].Message);
+            // Counts stay on the ring buffer — still see info:3 while viewing error.
+            Assert.Equal(4, vm.Logs.LevelAllCount);
+            Assert.Equal(3, vm.Logs.LevelInfoCount);
+            Assert.Equal(1, vm.Logs.LevelErrorCount);
+            Assert.Equal("全部 4", vm.Logs.LevelAllChipLabel);
+            Assert.Equal("info 3", vm.Logs.LevelInfoChipLabel);
+            Assert.Equal("error 1", vm.Logs.LevelErrorChipLabel);
 
             // Frame for docs: the chip bar with「error」selected, list filtered to it.
             for (var i = 0; i < 3; i++)
@@ -1873,6 +1885,170 @@ public class LogsPanelTests
             if (window.DataContext is MainWindowViewModel vmCleanup)
             {
                 vmCleanup.Logs.BufferCapacity = LogsViewModel.DefaultBufferCapacity;
+            }
+            window.Close();
+        }
+    }
+
+    // ===== level-chip live counts (ring buffer, not filtered Entries) =====
+
+    [Fact]
+    public void CountLevelsInBuffer_AndFormatLevelChipLabel_Helpers()
+    {
+        var empty = LogsViewModel.CountLevelsInBuffer([]);
+        Assert.Equal(0, empty.All);
+        Assert.Equal(0, empty.Info);
+        Assert.Equal(0, empty.Warn);
+        Assert.Equal(0, empty.Error);
+        Assert.Equal("全部 0", LogsViewModel.FormatLevelChipLabel("全部", 0));
+        Assert.Equal("info 80", LogsViewModel.FormatLevelChipLabel("info", 80));
+        Assert.Equal("warn 15", LogsViewModel.FormatLevelChipLabel("warn", 15));
+        Assert.Equal("error 5", LogsViewModel.FormatLevelChipLabel("error", 5));
+
+        var now = DateTime.UtcNow;
+        var buf = new[]
+        {
+            new LogEntry(now, "info", "a"),
+            new LogEntry(now, "INFO", "b"), // case-insensitive
+            new LogEntry(now, "warn", "c"),
+            new LogEntry(now, "error", "d"),
+            new LogEntry(now, "error", "e"),
+            new LogEntry(now, "debug", "f"), // unknown → All only
+        };
+        var c = LogsViewModel.CountLevelsInBuffer(buf);
+        Assert.Equal(6, c.All);
+        Assert.Equal(2, c.Info);
+        Assert.Equal(1, c.Warn);
+        Assert.Equal(2, c.Error);
+    }
+
+    [AvaloniaFact]
+    public async Task LevelChipCounts_TrackRingBuffer_NotFilteredEntries()
+    {
+        var (dash, logs, _) = MakeLogs();
+        Assert.Equal(0, logs.LevelAllCount);
+        Assert.Equal("全部 0", logs.LevelAllChipLabel);
+        Assert.Equal("info 0", logs.LevelInfoChipLabel);
+
+        dash.AppendOutput("info", "i1", "Terminal 01");
+        dash.AppendOutput("info", "i2", "Terminal 01");
+        dash.AppendOutput("warn", "w1", "Terminal 02");
+        dash.AppendOutput("error", "e1", "Terminal 01");
+        dash.AppendOutput("error", "e2", "Terminal 02");
+        await Until(() => logs.LevelAllCount == 5);
+
+        Assert.Equal(5, logs.LevelAllCount);
+        Assert.Equal(2, logs.LevelInfoCount);
+        Assert.Equal(1, logs.LevelWarnCount);
+        Assert.Equal(2, logs.LevelErrorCount);
+        Assert.Equal("全部 5", logs.LevelAllChipLabel);
+        Assert.Equal("info 2", logs.LevelInfoChipLabel);
+        Assert.Equal("warn 1", logs.LevelWarnChipLabel);
+        Assert.Equal("error 2", logs.LevelErrorChipLabel);
+
+        // Level filter narrows Entries but chip counts stay on the full ring buffer.
+        logs.LevelErrorSelected = true;
+        Assert.Equal(2, logs.Entries.Count);
+        Assert.Equal(5, logs.LevelAllCount);
+        Assert.Equal(2, logs.LevelInfoCount);
+        Assert.Equal("error 2", logs.LevelErrorChipLabel);
+
+        // Text filter likewise does not shrink chip counts.
+        logs.LevelAllSelected = true;
+        logs.FilterText = "nope";
+        Assert.Empty(logs.Entries);
+        Assert.Equal(5, logs.LevelAllCount);
+        Assert.Equal("全部 5", logs.LevelAllChipLabel);
+        logs.FilterText = "";
+
+        // ClearVisible on a level slice removes those lines from the buffer → counts drop.
+        logs.LevelWarnSelected = true;
+        Assert.Single(logs.Entries);
+        logs.ClearVisibleCommand.Execute(null);
+        Assert.Equal(4, logs.LevelAllCount);
+        Assert.Equal(0, logs.LevelWarnCount);
+        Assert.Equal("warn 0", logs.LevelWarnChipLabel);
+        Assert.Equal(2, logs.LevelInfoCount);
+        Assert.Equal(2, logs.LevelErrorCount);
+    }
+
+    [AvaloniaFact]
+    public async Task LevelChipCounts_TrimAndOutputClear_Recompute()
+    {
+        var (dash, logs, _) = MakeLogs(bufferCapacity: 4);
+        for (var i = 0; i < 4; i++)
+            dash.AppendOutput(i < 2 ? "info" : "error", $"t{i}", "Terminal 01");
+        await Until(() => logs.LevelAllCount == 4);
+        Assert.Equal(2, logs.LevelInfoCount);
+        Assert.Equal(2, logs.LevelErrorCount);
+
+        // Evict oldest (info) via capacity — counts follow the trim.
+        dash.AppendOutput("warn", "tw", "Terminal 01");
+        await Until(() => logs.LevelAllCount == 4 && logs.LevelWarnCount == 1);
+        Assert.Equal(1, logs.LevelInfoCount); // one info evicted
+        Assert.Equal(2, logs.LevelErrorCount);
+        Assert.Equal("全部 4", logs.LevelAllChipLabel);
+
+        // Shrink capacity → trim oldest + refresh counts.
+        logs.BufferCapacity = 2;
+        Assert.Equal(2, logs.LevelAllCount);
+        Assert.Equal("全部 2", logs.LevelAllChipLabel);
+
+        // Output clear (default) empties buffer → zeros.
+        dash.ClearOutputCommand.Execute(null);
+        Assert.Equal(0, logs.LevelAllCount);
+        Assert.Equal(0, logs.LevelInfoCount);
+        Assert.Equal("全部 0", logs.LevelAllChipLabel);
+        Assert.Equal("error 0", logs.LevelErrorChipLabel);
+    }
+
+    [AvaloniaFact]
+    public async Task LevelChipCounts_UI_EndToEnd_ChipsShowCounts()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2;
+            await Task.Delay(150);
+
+            for (var i = 0; i < 5; i++)
+                vm.Dashboard.AppendOutput("info", $"cnt-info-{i}", "Terminal 01");
+            for (var i = 0; i < 2; i++)
+                vm.Dashboard.AppendOutput("warn", $"cnt-warn-{i}", "Terminal 01");
+            for (var i = 0; i < 3; i++)
+                vm.Dashboard.AppendOutput("error", $"cnt-err-{i}", "Terminal 01");
+            await Until(() => vm.Logs.LevelAllCount >= 10);
+
+            Assert.Equal(10, vm.Logs.LevelAllCount);
+            Assert.Equal(5, vm.Logs.LevelInfoCount);
+            Assert.Equal(2, vm.Logs.LevelWarnCount);
+            Assert.Equal(3, vm.Logs.LevelErrorCount);
+
+            var chips = window.GetVisualDescendants().OfType<ToggleButton>()
+                .Where(t => t.Classes.Contains("levelchip")).ToList();
+            Assert.Contains(chips, c => (string?)c.Content == "全部 10");
+            Assert.Contains(chips, c => (string?)c.Content == "info 5");
+            Assert.Contains(chips, c => (string?)c.Content == "warn 2");
+            Assert.Contains(chips, c => (string?)c.Content == "error 3");
+
+            // Stay on「全部」so all counts are visible in the ship-bar screenshot.
+            Assert.True(vm.Logs.LevelAllSelected);
+
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-level-counts.png"));
+        }
+        finally
+        {
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
             }
             window.Close();
         }

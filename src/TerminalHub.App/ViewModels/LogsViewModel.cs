@@ -144,6 +144,63 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 
     partial void OnFollowTailChanged(bool value) => OnPropertyChanged(nameof(FollowPaused));
 
+
+    /// <summary>Tallies of <see cref="_buffer"/> by level — chip counts ignore the active
+    /// level/text/session filter so e.g. error:3 stays visible while「全部」is selected.</summary>
+    public readonly record struct LevelCounts(int All, int Info, int Warn, int Error);
+
+    /// <summary>Count info/warn/error (+ all) over a ring-buffer snapshot. Unknown levels
+    /// count toward <see cref="LevelCounts.All"/> only.</summary>
+    public static LevelCounts CountLevelsInBuffer(IEnumerable<LogEntry> buffer)
+    {
+        var info = 0; var warn = 0; var error = 0; var all = 0;
+        foreach (var e in buffer)
+        {
+            all++;
+            if (string.Equals(e.Level, "info", StringComparison.OrdinalIgnoreCase)) info++;
+            else if (string.Equals(e.Level, "warn", StringComparison.OrdinalIgnoreCase)) warn++;
+            else if (string.Equals(e.Level, "error", StringComparison.OrdinalIgnoreCase)) error++;
+        }
+        return new LevelCounts(all, info, warn, error);
+    }
+
+    /// <summary>Chip caption style matching the toolbar: <c>全部 120</c> / <c>info 80</c>.</summary>
+    public static string FormatLevelChipLabel(string name, int count) => $"{name} {count}";
+
+    /// <summary>Live totals from the ring buffer (not the filtered <see cref="Entries"/> view).</summary>
+    public int LevelAllCount { get; private set; }
+    public int LevelInfoCount { get; private set; }
+    public int LevelWarnCount { get; private set; }
+    public int LevelErrorCount { get; private set; }
+
+    /// <summary>Bindable chip captions — recomputed whenever the buffer appends/trims/clears.</summary>
+    public string LevelAllChipLabel { get; private set; } = FormatLevelChipLabel("全部", 0);
+    public string LevelInfoChipLabel { get; private set; } = FormatLevelChipLabel("info", 0);
+    public string LevelWarnChipLabel { get; private set; } = FormatLevelChipLabel("warn", 0);
+    public string LevelErrorChipLabel { get; private set; } = FormatLevelChipLabel("error", 0);
+
+    /// <summary>Recount <see cref="_buffer"/> by level and push chip labels / count props.</summary>
+    private void RefreshLevelCounts()
+    {
+        var c = CountLevelsInBuffer(_buffer);
+        LevelAllCount = c.All;
+        LevelInfoCount = c.Info;
+        LevelWarnCount = c.Warn;
+        LevelErrorCount = c.Error;
+        LevelAllChipLabel = FormatLevelChipLabel("全部", c.All);
+        LevelInfoChipLabel = FormatLevelChipLabel("info", c.Info);
+        LevelWarnChipLabel = FormatLevelChipLabel("warn", c.Warn);
+        LevelErrorChipLabel = FormatLevelChipLabel("error", c.Error);
+        OnPropertyChanged(nameof(LevelAllCount));
+        OnPropertyChanged(nameof(LevelInfoCount));
+        OnPropertyChanged(nameof(LevelWarnCount));
+        OnPropertyChanged(nameof(LevelErrorCount));
+        OnPropertyChanged(nameof(LevelAllChipLabel));
+        OnPropertyChanged(nameof(LevelInfoChipLabel));
+        OnPropertyChanged(nameof(LevelWarnChipLabel));
+        OnPropertyChanged(nameof(LevelErrorChipLabel));
+    }
+
     /// <summary>Chip names for the exclusive level bar — index i ↔ <see cref="LevelFilterIndex"/> i.</summary>
     private static readonly string[] LevelChipProps =
         [nameof(LevelAllSelected), nameof(LevelInfoSelected), nameof(LevelWarnSelected), nameof(LevelErrorSelected)];
@@ -230,7 +287,11 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             _buffer.RemoveAt(0);
             trimmed = true;
         }
-        if (trimmed) Refilter();
+        if (trimmed)
+        {
+            Refilter();
+            RefreshLevelCounts();
+        }
         OnPropertyChanged(nameof(BufferCapacity));
         NotifyCapacityChips();
         if (announce)
@@ -264,6 +325,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Entries.CollectionChanged += OnEntriesChanged;
         Refilter();
+        RefreshLevelCounts();
         if (fileLogging) FileLogging = true; // goes through OnFileLoggingChanged
     }
 
@@ -332,6 +394,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        var bufferChanged = false;
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add when e.NewItems is not null:
@@ -347,6 +410,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
                     }
                     if (Matches(entry)) Entries.Add(entry);
                 }
+                bufferChanged = true;
                 break;
             case NotifyCollectionChangedAction.Reset:
                 // Output panel cleared. Default: follow (drop our history too);
@@ -355,12 +419,14 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
                 {
                     _buffer.Clear();
                     Entries.Clear();
+                    bufferChanged = true;
                 }
                 break;
             default:
                 // Output trimmed its oldest line (Remove) — our buffer keeps its own copy.
                 break;
         }
+        if (bufferChanged) RefreshLevelCounts();
     }
 
     /// <summary>Selection bookkeeping over the filtered view: a refilter invalidates
@@ -597,6 +663,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _buffer.RemoveAll(e => dismissed.Contains(e));
         var n = Entries.Count;
         Entries.Clear();
+        RefreshLevelCounts();
         StatusText = $"已清空 {n} 行";
     }
 
