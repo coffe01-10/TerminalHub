@@ -32,6 +32,8 @@ public sealed class AppSettings
     public string WorkspaceName { get; set; } = "MangaFlow";
     /// <summary>When true, session output is also written to a local log file.</summary>
     public bool SessionLogToFile { get; set; }
+    /// <summary>Saved SSH connections for the right-rail SSH tab.</summary>
+    public List<TerminalHub.Core.Ssh.SshHost> SshHosts { get; set; } = [];
     public List<StartupSession> StartupSessions { get; set; } =
     [
         new StartupSession { Name = "Terminal 01", Tag = "开发环境" },

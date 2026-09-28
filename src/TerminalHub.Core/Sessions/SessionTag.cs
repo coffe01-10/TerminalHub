@@ -8,6 +8,7 @@ public enum SessionTag
     Test,
     Deploy,
     Codex,
+    Ssh,
 }
 
 public static class SessionTagExtensions
@@ -18,6 +19,7 @@ public static class SessionTagExtensions
         SessionTag.Test => "测试环境",
         SessionTag.Deploy => "部署控制",
         SessionTag.Codex => "Codex",
+        SessionTag.Ssh => "SSH",
         _ => "",
     };
 
@@ -28,6 +30,7 @@ public static class SessionTagExtensions
         SessionTag.Test => "#A78BFA",  // violet
         SessionTag.Deploy => "#F472B6", // pink
         SessionTag.Codex => "#34D399",  // green
+        SessionTag.Ssh => "#FB923C",   // orange
         _ => "#64748B",
     };
 }

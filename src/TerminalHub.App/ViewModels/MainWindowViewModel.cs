@@ -62,6 +62,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public AiPanelViewModel Assistant { get; }
     public FilesViewModel Files { get; }
     public LogsViewModel Logs { get; }
+    public SshViewModel Ssh { get; }
     private readonly SessionLogFile _sessionLog = new();
 
     public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null)
@@ -81,6 +82,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
             v => _settings.SessionLogToFile = v);
+        Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         _sessions.SessionAdded += OnSessionAdded;
         _sessions.SessionRemoved += OnSessionRemoved;
@@ -109,6 +111,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         "测试环境" or "test" or "Test" => SessionTag.Test,
         "部署控制" or "deploy" or "Deploy" => SessionTag.Deploy,
         "Codex" => SessionTag.Codex,
+        "SSH" or "ssh" => SessionTag.Ssh,
         _ => SessionTag.None,
     };
 
@@ -130,6 +133,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             PtySessionFactory.Create,
             new PtyOptions { Shell = shellCmd, WorkingDirectory = cwd },
             name, tag);
+    }
+
+    /// <summary>SSH tab → spawn a session running the local ssh binary.</summary>
+    private void ConnectSsh(TerminalHub.Core.Ssh.SshHost host)
+    {
+        Dashboard.AppendOutput("info", $"SSH 连接: {host.CommandLine}", "ssh");
+        _ = _sessions.CreateAsync(
+            PtySessionFactory.Create,
+            new PtyOptions
+            {
+                Shell = "ssh",
+                Arguments = host.SshArguments,
+                WorkingDirectory = OperatingSystem.IsWindows()
+                    ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            },
+            host.DisplayName, SessionTag.Ssh);
     }
 
     [RelayCommand]

@@ -5,6 +5,7 @@
         xmlns:mon="using:TerminalHub.Core.Monitoring"
         xmlns:ai="using:TerminalHub.Core.AI"
         xmlns:files="using:TerminalHub.Core.Files"
+        xmlns:ssh="using:TerminalHub.Core.Ssh"
         x:Class="TerminalHub.App.Views.MainWindow"
         x:Name="Root"
         x:DataType="vm:MainWindowViewModel"
@@ -655,9 +656,86 @@
               </Grid>
 
               <!-- ===== SSH ===== -->
-              <TextBlock IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
-                         Text="SSH — saved connections (stub)" Foreground="#64748B"
-                         FontSize="11" Margin="8" TextWrapping="Wrap"/>
+              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
+                    RowDefinitions="Auto,*,Auto">
+                <!-- edit form -->
+                <Border CornerRadius="8" Background="#CC141B29" BorderBrush="#332A3142"
+                        BorderThickness="1" Padding="8" Margin="0,2,0,6">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="新建 / 编辑连接" FontSize="10.5" FontWeight="SemiBold" Foreground="#94A3B8"/>
+                    <Grid ColumnDefinitions="*,*">
+                      <TextBox Text="{Binding Ssh.EditName}" Watermark="名称 (可选)"
+                               Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
+                               Foreground="#E2E8F0" Padding="8,3" FontSize="10.5"/>
+                      <TextBox Grid.Column="1" Text="{Binding Ssh.EditUser}" Watermark="用户"
+                               Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
+                               Foreground="#E2E8F0" Padding="8,3" FontSize="10.5" Margin="6,0,0,0"/>
+                    </Grid>
+                    <TextBox Text="{Binding Ssh.EditHost}" Watermark="主机 host / IP"
+                             Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
+                             Foreground="#E2E8F0" Padding="8,3" FontSize="10.5"
+                             FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBox Text="{Binding Ssh.EditPort}" Watermark="端口"
+                               Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
+                               Foreground="#E2E8F0" Padding="8,3" FontSize="10.5"/>
+                      <Button Grid.Column="1" Content="＋ 添加/更新" Margin="6,0,0,0" Padding="10,3"
+                              CornerRadius="6" Background="#3B82F6" Foreground="White" FontSize="10"
+                              Command="{Binding Ssh.AddOrUpdateCommand}"/>
+                    </Grid>
+                    <TextBlock Text="{Binding Ssh.StatusText}" FontSize="9.5" TextWrapping="Wrap"
+                               Foreground="#FBBF24"
+                               IsVisible="{Binding Ssh.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                  </StackPanel>
+                </Border>
+
+                <!-- saved hosts -->
+                <Border Grid.Row="1" CornerRadius="8" Background="#CC141B29"
+                        BorderBrush="#332A3142" BorderThickness="1">
+                  <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
+                           Background="Transparent" BorderThickness="0" Padding="4">
+                    <ListBox.Styles>
+                      <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="6,4"/>
+                        <Setter Property="Margin" Value="0,1"/>
+                        <Setter Property="CornerRadius" Value="6"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                      </Style>
+                      <Style Selector="ListBoxItem:pointerover">
+                        <Setter Property="Background" Value="#22131A28"/>
+                      </Style>
+                      <Style Selector="ListBoxItem:selected">
+                        <Setter Property="Background" Value="#3B233246"/>
+                      </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="ssh:SshHost">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                          <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DisplayName}" FontSize="10.5" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                            <TextBlock Text="{Binding CommandLine}" FontSize="9" Foreground="#64748B"
+                                       FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="连接" Padding="8,2" Margin="6,0,0,0"
+                                  CornerRadius="5" Background="#26303F" Foreground="#38BDF8"
+                                  BorderBrush="#2A3142" FontSize="10"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Ssh.ConnectCommand}"
+                                  CommandParameter="{Binding}"/>
+                          <Button Grid.Column="2" Content="✕" Padding="6,2" Margin="4,0,0,0"
+                                  CornerRadius="5" Background="Transparent" Foreground="#64748B"
+                                  BorderThickness="0" FontSize="10"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Ssh.RemoveCommand}"
+                                  CommandParameter="{Binding}"/>
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Border>
+
+                <TextBlock Grid.Row="2" FontSize="9" Foreground="#475569" Margin="2,6,2,0"
+                           TextWrapping="Wrap"
+                           Text="连接使用本机 ssh 命令:密码 / 密钥确认直接在终端会话中完成;密钥建议用 ssh-agent 或 ~/.ssh/config。"/>
+              </Grid>
 
               <!-- ===== Codex assistant ===== -->
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
