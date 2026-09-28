@@ -1,8 +1,12 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.VisualTree;
+using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
 using TerminalHub.App.Views;
 using TerminalHub.Core.Logging;
@@ -782,6 +786,314 @@ public class LogsPanelTests
         {
             vm.Dispose();
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    // ===== search highlight (HighlightTextBlock) +「上一条/下一条」match navigation =====
+
+    /// <summary>A highlighted span: the same yellow-bold style the Search tab uses.</summary>
+    private static bool IsMatchRun(Run r)
+        => r.Foreground is ISolidColorBrush b
+           && b.Color == Color.Parse("#FDE047") && r.FontWeight == FontWeight.Bold;
+
+    private static List<Run> Runs(HighlightTextBlock h) => h.Inlines!.OfType<Run>().ToList();
+
+    [AvaloniaFact]
+    public void HighlightTextBlock_Literal_EveryCaseInsensitiveMatch_YellowBold()
+    {
+        var h = new HighlightTextBlock { LineText = "GET /api/get?get=1" };
+        h.Query = "get";
+        // The Search tab's default mode: plain literal, case-insensitive, all spans.
+        var runs = Runs(h);
+        Assert.Equal(new[] { "GET", " /api/", "get", "?", "get", "=1" },
+            runs.Select(r => r.Text));
+        Assert.True(IsMatchRun(runs[0]));   // GET  (case differs from query)
+        Assert.False(IsMatchRun(runs[1]));  // separator stays plain
+        Assert.True(IsMatchRun(runs[2]));
+        Assert.False(IsMatchRun(runs[3]));
+        Assert.True(IsMatchRun(runs[4]));
+        Assert.False(IsMatchRun(runs[5]));
+
+        // No query → one plain run; the whole text survives verbatim.
+        h.Query = "";
+        var plain = Assert.Single(Runs(h));
+        Assert.Equal("GET /api/get?get=1", plain.Text);
+        Assert.False(IsMatchRun(plain));
+    }
+
+    [AvaloniaFact]
+    public void HighlightTextBlock_Regex_HighlightsMatches_PlainOnInvalidOrEmpty()
+    {
+        var h = new HighlightTextBlock { LineText = "GET /a 200 in 12ms" };
+        h.UseRegex = true;
+        h.Query = @"\d+";
+        var runs = Runs(h);
+        Assert.Equal(new[] { "GET /a ", "200", " in ", "12", "ms" }, runs.Select(r => r.Text));
+        Assert.False(IsMatchRun(runs[0]));
+        Assert.True(IsMatchRun(runs[1]));   // 200
+        Assert.True(IsMatchRun(runs[3]));   // 12
+        Assert.False(IsMatchRun(runs[4]));
+
+        // Regex semantics really apply (literal mode would not match "\d" at all).
+        h.Query = @"2\d\d";
+        runs = Runs(h);
+        var hit = Assert.Single(runs, IsMatchRun);
+        Assert.Equal("200", hit.Text);
+
+        // Broken pattern: never throws, renders the line plain (the VM matches nothing).
+        h.Query = "([unclosed";
+        runs = Runs(h);
+        var plain = Assert.Single(runs);
+        Assert.Equal("GET /a 200 in 12ms", plain.Text);
+        Assert.False(IsMatchRun(plain));
+
+        // Zero-width matches highlight nothing but keep the text intact.
+        h.Query = "x*";
+        plain = Assert.Single(Runs(h));
+        Assert.Equal("GET /a 200 in 12ms", plain.Text);
+
+        // Toggle back to literal: pattern chars are taken verbatim again.
+        h.UseRegex = false;
+        h.Query = "2\\d\\d"; // the literal backslashes, not the regex class
+        plain = Assert.Single(Runs(h));
+        Assert.Equal("GET /a 200 in 12ms", plain.Text);
+        Assert.False(IsMatchRun(plain));
+    }
+
+    [AvaloniaFact]
+    public async Task MatchNav_GoNextPrev_StepsThroughMatches_NoWrap_PausesFollow()
+    {
+        var (dash, logs, _) = MakeLogs();
+        for (var i = 0; i < 5; i++)
+            dash.AppendOutput("info", $"hit {i}", "Terminal 01");
+        dash.AppendOutput("info", "unrelated", "Terminal 01");
+        await Until(() => logs.Entries.Count == 6);
+
+        logs.FilterText = "hit";
+        Assert.Equal(5, logs.Entries.Count);
+        Assert.Equal(-1, logs.SelectedIndex); // fresh filter → nothing selected
+        Assert.False(logs.CanGoPrevMatch);    // nothing before the start
+        Assert.True(logs.CanGoNextMatch);
+
+        logs.GoNextMatchCommand.Execute(null); // first press selects the first match
+        Assert.Equal(0, logs.SelectedIndex);
+        Assert.Equal("hit 0", logs.SelectedEntry!.Message);
+        Assert.False(logs.CanGoPrevMatch);    // at the top: no wrap
+        Assert.True(logs.CanGoNextMatch);
+        Assert.False(logs.FollowTail);        // navigating pauses tail-follow
+        Assert.Contains("匹配 1/5", logs.StatusText);
+
+        logs.GoNextMatchCommand.Execute(null);
+        logs.GoNextMatchCommand.Execute(null); // → 2
+        logs.GoPrevMatchCommand.Execute(null); // → 1
+        Assert.Equal(1, logs.SelectedIndex);
+        Assert.True(logs.CanGoPrevMatch);
+        Assert.Contains("匹配 2/5", logs.StatusText);
+
+        for (var i = 0; i < 10; i++) logs.GoNextMatchCommand.Execute(null);
+        Assert.Equal(4, logs.SelectedIndex);  // clamped at the last match
+        Assert.False(logs.CanGoNextMatch);    // at the bottom: no wrap
+        Assert.True(logs.CanGoPrevMatch);
+
+        for (var i = 0; i < 10; i++) logs.GoPrevMatchCommand.Execute(null);
+        Assert.Equal(0, logs.SelectedIndex);  // clamped at the first match
+        Assert.False(logs.CanGoPrevMatch);
+    }
+
+    [AvaloniaFact]
+    public async Task MatchNav_Disabled_WhenNoFilter_NoMatches_OrBrokenRegex()
+    {
+        var (dash, logs, _) = MakeLogs();
+        dash.AppendOutput("info", "alpha", "Terminal 01");
+        await Until(() => logs.Entries.Count == 1);
+
+        // No text filter → both nav buttons inert even with entries present.
+        Assert.False(logs.CanGoPrevMatch);
+        Assert.False(logs.CanGoNextMatch);
+        logs.GoNextMatchCommand.Execute(null);
+        Assert.Equal(-1, logs.SelectedIndex);
+        Assert.True(logs.FollowTail);
+
+        // Filter that matches nothing → no entries to navigate.
+        logs.FilterText = "zzz";
+        Assert.Empty(logs.Entries);
+        Assert.False(logs.CanGoPrevMatch);
+        Assert.False(logs.CanGoNextMatch);
+
+        // Broken regex → filter matches nothing, nav stays disabled.
+        logs.UseRegex = true;
+        logs.FilterText = "([bad";
+        Assert.NotEmpty(logs.FilterError);
+        Assert.False(logs.CanGoPrevMatch);
+        Assert.False(logs.CanGoNextMatch);
+
+        // Repairing the pattern re-enables navigation over the matches.
+        logs.FilterText = "al.*a";
+        Assert.True(logs.CanGoNextMatch);
+        logs.GoNextMatchCommand.Execute(null);
+        Assert.Equal(0, logs.SelectedIndex);
+        Assert.Equal("alpha", logs.SelectedEntry!.Message);
+    }
+
+    [AvaloniaFact]
+    public async Task MatchNav_FilterChange_ResetsSelection_ClickStyleSelectionWorks()
+    {
+        var (dash, logs, _) = MakeLogs();
+        for (var i = 0; i < 3; i++)
+            dash.AppendOutput("info", $"hit {i}", "Terminal 01");
+        await Until(() => logs.Entries.Count == 3);
+
+        logs.FilterText = "hit";
+        logs.GoNextMatchCommand.Execute(null);
+        logs.GoNextMatchCommand.Execute(null);
+        logs.GoNextMatchCommand.Execute(null);
+        Assert.Equal(2, logs.SelectedIndex);
+
+        // Refilter invalidates positions → selection restarts from「nothing selected」.
+        logs.FilterText = "hit 2";
+        Assert.Single(logs.Entries);
+        Assert.Equal(-1, logs.SelectedIndex);
+        Assert.False(logs.CanGoPrevMatch);
+
+        // A plain list click (two-way SelectedIndex) keeps the button states honest.
+        logs.FilterText = "hit";
+        logs.SelectedIndex = 2;
+        Assert.Equal("hit 2", logs.SelectedEntry!.Message);
+        Assert.True(logs.CanGoPrevMatch);
+        Assert.False(logs.CanGoNextMatch); // clicked the last row
+        logs.SelectedIndex = 0;
+        Assert.False(logs.CanGoPrevMatch);
+        Assert.True(logs.CanGoNextMatch);
+
+        // Clearing the filter drops back to no-selection, both disabled.
+        logs.FilterText = "";
+        Assert.Equal(3, logs.Entries.Count);
+        Assert.Equal(-1, logs.SelectedIndex);
+        Assert.False(logs.CanGoPrevMatch);
+        Assert.False(logs.CanGoNextMatch);
+    }
+
+    [AvaloniaFact]
+    public async Task MatchNav_SelectionTracksEviction_KeepsSameEntry()
+    {
+        // Live churn must not strand the selection: buffer eviction shifts the index
+        // so the same log line stays selected; losing it entirely deselects cleanly.
+        var (dash, logs, _) = MakeLogs(bufferCapacity: 5);
+        for (var i = 0; i < 5; i++)
+            dash.AppendOutput("info", $"l{i}", "Terminal 01");
+        await Until(() => logs.Entries.Count == 5);
+        logs.FilterText = "l";
+
+        for (var i = 0; i < 5; i++) logs.GoNextMatchCommand.Execute(null); // -1 → 0..4
+        Assert.Equal(4, logs.SelectedIndex);
+        Assert.Equal("l4", logs.SelectedEntry!.Message);
+
+        dash.AppendOutput("info", "l5", "Terminal 01");
+        dash.AppendOutput("info", "l6", "Terminal 01");
+        await Until(() => logs.Entries.Count == 5 && logs.Entries[^1].Message == "l6");
+        Assert.Equal(2, logs.SelectedIndex);       // l0/l1 evicted → index shifted down
+        Assert.Equal("l4", logs.SelectedEntry!.Message); // …same line still selected
+        Assert.True(logs.CanGoPrevMatch);
+        Assert.True(logs.CanGoNextMatch);
+    }
+
+    [AvaloniaFact]
+    public async Task SearchHighlight_UI_EndToEnd_RowsHighlight_NavButtonsBind()
+    {
+        // Full chain on the real MainWindow: rows re-render with yellow-bold spans
+        // for the active filter (literal and regex), the ▲/▼ buttons bind to the
+        // nav commands with honest IsEnabled, and selection reaches the real ListBox.
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2; // Logs
+            await Task.Delay(150);
+
+            for (var i = 0; i < 6; i++)
+                vm.Dashboard.AppendOutput("info", $"needle line {i}", "Terminal 01");
+            vm.Dashboard.AppendOutput("info", "unrelated noise", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 7);
+
+            var prevBtn = window.GetVisualDescendants().OfType<Button>()
+                .Single(b => ReferenceEquals(b.Command, vm.Logs.GoPrevMatchCommand));
+            var nextBtn = window.GetVisualDescendants().OfType<Button>()
+                .Single(b => ReferenceEquals(b.Command, vm.Logs.GoNextMatchCommand));
+            var list = window.GetVisualDescendants().OfType<ListBox>()
+                .Single(l => ReferenceEquals(l.ItemsSource, vm.Logs.Entries));
+
+            vm.Logs.FilterText = "needle";
+            await Until(() => vm.Logs.Entries.Count == 6);
+            await Task.Delay(150); // row bindings deliver Query/UseRegex
+            Assert.False(prevBtn.IsEnabled); // nothing selected yet
+            Assert.True(nextBtn.IsEnabled);
+
+            // Every visible Message row highlights the matched span, source stays plain.
+            var rows = window.GetVisualDescendants().OfType<HighlightTextBlock>()
+                .Where(h => h.LineText!.Contains("needle")).ToList();
+            Assert.Equal(6, rows.Count);
+            Assert.All(rows, h =>
+            {
+                var runs = Runs(h);
+                Assert.Equal(new[] { "needle", h.LineText!["needle".Length..] }, // " line {i}"
+                    runs.Select(r => r.Text));
+                Assert.True(IsMatchRun(runs[0]));
+                Assert.False(IsMatchRun(runs[1]));
+            });
+
+            // ▼ 下一条: selects through the two-way binding, pauses follow-tail.
+            nextBtn.Command!.Execute(null);
+            await Task.Delay(100);
+            Assert.Equal(0, vm.Logs.SelectedIndex);
+            Assert.Equal(0, list.SelectedIndex); // reached the real ListBox
+            Assert.False(vm.Logs.FollowTail);
+            Assert.False(prevBtn.IsEnabled);      // still on the first match
+            nextBtn.Command.Execute(null);
+            await Task.Delay(100);
+            Assert.Equal(1, vm.Logs.SelectedIndex);
+            Assert.True(prevBtn.IsEnabled);
+
+            // Frame for docs: filtered rows with yellow spans + selected match.
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-search-highlight.png"));
+
+            // Regex mode: the whole match (needle line N) becomes one span.
+            vm.Logs.UseRegex = true;
+            vm.Logs.FilterText = @"needle line \d";
+            await Until(() => vm.Logs.Entries.Count == 6);
+            await Task.Delay(150);
+            rows = window.GetVisualDescendants().OfType<HighlightTextBlock>()
+                .Where(h => h.LineText!.Contains("needle")).ToList();
+            Assert.Equal(6, rows.Count);
+            Assert.All(rows, h =>
+            {
+                var run = Assert.Single(Runs(h));
+                Assert.Equal(h.LineText, run.Text);
+                Assert.True(IsMatchRun(run));
+            });
+
+            // Broken pattern: nothing matches (no rows to mis-highlight), no crash, nav disabled.
+            // The invalid-pattern-renders-plain guarantee itself is covered by the
+            // HighlightTextBlock unit tests above.
+            vm.Logs.FilterText = "([oops";
+            await Until(() => vm.Logs.Entries.Count == 0);
+            Assert.NotEmpty(vm.Logs.FilterError);
+            Assert.False(nextBtn.IsEnabled);
+        }
+        finally
+        {
+            // Filter state persists to the shared settings.json now — leave it clean.
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
+            }
+            window.Close();
         }
     }
 }
