@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### PR — Logs 点击跳到会话 (`feat/logs-click-jump-session`)
+### PR #27 — Logs 点击跳到会话 (`feat/logs-click-jump-session`)
 - **双击 / 「↗ 跳到会话」**: Logs 列表行的 `LogEntry.Source` 若是会话名，则激活对
   应 `SessionCard` / `ActiveSession`（经 `MainWindowViewModel.TryActivateSessionByName`）；
   **Logs 页保持打开**（不改 `SelectedRightTab`）。状态行 `已跳到「Terminal 03」`。
