@@ -28,6 +28,7 @@
   退出记一条 `publish cancelled`（source `deploy`），`PublishBusy` 回到 false，可再次打包。
   空闲时取消只警告一次；重复取消不再多记。
 - 配置档与最近产物（PR #22）行为不变。
+- 实机截图：`docs/screenshots/deploy-stream-cancel.png`（Output `deploy` 流 + 右键「取消打包」）。
 
 ### PR #26 — Logs 按会话筛选记忆 (`feat/logs-pin-session-filters`)
 - **per-session 记忆**: 会话下拉选中具名会话时，其筛选组合（FilterText /
