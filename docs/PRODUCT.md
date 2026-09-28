@@ -82,10 +82,10 @@ Ship a usable Windows terminal control center MVP+ that closely matches the glas
 
 ## Success criteria (MVP+)
 
-- [ ] Sessions create/switch/close with ConPTY (or documented Windows-only path + Linux mock)
-- [ ] Process monitor + CPU/Mem/Disk/Net widgets update live
-- [ ] Bottom dock + settings persist
-- [ ] AI panel UI + interface stub (no paid calls)
-- [ ] Installer script (Inno/NSIS or MSIX) checked in
-- [ ] README with Windows build/run/package steps
-- [ ] UI recognizable vs both design PNGs
+- [x] Sessions create/switch/close with ConPTY (or documented Windows-only path + Linux mock)
+- [x] Process monitor + CPU/Mem/Disk/Net widgets update live
+- [x] Bottom dock + settings persist
+- [x] AI panel UI + interface stub (no paid calls)
+- [x] Installer script (Inno/NSIS or MSIX) checked in
+- [x] README with Windows build/run/package steps
+- [x] UI recognizable vs both design PNGs
