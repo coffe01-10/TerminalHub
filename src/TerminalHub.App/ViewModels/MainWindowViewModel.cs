@@ -85,7 +85,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Dashboard = new DashboardViewModel(_monitor);
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
-        Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.MockAiAssistant());
+        Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.LocalAiAssistant(),
+            msg => Dashboard.AppendOutput("info", msg, "codex"));
         Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory);
         Logs = new LogsViewModel(Dashboard, _sessionLog,
             () => SessionCards.Select(c => c.Name).ToList(),
@@ -335,9 +336,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SubmitCommandInput()
     {
-        if (string.IsNullOrEmpty(CommandInput) || ActiveSession is null) return;
-        ActiveSession.Emulator.SendText(CommandInput + "\r");
+        if (string.IsNullOrEmpty(CommandInput)) return;
+        var text = CommandInput;
         CommandInput = "";
+        if (text.StartsWith('?') || text.StartsWith("ai:", StringComparison.OrdinalIgnoreCase))
+        {
+            var query = text.TrimStart('?').Trim();
+            if (query.StartsWith("ai:", StringComparison.OrdinalIgnoreCase))
+                query = query[3..].TrimStart();
+            if (query.Length == 0) return;
+            _ = Assistant.SubmitQueryAsync(query);
+            return;
+        }
+        if (ActiveSession is null) return;
+        ActiveSession.Emulator.SendText(text + "\r");
     }
 
     /// <summary>Per-session UTF-8 line decoders feeding the real Output log.</summary>
@@ -365,13 +377,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         dec.Feed(data.Span);
     }
 
-    private static string ClassifyLine(string line)
-    {
-        if (line.Contains("error", StringComparison.OrdinalIgnoreCase)
-            || line.Contains("fail", StringComparison.OrdinalIgnoreCase)) return "error";
-        if (line.Contains("warn", StringComparison.OrdinalIgnoreCase)) return "warn";
-        return "info";
-    }
+    private static string ClassifyLine(string line) => LineClassifier.Classify(line);
 
     private void OnSessionAdded(TerminalSessionModel s)
     {

@@ -125,7 +125,7 @@ public partial class DashboardViewModel : ViewModelBase
         {
             OutputLog.Add(new LogEntry(DateTime.Now, level, message, source));
             while (OutputLog.Count > MaxOutputLines) OutputLog.RemoveAt(0);
-            if (level is "warn" or "error")
+            if (level == "error")
             {
                 Problems.Add(new LogEntry(DateTime.Now, level, message, source));
                 while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
@@ -137,6 +137,12 @@ public partial class DashboardViewModel : ViewModelBase
     public void ClearOutput()
     {
         OutputLog.Clear();
+        ClearProblems();
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    public void ClearProblems()
+    {
         Problems.Clear();
         ProblemCount = 0;
     }
