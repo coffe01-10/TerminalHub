@@ -14,6 +14,8 @@
 - **边界**: 不改 CopyVisible / Export；不动 Deploy/Files/SSH/PTY。
 - **验证**: 204 tests green（+2：选中行 FormatLine 绝对 + 无选中/无剪贴板软失败）。worktree
   `/workspace/TerminalHub-logs2`；工具 Grok Build。
+- 截图 `docs/screenshots/logs-copy-selected-line.png`（Logs 工具行「⧉ 复制选中」可见；DISPLAY=:9 Release）。
+  已 rebase 到 `origin/main`（含 #35 @16a8575）。
 
 ### PR #30 — Logs 时间戳相对/绝对切换 (`feat/logs-timestamp-toggle`)
 - **规则（距现在 ago-from-now）**: 关=绝对本地时钟 `HH:mm:ss`；开=相对短标签
