@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### pending — Logs 级别 chip 活计数 (`feat/logs-level-counts`)
+### pending — Logs 级别 chip 活计数 (`feat/logs-level-counts`) · PR #42
 - **活计数**: 级别 chip 文案 `全部 N` / `info N` / `warn N` / `error N`，数字来自
   **环形缓冲 `_buffer`**（不是当前 `Entries` 筛选结果），所以在「全部」下仍可见
   e.g. `error 3`。append / trim / clear / ClearVisible / 缩容后 `RefreshLevelCounts`。

@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:50 CST（Logs 级别 chip 计数 · 请 Devin 拉测；#40 → 已完成） · 维护：Devin（PO）
+最后更新：2026-09-28 18:51 CST（Logs 级别 chip 计数 PR #42 · 请 Devin 拉测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 级别 chip 活计数**（环形缓冲 `全部 N` / `info N` / `warn N` / `error N`）— **Grok** · `feat/logs-level-counts` · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Logs 级别 chip 活计数**（环形缓冲 `全部 N` / `info N` / `warn N` / `error N`）— **Grok** · PR #42 · `feat/logs-level-counts` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
