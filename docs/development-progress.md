@@ -44,6 +44,21 @@
 - Headless UI test renders both dashboard + Codex frames to PNG.
 - Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
 
+### PR #5 — Linux-runnable build (`feat/linux-run`)
+- **Verified real GUI on this box** (X.Org `:7`): `dotnet run` opens the window;
+  three `forkpty` bash sessions; `xdotool` typed `echo HELLO_FROM_LINUX_$((40+2))`
+  → `HELLO_FROM_LINUX_42` executed; thumbnails updated live; process table +
+  CPU/Mem/Disk/Net widgets all real data.
+- `scripts/run-linux.sh` — dep check (X11 libs) + `dotnet run`; `--headless`
+  runs under Xvfb; `--mock` forces mock PTY.
+- `scripts/publish-linux.sh` — self-contained `linux-x64` single-file publish
+  (86 MB); **published binary verified launching its own GUI instance**.
+- `docs/local-debugging.md` — 本机调试: deps, Xvfb/xdotool automation,
+  headless frames, platform matrix.
+- `docs/screenshots/` — real X11 captures committed (terminal + Codex views).
+- Installed on box: `x11-apps` (xwd), `imagemagick` for capture; existing
+  `xdotool`/`xvfb` used.
+
 ### PR #4 — Packaging + docs (`feat/packaging-docs`)
 - `packaging/TerminalHub.iss` — Inno Setup (x64, zh+en, desktop icon,
   single-instance-friendly uninstall/taskkill)
