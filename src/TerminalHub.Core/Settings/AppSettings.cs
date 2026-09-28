@@ -18,6 +18,17 @@ public sealed record StartupSession
     public ShellKind Shell { get; init; } = ShellKind.PowerShell;
 }
 
+/// <summary>Logs panel: one named session's remembered filter combo (per-session filter memory).</summary>
+public sealed class LogsSessionFilterState
+{
+    /// <summary>Last text filter for this session ("" = none).</summary>
+    public string FilterText { get; set; } = "";
+    public bool UseRegex { get; set; }
+    /// <summary>0=全部, 1=info, 2=warn, 3=error (clamped on use).</summary>
+    public int LevelFilterIndex { get; set; }
+    public bool RetainHistoryOnClear { get; set; }
+}
+
 /// <summary>Persisted application settings (JSON on disk).</summary>
 public sealed class AppSettings
 {
@@ -40,6 +51,17 @@ public sealed class AppSettings
     public int LogsLevelFilterIndex { get; set; }
     /// <summary>Logs panel: keep the buffered history when the Output panel is cleared.</summary>
     public bool LogsRetainHistoryOnClear { get; set; }
+
+    /// <summary>Logs panel: per-session filter memory keyed by session name — each named
+    /// session's last filter combo. 「全部会话」(dropdown index 0) is NOT in the map;
+    /// it uses the global <see cref="LogsFilterText"/>-family fields above as its slot.</summary>
+    public Dictionary<string, LogsSessionFilterState> LogsSessionFilters
+    {
+        get => _logsSessionFilters;
+        set => _logsSessionFilters = value ?? new Dictionary<string, LogsSessionFilterState>();
+    }
+    private Dictionary<string, LogsSessionFilterState> _logsSessionFilters = new();
+
     /// <summary>Saved SSH connections for the right-rail SSH tab.</summary>
     public List<TerminalHub.Core.Ssh.SshHost> SshHosts { get; set; } = [];
 

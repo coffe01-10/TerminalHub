@@ -158,9 +158,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             copyToClipboard: CopyTextToClipboardAsync,
             promptExportPath: PromptExportPathAsync,
             persistFilters: PersistLogsFilters);
-        // Replay the filters saved from the previous run (never writes back).
+        // Replay the filters saved from the previous run (never writes back):
+        // the global combo for「全部会话」, plus each named session's own memory.
         Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
             _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear);
+        Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
@@ -817,13 +819,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SaveSettingsInternal() => _settingsStore.Save(_settings);
 
     /// <summary>Logs filter changed → copy into <see cref="_settings"/> and save
-    /// (small JSON; every change is fine, no debounce needed).</summary>
+    /// (small JSON; every change is fine, no debounce needed). The global fields keep
+    /// 「全部会话」's last known combo; named sessions persist in their own map.</summary>
     private void PersistLogsFilters()
     {
-        _settings.LogsFilterText = Logs.FilterText;
-        _settings.LogsUseRegex = Logs.UseRegex;
-        _settings.LogsLevelFilterIndex = Logs.LevelFilterIndex;
-        _settings.LogsRetainHistoryOnClear = Logs.RetainHistoryOnClear;
+        var global = Logs.SnapshotGlobalFilters();
+        _settings.LogsFilterText = global.FilterText;
+        _settings.LogsUseRegex = global.UseRegex;
+        _settings.LogsLevelFilterIndex = global.LevelFilterIndex;
+        _settings.LogsRetainHistoryOnClear = global.RetainHistoryOnClear;
+        _settings.LogsSessionFilters = Logs.SnapshotSessionFilters();
         SaveSettingsInternal();
     }
 
