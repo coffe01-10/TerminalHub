@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using TerminalHub.Core.Pty;
+using TerminalHub.Core.Terminal;
 
 namespace TerminalHub.Core.Sessions;
 
@@ -25,19 +26,21 @@ public sealed class SessionManager
         PtyOptions options,
         string? name = null,
         SessionTag tag = SessionTag.None,
+        int columns = 120,
+        int rows = 30,
         CancellationToken cancellationToken = default)
     {
-        var pty = ptyFactory();
-        await pty.StartAsync(options, cancellationToken);
+        var emulator = new TerminalEmulator(ptyFactory(), columns, rows);
+        await emulator.StartAsync(options, cancellationToken);
 
         var session = new TerminalSessionModel
         {
             Name = name ?? $"Terminal {++_counter:D2}",
             Tag = tag,
-            Pty = pty,
+            Emulator = emulator,
             WorkingDirectory = options.WorkingDirectory,
         };
-        pty.Exited += (_, _) => SessionStateChanged?.Invoke(session);
+        emulator.Pty.Exited += (_, _) => SessionStateChanged?.Invoke(session);
 
         Sessions.Add(session);
         SessionAdded?.Invoke(session);
