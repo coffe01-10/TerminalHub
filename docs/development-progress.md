@@ -4,6 +4,7 @@
 
 ## 2026-09-28
 
+<<<<<<< HEAD
 ### PR #21 — 工具栏 CWD 真动作 ⟳/←/→ (`feat/toolbar-cwd-nav`)
 - **真实 CWD 链路**:`IPtySession.ProcessId`(Linux forkpty 子 pid /
   ConPTY process id / Mock null)+ `ProcessCwd.TryRead`(Linux 读
@@ -26,6 +27,27 @@
   DISPLAY=:7 实机:`cd /tmp` → 路径条 `~/tmp` 自动变 → ← 发
   `cd '/home/box'` → → 发 `cd '/tmp'` → ⟳ 一致。截图
   `toolbar-cwd-nav.png`。
+
+### PR #20 — 「↗ 在新窗口打开」会话弹出独立窗 (`feat/open-new-window`)
+- **真弹出**: 工具栏空壳按钮接上 `OpenInNewWindowCommand` —— 把当前（或选中）
+  会话 detach 出主列表,弹出为独立 Avalonia `SessionWindow`,含完整
+  TerminalView（键盘输入/渲染/滚轮/光标闪烁照常;OSC title 实时进窗口标题）。
+- **detach/reattach 语义**: `SessionManager.Detach` 移出 `Sessions` 并发
+  `SessionRemoved`(Output 订阅、卡片、Logs 过滤、分屏窗格全部走既有清理路径)
+  但**不杀 PTY、不 dispose**;子窗关闭(「↩ 收回」按钮 / Esc / 窗口 ✕)经
+  `Reattach` 回列表并激活 —— 弹出期产生的输出原样带回,缩略图照旧。
+  弹出/收回各写一条 Output(source `window`)。
+- **生命周期兜底**: `DetachedSessions`/`Popouts` 簿记;主窗 Dispose 先杀弹出
+  PTY 再关子窗,不留孤儿进程;无会话时按钮 CanExecute 禁用。弹窗层叠在主窗
+  +160,+110。
+- **与分屏兼容**: 弹出分屏窗格里的会话 → 窗格自动回退其它会话(复用其
+  `OnSessionRemoved` 修正),收回后回卡片列表。
+- **验证**: 149 tests green(+5 `PopoutWindowTests`:Core detach 保活/reattach
+  激活/幂等,headless 开窗分离+TerminalView 绑同一 Emulator、关窗收回且
+  其它会话不受影响、空列表禁用、主窗关闭连带处置弹出 PTY)。DISPLAY=:7
+  实机:Terminal 03 弹出独立窗跑 `echo POPOUT_$((40+2))_OK`→`POPOUT_42_OK`,
+  「↩ 收回」后卡片/tab 复活、缓冲含弹出期输出、Output 双行日志。
+- 截图 `docs/screenshots/open-new-window.png`。
 
 ### PR #18 — 「◫ 分屏」真双会话并排 (`feat/split-pane`)
 - **真分屏**:中部视口拆为 `GridSplitter` 左右双栏(可拖),各绑

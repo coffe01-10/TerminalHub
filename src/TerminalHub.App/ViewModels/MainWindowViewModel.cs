@@ -9,6 +9,7 @@ using TerminalHub.Core.Monitoring;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Sessions;
 using TerminalHub.Core.Settings;
+using TerminalHub.App.Views;
 using TerminalHub.Pty;
 
 namespace TerminalHub.App.ViewModels;
@@ -77,6 +78,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _sessions.Activate(value.Model);
     }
 
+    /// <summary>Active-session change also arms/disarms the popout toolbar button.</summary>
+    partial void OnActiveSessionChanged(TerminalSessionModel? value)
+        => OpenInNewWindowCommand.NotifyCanExecuteChanged();
+
     /// <summary>Assign a session to a pane, keeping the two panes distinct.</summary>
     private void AssignToPane(int pane, TerminalSessionModel s)
     {
@@ -109,6 +114,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// (poll) — all accesses go under this lock.</summary>
     private readonly Dictionary<Guid, CwdHistory> _cwdHistories = new();
     private readonly object _cwdLock = new();
+
+    /// <summary>Sessions popped out into standalone windows. They are off the main
+    /// session list but still owned here for shutdown; each returns via Reattach
+    /// when its window closes.</summary>
+    public ObservableCollection<TerminalSessionModel> DetachedSessions { get; } = [];
+    private readonly List<SessionWindow> _popouts = [];
+    /// <summary>Live popout windows, one per detached session (tests drive these).</summary>
+    public IReadOnlyList<SessionWindow> Popouts => _popouts;
+    private bool _disposed;
 
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
@@ -304,6 +318,51 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, card.Model));
         _sessions.Close(card.Model);
         if (vm is not null) SessionCards.Remove(vm);
+    }
+
+    /// <summary>「↗ 在新窗口打开」: detach the given (or active) session into a
+    /// standalone <see cref="SessionWindow"/>. The PTY/emulator keep running —
+    /// the card leaves the main list and comes back when the popout closes.</summary>
+    [RelayCommand(CanExecute = nameof(HasPopoutTarget))]
+    private void OpenInNewWindow(SessionCardViewModel? card)
+    {
+        var model = card?.Model ?? ActiveSession;
+        if (model is null) return;
+        var session = _sessions.Detach(model);
+        if (session is null) return;
+
+        DetachedSessions.Add(session);
+        var win = new SessionWindow(session, FontSize);
+        _popouts.Add(win);
+        PositionPopout(win);
+        win.Closed += (_, _) => OnPopoutClosed(win, session);
+        Dashboard.AppendOutput("info",
+            $"会话「{session.Name}」已弹出为独立窗口（关闭子窗即收回）", "window");
+        win.Show();
+    }
+
+    private bool HasPopoutTarget(SessionCardViewModel? card)
+        => (card?.Model ?? ActiveSession) is not null;
+
+    /// <summary>Popout closed → return the session to the main window's list.
+    /// During shutdown (<see cref="_disposed"/>) the session is already disposed —
+    /// skip the reattach.</summary>
+    private void OnPopoutClosed(SessionWindow win, TerminalSessionModel session)
+    {
+        _popouts.Remove(win);
+        DetachedSessions.Remove(session);
+        if (_disposed) return;
+        _sessions.Reattach(session);
+        Dashboard.AppendOutput("info", $"会话「{session.Name}」已收回主窗口", "window");
+    }
+
+    /// <summary>Cascade the popout over the main window so both stay visible.</summary>
+    private static void PositionPopout(SessionWindow win)
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime
+                { MainWindow: { } main })
+            win.Position = new Avalonia.PixelPoint(main.Position.X + 160, main.Position.Y + 110);
     }
 
     /// <summary>Rename a session (tab title); keeps Logs' session filter and output source names in sync.</summary>
@@ -879,6 +938,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;   // popout Closed handlers must not reattach anymore
+        // Kill detached PTYs before closing their windows — OnPopoutClosed removes
+        // them from DetachedSessions, so disposing after the closes would leak them.
+        foreach (var s in DetachedSessions) s.Dispose();
+        DetachedSessions.Clear();
+        foreach (var w in _popouts.ToArray()) w.Close();
+        _popouts.Clear();
         _publishIds.Clear();
         PersistSettings();
         Logs.Dispose();

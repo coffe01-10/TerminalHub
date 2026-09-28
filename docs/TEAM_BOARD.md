@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 16:48 CST（Logs 行定分支 feat/logs-level-filter-persist） · 维护：Devin（PO）
+最后更新：2026-09-28 17:00 CST（Devin B 新窗口 PR #20） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,8 +18,6 @@
 
 ## 进行中
 
-
-- [ ] **会话新窗口** — **Devin B** · `feat/open-new-window` · `/workspace/TerminalHub-newwin` · 「↗ 在新窗口打开」
 - [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
@@ -31,6 +29,7 @@
 ## 已完成（近期）
 
 - [x] PR #21 工具栏 CWD 真动作（⟳刷新 + ←/→ 历史 + /proc 轮询 + OSC7)— GLM WIP · Devin 接管 · `feat/toolbar-cwd-nav`
+- [x] PR #20 「↗ 在新窗口打开」会话弹出独立窗（detach/收回 + 弹出期输出保留）— Devin B · `feat/open-new-window`
 - [x] PR #17 Logs 级别筛选 chip 条 + 过滤持久化 — GLM · `feat/logs-level-filter-persist` · `main@c30b204`
 - [x] PR #18 「◫ 分屏」真双会话并排（双 PTY/Emulator + 窗格聚焦 + 卡片分配）— Devin A · `feat/split-pane` · `main@8b2f309`
 - [x] PR #15 整窗 mockup 走查（缩略图加密 + Codex ⚙）— Devin · `main@bf955fb`
