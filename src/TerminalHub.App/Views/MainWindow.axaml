@@ -101,13 +101,13 @@
                           <TextBlock Text="{Binding TagText}" FontSize="9" FontWeight="SemiBold" Foreground="{Binding TagBrush}"/>
                         </Border>
                       </Grid>
-                      <Border CornerRadius="6" Background="#F20A0D14" Padding="4" MinHeight="80">
+                      <Border CornerRadius="6" Background="#F20A0D14" Padding="4" MinHeight="92">
                         <ItemsControl ItemsSource="{Binding PreviewLines}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
                               <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}"
                                          FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
-                                         FontSize="6.5" LineHeight="7.5" TextWrapping="NoWrap"/>
+                                         FontSize="6.6" LineHeight="7.4" TextWrapping="NoWrap"/>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -860,7 +860,8 @@
                     </Border>
                     <TextBlock Text="Codex 助手" FontWeight="SemiBold" FontSize="13" Foreground="#E2E8F0" VerticalAlignment="Center"/>
                   </StackPanel>
-                  <Button Grid.Column="1" Content="⚙" Background="Transparent" BorderThickness="0" Foreground="#64748B"/>
+                  <Button Grid.Column="1" Content="⚙" Background="Transparent" BorderThickness="0" Foreground="#64748B"
+                          ToolTip.Tip="设置" Command="{Binding DockSelectCommand}" CommandParameter="5"/>
                 </Grid>
 
                 <Border Grid.Row="1" CornerRadius="8" Background="#CC141B29" Padding="8" Margin="0,4">

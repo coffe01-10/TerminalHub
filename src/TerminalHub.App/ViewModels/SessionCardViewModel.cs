@@ -58,7 +58,7 @@ public partial class SessionCardViewModel : ViewModelBase
 
     private void RefreshPreview()
     {
-        var lines = Model.Emulator.Buffer.TailLines(10);
+        var lines = Model.Emulator.Buffer.TailLines(12);
         PreviewLines = lines
             .Select(l => new PreviewLineView(l.Text,
                 l.FgHex is null ? DefaultPreviewBrush : new SolidColorBrush(Color.Parse(l.FgHex))))
