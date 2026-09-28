@@ -4,6 +4,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
+using TerminalHub.Core.Deploy;
+using TerminalHub.Core.Settings;
 
 namespace TerminalHub.App.Views;
 
@@ -14,13 +16,17 @@ public partial class MainWindow : Window
     /// <summary>Inner ScrollViewer of the Logs list; drives the follow-tail state machine.</summary>
     private ScrollViewer? _logsScroll;
 
-    public MainWindow()
+    public MainWindow() : this(null)
+    {
+    }
+
+    public MainWindow(SettingsStore? settingsStore)
     {
         InitializeComponent();
         // Acrylic is Windows-only eye candy; on compositor-less X11 it renders black.
         if (!OperatingSystem.IsWindows())
             TransparencyLevelHint = new[] { Avalonia.Controls.WindowTransparencyLevel.None };
-        DataContext = new MainWindowViewModel();
+        DataContext = new MainWindowViewModel(settingsStore: settingsStore);
         // Button marks pointer events handled before instance handlers, so listen with handledEventsToo.
         // Press runs before the release click, which is what DockSelectCommand executes.
         DeployDockButton.AddHandler(InputElement.PointerPressedEvent, OnDeployPointerPressed,
@@ -98,6 +104,96 @@ public partial class MainWindow : Window
     /// active so the middle input row, Output and Search follow it.</summary>
     private void OnLeftPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(0);
     private void OnRightPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(1);
+
+    private void OnDeployMenuOpening(object? sender, EventArgs e) => RefreshDeployContextMenu();
+
+    /// <summary>Rebuild profile and recent-artifact submenus from settings and disk.</summary>
+    public void RefreshDeployContextMenu()
+    {
+        if (DeployDockButton.ContextFlyout is MenuFlyout flyout)
+            PopulateDeployMenu(flyout);
+    }
+
+    private void PopulateDeployMenu(MenuFlyout flyout)
+    {
+        if (FindDeployMenu(flyout, static h => h.StartsWith("配置档", StringComparison.Ordinal)) is { } profiles)
+            FillProfileMenu(profiles, activate: true);
+        if (FindDeployMenu(flyout, static h => h.StartsWith("删除配置档", StringComparison.Ordinal)) is { } deletes)
+            FillProfileMenu(deletes, activate: false);
+        if (FindDeployMenu(flyout, static h => h.StartsWith("最近产物", StringComparison.Ordinal)) is { } recent)
+            FillRecentMenu(recent);
+    }
+
+    private static MenuItem? FindDeployMenu(MenuFlyout flyout, Func<string, bool> match) =>
+        flyout.Items.OfType<MenuItem>().FirstOrDefault(i => i.Header is string header && match(header));
+
+    private void FillProfileMenu(MenuItem menu, bool activate)
+    {
+        menu.Items.Clear();
+        var profiles = Vm.ListPublishProfiles();
+        if (profiles.Count == 0)
+        {
+            menu.Items.Add(new MenuItem { Header = "（无已存配置）", IsEnabled = false });
+            return;
+        }
+
+        foreach (var profile in profiles)
+        {
+            var id = profile.Id;
+            var active = Vm.IsActivePublishProfile(id);
+            var item = new MenuItem
+            {
+                Header = activate && active ? $"✓ {profile.Name}" : profile.Name,
+                Tag = id,
+            };
+            ToolTip.SetTip(item, ProfileTip(profile));
+            if (activate)
+                item.Click += (_, _) => Vm.ActivatePublishProfile(id);
+            else
+                item.Click += (_, _) => Vm.DeletePublishProfile(id);
+            menu.Items.Add(item);
+        }
+    }
+
+    private static string ProfileTip(PublishProfile profile)
+    {
+        var root = string.IsNullOrWhiteSpace(profile.RepoRoot) ? "cwd（当前目录向上查找）" : profile.RepoRoot;
+        var rid = string.IsNullOrWhiteSpace(profile.Rid) ? "host（当前系统）" : profile.Rid;
+        var note = string.IsNullOrWhiteSpace(profile.Note) ? "" : "\n" + profile.Note;
+        return $"root: {root}\nrid: {rid}{note}";
+    }
+
+    private void FillRecentMenu(MenuItem menu)
+    {
+        menu.Items.Clear();
+        var rows = Vm.QueryRecentArtifacts();
+        if (rows.Count == 0)
+        {
+            menu.Items.Add(new MenuItem { Header = "（暂无产物）", IsEnabled = false });
+            return;
+        }
+
+        foreach (var row in rows)
+        {
+            var path = row.Path;
+            var item = new MenuItem
+            {
+                Header = $"{row.Rid}   {MainWindowViewModel.FmtBytes(row.SizeBytes)}   {row.Modified.ToLocalTime():MM-dd HH:mm}",
+                Tag = path,
+            };
+            ToolTip.SetTip(item, $"{path}\n{row.FileCount} files");
+            item.Click += (_, _) => Vm.OpenRecentArtifact(path);
+            menu.Items.Add(item);
+        }
+    }
+
+    private async void OnSavePublishProfileClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new PublishProfileWindow();
+        dialog.ApplyDraft(Vm.CurrentPublishDraft());
+        if (await dialog.ShowDialog<bool>(this) != true) return;
+        Vm.SavePublishProfile(dialog.ProfileName, dialog.RepoRoot, dialog.SelectedRid, dialog.NoteText);
+    }
 
     private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
     {

@@ -4,7 +4,25 @@
 
 ## 2026-09-28
 
-<<<<<<< HEAD
+### pending / next Deploy slice — 多发布配置档 + 最近产物 (`feat/deploy-profiles-recent`)
+- **配置档**: Deploy 坞按钮右键可保存 / 切换 / 删除命名发布配置。每条含名称、
+  可选仓库根目录（空 = 仍从当前工作目录向上查找脚本和产物）、可选 RID
+  （`linux-x64` → 已有 `scripts/publish-linux.sh`，`win-x64` → 已有
+  `scripts/publish-windows.ps1`，空 = 当前系统）、备注、`CreatedAt` / `LastUsedAt`。
+  写入真实 `settings.json`（`AppSettings.PublishProfiles` + `ActivePublishProfileId`），
+  与 SSH hosts 同一 `SettingsStore`。切换或保存后，下一次坞按钮 Deploy
+  （Ctrl+点击和「重新打包」同样走这条路径）使用该配置；调用方若传入显式起始目录
+  （测试 / 编程调用）则跳过配置档，避免改变 PR #12 的显式路径语义。
+  `LastUsedAt` 在切换和实际 Deploy 时更新，菜单按它从新到旧排列。
+- **最近产物**: 右键「最近产物」从 `artifacts/publish` 读真实目录（路径、RID 文件夹名、
+  直接子文件的最新 mtime、这些文件的大小合计），按 mtime 从新到旧。点击条目沿用
+  原来的文件管理器打开。菜单每次打开都重扫；打包成功（`ReportPublishExit` exit 0）
+  再扫并把结果写进 Output。没有产物时显示「暂无产物」，没有示例行。
+- `PublishPlanner` / `ArtifactLocator` 行为保持，配置和最近列表是组合层。
+  脚本仍只发布它们写死的 RID，配置档只是在两个已有脚本之间选择。
+- 单测覆盖配置档往返、切换 / 删除 / 根目录与 RID 生效、最近产物空目录与 mtime 排序，
+  以及坞菜单接线。146 tests green。
+
 ### PR #21 — 工具栏 CWD 真动作 ⟳/←/→ (`feat/toolbar-cwd-nav`)
 - **真实 CWD 链路**:`IPtySession.ProcessId`(Linux forkpty 子 pid /
   ConPTY process id / Mock null)+ `ProcessCwd.TryRead`(Linux 读
