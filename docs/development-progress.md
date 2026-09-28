@@ -4,19 +4,24 @@
 
 ## 2026-09-28
 
-### pending — Logs 紧凑密度 toggle (`feat/logs-compact-density`) · PR #40
-- **「紧凑」chip**: 「换行」旁 `timechip` ToggleButton；关（默认）= FontSize 9.5 /
-  Padding 4,1；开 ≈ FontSize 8.5 / Padding 2,0。`Classes.compact` 绑
-  `Logs.CompactDensity`，ListBoxItem 样式刷新；行内 TextBlock /
-  `HighlightTextBlock` 经 `BoolToLogsFontSizeConverter` 同步字号。
-- **持久化**: 全局 `AppSettings.LogsCompactDensity`（默认 false）；经同一
-  `PersistLogsFilters` 落盘（与 wrap/relative 同路）；**不是** per-session。
-- **边界**: 只动 Logs + AppSettings；不动 Deploy/Files/SSH/Core PTY。
-- **验证**: 220 tests green（+2：SettingsStore 往返、MainWindow「紧凑」Toggle
-  默认关绑定 + compact class）。worktree `/workspace/TerminalHub-logs2`；
-  工具 Grok Build / Claude Code OK。
-- 截图 `docs/screenshots/logs-compact-density.png`（「紧凑」chip 可见且优选开）。
-  已对齐 `origin/main` @ `a6c34a6`（含 #37/#39）。
+### pending — Logs 级别 chip 活计数 (`feat/logs-level-counts`) · PR #42
+- **活计数**: 级别 chip 文案 `全部 N` / `info N` / `warn N` / `error N`，数字来自
+  **环形缓冲 `_buffer`**（不是当前 `Entries` 筛选结果），所以在「全部」下仍可见
+  e.g. `error 3`。append / trim / clear / ClearVisible / 缩容后 `RefreshLevelCounts`。
+- **API**: `CountLevelsInBuffer` + `FormatLevelChipLabel`；bindable
+  `Level*Count` / `Level*ChipLabel`。级别筛选语义不变。
+- **边界**: 只动 Logs；不动 Deploy/Files/SSH/Core PTY。
+- **验证**: 224 tests green（+4：helpers、缓冲 vs 筛选、trim/clear、MainWindow
+  chip 文案 + 截图）。worktree `/workspace/TerminalHub-logs2`；工具 Grok Build /
+  Claude Code OK。
+- 截图 `docs/screenshots/logs-level-counts.png`（chip 带计数可见）。
+
+### PR #40 — Logs 紧凑密度 toggle (`feat/logs-compact-density`)
+- **「紧凑」chip**: 「换行」旁 `timechip`；关（默认）FontSize 9.5 / Padding 4,1；
+  开 ≈8.5 / 2,0。`Classes.compact` + `BoolToLogsFontSizeConverter`。
+- **持久化**: 全局 `AppSettings.LogsCompactDensity`；经 `PersistLogsFilters`。
+- **验证**: 220 tests green。截图 `docs/screenshots/logs-compact-density.png`。
+  已合 `main@ecc5da1`。
 
 ### PR #37 — Deploy 打包中实时耗时 + 复制上次成功产物路径 (`feat/deploy-live-elapsed-copy-path`)
 - **实时耗时**: `IsPublishRunning` 时 Deploy 坞状态行显示 `打包中 · Ns` / `打包中 · NmNs`，
