@@ -757,6 +757,19 @@
                     <Setter Property="Foreground" Value="#38BDF8"/>
                     <Setter Property="BorderBrush" Value="#3B82F6"/>
                   </Style>
+                  <Style Selector="ToggleButton.capchip">
+                    <Setter Property="Padding" Value="10,3"/>
+                    <Setter Property="MinWidth" Value="44"/>
+                    <Setter Property="CornerRadius" Value="6"/>
+                    <Setter Property="Background" Value="#1A2030"/>
+                    <Setter Property="BorderBrush" Value="#2A3142"/>
+                    <Setter Property="Foreground" Value="#94A3B8"/>
+                    <Setter Property="FontSize" Value="10"/>
+                  </Style>
+                  <Style Selector="ToggleButton.capchip:checked">
+                    <Setter Property="Foreground" Value="#38BDF8"/>
+                    <Setter Property="BorderBrush" Value="#3B82F6"/>
+                  </Style>
                 </Grid.Styles>
                 <!-- filter row: text + regex toggle + file sink -->
                 <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2,0,4">
@@ -789,8 +802,8 @@
                     </ToggleButton.Styles>
                   </ToggleButton>
                 </Grid>
-                <!-- level filter: exclusive chip bar (全部/info/warn/error) + timestamp mode -->
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                <!-- level filter: exclusive chip bar (全部/info/warn/error) + timestamp / wrap / 容量 -->
+                <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
                   <ToggleButton Classes="levelchip" Content="全部"
                                 IsChecked="{Binding Logs.LevelAllSelected}"
                                 ToolTip.Tip="显示所有级别 / show all levels"/>
@@ -811,7 +824,20 @@
                   <ToggleButton Classes="timechip" Content="换行" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.WrapLines}"
                                 ToolTip.Tip="换行：开（默认）=长消息自动折行；关=单行显示并允许横向滚动，便于密扫。"/>
-                </StackPanel>
+                  <!-- ring-buffer capacity presets (exclusive chips; default 2000) -->
+                  <TextBlock Text="容量" FontSize="10" Foreground="#64748B"
+                             VerticalAlignment="Center" Margin="10,0,4,0"
+                             ToolTip.Tip="Logs 环形缓冲容量（条）。缩小会丢弃最旧行。"/>
+                  <ToggleButton Classes="capchip" Content="500"
+                                IsChecked="{Binding Logs.Capacity500Selected}"
+                                ToolTip.Tip="缓冲 500 行（浅）"/>
+                  <ToggleButton Classes="capchip" Content="2000" Margin="4,0,0,0"
+                                IsChecked="{Binding Logs.Capacity2000Selected}"
+                                ToolTip.Tip="缓冲 2000 行（默认）"/>
+                  <ToggleButton Classes="capchip" Content="5000" Margin="4,0,0,0"
+                                IsChecked="{Binding Logs.Capacity5000Selected}"
+                                ToolTip.Tip="缓冲 5000 行（深）"/>
+                </WrapPanel>
                 <!-- session filter -->
                 <ComboBox Grid.Row="2" ItemsSource="{Binding Logs.SessionNames}"
                           SelectedIndex="{Binding Logs.SessionFilterIndex}"
