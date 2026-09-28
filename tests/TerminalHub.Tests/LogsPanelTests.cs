@@ -129,4 +129,56 @@ public class LogsPanelTests
         }
         await Task.CompletedTask;
     }
+
+    [Fact]
+    public void Decoder_RawLineReceived_KeepsAnsi()
+    {
+        var dec = new Utf8LineDecoder();
+        var raw = new List<string>();
+        var clean = new List<string>();
+        dec.RawLineReceived += raw.Add;
+        dec.LineReceived += clean.Add;
+        dec.Feed("\u001b[32mgreen\u001b[0m plain\n"u8);
+        Assert.Equal(["\u001b[32mgreen\u001b[0m plain"], raw);
+        Assert.Equal(["green plain"], clean);
+    }
+
+    [Fact]
+    public void DebugEscape_MakesControlsVisible()
+    {
+        Assert.Equal("␛[32mhi␛[0m", AnsiText.DebugEscape("\x1b[32mhi\x1b[0m"));
+        Assert.Equal("a␇b", AnsiText.DebugEscape("a\ab")); // \x07 followed by 'b' would merge into one hex escape
+        Assert.Equal("^A", AnsiText.DebugEscape("\x01"));
+    }
+
+    [AvaloniaFact]
+    public async Task DebugLog_ReceivesRawLines()
+    {
+        var dash = new DashboardViewModel(new FakeMonitor());
+        dash.AppendDebug("␛[32mraw", "Terminal 01");
+        await Task.Delay(80);
+        Assert.Single(dash.DebugLog);
+        Assert.Contains("␛[32m", dash.DebugLog[0].Message);
+    }
+
+    [AvaloniaFact]
+    public async Task Search_FiltersActiveSessionBuffer()
+    {
+        var dash = new DashboardViewModel(new FakeMonitor());
+        var buf = new TerminalHub.Core.Terminal.ScreenBuffer(40, 5);
+        var parser = new TerminalHub.Core.Terminal.VtParser(buf);
+        parser.Feed("alpha line\r\nbeta needle here\r\ngamma\r\n");
+        dash.BufferSource = () => buf;
+
+        dash.SearchQuery = "needle";
+        await Task.Delay(50);
+        Assert.Single(dash.SearchHits);
+        Assert.Equal("1 处匹配", dash.SearchStatus);
+        Assert.Contains("needle", dash.SearchHits[0].Text);
+
+        dash.SearchQuery = "zzz";
+        await Task.Delay(50);
+        Assert.Empty(dash.SearchHits);
+        Assert.Equal("无匹配", dash.SearchStatus);
+    }
 }

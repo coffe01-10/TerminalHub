@@ -11,8 +11,26 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Acrylic is Windows-only eye candy; on compositor-less X11 it renders black.
+        if (!OperatingSystem.IsWindows())
+            TransparencyLevelHint = new[] { Avalonia.Controls.WindowTransparencyLevel.None };
         DataContext = new MainWindowViewModel();
-        Opened += async (_, _) => await Vm.SpawnStartupSessionsAsync();
+        Opened += (_, _) =>
+        {
+            FitToScreen();
+            _ = Vm.SpawnStartupSessionsAsync();
+        };
+    }
+
+    /// <summary>Never open larger than the working area — the floating dock must stay on-screen.</summary>
+    private void FitToScreen()
+    {
+        var wa = Screens.ScreenFromWindow(this)?.WorkingArea ?? Screens.Primary?.WorkingArea;
+        if (wa is not { } s) return;
+        var maxW = s.Width - 24;
+        var maxH = s.Height - 24;
+        if (Width > maxW) Width = maxW;
+        if (Height > maxH) Height = maxH;
     }
 
     private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)

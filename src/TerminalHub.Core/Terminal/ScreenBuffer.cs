@@ -544,4 +544,41 @@ public sealed class ScreenBuffer
             sb.Append(cell.Char == '\0' ? ' ' : cell.Char);
         return sb.ToString().TrimEnd();
     }
+
+    /// <summary>Trimmed text of scrollback row <paramref name="index"/>.</summary>
+    public string ScrollbackText(int index)
+    {
+        var span = _scrollback[index].AsSpan();
+        var sb = new StringBuilder(span.Length);
+        foreach (var cell in span)
+            sb.Append(cell.Char == '\0' ? ' ' : cell.Char);
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>One search hit: <paramref name="Line"/> is a global index (scrollback, then screen).</summary>
+    public readonly record struct SearchHit(int Line, string Text);
+
+    /// <summary>
+    /// Case-insensitive substring search over scrollback + screen, oldest first.
+    /// Returns at most <paramref name="max"/> hits.
+    /// </summary>
+    public List<SearchHit> SearchLines(string term, int max = 200)
+    {
+        var hits = new List<SearchHit>();
+        if (string.IsNullOrEmpty(term)) return hits;
+        var idx = 0;
+        for (var i = 0; i < _scrollback.Count && hits.Count < max; i++, idx++)
+        {
+            var t = ScrollbackText(i);
+            if (t.Contains(term, StringComparison.OrdinalIgnoreCase))
+                hits.Add(new SearchHit(idx, t));
+        }
+        for (var r = 0; r < Rows && hits.Count < max; r++, idx++)
+        {
+            var t = RowText(r);
+            if (t.Contains(term, StringComparison.OrdinalIgnoreCase))
+                hits.Add(new SearchHit(idx, t));
+        }
+        return hits;
+    }
 }

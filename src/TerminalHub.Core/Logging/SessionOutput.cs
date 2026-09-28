@@ -18,6 +18,9 @@ public sealed class Utf8LineDecoder
     /// <summary>Raised for each completed line (no trailing newline).</summary>
     public event Action<string>? LineReceived;
 
+    /// <summary>Same completion points as <see cref="LineReceived"/> but pre-ANSI-strip — for the Debug view.</summary>
+    public event Action<string>? RawLineReceived;
+
     public void Feed(ReadOnlySpan<byte> data)
     {
         if (data.IsEmpty) return;
@@ -60,8 +63,10 @@ public sealed class Utf8LineDecoder
 
     private void Emit()
     {
-        var text = AnsiText.Strip(_line.ToString());
+        var raw = _line.ToString();
         _line.Clear();
+        if (raw.Length > 0) RawLineReceived?.Invoke(raw);
+        var text = AnsiText.Strip(raw);
         if (text.Length > 0) LineReceived?.Invoke(text);
     }
 }
@@ -74,4 +79,24 @@ public static partial class AnsiText
 
     public static string Strip(string input)
         => string.IsNullOrEmpty(input) ? input : AnsiPattern().Replace(input, "");
+
+    /// <summary>
+    /// Make control bytes printable for the Debug view: ESC→␛, BEL→␇,
+    /// other C0 controls → caret notation, tabs/del kept readable.
+    /// </summary>
+    public static string DebugEscape(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        var sb = new StringBuilder(input.Length + 8);
+        foreach (var c in input)
+        {
+            if (c == '\x1b') sb.Append('␛');
+            else if (c == '\x07') sb.Append('␇');
+            else if (c == '\t') sb.Append("⇥");
+            else if (c < '\x20') sb.Append('^').Append((char)('A' + c - 1));
+            else if (c == '\x7f') sb.Append("␡");
+            else sb.Append(c);
+        }
+        return sb.ToString();
+    }
 }

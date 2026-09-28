@@ -34,6 +34,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _commandInput = "";
     [ObservableProperty] private int _selectedRightTab;
     [ObservableProperty] private bool _settingsOpen;
+    /// <summary>Dock index of the active surface (-1 when a tab has no dock item).</summary>
+    [ObservableProperty] private int _dockHighlight = -1;
 
     /// <summary>Title-bar OS label ("Windows System" in the mockup — follows the real OS).</summary>
     public string OsLabel => OperatingSystem.IsWindows() ? "Windows System"
@@ -47,7 +49,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         AssistantMode = value == 4;
         if (value == 1) Files.EnsureSessionDir();
         if (value == 2) Logs.RefreshSessions();
+        // Dock: 1 Monitor→tab0, 2 SSH→tab3, 3 Logs→tab2; Files/Codex have no dock item.
+        DockHighlight = value switch { 0 => 1, 2 => 3, 3 => 2, _ => SettingsOpen ? 5 : -1 };
     }
+
+    partial void OnSettingsOpenChanged(bool value)
+        => DockHighlight = value ? 5 : (SelectedRightTab switch { 0 => 1, 2 => 3, 3 => 2, _ => -1 });
 
     /// <summary>Selection sync: ListBox.SelectedItem drives activation.</summary>
     partial void OnActiveCardChanged(SessionCardViewModel? value)
@@ -76,6 +83,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _monitor.Start(TimeSpan.FromSeconds(1));
 
         Dashboard = new DashboardViewModel(_monitor);
+        Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
         Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.MockAiAssistant());
         Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory);
         Logs = new LogsViewModel(Dashboard, _sessionLog,
@@ -177,17 +185,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [RelayCommand] private void ToggleAssistant() => AssistantMode = !AssistantMode;
 
-    /// <summary>Bottom dock: 0 New 1 Monitor 2 SSH 3 Logs 4 Deploy 5 Settings</summary>
+    /// <summary>Bottom dock: 0 New 1 Monitor 2 SSH 3 Logs 4 Deploy 5 Settings.
+    /// Parameter arrives as a string from XAML — parse it (int also accepted).</summary>
     [RelayCommand]
-    private void DockSelect(int index)
+    private void DockSelect(object? parameter)
     {
+        if (!int.TryParse(parameter?.ToString(), out var index)) return;
         switch (index)
         {
             case 0: _ = NewSession(); break;
-            case 1: SelectedRightTab = 0; break;
-            case 2: SelectedRightTab = 3; break;
-            case 3: SelectedRightTab = 2; break;
-            case 4: DeployArtifacts(); break;
+            case 1: DockHighlight = 1; SelectedRightTab = 0; break;
+            case 2: DockHighlight = 2; SelectedRightTab = 3; break;
+            case 3: DockHighlight = 3; SelectedRightTab = 2; break;
+            case 4: Dashboard.SelectedBottomTab = 0; DeployArtifacts(); break;
             case 5: SettingsOpen = !SettingsOpen; break;
         }
     }
@@ -309,6 +319,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 Dashboard.AppendOutput(level, line, name);
                 _sessionLog.Write(name, level, line);
             };
+            dec.RawLineReceived += raw =>
+                Dashboard.AppendDebug(
+                    TerminalHub.Core.Logging.AnsiText.DebugEscape(raw),
+                    _sessionNames.GetValueOrDefault(pty.Id, "session"));
             _lineDecoders[pty.Id] = dec;
         }
         dec.Feed(data.Span);
@@ -357,6 +371,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var target = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, ActiveSession));
         if (!ReferenceEquals(ActiveCard, target))
             ActiveCard = target;
+        Dashboard.RefreshSearch();
         var cwd = ActiveSession?.WorkingDirectory ?? "";
         Breadcrumb = string.IsNullOrEmpty(cwd)
             ? ""
