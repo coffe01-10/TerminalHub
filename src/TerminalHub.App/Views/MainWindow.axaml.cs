@@ -33,6 +33,10 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         DeployDockButton.AddHandler(InputElement.PointerReleasedEvent, OnDeployPointerReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
+        // Session shortcuts must win over the focused control (a terminal would
+        // otherwise eat Ctrl+W as kill-word / Ctrl+Tab as a shell byte).
+        AddHandler(InputElement.KeyDownEvent, OnSessionShortcutKeyDown,
+            RoutingStrategies.Tunnel);
         Opened += (_, _) =>
         {
             FitToScreen();
@@ -197,6 +201,24 @@ public partial class MainWindow : Window
         dialog.ApplyDraft(Vm.CurrentPublishDraft());
         if (await dialog.ShowDialog<bool>(this) != true) return;
         Vm.SavePublishProfile(dialog.ProfileName, dialog.RepoRoot, dialog.SelectedRid, dialog.NoteText);
+    }
+
+    /// <summary>Window-level session shortcuts (tunneling, before TerminalView):
+    /// Ctrl+W closes the active session; Ctrl+Tab / Ctrl+Shift+Tab cycle cards.</summary>
+    private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (e.Key == Key.W && !shift)
+        {
+            Vm.CloseActiveSessionCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Tab)
+        {
+            Vm.CycleSession(shift ? -1 : +1);
+            e.Handled = true;
+        }
     }
 
     private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)

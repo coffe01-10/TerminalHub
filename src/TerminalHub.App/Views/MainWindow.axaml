@@ -206,7 +206,17 @@
                       Command="{Binding OpenInNewWindowCommand}"
                       ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）"/>
               <Button Grid.Column="6" Content="•••" Background="Transparent" BorderThickness="0"
-                      Foreground="#94A3B8" Padding="6,0"/>
+                      Foreground="#94A3B8" Padding="6,0" ToolTip.Tip="会话操作">
+                <Button.Flyout>
+                  <MenuFlyout>
+                    <MenuItem Header="关闭会话        Ctrl+W" Command="{Binding CloseActiveSessionCommand}"/>
+                    <MenuItem Header="下一个会话      Ctrl+Tab" Command="{Binding CycleSessionNextCommand}"/>
+                    <MenuItem Header="上一个会话      Ctrl+Shift+Tab" Command="{Binding CycleSessionPrevCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="复制 CWD" Command="{Binding CopyActiveCwdCommand}"/>
+                  </MenuFlyout>
+                </Button.Flyout>
+              </Button>
             </Grid>
 
             <!-- Terminal viewport -->

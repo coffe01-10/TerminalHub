@@ -340,6 +340,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (vm is not null) SessionCards.Remove(vm);
     }
 
+    /// <summary>Ctrl+W / 「••• → 关闭会话」: close the currently active session.</summary>
+    [RelayCommand]
+    private void CloseActiveSession() => CloseSession(ActiveCard);
+
+    /// <summary>Ctrl+Tab / Ctrl+Shift+Tab: cycle session cards (wraps).</summary>
+    public void CycleSession(int direction)
+    {
+        if (SessionCards.Count == 0) return;
+        var idx = ActiveCard is null ? -1 : SessionCards.IndexOf(ActiveCard);
+        var next = SessionCards[(idx + direction + SessionCards.Count) % SessionCards.Count];
+        // Goes through the normal activation path (syncs ActiveSession,
+        // split-pane assignment to the focused pane, Output/Logs switch).
+        ActiveCard = next;
+    }
+
+    [RelayCommand] private void CycleSessionNext() => CycleSession(+1);
+    [RelayCommand] private void CycleSessionPrev() => CycleSession(-1);
+
+    /// <summary>「••• → 复制 CWD」: copy the active session's real working directory.</summary>
+    [RelayCommand]
+    private void CopyActiveCwd()
+    {
+        var cwd = ActiveSession?.WorkingDirectory;
+        if (string.IsNullOrEmpty(cwd)) return;
+        _ = CopyTextToClipboardAsync(cwd);
+        Dashboard.AppendOutput("info", $"已复制 CWD: {cwd}", "ui");
+    }
+
     /// <summary>「↗ 在新窗口打开」: detach the given (or active) session into a
     /// standalone <see cref="SessionWindow"/>. The PTY/emulator keep running —
     /// the card leaves the main list and comes back when the popout closes.</summary>
