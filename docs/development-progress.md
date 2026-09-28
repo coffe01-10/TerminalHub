@@ -4,19 +4,24 @@
 
 ## 2026-09-28
 
-### pending / next Deploy slice — 坞上当前配置档 + 清除上次发布结果 (`feat/deploy-active-profile-clear-result`)
+### pending — Logs ▲/▼ error 跳转 (`feat/logs-jump-level`) · PR #43
+- **工具栏**: 匹配导航旁「▲ error」/「▼ error」；在当前 `Entries`（尤其「全部」）
+  内选上/下一条 Level=`error`（大小写不敏感）；无环绕；仅当邻居存在时启用。
+- **行为**: 与 GoNextMatch 一样暂停 follow-tail；软 `StatusText`（`error N/M`）。
+- **API**: 静态 `FindAdjacentLevel(entries, fromIndex, level, direction)`（warn 同 helpers
+  可用；UI 仅 error）。`CanGoPrevError` / `CanGoNextError` + RelayCommands。
+- **边界**: 只动 Logs；不动 Deploy/Files/SSH/Core PTY。
+- **验证**: 231 tests green（+4：FindAdjacentLevel、跳转无环绕/暂停跟随、筛选门控、
+  MainWindow 按钮绑定 + 截图）。worktree `/workspace/TerminalHub-logs2`；工具 Grok Build /
+  Claude Code OK。
+- 截图 `docs/screenshots/logs-jump-level.png`（▲/▼ error 可见）。
+- 已 rebase 到 `origin/main` @ `a06dd9e`（含 #41）。
+
+### PR #41 — Deploy 坞显示当前配置档 + 清除上次发布结果 (`feat/deploy-active-profile-clear-result`)
 - **配置档标签**: Deploy 坞在上次发布徽章下增加安静一行 `ActivePublishProfileLabel`
-  （`PublishProfiles.FormatDockLabel`：名称，非空 RID 时 `名称 · linux-x64`）。无激活/
-  无有效名称时隐藏。Activate / Save / Delete / TouchActive 后 `NotifyActivePublishProfile`
-  刷新；Tooltip 附「配置档：…」。
-- **清除上次结果**: 右键「清除上次发布结果 Clear last result」，在打开/复制上次旁；
-  `CanClearLastPublishResult` 在有已知 outcome 时启用（产物目录已删仍可清）。
-  `LastPublishResults.Clear` → 持久化 → 刷新徽章/打开/复制/清除门控；Output
-  `source=deploy` 记「已清除上次发布结果」。
-- **验证**: `dotnet test -c Release`；不动 Files/Logs/SSH。
-- 截图 `docs/screenshots/deploy-active-profile-clear-result.png`（Deploy 右键「清除上次发布结果」可见）。
-- 布局选择：徽章下第二安静行（FontSize 8 · Opacity 0.72），而非仅 tooltip。
-- 基线 `origin/main` @ `2c6998c`（含 #42）。
+  （`PublishProfiles.FormatDockLabel`：名称，非空 RID 时 `名称 · linux-x64`）。
+- **清除上次结果**: 右键「清除上次发布结果 Clear last result」；有已知 outcome 时可清。
+- **验证**: `dotnet test -c Release`。已合 `main@a06dd9e`。
 
 ### PR #42 — Logs 级别 chip 活计数 (`feat/logs-level-counts`)
 - **活计数**: 级别 chip 文案 `全部 N` / `info N` / `warn N` / `error N`，数字来自
@@ -29,6 +34,7 @@
   chip 文案 + 截图）。worktree `/workspace/TerminalHub-logs2`；工具 Grok Build /
   Claude Code OK。
 - 截图 `docs/screenshots/logs-level-counts.png`（chip 带计数可见）。已合 `main@2c6998c`。
+
 
 ### PR #40 — Logs 紧凑密度 toggle (`feat/logs-compact-density`)
 - **「紧凑」chip**: 「换行」旁 `timechip`；关（默认）FontSize 9.5 / Padding 4,1；

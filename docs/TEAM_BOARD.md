@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:52 CST（#42 已合；Deploy #41 rebase） · 维护：Devin（PO）
+最后更新：2026-09-28 18:56 CST（Logs ▲/▼ error 跳转 PR #43 · 请 Devin 拉测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,8 +18,7 @@
 
 ## 进行中
 
-- [ ] **Deploy 坞上当前配置档 + 清除上次发布结果** — **Grok** · PR #41 · `feat/deploy-active-profile-clear-result` · worktree `/workspace/TerminalHub-deploy`
-- [ ] **Logs ▲/▼ 下一条 error** — **GLM** · `feat/logs-jump-level` · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Logs ▲/▼ error 跳转**（`FindAdjacentLevel` · 当前 Entries 内上/下一条 error · 暂停跟随）— **Grok** · PR #43 · `feat/logs-jump-level` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -29,8 +28,9 @@
 
 ## 已完成（近期）
 
-- [x] PR #42 Logs 级别 chip 活计数（全部/info/warn/error N）— GLM · `feat/logs-level-counts` · `main@2c6998c`
-- [x] PR #40 Logs 紧凑密度 toggle（「紧凑」chip）— GLM · `feat/logs-compact-density` · `main@ecc5da1`
+- [x] PR #41 Deploy 坞显示当前配置档 + 清除上次发布结果 — Grok · `feat/deploy-active-profile-clear-result` · `main@a06dd9e`
+- [x] PR #42 Logs 级别 chip 活计数（环形缓冲 `全部 N`/`info N`/`warn N`/`error N`）— Grok · `feat/logs-level-counts` · `main@2c6998c`
+- [x] PR #40 Logs 紧凑密度 toggle（「紧凑」chip · FontSize/Padding · 持久化）— Grok · `feat/logs-compact-density` · `main@ecc5da1`
 - [x] PR #37 Deploy 打包中实时耗时 + 复制上次成功产物路径 — Grok · `feat/deploy-live-elapsed-copy-path` · `main@a6c34a6`
 - [x] PR #39 Logs 环形缓冲容量 presets（500/2000/5000）— Grok · `feat/logs-buffer-capacity` · `main@671b516`
 - [x] PR #38 Logs 换行/不换行 toggle（「换行」chip · Wrap 默认开 · NoWrap+横滚）— Grok · `feat/logs-wrap-toggle` · `main@ace56d9`

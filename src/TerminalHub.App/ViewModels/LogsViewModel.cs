@@ -139,6 +139,12 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// <summary>「下一条」enabled: a match after the selection exists (from -1, the first).</summary>
     public bool CanGoNextMatch => HasTextFilter && Entries.Count > 0 && SelectedIndex < Entries.Count - 1;
 
+    /// <summary>「▲ error」enabled: an error-level row exists before the selection (no wrap).</summary>
+    public bool CanGoPrevError => FindAdjacentLevel(Entries, SelectedIndex, "error", -1) >= 0;
+
+    /// <summary>「▼ error」enabled: an error-level row exists after the selection (from -1, the first).</summary>
+    public bool CanGoNextError => FindAdjacentLevel(Entries, SelectedIndex, "error", +1) >= 0;
+
     /// <summary>True while following is paused — drives the floating「⬇ 跟随」button.</summary>
     public bool FollowPaused => !FollowTail;
 
@@ -166,6 +172,37 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Chip caption style matching the toolbar: <c>全部 120</c> / <c>info 80</c>.</summary>
     public static string FormatLevelChipLabel(string name, int count) => $"{name} {count}";
+
+    /// <summary>Nearest index of <paramref name="level"/> relative to <paramref name="fromIndex"/>
+    /// in the current (filtered) list. <paramref name="direction"/> &lt; 0 searches backward,
+    /// &gt; 0 forward. Case-insensitive; no wrap. Returns -1 when no neighbor exists.
+    /// Shared by error jump (and cheaply usable for warn).</summary>
+    public static int FindAdjacentLevel(IReadOnlyList<LogEntry> entries, int fromIndex, string level, int direction)
+    {
+        if (entries is null || entries.Count == 0 || direction == 0
+            || string.IsNullOrEmpty(level))
+            return -1;
+
+        if (direction > 0)
+        {
+            var start = Math.Max(fromIndex + 1, 0);
+            for (var i = start; i < entries.Count; i++)
+            {
+                if (string.Equals(entries[i].Level, level, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+        }
+        else
+        {
+            var start = fromIndex < 0 ? -1 : Math.Min(fromIndex - 1, entries.Count - 1);
+            for (var i = start; i >= 0; i--)
+            {
+                if (string.Equals(entries[i].Level, level, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+        }
+        return -1;
+    }
 
     /// <summary>Live totals from the ring buffer (not the filtered <see cref="Entries"/> view).</summary>
     public int LevelAllCount { get; private set; }
@@ -451,6 +488,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             SelectedIndex = Entries.Count - 1;
         OnPropertyChanged(nameof(CanGoPrevMatch));
         OnPropertyChanged(nameof(CanGoNextMatch));
+        OnPropertyChanged(nameof(CanGoPrevError));
+        OnPropertyChanged(nameof(CanGoNextError));
     }
 
     partial void OnSelectedIndexChanged(int value)
@@ -459,6 +498,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasSelectedEntry));
         OnPropertyChanged(nameof(CanGoPrevMatch));
         OnPropertyChanged(nameof(CanGoNextMatch));
+        OnPropertyChanged(nameof(CanGoPrevError));
+        OnPropertyChanged(nameof(CanGoNextError));
     }
 
     private bool Matches(LogEntry e)
@@ -701,6 +742,26 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         SelectedIndex = Math.Clamp(index, 0, Entries.Count - 1);
         FollowTail = false;
         StatusText = $"匹配 {SelectedIndex + 1}/{Entries.Count}";
+    }
+
+    /// <summary>「▲ error」: jump to the previous error-level row in current Entries (no wrap).</summary>
+    [RelayCommand]
+    private void GoPrevError() => JumpToAdjacentLevel("error", -1);
+
+    /// <summary>「▼ error」: jump to the next error-level row in current Entries (no wrap).
+    /// With nothing selected yet, lands on the first error.</summary>
+    [RelayCommand]
+    private void GoNextError() => JumpToAdjacentLevel("error", +1);
+
+    /// <summary>Select the adjacent level neighbor: pause follow-tail (same as match nav)
+    /// and soft-status the row position. No-op when no neighbor exists.</summary>
+    private void JumpToAdjacentLevel(string level, int direction)
+    {
+        var idx = FindAdjacentLevel(Entries, SelectedIndex, level, direction);
+        if (idx < 0) return;
+        SelectedIndex = idx;
+        FollowTail = false;
+        StatusText = $"{level} {SelectedIndex + 1}/{Entries.Count}";
     }
 
     /// <summary>Default export destination: `export-&lt;ts&gt;.log` in the file sink's dir.</summary>
