@@ -99,6 +99,7 @@ public class UiSmokeTests
 
         var deployLines = vm.Dashboard.OutputLog.Where(l => l.Message.Contains("Deploy")).ToList();
         Assert.NotEmpty(deployLines);
+        Assert.Contains(deployLines, l => l.Source == "deploy");
         Assert.Contains(deployLines, l =>
             l.Message.Contains("产物目录") || l.Message.Contains("publish") || l.Message.Contains("打包"));
         window.Close();

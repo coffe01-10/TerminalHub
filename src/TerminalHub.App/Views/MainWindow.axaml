@@ -1034,8 +1034,16 @@
             <TextBlock Text="Logs" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
-                Command="{Binding DockSelectCommand}" CommandParameter="4">
+        <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish. -->
+        <Button x:Name="DeployDockButton" Classes="dock"
+                Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
+                Command="{Binding DockSelectCommand}" CommandParameter="4"
+                ToolTip.Tip="点击：有产物则打开目录，无产物则开始打包。Ctrl+点击或右键「重新打包」强制重新发布。">
+          <Button.ContextFlyout>
+            <MenuFlyout>
+              <MenuItem Header="重新打包 Republish" Click="OnRepublishMenuClick"/>
+            </MenuFlyout>
+          </Button.ContextFlyout>
           <StackPanel>
             <TextBlock Text="☁" FontSize="13" HorizontalAlignment="Center"/>
             <TextBlock Text="Deploy" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
