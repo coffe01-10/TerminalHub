@@ -583,9 +583,76 @@
               </Grid>
 
               <!-- ===== Logs ===== -->
-              <TextBlock IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
-                         Text="日志 — session/system logs (stub)" Foreground="#64748B"
-                         FontSize="11" Margin="8" TextWrapping="Wrap"/>
+              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
+                    RowDefinitions="Auto,Auto,*,Auto">
+                <!-- filter row -->
+                <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,4">
+                  <TextBox Text="{Binding Logs.FilterText}" Watermark="过滤日志…"
+                           Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
+                           Foreground="#E2E8F0" Padding="8,3" FontSize="10.5"/>
+                  <ToggleButton Grid.Column="1" Content="⬇ 写文件" Margin="6,0,0,0" Padding="8,3"
+                                CornerRadius="6" Background="#1A2030" BorderBrush="#2A3142"
+                                Foreground="#94A3B8" FontSize="10"
+                                IsChecked="{Binding Logs.FileLogging}"
+                                ToolTip.Tip="将会话输出写入本地日志文件">
+                    <ToggleButton.Styles>
+                      <Style Selector="ToggleButton:checked">
+                        <Setter Property="Foreground" Value="#38BDF8"/>
+                        <Setter Property="BorderBrush" Value="#3B82F6"/>
+                      </Style>
+                    </ToggleButton.Styles>
+                  </ToggleButton>
+                </Grid>
+                <!-- level + session filters -->
+                <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,0,0,4">
+                  <ComboBox SelectedIndex="{Binding Logs.LevelFilterIndex}"
+                            Background="#1A2030" BorderBrush="#2A3142" FontSize="10"
+                            CornerRadius="6" Padding="8,2" MinWidth="96"
+                            VerticalAlignment="Center">
+                    <ComboBoxItem>All Levels</ComboBoxItem>
+                    <ComboBoxItem>info</ComboBoxItem>
+                    <ComboBoxItem>warn</ComboBoxItem>
+                    <ComboBoxItem>error</ComboBoxItem>
+                  </ComboBox>
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding Logs.SessionNames}"
+                            SelectedIndex="{Binding Logs.SessionFilterIndex}"
+                            Background="#1A2030" BorderBrush="#2A3142" FontSize="10"
+                            CornerRadius="6" Padding="8,2" Margin="6,0,0,0"
+                            VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- log lines -->
+                <Border Grid.Row="2" CornerRadius="8" Background="#CC141B29"
+                        BorderBrush="#332A3142" BorderThickness="1">
+                  <ListBox ItemsSource="{Binding Logs.Entries}"
+                           Background="Transparent" BorderThickness="0" Padding="4">
+                    <ListBox.Styles>
+                      <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="4,1"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                        <Setter Property="FontSize" Value="9.5"/>
+                      </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:LogEntry">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Time, StringFormat='{}{0:HH:mm:ss}'}" Foreground="#64748B"/>
+                          <TextBlock Text="{Binding Level, StringFormat='[{0}]'}"
+                                     Foreground="{Binding Level, Converter={x:Static vm:LogLevelConverter.Instance}}"/>
+                          <TextBlock Text="{Binding Source, StringFormat='({0})'}" Foreground="#7C8AA5"
+                                     IsVisible="{Binding Source, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                          <TextBlock Text="{Binding Message}" Foreground="#CBD5E1" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Border>
+
+                <TextBlock Grid.Row="3" Text="{Binding Logs.FileStatus}" Foreground="#34D399"
+                           FontSize="9" Margin="2,4,2,0" TextWrapping="Wrap"
+                           IsVisible="{Binding Logs.FileStatus, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+              </Grid>
 
               <!-- ===== SSH ===== -->
               <TextBlock IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"

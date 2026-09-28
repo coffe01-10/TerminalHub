@@ -44,6 +44,19 @@
 - Headless UI test renders both dashboard + Codex frames to PNG.
 - Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
 
+### PR #7 — Logs panel + file sink (`feat/logs-panel`)
+- Right-rail **Logs** tab over the real session stream: text filter + level
+  filter (info/warn/error) + per-session filter (rebuilt on tab open);
+  `LogEntry.Source` carries the session name, shown as `(Terminal 03)`.
+- `⬇ 写文件` toggle → `SessionLogFile` writes
+  `~/.config/terminalhub/logs/terminalhub-<ts>.log` (`HH:mm:ss.fff [level] (src) msg`),
+  persisted via `AppSettings.SessionLogToFile`; status line shows the path.
+- warn/error lines also fan out to the bottom **Problems** badge (verified:
+  `warn_me`→warn, `ls: write error`→error, badge=3).
+- Verified on DISPLAY=:7: typed `echo LOGTEST_99; ls /tmp|head -3; echo warn_me`,
+  filtered "LOGTEST" → 2 entries; toggle wrote real file with subsequent lines.
+- `docs/screenshots/logs-panel.png`. 51 tests green.
+
 ### PR #6 — Files panel + real Output stream (`feat/files-panel`)
 - Right-rail **Files** tab is a real local browser: `↑` + clickable breadcrumb
   (`/ › home › box › .config`), dirs-first sorted listing (dirs blue `▸`,

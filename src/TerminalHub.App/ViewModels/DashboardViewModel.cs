@@ -4,8 +4,8 @@ using TerminalHub.Core.Monitoring;
 
 namespace TerminalHub.App.ViewModels;
 
-/// <summary>Bottom-panel log entry (Output tab).</summary>
-public sealed record LogEntry(DateTime Time, string Level, string Message);
+/// <summary>Bottom-panel log entry (Output tab). Source = session name, "" for app events.</summary>
+public sealed record LogEntry(DateTime Time, string Level, string Message, string Source = "");
 
 /// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
 public partial class DashboardViewModel : ViewModelBase
@@ -76,14 +76,14 @@ public partial class DashboardViewModel : ViewModelBase
     private const int MaxProblemLines = 200;
 
     /// <summary>Append a line from a real session stream (PTY output) or an app event.</summary>
-    public void AppendOutput(string level, string message)
+    public void AppendOutput(string level, string message, string source = "")
         => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            OutputLog.Add(new LogEntry(DateTime.Now, level, message));
+            OutputLog.Add(new LogEntry(DateTime.Now, level, message, source));
             while (OutputLog.Count > MaxOutputLines) OutputLog.RemoveAt(0);
             if (level is "warn" or "error")
             {
-                Problems.Add(new LogEntry(DateTime.Now, level, message));
+                Problems.Add(new LogEntry(DateTime.Now, level, message, source));
                 while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
                 ProblemCount = Problems.Count;
             }

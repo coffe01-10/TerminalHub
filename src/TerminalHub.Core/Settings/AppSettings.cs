@@ -30,6 +30,8 @@ public sealed class AppSettings
     public double FontSize { get; set; } = 13;
     public string Theme { get; set; } = "DarkGlass";
     public string WorkspaceName { get; set; } = "MangaFlow";
+    /// <summary>When true, session output is also written to a local log file.</summary>
+    public bool SessionLogToFile { get; set; }
     public List<StartupSession> StartupSessions { get; set; } =
     [
         new StartupSession { Name = "Terminal 01", Tag = "开发环境" },

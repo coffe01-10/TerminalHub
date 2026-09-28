@@ -46,6 +46,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         AssistantMode = value == 4;
         if (value == 1) Files.EnsureSessionDir();
+        if (value == 2) Logs.RefreshSessions();
     }
 
     /// <summary>Selection sync: ListBox.SelectedItem drives activation.</summary>
@@ -60,6 +61,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
     public FilesViewModel Files { get; }
+    public LogsViewModel Logs { get; }
+    private readonly SessionLogFile _sessionLog = new();
 
     public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null)
     {
@@ -74,6 +77,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dashboard = new DashboardViewModel(_monitor);
         Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.MockAiAssistant());
         Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory);
+        Logs = new LogsViewModel(Dashboard, _sessionLog,
+            () => SessionCards.Select(c => c.Name).ToList(),
+            _settings.SessionLogToFile,
+            v => _settings.SessionLogToFile = v);
 
         _sessions.SessionAdded += OnSessionAdded;
         _sessions.SessionRemoved += OnSessionRemoved;
@@ -227,13 +234,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>Per-session UTF-8 line decoders feeding the real Output log.</summary>
     private readonly Dictionary<Guid, Utf8LineDecoder> _lineDecoders = new();
+    private readonly Dictionary<Guid, string> _sessionNames = new();
 
     private void OnPtyOutput(IPtySession pty, ReadOnlyMemory<byte> data)
     {
         if (!_lineDecoders.TryGetValue(pty.Id, out var dec))
         {
             dec = new Utf8LineDecoder();
-            dec.LineReceived += line => Dashboard.AppendOutput(ClassifyLine(line), line);
+            dec.LineReceived += line =>
+            {
+                var level = ClassifyLine(line);
+                var name = _sessionNames.GetValueOrDefault(pty.Id, "session");
+                Dashboard.AppendOutput(level, line, name);
+                _sessionLog.Write(name, level, line);
+            };
             _lineDecoders[pty.Id] = dec;
         }
         dec.Feed(data.Span);
@@ -249,6 +263,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnSessionAdded(TerminalSessionModel s)
     {
+        _sessionNames[s.Id] = s.Name;
         s.Pty.OutputReceived += OnPtyOutput;
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
@@ -264,6 +279,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         s.Pty.OutputReceived -= OnPtyOutput;
         _lineDecoders.Remove(s.Id);
+        _sessionNames.Remove(s.Id);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
@@ -322,6 +338,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         PersistSettings();
+        Logs.Dispose();
+        _sessionLog.Dispose();
         _monitor.Dispose();
         foreach (var c in SessionCards) c.Model.Dispose();
         SessionCards.Clear();
