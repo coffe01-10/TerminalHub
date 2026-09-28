@@ -18,7 +18,6 @@
 
 ## 进行中
 
-- [ ] **会话快捷键 + ••• 菜单** — **Devin** · `feat/session-shortcuts` · PR #29 · worktree `/workspace/TerminalHub-shortcuts`
 - [ ] **Deploy 发布流 + 取消** — **Grok** · `feat/deploy-publish-stream-cancel` · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
@@ -29,6 +28,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #29 会话快捷键 + ••• 菜单（Ctrl+W 关会话 / Ctrl+Tab 双向循环 / 复制 CWD）— Devin · `feat/session-shortcuts` · `main@6cc8405`
 - [x] PR #27 Logs 点击跳到会话（双击 / 「跳到会话」）— GLM · `feat/logs-click-jump-session` · `main@779de78`
 - [x] PR #26 Logs 按会话筛选记忆（切换恢复各自筛选）— GLM · `feat/logs-pin-session-filters` · `main@fe75b42`
 - [x] PR #25 Logs 搜索高亮 + 上一条/下一条匹配 — GLM · `feat/logs-search-nav` · `main@114eeb0`
