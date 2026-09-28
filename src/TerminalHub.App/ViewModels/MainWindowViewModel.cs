@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TerminalHub.Core.Deploy;
@@ -100,7 +101,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
             v => _settings.SessionLogToFile = v,
-            copyToClipboard: CopyTextToClipboardAsync);
+            copyToClipboard: CopyTextToClipboardAsync,
+            promptExportPath: PromptExportPathAsync);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
@@ -227,6 +229,43 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             // Clipboard unavailable (headless / locked desktop) — copy stays best-effort.
         }
+    }
+
+    /// <summary>Save dialog for the Logs one-shot export. No window (headless/automation),
+    /// a broken picker (Linux X11 without a desktop portal), or a picker that never
+    /// answers → fall back to the default export path so the file still lands on disk;
+    /// a dismissed dialog returns null and the VM reports "已取消导出".</summary>
+    private async Task<string?> PromptExportPathAsync()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime
+            { MainWindow: { StorageProvider: { } picker } })
+        {
+            try
+            {
+                var pick = picker.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = "导出 Logs 可见行",
+                    SuggestedFileName = Path.GetFileName(Logs.DefaultExportPath()),
+                    FileTypeChoices =
+                    [
+                        new FilePickerFileType("日志文件") { Patterns = ["*.log"] },
+                        new FilePickerFileType("文本文件") { Patterns = ["*.txt"] },
+                    ],
+                });
+                // Without xdg-desktop-portal the DBus call can hang forever — don't let
+                // that swallow the export; time out into the default path.
+                var done = await Task.WhenAny(pick, Task.Delay(TimeSpan.FromSeconds(10)));
+                if (done != pick) return Logs.DefaultExportPath();
+                var file = await pick;
+                return file?.TryGetLocalPath();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return Logs.DefaultExportPath(); // picker broken on this platform — still export
+            }
+        }
+        return Logs.DefaultExportPath();
     }
 
     [RelayCommand] private void ToggleAssistant() => AssistantMode = !AssistantMode;

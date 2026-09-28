@@ -27,6 +27,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     private readonly Func<IReadOnlyList<string>> _sessionNames;
     private readonly Action<bool>? _persistFileLogging;
     private readonly Func<string, Task>? _copyToClipboard;
+    private readonly Func<Task<string?>>? _promptExportPath;
     private readonly int _capacity;
 
     /// <summary>Deep history of session lines; independent of Output's display cap.</summary>
@@ -51,6 +52,15 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _statusText = "";
     /// <summary>On: clearing the Output panel keeps this panel's buffered history. Off (default): follow the clear.</summary>
     [ObservableProperty] private bool _retainHistoryOnClear;
+    /// <summary>On (default): the list stays pinned to the newest line — new lines auto-scroll
+    /// to the bottom. User scroll-up pauses it; the「⬇ 跟随」button or scrolling back to
+    /// the bottom resumes. New lines while paused never flip this back on.</summary>
+    [ObservableProperty] private bool _followTail = true;
+
+    /// <summary>True while following is paused — drives the floating「⬇ 跟随」button.</summary>
+    public bool FollowPaused => !FollowTail;
+
+    partial void OnFollowTailChanged(bool value) => OnPropertyChanged(nameof(FollowPaused));
 
     public LogsViewModel(
         DashboardViewModel dashboard,
@@ -60,7 +70,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         Action<bool>? persistFileLogging = null,
         string? logDir = null,
         int bufferCapacity = DefaultBufferCapacity,
-        Func<string, Task>? copyToClipboard = null)
+        Func<string, Task>? copyToClipboard = null,
+        Func<Task<string?>>? promptExportPath = null)
     {
         _dashboard = dashboard;
         _file = file;
@@ -69,6 +80,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _persistFileLogging = persistFileLogging;
         _capacity = Math.Max(1, bufferCapacity);
         _copyToClipboard = copyToClipboard;
+        _promptExportPath = promptExportPath;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Refilter();
         if (fileLogging) FileLogging = true; // goes through OnFileLoggingChanged
@@ -222,6 +234,58 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         var n = Entries.Count;
         Entries.Clear();
         StatusText = $"已清空 {n} 行";
+    }
+
+    /// <summary>Called by the view on a *user-driven* scroll (offset changed, extent
+    /// did not): landing at the bottom resumes following, anywhere else pauses it.
+    /// Extent-only events (new lines, resize) carry no user intent and must not
+    /// go through here — otherwise incoming lines would cancel the follow.</summary>
+    public void UpdateFollowFromScroll(bool atBottom) => FollowTail = atBottom;
+
+    /// <summary>「⬇ 跟随」button: resume tail-following; the view scrolls to bottom.</summary>
+    [RelayCommand]
+    private void ResumeFollow() => FollowTail = true;
+
+    /// <summary>Default export destination: `export-&lt;ts&gt;.log` in the file sink's dir.</summary>
+    public string DefaultExportPath()
+        => Path.Combine(_logDir ?? SessionLogFile.DefaultDir(),
+            $"export-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+
+    /// <summary>One-shot export of the currently visible (filtered) lines to .log/.txt.
+    /// With a picker hook the user picks the path (cancel → status note, no write);
+    /// without one (tests / headless) it writes <see cref="DefaultExportPath"/>.
+    /// Independent of the「⬇ 写文件」live sink, which keeps streaming untouched.</summary>
+    [RelayCommand]
+    private async Task ExportVisibleAsync()
+    {
+        if (Entries.Count == 0)
+        {
+            StatusText = "没有可导出的行";
+            return;
+        }
+        string? path;
+        if (_promptExportPath is null)
+            path = DefaultExportPath();
+        else
+        {
+            path = await _promptExportPath();
+            if (path is null)
+            {
+                StatusText = "已取消导出";
+                return;
+            }
+        }
+        try
+        {
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(path, BuildVisibleText() + Environment.NewLine);
+            StatusText = $"已导出 {Entries.Count} 行 → {path}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"导出失败: {ex.Message}";
+        }
     }
 
     /// <summary>Rebuild the session-name filter list (call when sessions change).</summary>
