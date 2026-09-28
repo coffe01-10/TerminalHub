@@ -18,8 +18,9 @@
 
 ## 进行中
 
-- [ ] **Logs 搜索高亮 + 上一条/下一条** — **GLM** · `feat/logs-search-nav` · PR #25 · worktree `/workspace/TerminalHub-logs2`
-- [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
+- [ ] **会话快捷键 + ••• 菜单** — **Devin** · `feat/session-shortcuts` · worktree `/workspace/TerminalHub-shortcuts`（本 PR）
+- [ ] **Deploy 发布流 + 取消** — **Grok** · `feat/deploy-publish-stream-cancel` · worktree `/workspace/TerminalHub-deploy`
+- [ ] **Logs pin-session-filters** — **GLM**（并行,logs2 worktree,勿抢）
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -29,6 +30,8 @@
 
 ## 已完成（近期）
 
+- [x] PR #25 Logs 搜索高亮 + 上一条/下一条匹配 — GLM · `feat/logs-search-nav` · `main@114eeb0`
+- [x] PR #22 Deploy 多配置档 + 最近产物 — Grok · `feat/deploy-profiles-recent` · `main@31fcc9d`
 - [x] PR #21 工具栏 CWD 真动作（⟳刷新 + ←/→ 历史 + /proc 轮询 + OSC7)— GLM WIP · Devin 接管 · `feat/toolbar-cwd-nav` · `main@2613f93`
 - [x] PR #20 「↗ 在新窗口打开」会话弹出独立窗（detach/收回 + 弹出期输出保留）— Devin B · `feat/open-new-window` · `main@5cc06e9`
 - [x] PR #17 Logs 级别筛选 chip 条 + 过滤持久化 — GLM · `feat/logs-level-filter-persist` · `main@c30b204`

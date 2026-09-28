@@ -4,6 +4,21 @@
 
 ## 2026-09-28
 
+### PR ? — 会话快捷键 + ••• 会话菜单 (`feat/session-shortcuts`)
+- **Ctrl+W** 关当前会话、**Ctrl+Tab / Ctrl+Shift+Tab** 双向循环会话卡 —
+  窗口级 Tunnel `KeyDown` handler 抢在 TerminalView 之前(否则 Ctrl+W 被
+  shell 吃掉当 kill-word、Ctrl+Tab 被当 `\t` 补全),走正常激活路径
+  (分屏时分配到聚焦窗格)。
+- **••• 菜单**:`Button.Flyout` + `MenuFlyout` —— 关闭会话 / 下一个会话 /
+  上一个会话 / 复制 CWD(`CopyActiveCwd` 写剪贴板 + Output 记 `ui` 行),
+  菜单项命令绑定 VM 命令。
+- **验证**:6 个新测 —— `KeyPress` 真输入管线 Ctrl+W 关会话 / Ctrl+Tab
+  双向循环(含 wrap)、CycleSession 环绕、CloseActiveSession 杀 PTY+
+  激活下一个、CopyActiveCwd 写 ui 日志、••• flyout 菜单项命令绑定。
+  DISPLAY=:7 实机:Ctrl+W 关 T02(tab 消失)、Ctrl+Tab/Shift+Tab 双向、
+  ••• 菜单点开 +「复制 CWD」→ Output `已复制 CWD: /home/box`。
+- 截图 `session-shortcuts.png`。180+ tests green。
+
 ### PR #25 — Logs 搜索高亮 + 上一条/下一条 (`feat/logs-search-nav`)
 - **高亮**: 扩展 `HighlightTextBlock`（`UseRegex`）；Logs 列表 Message / Source 在
   字面或正则过滤下黄粗高亮匹配段；过滤空或坏正则 → 无高亮。底栏 Search 仍走字面。
