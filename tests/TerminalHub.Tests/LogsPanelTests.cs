@@ -1590,5 +1590,81 @@ public class LogsPanelTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task WrapLines_Preference_SurvivesRestart_ViaSettingsStore()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        try
+        {
+            var vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.True(vm.Logs.WrapLines); // default wrap on
+            vm.Logs.WrapLines = false;
+
+            var onDisk = new SettingsStore(settingsPath).Load();
+            Assert.False(onDisk.LogsWrapLines);
+            vm.Dispose();
+
+            var vm2 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.False(vm2.Logs.WrapLines);
+            // Restoring must not write back on its own — flip on and confirm save.
+            var savesBefore = File.ReadAllText(settingsPath);
+            vm2.Logs.WrapLines = true;
+            var onDisk2 = new SettingsStore(settingsPath).Load();
+            Assert.True(onDisk2.LogsWrapLines);
+            Assert.NotEqual(savesBefore, File.ReadAllText(settingsPath));
+            vm2.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task WrapLines_UI_ToggleBinds_DefaultOn()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2;
+            await Task.Delay(150);
+
+            var toggle = window.GetVisualDescendants().OfType<ToggleButton>()
+                .Single(t => (string?)t.Content == "换行");
+            Assert.True(toggle.IsChecked);
+            Assert.True(vm.Logs.WrapLines);
+
+            toggle.IsChecked = false;
+            await Task.Delay(150);
+            Assert.False(vm.Logs.WrapLines);
+            Assert.False(toggle.IsChecked);
+
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            // Capture with wrap off so the chip is unchecked — then flip back for the
+            // docs screenshot which wants the chip visible/on (default).
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-wrap-toggle-off.png"));
+
+            toggle.IsChecked = true;
+            await Task.Delay(100);
+            Assert.True(vm.Logs.WrapLines);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-wrap-toggle.png"));
+        }
+        finally
+        {
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.WrapLines = true;
+            }
+            window.Close();
+        }
+    }
+
 
 }
