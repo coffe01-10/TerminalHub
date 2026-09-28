@@ -1193,7 +1193,9 @@
           </StackPanel>
         </Button>
         <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
-             Right-click also switches publish profiles, opens recent artifacts, and cancels a running publish. -->
+             Right-click also switches publish profiles, opens recent artifacts, opens the last
+             successful artifact, and cancels a running publish. The line under Deploy is the
+             real last exit (empty until one exists; hidden while a publish is running). -->
         <Button x:Name="DeployDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4"
@@ -1212,6 +1214,8 @@
                 <MenuItem Header="（无已存配置）" IsEnabled="False"/>
               </MenuItem>
               <Separator/>
+              <MenuItem Header="打开上次成功产物 Open last success" Click="OnOpenLastSuccessClick"
+                        IsEnabled="False"/>
               <MenuItem Header="最近产物 Recent">
                 <MenuItem Header="（暂无产物）" IsEnabled="False"/>
               </MenuItem>
@@ -1220,6 +1224,10 @@
           <StackPanel>
             <TextBlock Text="☁" FontSize="13" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding DeployDockCaption}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+            <TextBlock Text="{Binding LastPublishBadge}" FontSize="9"
+                       HorizontalAlignment="Center" Margin="0,1,0,0"
+                       IsVisible="{Binding HasLastPublishBadge}"
+                       TextWrapping="NoWrap"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"

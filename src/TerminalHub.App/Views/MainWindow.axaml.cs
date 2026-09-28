@@ -111,6 +111,9 @@ public partial class MainWindow : Window
     private void OnCancelPublishMenuClick(object? sender, RoutedEventArgs e)
         => Vm.CancelPublishCommand.Execute(null);
 
+    private void OnOpenLastSuccessClick(object? sender, RoutedEventArgs e)
+        => Vm.OpenLastSuccessfulArtifact();
+
     /// <summary>Split panes: a press on a pane focuses it — its session becomes
     /// active so the middle input row, Output and Search follow it.</summary>
     private void OnLeftPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(0);
@@ -129,6 +132,8 @@ public partial class MainWindow : Window
     {
         if (FindDeployMenu(flyout, static h => h.StartsWith("取消打包", StringComparison.Ordinal)) is { } cancel)
             cancel.IsEnabled = Vm.IsPublishRunning;
+        if (FindDeployMenu(flyout, static h => h.StartsWith("打开上次成功产物", StringComparison.Ordinal)) is { } last)
+            last.IsEnabled = Vm.CanOpenLastSuccessfulArtifact;
         if (FindDeployMenu(flyout, static h => h.StartsWith("配置档", StringComparison.Ordinal)) is { } profiles)
             FillProfileMenu(profiles, activate: true);
         if (FindDeployMenu(flyout, static h => h.StartsWith("删除配置档", StringComparison.Ordinal)) is { } deletes)

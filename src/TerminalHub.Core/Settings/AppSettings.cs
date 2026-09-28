@@ -86,6 +86,20 @@ public sealed class AppSettings
         set => _activePublishProfileId = value ?? "";
     }
     private string _activePublishProfileId = "";
+
+    /// <summary>
+    /// Last real publish exit (success / fail / cancelled), including exit code and duration.
+    /// Null until a publish has finished. ArtifactPath on the result keeps the last successful
+    /// folder when a later run fails or is cancelled.
+    /// Missing or null in <c>settings.json</c> loads as null.
+    /// </summary>
+    public TerminalHub.Core.Deploy.LastPublishResult? LastPublishResult
+    {
+        get => _lastPublishResult;
+        set => _lastPublishResult = value;
+    }
+    private TerminalHub.Core.Deploy.LastPublishResult? _lastPublishResult;
+
     public List<StartupSession> StartupSessions { get; set; } =
     [
         new StartupSession { Name = "Terminal 01", Tag = "开发环境" },

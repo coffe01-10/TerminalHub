@@ -17,6 +17,21 @@
 - **验证**: 187 tests green（本切片 +4：formatter 各档 + 怪异 Time、导出仍绝对、
   SettingsStore 往返、MainWindow Toggle 绑定 + 列表相对标签）。worktree
   `/workspace/TerminalHub-logs2`；工具 Grok Build。
+### pending / next Deploy slice — 坞上真实上次发布结果 + 一键打开上次成功产物 (`feat/deploy-last-status-badge`)
+- **上次结果**: `ReportPublishExit`（以及启动失败 / 启动前取消）把真实结局写入
+  `AppSettings.LastPublishResult`：`success` / `fail` / `cancelled`、进程 exit code、
+  `FinishedAt`、耗时。空闲时 Deploy 坞标题下显示 `成功 · 12s` / `失败 exit 1 · 3s` /
+  `已取消 · 1s`；从未打包则为空，提示「尚未打包」。打包进行中标题仍是「打包中」，
+  不盖上次徽章。没有假进度、假百分比。
+- **持久化**: 与配置档相同，经 `SettingsStore` 写入 `settings.json`。重启后坞上仍显示。
+  缺字段或 `LastPublishResult: null` 时 Load 不抛。失败或取消保留上次成功目录路径。
+- **打开上次成功产物**: 右键「打开上次成功产物 Open last success」，与「最近产物」并列。
+  仅当该目录仍在磁盘上时启用；点击复用 `OpenRecentArtifact`。成功退出后取
+  `RecentArtifactList` 最新目录写入 `ArtifactPath`。目录被删则禁用，若仍被调用则 Output 警告。
+- 发布流进 Output、取消、配置档、最近产物行为保持。
+- **验证**: `dotnet test -c Release` 204 tests green（本切片 +6：SettingsStore 往返与缺字段、
+  失败/取消保留成功路径、坞菜单打开上次成功产物、目录缺失则禁用）。
+- 实机截图：`docs/screenshots/deploy-last-status-badge.png`（Deploy 坞「成功 · 42s」徽章 + 右键「打开上次成功产物」）。
 
 ### PR #31 — Files「在此打开终端」+「复制路径」 (`feat/files-open-in-terminal`)
 - **在此打开终端**: Files 工具行 ⇥ 按钮 + 条目右键菜单 —— 选中**目录** → 活动
