@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### PR ? — 会话快捷键 + ••• 会话菜单 (`feat/session-shortcuts`)
+### PR #29 — 会话快捷键 + ••• 会话菜单 (`feat/session-shortcuts`)
 - **Ctrl+W** 关当前会话、**Ctrl+Tab / Ctrl+Shift+Tab** 双向循环会话卡 —
   窗口级 Tunnel `KeyDown` handler 抢在 TerminalView 之前(否则 Ctrl+W 被
   shell 吃掉当 kill-word、Ctrl+Tab 被当 `\t` 补全),走正常激活路径
