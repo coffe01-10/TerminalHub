@@ -4,7 +4,21 @@
 
 ## 2026-09-28
 
-### pending — Logs 复制选中行 (`feat/logs-copy-selected-line`)
+### pending — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
+- **「换行」chip**: 级别 chip /「相对」旁 `timechip` ToggleButton；开（默认）=
+  `TextWrapping.Wrap`（现行行为）；关 = `NoWrap` + `LogsList`
+  `ScrollViewer.HorizontalScrollBarVisibility=Auto`，便于密扫长行。
+- **绑定**: DataTemplate 内 Message 的 `HighlightTextBlock.TextWrapping` 经
+  `BoolToTextWrappingConverter` 绑 `Logs.WrapLines`。
+- **持久化**: 全局 `AppSettings.LogsWrapLines`（默认 true）；与
+  `LogsUseRelativeTimestamps` 同路经 `PersistLogsFilters` 落盘；**不是** per-session。
+- **边界**: 只动 Logs + settings；不动 Deploy/Files/SSH/Core PTY。
+- **验证**: 212 tests green（+2：SettingsStore 往返、MainWindow「换行」Toggle 默认开绑定）。
+  worktree `/workspace/TerminalHub-logs2`；工具 Grok Build / Claude Code OK。
+- 截图 `docs/screenshots/logs-wrap-toggle.png`（「换行」chip 可见且默认开）。
+  已对齐 `origin/main` @ `9f5ff3d`（含 #36）。
+
+### PR #36 — Logs 复制选中行 (`feat/logs-copy-selected-line`)
 - **CopySelectedCommand**: 若 `SelectedIndex` 有效，把该行绝对 `FormatLine`
   （与导出/复制可见行同格式）写入剪贴板；`StatusText`「已复制选中行」。
   无选中 →「没有选中的日志行」；无剪贴板钩子 →「剪贴板不可用」（软失败，不抛）。

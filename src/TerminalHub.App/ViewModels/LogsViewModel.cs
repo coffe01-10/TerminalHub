@@ -75,6 +75,10 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// Off (default): absolute <c>HH:mm:ss</c>. Global preference (not per-session). Export always absolute.</summary>
     [ObservableProperty] private bool _useRelativeTimestamps;
 
+    /// <summary>On (default): wrap long Message lines in the Logs list.
+    /// Off: NoWrap for dense one-line scanning (list gains horizontal scroll). Global preference.</summary>
+    [ObservableProperty] private bool _wrapLines = true;
+
     /// <summary>On (default): the list stays pinned to the newest line — new lines auto-scroll
     /// to the bottom. User scroll-up pauses it; the「⬇ 跟随」button or scrolling back to
     /// the bottom resumes. New lines while paused never flip this back on.</summary>
@@ -176,7 +180,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// the bar). The restore itself never writes back: <see cref="SaveCurrentFilters"/> is
     /// suppressed while applying, so loading cannot trigger a save.</summary>
     public void ApplyPersistedFilters(string? filterText, bool useRegex, int levelFilterIndex, bool retainHistoryOnClear,
-        bool useRelativeTimestamps = false)
+        bool useRelativeTimestamps = false, bool wrapLines = true)
     {
         _restoringFilters = true;
         try
@@ -186,6 +190,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             LevelFilterIndex = Math.Clamp(levelFilterIndex, 0, LevelNames.Length);
             RetainHistoryOnClear = retainHistoryOnClear;
             UseRelativeTimestamps = useRelativeTimestamps;
+            WrapLines = wrapLines;
         }
         finally { _restoringFilters = false; }
         // These are「全部会话」's globals (startup always selects index 0) — remember
@@ -342,6 +347,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     }
     partial void OnRetainHistoryOnClearChanged(bool value) => SaveCurrentFilters();
     partial void OnUseRelativeTimestampsChanged(bool value) => SaveCurrentFilters();
+    partial void OnWrapLinesChanged(bool value) => SaveCurrentFilters();
 
     /// <summary>Session switch → swap the visible combo to the new selection's remembered
     /// state. Nothing needs saving on the way out: every filter change (and every

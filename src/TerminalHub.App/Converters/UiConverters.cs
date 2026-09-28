@@ -139,6 +139,18 @@ public sealed class ChecklistTextConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>bool wrap → TextWrapping.Wrap (true) or NoWrap (false). Logs message lines.</summary>
+public sealed class BoolToTextWrappingConverter : IValueConverter
+{
+    public static readonly BoolToTextWrappingConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? TextWrapping.Wrap : TextWrapping.NoWrap;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is TextWrapping.Wrap;
+}
+
 /// <summary>Logs list timestamp: values[0]=DateTime Time, values[1]=bool UseRelativeTimestamps → label.</summary>
 public sealed class LogTimestampConverter : IMultiValueConverter
 {

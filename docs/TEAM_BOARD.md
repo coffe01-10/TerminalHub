@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:26 CST（Logs 复制选中行截图已补，待 Devin 拉测） · 维护：Devin（PO）
+最后更新：2026-09-28 18:30 CST（Logs 换行 toggle 进行中，待 PR + Devin 拉测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 复制选中行**（⧉ 复制选中 + Ctrl+C）— **Grok** · `feat/logs-copy-selected-line` · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Logs 换行/不换行 toggle**（「换行」chip · Wrap 默认开 · NoWrap+横滚）— **Grok** · `feat/logs-wrap-toggle` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **Deploy last-status 徽标 + 打开上次成功产物** — **Grok** · `feat/deploy-last-status-badge` · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
@@ -29,6 +29,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #36 Logs 复制选中行（⧉ 复制选中 + Ctrl+C）— Grok · `feat/logs-copy-selected-line` · `main@9f5ff3d`
 - [x] PR #30 Logs 时间戳相对/绝对切换（相对 chip + 列表相对标签；导出仍绝对）— Grok · Devin 拉测修列表绑定 · `feat/logs-timestamp-toggle` · `main@c7b6fec`
 - [x] PR #33 看板补 #31 merge SHA — Devin B · `main@e99950f`
 - [x] PR #32 看板补 #29 merge SHA — Devin · `main@9e98d8a`

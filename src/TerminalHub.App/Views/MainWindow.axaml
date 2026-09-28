@@ -807,6 +807,10 @@
                   <ToggleButton Classes="timechip" Content="相对" Margin="10,0,0,0"
                                 IsChecked="{Binding Logs.UseRelativeTimestamps}"
                                 ToolTip.Tip="时间戳：关=绝对 HH:mm:ss；开=相对距现在（刚刚 / 12s / 3m / 1h / 昨天 HH:mm；更早回退绝对）。导出始终用绝对时间。"/>
+                  <!-- line wrap: on(default)=Wrap · off=NoWrap + horizontal scroll for dense scanning -->
+                  <ToggleButton Classes="timechip" Content="换行" Margin="4,0,0,0"
+                                IsChecked="{Binding Logs.WrapLines}"
+                                ToolTip.Tip="换行：开（默认）=长消息自动折行；关=单行显示并允许横向滚动，便于密扫。"/>
                 </StackPanel>
                 <!-- session filter -->
                 <ComboBox Grid.Row="2" ItemsSource="{Binding Logs.SessionNames}"
@@ -872,6 +876,7 @@
                              SelectedIndex="{Binding Logs.SelectedIndex, Mode=TwoWay}"
                              DoubleTapped="OnLogsEntryDoubleTapped"
                              KeyDown="OnLogsListKeyDown"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
                              Background="Transparent" BorderThickness="0" Padding="4">
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">
@@ -900,7 +905,8 @@
                                                     Query="{Binding $parent[ListBox].DataContext.Logs.FilterText}"
                                                     UseRegex="{Binding $parent[ListBox].DataContext.Logs.UseRegex}"
                                                     IsVisible="{Binding Source, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
-                            <ctl:HighlightTextBlock LineText="{Binding Message}" Foreground="#CBD5E1" TextWrapping="Wrap"
+                            <ctl:HighlightTextBlock LineText="{Binding Message}" Foreground="#CBD5E1"
+                                                    TextWrapping="{Binding $parent[ListBox].DataContext.Logs.WrapLines, Converter={x:Static vm:BoolToTextWrappingConverter.Instance}}"
                                                     Query="{Binding $parent[ListBox].DataContext.Logs.FilterText}"
                                                     UseRegex="{Binding $parent[ListBox].DataContext.Logs.UseRegex}"/>
                           </StackPanel>
