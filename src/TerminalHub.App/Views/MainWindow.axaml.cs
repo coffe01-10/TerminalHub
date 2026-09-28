@@ -279,6 +279,17 @@ public partial class MainWindow : Window
         {
             Vm.Logs.JumpToSessionCommand.Execute(null);
             e.Handled = true;
+            return;
+        }
+        // Ctrl+C copies the selected row only while the list itself is focused
+        // (this handler is on LogsList — filter TextBox never reaches here).
+        if (e.Key == Key.C
+            && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && !e.KeyModifiers.HasFlag(KeyModifiers.Alt)
+            && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            Vm.Logs.CopySelectedCommand.Execute(null);
+            e.Handled = true;
         }
     }
 

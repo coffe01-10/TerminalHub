@@ -4,6 +4,17 @@
 
 ## 2026-09-28
 
+### pending — Logs 复制选中行 (`feat/logs-copy-selected-line`)
+- **CopySelectedCommand**: 若 `SelectedIndex` 有效，把该行绝对 `FormatLine`
+  （与导出/复制可见行同格式）写入剪贴板；`StatusText`「已复制选中行」。
+  无选中 →「没有选中的日志行」；无剪贴板钩子 →「剪贴板不可用」（软失败，不抛）。
+- **UI**: 工具行「⧉ 复制可见行」旁「⧉ 复制选中」，`IsEnabled` 绑 `HasSelectedEntry`。
+- **键盘**: `LogsList` 聚焦时 Ctrl+C（code-behind `OnLogsListKeyDown`）复制选中行；
+  过滤 TextBox 不抢（handler 只挂在 ListBox）。
+- **边界**: 不改 CopyVisible / Export；不动 Deploy/Files/SSH/PTY。
+- **验证**: 204 tests green（+2：选中行 FormatLine 绝对 + 无选中/无剪贴板软失败）。worktree
+  `/workspace/TerminalHub-logs2`；工具 Grok Build。
+
 ### PR #30 — Logs 时间戳相对/绝对切换 (`feat/logs-timestamp-toggle`)
 - **规则（距现在 ago-from-now）**: 关=绝对本地时钟 `HH:mm:ss`；开=相对短标签
   `刚刚`（&lt;2s）/ `12s` / `3m` / `1h` / `昨天 HH:mm`；比昨天更早或异常 Time →

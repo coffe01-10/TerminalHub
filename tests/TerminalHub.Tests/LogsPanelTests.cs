@@ -516,6 +516,51 @@ public class LogsPanelTests
     }
 
     [AvaloniaFact]
+    public async Task CopySelected_CopiesOnlySelected_FormatLineAbsolute()
+    {
+        var captured = new List<string>();
+        var (dash, logs, _) = MakeLogs(copyToClipboard: t => { captured.Add(t); return Task.CompletedTask; });
+        dash.AppendOutput("info", "plain line", "Terminal 01");
+        dash.AppendOutput("warn", "watch out", "Terminal 02");
+        await Until(() => logs.Entries.Count == 2);
+
+        Assert.False(logs.HasSelectedEntry);
+        logs.SelectedIndex = 1;
+        Assert.True(logs.HasSelectedEntry);
+
+        await logs.CopySelectedCommand.ExecuteAsync(null);
+        var text = Assert.Single(captured);
+        Assert.Equal(LogsViewModel.FormatLine(logs.Entries[1]), text);
+        Assert.Contains("[warn]", text);
+        Assert.Contains("(Terminal 02) watch out", text);
+        Assert.DoesNotContain("plain line", text);
+        Assert.Equal("已复制选中行", logs.StatusText);
+    }
+
+    [AvaloniaFact]
+    public async Task CopySelected_SoftFails_WhenNoneSelected_OrNoClipboard()
+    {
+        // No selection → status note, clipboard untouched.
+        var captured = new List<string>();
+        var (dash, logs, _) = MakeLogs(copyToClipboard: t => { captured.Add(t); return Task.CompletedTask; });
+        dash.AppendOutput("info", "alone", "Terminal 01");
+        await Until(() => logs.Entries.Count == 1);
+
+        Assert.Equal(-1, logs.SelectedIndex);
+        await logs.CopySelectedCommand.ExecuteAsync(null);
+        Assert.Empty(captured);
+        Assert.Equal("没有选中的日志行", logs.StatusText);
+
+        // Clipboard hook missing → soft fail after a valid selection.
+        var (dash2, logs2, _) = MakeLogs(); // copyToClipboard: null
+        dash2.AppendOutput("warn", "need clip", "Terminal 02");
+        await Until(() => logs2.Entries.Count == 1);
+        logs2.SelectedIndex = 0;
+        await logs2.CopySelectedCommand.ExecuteAsync(null);
+        Assert.Equal("剪贴板不可用", logs2.StatusText);
+    }
+
+    [AvaloniaFact]
     public async Task FollowTail_DefaultsTrue_ScrollUpPauses_NewLinesDoNotSilentlyResume()
     {
         var (dash, logs, _) = MakeLogs();

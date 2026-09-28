@@ -834,6 +834,11 @@
                           Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
                           FontSize="10" Command="{Binding Logs.CopyVisibleCommand}"
                           ToolTip.Tip="复制当前过滤结果到剪贴板"/>
+                  <Button Content="⧉ 复制选中" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
+                          FontSize="10" Command="{Binding Logs.CopySelectedCommand}"
+                          IsEnabled="{Binding Logs.HasSelectedEntry}"
+                          ToolTip.Tip="复制当前选中的日志行到剪贴板（Logs 列表聚焦时 Ctrl+C）"/>
                   <Button Content="⬇ 导出" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="#1A2030" BorderBrush="#2A3142" Foreground="#94A3B8"
                           FontSize="10" Command="{Binding Logs.ExportVisibleCommand}"
