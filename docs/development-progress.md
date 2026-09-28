@@ -4,6 +4,20 @@
 
 ## 2026-09-28
 
+### PR #30 — Logs 时间戳相对/绝对切换 (`feat/logs-timestamp-toggle`)
+- **规则（距现在 ago-from-now）**: 关=绝对本地时钟 `HH:mm:ss`；开=相对短标签
+  `刚刚`（&lt;2s）/ `12s` / `3m` / `1h` / `昨天 HH:mm`；比昨天更早或异常 Time →
+  回退绝对。未来/时钟偏差按 0 处理（显示 `刚刚`），不抛。
+- **UI**: 级别 chip 旁 `相对` ToggleButton（`timechip` 样式，不挤占 `levelchip`）；
+  `LogsList` DataTemplate 经 `LogTimestampConverter` MultiBinding
+  （`Time` + `Logs.UseRelativeTimestamps`）显示所选格式。
+- **持久化**: 全局 `AppSettings.LogsUseRelativeTimestamps`（默认 false）；与其它
+  Logs 过滤 prefs 一样经 `PersistLogsFilters` 落盘；**不是** per-session 字段。
+- **导出/复制**: `FormatLine` / `BuildVisibleText` 始终绝对时间，不随显示模式变。
+- **验证**: 187 tests green（本切片 +4：formatter 各档 + 怪异 Time、导出仍绝对、
+  SettingsStore 往返、MainWindow Toggle 绑定 + 列表相对标签）。worktree
+  `/workspace/TerminalHub-logs2`；工具 Grok Build。
+
 ### PR #31 — Files「在此打开终端」+「复制路径」 (`feat/files-open-in-terminal`)
 - **在此打开终端**: Files 工具行 ⇥ 按钮 + 条目右键菜单 —— 选中**目录** → 活动
   PTY 真实 `cd '<path>'`（与工具栏 CWD ←/→ 同一 `ApplyDisplayedCwd` 路径：

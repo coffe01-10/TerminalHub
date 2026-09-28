@@ -1,7 +1,9 @@
+using System.Collections;
 using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using TerminalHub.Core.AI;
+using TerminalHub.Core.Logging;
 
 namespace TerminalHub.App.ViewModels;
 
@@ -135,4 +137,17 @@ public sealed class ChecklistTextConverter : IValueConverter
             }))
             : Brushes.Gray;
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
+/// <summary>Logs list timestamp: values[0]=DateTime Time, values[1]=bool UseRelativeTimestamps → label.</summary>
+public sealed class LogTimestampConverter : IMultiValueConverter
+{
+    public static readonly LogTimestampConverter Instance = new();
+
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var time = values.Count > 0 && values[0] is DateTime dt ? dt : default;
+        var relative = values.Count > 1 && values[1] is true;
+        return LogTimestampFormatter.Format(time, relative);
+    }
 }
