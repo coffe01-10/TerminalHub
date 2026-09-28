@@ -42,7 +42,6 @@ public partial class DashboardViewModel : ViewModelBase
     {
         _monitor = monitor;
         _monitor.Sampled += OnSampled;
-        SeedMockLog();
     }
 
     private void OnSampled(ISystemMonitor m)
@@ -73,28 +72,30 @@ public partial class DashboardViewModel : ViewModelBase
         });
     }
 
-    private void SeedMockLog()
-    {
-        // Sample Output rows matching the dashboard mockup style.
-        var t = DateTime.Now;
-        OutputLog.Add(new LogEntry(t, "info", "Starting development server…"));
-        OutputLog.Add(new LogEntry(t.AddSeconds(1), "info", "Loaded environment variables from .env.local"));
-        OutputLog.Add(new LogEntry(t.AddSeconds(2), "warn", "Experimental features enabled"));
-        OutputLog.Add(new LogEntry(t.AddSeconds(3), "info", "Compiled successfully in 1.2s (893 modules)"));
-        OutputLog.Add(new LogEntry(t.AddSeconds(4), "info", "GET / 200 in 310ms"));
-        OutputLog.Add(new LogEntry(t.AddSeconds(5), "info", "GET /api/posts 200 in 124ms"));
-        OutputLog.Add(new LogEntry(t.AddSeconds(6), "info", "Hot reload triggered by src/app.tsx"));
-        Problems.Add(new LogEntry(t, "warn", "Experimental features enabled"));
-        Problems.Add(new LogEntry(t, "error", "DeprecationWarning: legacy API"));
-        ProblemCount = Problems.Count;
-    }
+    private const int MaxOutputLines = 500;
+    private const int MaxProblemLines = 200;
 
+    /// <summary>Append a line from a real session stream (PTY output) or an app event.</summary>
     public void AppendOutput(string level, string message)
         => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            OutputLog.Add(new LogEntry(DateTime.Now, level, message)));
+        {
+            OutputLog.Add(new LogEntry(DateTime.Now, level, message));
+            while (OutputLog.Count > MaxOutputLines) OutputLog.RemoveAt(0);
+            if (level is "warn" or "error")
+            {
+                Problems.Add(new LogEntry(DateTime.Now, level, message));
+                while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
+                ProblemCount = Problems.Count;
+            }
+        });
 
     [CommunityToolkit.Mvvm.Input.RelayCommand]
-    public void ClearOutput() => OutputLog.Clear();
+    public void ClearOutput()
+    {
+        OutputLog.Clear();
+        Problems.Clear();
+        ProblemCount = 0;
+    }
 
     private static string FmtShort(double bytes)
     {

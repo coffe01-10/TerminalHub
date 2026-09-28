@@ -67,12 +67,20 @@ public class UiSmokeTests
         await Task.Delay(120);
         window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "dashboard.png"));
 
+        // Files tab — lands in the session cwd, entries populated
+        vm.SelectedRightTab = 1;
+        await Task.Delay(200);
+        Assert.NotEmpty(vm.Files.Entries);
+        Assert.NotEmpty(vm.Files.Breadcrumbs);
+        window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "files.png"));
+
         // Codex assistant tab
         vm.SelectedRightTab = 4;
         await Task.Delay(120);
         window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "assistant.png"));
 
         Assert.True(File.Exists(Path.Combine(outDir, "dashboard.png")));
+        Assert.True(File.Exists(Path.Combine(outDir, "files.png")));
         Assert.True(File.Exists(Path.Combine(outDir, "assistant.png")));
         window.Close();
     }

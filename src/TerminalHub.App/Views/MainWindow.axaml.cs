@@ -32,6 +32,22 @@ public partial class MainWindow : Window
 
     private void OnCloseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
+    private void OnFileEntryDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        // DoubleTapped sits on the ListBox; the tapped element carries the FileEntry DataContext.
+        if (e.Source is Control c && c.DataContext is TerminalHub.Core.Files.FileEntry entry)
+            Vm.Files.Open(entry);
+    }
+
+    private void OnFilesListKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            Vm.Files.OpenSelected();
+            e.Handled = true;
+        }
+    }
+
     private void OnAssistantInputKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)

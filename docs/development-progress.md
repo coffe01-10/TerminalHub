@@ -44,6 +44,24 @@
 - Headless UI test renders both dashboard + Codex frames to PNG.
 - Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
 
+### PR #6 — Files panel + real Output stream (`feat/files-panel`)
+- Right-rail **Files** tab is a real local browser: `↑` + clickable breadcrumb
+  (`/ › home › box › .config`), dirs-first sorted listing (dirs blue `▸`,
+  sizes via `BytesConverter`), hover/selected styling matching the monitor cards.
+- **Double-click** dir → navigate; double-click file → preview pane
+  (title + size/mtime meta + mono text); binary / >2 MB show explicit reasons
+  (`PreviewKind.Text|Binary|TooLarge`, full `File.ReadAllBytes` read).
+- First visit lands in the active session's cwd (⌂ returns anytime).
+- `Core/Files/LocalFileBrowser` — pure-BCL service, unit tested.
+- **Real Output stream**: `Utf8LineDecoder` (CRLF/lone-CR/progress-redraw +
+  pending-CR across chunks) + `AnsiText.Strip` (OSC/CSI/charset) feed the
+  bottom Output tab from live `IPtySession.OutputReceived`; warn/error lines
+  fan out to Problems badge; fake Next.js seed log removed.
+- Title bar shows real OS (`Linux System` on this box).
+- Verified on DISPLAY=:7: browse `.config`, preview `mimeapps.list`,
+  `echo OUT_OK_42` appears in terminal, thumbnail, AND Output tab.
+- `docs/screenshots/files-panel.png` committed. 46 tests green.
+
 ### PR #5 — Linux-runnable build (`feat/linux-run`)
 - **Verified real GUI on this box** (X.Org `:7`): `dotnet run` opens the window;
   three `forkpty` bash sessions; `xdotool` typed `echo HELLO_FROM_LINUX_$((40+2))`
