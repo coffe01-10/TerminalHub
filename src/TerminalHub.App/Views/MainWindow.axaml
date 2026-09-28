@@ -86,18 +86,19 @@
                       </Style>
                       <Style Selector="Border.active">
                         <Setter Property="BorderBrush" Value="#38BDF8"/>
-                        <Setter Property="BoxShadow" Value="0 0 16 0 #5938BDF8"/>
+                        <Setter Property="Background" Value="#E61A2233"/>
+                        <Setter Property="BoxShadow" Value="0 0 22 1 #7338BDF8"/>
                       </Style>
                     </Border.Styles>
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="5">
                       <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                           <Ellipse Width="7" Height="7" Fill="{Binding StatusBrush}"/>
-                          <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="#E2E8F0"/>
                         </StackPanel>
                         <Border Grid.Column="1" IsVisible="{Binding HasTag}"
-                                CornerRadius="6" Padding="6,1" Background="#26303F">
-                          <TextBlock Text="{Binding TagText}" FontSize="9" Foreground="{Binding TagBrush}"/>
+                                CornerRadius="7" Padding="8,2" Background="{Binding TagPillBrush}">
+                          <TextBlock Text="{Binding TagText}" FontSize="9" FontWeight="SemiBold" Foreground="{Binding TagBrush}"/>
                         </Border>
                       </Grid>
                       <Border CornerRadius="6" Background="#F20A0D14" Padding="4" MinHeight="80">
@@ -203,21 +204,21 @@
             </Border>
 
             <!-- Assistant progress row -->
-            <Grid Grid.Row="3" Margin="4,2" IsVisible="{Binding Assistant.HasProgress}"
+            <Grid Grid.Row="3" Margin="6,3" IsVisible="{Binding Assistant.HasProgress}"
                   ColumnDefinitions="*,Auto">
               <ProgressBar Value="{Binding Assistant.ProgressPercent}" Minimum="0" Maximum="100"
-                           Height="6" CornerRadius="3" Foreground="#3B82F6" Background="#1A2030"/>
-              <TextBlock Grid.Column="1" Text="{Binding Assistant.ProgressPercent, StringFormat='{}{0}%'}"
+                           Height="7" CornerRadius="3.5" Foreground="#3B82F6" Background="#1A2030"/>
+              <TextBlock Grid.Column="1" Text="{Binding Assistant.ProgressLabel}"
                          FontSize="10" Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,0,0"/>
             </Grid>
 
             <!-- Command input -->
             <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="4,2">
               <TextBox Text="{Binding CommandInput}" Watermark="输入命令，或 ? 开头向 Codex 提问…"
-                       Background="#1A2030" CornerRadius="8" BorderBrush="#2A3142" BorderThickness="1"
-                       Foreground="#E2E8F0" Padding="10,5" FontSize="12"
+                       Background="#1A2030" CornerRadius="10" BorderBrush="#2A3142" BorderThickness="1"
+                       Foreground="#E2E8F0" Padding="12,6" FontSize="12"
                        KeyDown="OnCommandInputKeyDown"/>
-              <Button Grid.Column="1" Content="➤" Margin="6,0,0,0" Width="38" CornerRadius="8"
+              <Button Grid.Column="1" Content="➤" Margin="6,0,0,0" Width="38" CornerRadius="10"
                       Background="#3B82F6" Foreground="White"
                       Command="{Binding SubmitCommandInputCommand}"/>
             </Grid>
@@ -244,8 +245,8 @@
                         <Setter Property="Background" Value="Transparent"/>
                       </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="#3B233246"/>
-                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="Background" Value="#3B82F6"/>
+                        <Setter Property="Foreground" Value="#FFFFFF"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBoxItem>Output</ListBoxItem>
@@ -424,8 +425,8 @@
                   <Setter Property="Background" Value="Transparent"/>
                 </Style>
                 <Style Selector="ListBoxItem:selected">
-                  <Setter Property="Background" Value="#3B233246"/>
-                  <Setter Property="Foreground" Value="#E2E8F0"/>
+                  <Setter Property="Background" Value="#3B82F6"/>
+                  <Setter Property="Foreground" Value="#FFFFFF"/>
                 </Style>
               </ListBox.Styles>
               <ListBoxItem>Processes</ListBoxItem>

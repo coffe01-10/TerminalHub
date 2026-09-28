@@ -23,6 +23,15 @@ public partial class SessionCardViewModel : ViewModelBase
     public string TagText => Model.Tag.DisplayName();
     public bool HasTag => Model.Tag != SessionTag.None;
     public IBrush TagBrush => new SolidColorBrush(Color.Parse(Model.Tag.AccentColor()));
+    /// <summary>Translucent tag-color fill for the header pill (mockup-style tinted chip).</summary>
+    public IBrush TagPillBrush
+    {
+        get
+        {
+            var c = Color.Parse(Model.Tag.AccentColor());
+            return new SolidColorBrush(new Color(0x3A, c.R, c.G, c.B));
+        }
+    }
     public IBrush StatusBrush => new SolidColorBrush(
         Color.Parse(Model.IsRunning ? "#34D399" : "#F87171"));
 
