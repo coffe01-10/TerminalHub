@@ -1,19 +1,692 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TerminalHub.App.ViewModels"
+        xmlns:ctl="using:TerminalHub.App.Controls"
+        xmlns:mon="using:TerminalHub.Core.Monitoring"
+        xmlns:ai="using:TerminalHub.Core.AI"
         x:Class="TerminalHub.App.Views.MainWindow"
+        x:Name="Root"
+        x:DataType="vm:MainWindowViewModel"
         Title="Terminal Hub · 终端控制中心"
-        Width="1440" Height="900" MinWidth="1024" MinHeight="640"
-        Background="{DynamicResource GlassBackgroundBrush}"
+        Width="1440" Height="900" MinWidth="1100" MinHeight="680"
+        Background="#FF0A0D14"
         TransparencyLevelHint="AcrylicBlur">
-  <Grid RowDefinitions="Auto,*,Auto">
-    <!-- Placeholder shell; full chrome lands in feat/dashboard-ui -->
-    <Border Grid.Row="0" Padding="12,8" Background="{DynamicResource GlassPanelBrush}">
-      <TextBlock Text="Terminal Hub · 终端控制中心" Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding NewSessionCommand}"/>
+  </Window.KeyBindings>
+
+  <Design.DataContext>
+    <vm:MainWindowViewModel />
+  </Design.DataContext>
+
+  <Panel>
+    <Grid RowDefinitions="34,*,28">
+
+      <!-- ============ Title bar ============ -->
+      <Border Grid.Row="0" Background="#B3121724" Padding="12,0">
+        <Grid ColumnDefinitions="Auto,*">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Border Width="18" Height="18" CornerRadius="4" Background="#3B82F6">
+              <TextBlock Text="▦" FontSize="11" Foreground="White"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <TextBlock Text="Terminal Hub" Foreground="#E2E8F0" FontSize="13"
+                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Text="终端控制中心" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                      Spacing="10" VerticalAlignment="Center">
+            <TextBlock Text="Windows System" Foreground="#64748B" FontSize="11" VerticalAlignment="Center"/>
+            <Button Content="⚙" Padding="6,0" Background="Transparent" Foreground="#94A3B8" BorderThickness="0"
+                    Command="{Binding DockSelectCommand}" CommandParameter="5"/>
+            <Button Content="—" Padding="6,0" Background="Transparent" Foreground="#94A3B8" BorderThickness="0"
+                    Click="OnMinimizeClick"/>
+            <Button Content="▢" Padding="6,0" Background="Transparent" Foreground="#94A3B8" BorderThickness="0" FontSize="10"
+                    Click="OnMaximizeClick"/>
+            <Button Content="✕" Padding="6,0" Background="Transparent" Foreground="#94A3B8" BorderThickness="0" FontSize="10"
+                    Click="OnCloseClick"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- ============ Main three-rail ============ -->
+      <Grid Grid.Row="1" ColumnDefinitions="212,6,*,6,352" Margin="8,4,8,0">
+
+        <!-- ===== LEFT: session cards ===== -->
+        <Border Grid.Column="0" CornerRadius="14"
+                Background="#66131A28" BorderBrush="#332A3142" BorderThickness="1">
+          <Grid RowDefinitions="*,Auto" Margin="8">
+            <ListBox ItemsSource="{Binding SessionCards}"
+                     SelectedItem="{Binding ActiveCard}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.VerticalScrollBarVisibility="Hidden">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="0"/>
+                  <Setter Property="Margin" Value="0,0,0,10"/>
+                  <Setter Property="CornerRadius" Value="10"/>
+                  <Setter Property="Background" Value="Transparent"/>
+                </Style>
+                <Style Selector="ListBoxItem:selected">
+                  <Setter Property="Background" Value="Transparent"/>
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:SessionCardViewModel">
+                  <Border CornerRadius="10" Padding="8"
+                          BorderThickness="1.5"
+                          Classes.active="{Binding IsActive}"
+                          Background="#CC141B29">
+                    <Border.Styles>
+                      <Style Selector="Border">
+                        <Setter Property="BorderBrush" Value="#332A3142"/>
+                      </Style>
+                      <Style Selector="Border.active">
+                        <Setter Property="BorderBrush" Value="#38BDF8"/>
+                        <Setter Property="BoxShadow" Value="0 0 16 0 #5938BDF8"/>
+                      </Style>
+                    </Border.Styles>
+                    <StackPanel Spacing="4">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                          <Ellipse Width="7" Height="7" Fill="{Binding StatusBrush}"/>
+                          <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" IsVisible="{Binding HasTag}"
+                                CornerRadius="6" Padding="6,1" Background="#26303F">
+                          <TextBlock Text="{Binding TagText}" FontSize="9" Foreground="{Binding TagBrush}"/>
+                        </Border>
+                      </Grid>
+                      <Border CornerRadius="6" Background="#F20A0D14" Padding="5" MinHeight="88">
+                        <TextBlock Text="{Binding PreviewText}"
+                                   FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
+                                   FontSize="7" Foreground="#7C8AA5" TextWrapping="NoWrap"/>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Button Grid.Row="1" CornerRadius="10" Margin="0,4,0,0" Padding="10,8"
+                    Background="#1A2438" BorderBrush="#3B82F6" BorderThickness="1"
+                    HorizontalContentAlignment="Left"
+                    Command="{Binding NewSessionCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="+" Foreground="#38BDF8" FontWeight="Bold"/>
+                <TextBlock Text="新建终端" Foreground="#E2E8F0"/>
+                <TextBlock Text="Ctrl N" Foreground="#64748B" FontSize="10" Margin="14,0,0,0"/>
+              </StackPanel>
+            </Button>
+          </Grid>
+        </Border>
+
+        <!-- ===== CENTER ===== -->
+        <Border Grid.Column="2" CornerRadius="14"
+                Background="#66131A28" BorderBrush="#332A3142" BorderThickness="1">
+          <Grid RowDefinitions="34,30,*,Auto,Auto,170" Margin="6">
+
+            <!-- Tab strip -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+              <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="4,0,8,0">
+                <Ellipse Width="10" Height="10" Fill="#F87171"/>
+                <Ellipse Width="10" Height="10" Fill="#FBBF24"/>
+                <Ellipse Width="10" Height="10" Fill="#34D399"/>
+              </StackPanel>
+              <ListBox Grid.Column="1" ItemsSource="{Binding SessionCards}"
+                       SelectedItem="{Binding ActiveCard}"
+                       Background="Transparent" BorderThickness="0"
+                       ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                       ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.Styles>
+                  <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="2,3"/>
+                    <Setter Property="CornerRadius" Value="8"/>
+                    <Setter Property="Background" Value="#26131A28"/>
+                    <Setter Property="BorderBrush" Value="#332A3142"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                  </Style>
+                  <Style Selector="ListBoxItem:selected">
+                    <Setter Property="Background" Value="#3B233246"/>
+                    <Setter Property="BorderBrush" Value="#3B82F6"/>
+                  </Style>
+                </ListBox.Styles>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SessionCardViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,4">
+                      <Ellipse Width="7" Height="7" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#E2E8F0"/>
+                      <Button Content="×" FontSize="11" Padding="2,0" Background="Transparent"
+                              Foreground="#64748B" BorderThickness="0"
+                              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CloseSessionCommand}"
+                              CommandParameter="{Binding}"/>
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <Button Grid.Column="2" Content="＋" Padding="10,2" Margin="4,3" CornerRadius="8"
+                      Background="#26131A28" Foreground="#38BDF8" BorderBrush="#332A3142"
+                      Command="{Binding NewSessionCommand}"/>
+            </Grid>
+
+            <!-- Toolbar -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+              <Button Content="⟳" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"/>
+              <Button Grid.Column="1" Content="→" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"/>
+              <TextBlock Grid.Column="2" Text="{Binding Breadcrumb}" FontSize="11"
+                         Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <Button Grid.Column="3" Content="◫ 分屏" Background="Transparent" BorderThickness="0"
+                      Foreground="#94A3B8" FontSize="11" Padding="6,0"/>
+              <Button Grid.Column="4" Content="↗ 在新窗口打开" Background="Transparent" BorderThickness="0"
+                      Foreground="#94A3B8" FontSize="11" Padding="6,0"/>
+              <Button Grid.Column="5" Content="•••" Background="Transparent" BorderThickness="0"
+                      Foreground="#94A3B8" Padding="6,0"/>
+            </Grid>
+
+            <!-- Terminal viewport -->
+            <Border Grid.Row="2" CornerRadius="8" Background="#F20A0D14" Margin="2,4" ClipToBounds="True">
+              <ctl:TerminalView Emulator="{Binding ActiveSession.Emulator}"
+                                TerminalFontSize="{Binding Settings.FontSize}"/>
+            </Border>
+
+            <!-- Assistant progress row -->
+            <Grid Grid.Row="3" Margin="4,2" IsVisible="{Binding Assistant.HasProgress}"
+                  ColumnDefinitions="*,Auto">
+              <ProgressBar Value="{Binding Assistant.ProgressPercent}" Minimum="0" Maximum="100"
+                           Height="6" CornerRadius="3" Foreground="#3B82F6" Background="#1A2030"/>
+              <TextBlock Grid.Column="1" Text="{Binding Assistant.ProgressPercent, StringFormat='{}{0}%'}"
+                         FontSize="10" Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </Grid>
+
+            <!-- Command input -->
+            <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="4,2">
+              <TextBox Text="{Binding CommandInput}" Watermark="Ask Codex or type a command…"
+                       Background="#1A2030" CornerRadius="8" BorderBrush="#2A3142" BorderThickness="1"
+                       Foreground="#E2E8F0" Padding="10,5" FontSize="12"
+                       KeyDown="OnCommandInputKeyDown"/>
+              <Button Grid.Column="1" Content="➤" Margin="6,0,0,0" Width="38" CornerRadius="8"
+                      Background="#3B82F6" Foreground="White"
+                      Command="{Binding SubmitCommandInputCommand}"/>
+            </Grid>
+
+            <!-- Bottom panel: Output / Debug / Problems / Search -->
+            <Border Grid.Row="5" CornerRadius="8" Background="#99131A28"
+                    BorderBrush="#332A3142" BorderThickness="1">
+              <Grid RowDefinitions="30,*">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="4,0">
+                  <ListBox SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
+                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                           ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                           Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.Styles>
+                      <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="12,4"/>
+                        <Setter Property="Margin" Value="0,3"/>
+                        <Setter Property="CornerRadius" Value="6"/>
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="Foreground" Value="#94A3B8"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                      </Style>
+                      <Style Selector="ListBoxItem:selected">
+                        <Setter Property="Background" Value="#3B233246"/>
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                      </Style>
+                    </ListBox.Styles>
+                    <ListBoxItem>Output</ListBoxItem>
+                    <ListBoxItem>Debug</ListBoxItem>
+                    <ListBoxItem>
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Problems"/>
+                        <Border IsVisible="{Binding Dashboard.HasProblems}" CornerRadius="8"
+                                Background="#F87171" Padding="5,1" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Dashboard.ProblemCount}" FontSize="9" Foreground="White"/>
+                        </Border>
+                      </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>Search</ListBoxItem>
+                  </ListBox>
+                  <Button Grid.Column="1" Content="⧉ Clear" FontSize="10" Padding="8,2"
+                          Background="#1A2030" CornerRadius="6" BorderBrush="#2A3142"
+                          Foreground="#94A3B8" VerticalAlignment="Center"
+                          Command="{Binding Dashboard.ClearOutputCommand}"/>
+                  <ComboBox Grid.Column="2" SelectedIndex="0" Margin="6,0,0,0" VerticalAlignment="Center"
+                            Background="#1A2030" BorderBrush="#2A3142" FontSize="10" MinWidth="90"
+                            CornerRadius="6" Padding="6,2">
+                    <ComboBoxItem>All Levels</ComboBoxItem>
+                    <ComboBoxItem>Info</ComboBoxItem>
+                    <ComboBoxItem>Warn</ComboBoxItem>
+                    <ComboBoxItem>Error</ComboBoxItem>
+                  </ComboBox>
+                </Grid>
+
+                <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="#1F2635">
+                  <Panel>
+                    <!-- Output -->
+                    <ListBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
+                             ItemsSource="{Binding Dashboard.OutputLog}"
+                             Background="Transparent" BorderThickness="0" Padding="6">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="Padding" Value="2,1"/>
+                          <Setter Property="Background" Value="Transparent"/>
+                          <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                          <Setter Property="FontSize" Value="10"/>
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LogEntry">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Time, StringFormat='{}{0:HH:mm:ss}'}" Foreground="#64748B"/>
+                            <TextBlock Text="{Binding Level, StringFormat='[{0}]'}"
+                                       Foreground="{Binding Level, Converter={x:Static vm:LogLevelConverter.Instance}}"/>
+                            <TextBlock Text="{Binding Message}" Foreground="#CBD5E1"/>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Debug -->
+                    <TextBlock IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
+                               Text="调试输出 — no debug session active" Foreground="#64748B"
+                               FontSize="11" Margin="10,8"/>
+
+                    <!-- Problems -->
+                    <ListBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
+                             ItemsSource="{Binding Dashboard.Problems}"
+                             Background="Transparent" BorderThickness="0" Padding="6">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="Padding" Value="2,1"/>
+                          <Setter Property="Background" Value="Transparent"/>
+                          <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                          <Setter Property="FontSize" Value="10"/>
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LogEntry">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Level, StringFormat='[{0}]'}"
+                                       Foreground="{Binding Level, Converter={x:Static vm:LogLevelConverter.Instance}}"/>
+                            <TextBlock Text="{Binding Message}" Foreground="#CBD5E1"/>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Search -->
+                    <TextBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
+                             Watermark="Search output…" Margin="8,6" FontSize="11"
+                             Background="#1A2030" BorderBrush="#2A3142" Foreground="#E2E8F0"
+                             CornerRadius="6" Padding="8,4"/>
+                  </Panel>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
+
+        <!-- ===== RIGHT: Processes/Files/Logs/SSH/Codex ===== -->
+        <Border Grid.Column="4" CornerRadius="14"
+                Background="#66131A28" BorderBrush="#332A3142" BorderThickness="1">
+          <Grid RowDefinitions="34,*" Margin="6">
+
+            <ListBox Grid.Row="0" SelectedIndex="{Binding SelectedRightTab}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="10,4"/>
+                  <Setter Property="Margin" Value="0,3"/>
+                  <Setter Property="CornerRadius" Value="6"/>
+                  <Setter Property="FontSize" Value="11"/>
+                  <Setter Property="Foreground" Value="#94A3B8"/>
+                  <Setter Property="Background" Value="Transparent"/>
+                </Style>
+                <Style Selector="ListBoxItem:selected">
+                  <Setter Property="Background" Value="#3B233246"/>
+                  <Setter Property="Foreground" Value="#E2E8F0"/>
+                </Style>
+              </ListBox.Styles>
+              <ListBoxItem>Processes</ListBoxItem>
+              <ListBoxItem>Files</ListBoxItem>
+              <ListBoxItem>Logs</ListBoxItem>
+              <ListBoxItem>SSH</ListBoxItem>
+              <ListBoxItem>Codex</ListBoxItem>
+            </ListBox>
+
+            <Panel Grid.Row="1" Margin="0,4,0,0">
+              <!-- ===== Processes + System Monitor ===== -->
+              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
+                    RowDefinitions="*,Auto">
+                <Grid RowDefinitions="Auto,*">
+                  <Grid ColumnDefinitions="50,*,70,70" Margin="6,4">
+                    <TextBlock Text="PID" FontSize="10" Foreground="#64748B" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" Text="NAME" FontSize="10" Foreground="#64748B" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="2" Text="CPU" FontSize="10" Foreground="#64748B" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                    <TextBlock Grid.Column="3" Text="MEM" FontSize="10" Foreground="#64748B" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                  </Grid>
+                  <ListBox Grid.Row="1" ItemsSource="{Binding Dashboard.Processes}"
+                           Background="Transparent" BorderThickness="0">
+                    <ListBox.Styles>
+                      <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="6,3"/>
+                        <Setter Property="Margin" Value="0,1"/>
+                        <Setter Property="CornerRadius" Value="6"/>
+                        <Setter Property="Background" Value="#19131A28"/>
+                        <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                        <Setter Property="FontSize" Value="10.5"/>
+                      </Style>
+                      <Style Selector="ListBoxItem:selected">
+                        <Setter Property="Background" Value="#3B233246"/>
+                      </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="mon:ProcessInfo">
+                        <Grid ColumnDefinitions="50,*,70,70">
+                          <TextBlock Text="{Binding Pid}" Foreground="#94A3B8"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#E2E8F0"/>
+                          <TextBlock Grid.Column="2" Text="{Binding CpuPercent, StringFormat='{}{0:0.0}%'}"
+                                     Foreground="#34D399" HorizontalAlignment="Right"/>
+                          <TextBlock Grid.Column="3" Text="{Binding MemoryBytes, Converter={x:Static vm:BytesConverter.Instance}}"
+                                     Foreground="#94A3B8" HorizontalAlignment="Right"/>
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Grid>
+
+                <!-- System Monitor widgets -->
+                <Border Grid.Row="1" CornerRadius="10" Background="#99131A28"
+                        BorderBrush="#332A3142" BorderThickness="1" Padding="8" Margin="0,6,0,0">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="System Monitor" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"/>
+                    <Grid ColumnDefinitions="*,10,*">
+                      <Border CornerRadius="8" Background="#CC141B29" Padding="8">
+                        <Grid RowDefinitions="Auto,Auto,*">
+                          <TextBlock Text="CPU" FontSize="10" Foreground="#64748B"/>
+                          <TextBlock Grid.Row="1" Text="{Binding Dashboard.CpuPercent}" FontSize="18"
+                                     FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                          <ctl:SparklineControl Grid.Row="2" Values="{Binding Dashboard.CpuSpark}"
+                                                Stroke="#3B82F6" Fill="#333B82F6" Height="34" Margin="0,4,0,0"/>
+                        </Grid>
+                      </Border>
+                      <Border Grid.Column="2" CornerRadius="8" Background="#CC141B29" Padding="8">
+                        <Grid RowDefinitions="Auto,Auto,*">
+                          <TextBlock Text="Memory" FontSize="10" Foreground="#64748B"/>
+                          <StackPanel Grid.Row="1" Orientation="Horizontal">
+                            <TextBlock Text="{Binding Dashboard.MemUsage}" FontSize="18" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                            <TextBlock Text="{Binding Dashboard.MemTotal}" FontSize="10" Foreground="#64748B"
+                                       VerticalAlignment="Bottom" Margin="4,0,0,2"/>
+                          </StackPanel>
+                          <ctl:SparklineControl Grid.Row="2" Values="{Binding Dashboard.MemSpark}"
+                                                Stroke="#A78BFA" Fill="#33A78BFA" Height="34" Margin="0,4,0,0"/>
+                        </Grid>
+                      </Border>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,10,*">
+                      <Border CornerRadius="8" Background="#CC141B29" Padding="8">
+                        <StackPanel Spacing="4">
+                          <TextBlock Text="Disk" FontSize="10" Foreground="#64748B"/>
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Dashboard.DiskUsage}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                          </StackPanel>
+                          <ProgressBar Value="{Binding Dashboard.DiskFraction}" Minimum="0" Maximum="1"
+                                       Height="6" CornerRadius="3" Foreground="#34D399" Background="#1A2030"/>
+                          <TextBlock Text="{Binding Dashboard.DiskPercent}" FontSize="9" Foreground="#64748B" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                      </Border>
+                      <Border Grid.Column="2" CornerRadius="8" Background="#CC141B29" Padding="8">
+                        <Grid RowDefinitions="Auto,*,*">
+                          <TextBlock Text="Network" FontSize="10" Foreground="#64748B"/>
+                          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding Dashboard.NetDown}" FontSize="11" Foreground="#34D399"/>
+                            <ctl:SparklineControl Values="{Binding Dashboard.NetDownSpark}" Stroke="#34D399"
+                                                  Width="60" Height="16" VerticalAlignment="Center" MaxValue="20"/>
+                          </StackPanel>
+                          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding Dashboard.NetUp}" FontSize="11" Foreground="#38BDF8"/>
+                            <ctl:SparklineControl Values="{Binding Dashboard.NetUpSpark}" Stroke="#38BDF8"
+                                                  Width="60" Height="16" VerticalAlignment="Center" MaxValue="20"/>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </Grid>
+
+              <!-- ===== Files ===== -->
+              <TextBlock IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
+                         Text="文件 — workspace file browser (coming with Files tab)" Foreground="#64748B"
+                         FontSize="11" Margin="8" TextWrapping="Wrap"/>
+
+              <!-- ===== Logs ===== -->
+              <TextBlock IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
+                         Text="日志 — session/system logs (stub)" Foreground="#64748B"
+                         FontSize="11" Margin="8" TextWrapping="Wrap"/>
+
+              <!-- ===== SSH ===== -->
+              <TextBlock IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
+                         Text="SSH — saved connections (stub)" Foreground="#64748B"
+                         FontSize="11" Margin="8" TextWrapping="Wrap"/>
+
+              <!-- ===== Codex assistant ===== -->
+              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
+                    RowDefinitions="Auto,Auto,Auto,*,Auto">
+                <Grid ColumnDefinitions="*,Auto" Margin="2,2">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border Width="22" Height="22" CornerRadius="6" Background="#26303F">
+                      <TextBlock Text="⌘" FontSize="12" Foreground="#38BDF8"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Codex 助手" FontWeight="SemiBold" FontSize="13" Foreground="#E2E8F0" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="⚙" Background="Transparent" BorderThickness="0" Foreground="#64748B"/>
+                </Grid>
+
+                <Border Grid.Row="1" CornerRadius="8" Background="#CC141B29" Padding="8" Margin="0,4">
+                  <TextBlock Text="{Binding Assistant.StatusText}" FontSize="11" Foreground="#CBD5E1"
+                             TextWrapping="Wrap" LineHeight="16"/>
+                </Border>
+
+                <StackPanel Grid.Row="2" Spacing="5" Margin="0,2">
+                  <ItemsControl ItemsSource="{Binding Assistant.Checklist}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="ai:ChecklistItem">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Ellipse Width="14" Height="14" VerticalAlignment="Center"
+                                   Stroke="{Binding State, Converter={x:Static vm:ChecklistRingConverter.Instance}}"
+                                   StrokeThickness="1.5"
+                                   Fill="{Binding State, Converter={x:Static vm:ChecklistFillConverter.Instance}}"/>
+                          <TextBlock Text="{Binding Text}" FontSize="11" VerticalAlignment="Center"
+                                     Foreground="{Binding State, Converter={x:Static vm:ChecklistTextConverter.Instance}}"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+                <DockPanel Grid.Row="3" Margin="0,6,0,0">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                    <TextBlock Text="建议任务" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                    <Border Grid.Column="1" CornerRadius="6" Background="#1A2030" Padding="8,2">
+                      <TextBlock Text="全部 ⌄" FontSize="10" Foreground="#94A3B8"/>
+                    </Border>
+                  </Grid>
+                  <ScrollViewer VerticalScrollBarVisibility="Hidden">
+                    <ItemsControl ItemsSource="{Binding Assistant.Suggestions}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="ai:SuggestedTask">
+                          <Border CornerRadius="8" Background="#CC141B29" BorderBrush="#332A3142"
+                                  BorderThickness="1" Padding="8" Margin="0,0,0,6">
+                            <Grid ColumnDefinitions="Auto,*">
+                              <Border Width="24" Height="24" CornerRadius="6" Background="#26303F" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding Icon}" FontSize="11" Foreground="#38BDF8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                              </Border>
+                              <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="1">
+                                <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                <TextBlock Text="{Binding Description}" FontSize="9.5" Foreground="#64748B" TextWrapping="Wrap"/>
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+
+                <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                  <TextBox Text="{Binding Assistant.TaskInput}" Watermark="描述你想做的任务…"
+                           Background="#1A2030" CornerRadius="8" BorderBrush="#2A3142" BorderThickness="1"
+                           Foreground="#E2E8F0" Padding="10,5" FontSize="11"
+                           KeyDown="OnAssistantInputKeyDown"/>
+                  <Button Grid.Column="1" Content="➤" Margin="6,0,0,0" Width="34" CornerRadius="8"
+                          Background="#26303F" Foreground="#38BDF8" BorderBrush="#2A3142"
+                          Command="{Binding Assistant.SubmitTaskCommand}"/>
+                </Grid>
+              </Grid>
+            </Panel>
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- ============ Status bar ============ -->
+      <Border Grid.Row="2" Background="#B3121724" Padding="12,0">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="▦" Foreground="#64748B" FontSize="11" VerticalAlignment="Center"/>
+              <TextBlock Text="工作空间" Foreground="#94A3B8" FontSize="11"/>
+              <TextBlock Text="{Binding WorkspaceName}" Foreground="#E2E8F0" FontSize="11" FontWeight="SemiBold"/>
+            </StackPanel>
+            <TextBlock Text="{Binding TerminalCount, StringFormat='◔ {0} 个终端'}" Foreground="#94A3B8" FontSize="11"/>
+            <TextBlock Text="{Binding RunningCount, StringFormat='⊕ {0} 个运行中'}" Foreground="#94A3B8" FontSize="11"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CpuText}" Foreground="#94A3B8" FontSize="11"/>
+            <TextBlock Text="{Binding MemText}" Foreground="#94A3B8" FontSize="11"/>
+            <ctl:SparklineControl Values="{Binding StatusSpark}" Stroke="#3B82F6" Width="50" Height="14" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ============ Floating action dock ============ -->
+    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,40"
+            CornerRadius="16" Padding="6"
+            Background="#D91B2333" BorderBrush="#403B82F6" BorderThickness="1"
+            BoxShadow="0 8 30 0 #80000000">
+      <StackPanel Orientation="Horizontal" Spacing="2">
+        <Button Classes="primary" Padding="12,6" CornerRadius="10"
+                Command="{Binding DockSelectCommand}" CommandParameter="0">
+          <Button.Styles>
+            <Style Selector="Button.primary">
+              <Setter Property="Background" Value="#3B82F6"/>
+              <Setter Property="Foreground" Value="White"/>
+            </Style>
+          </Button.Styles>
+          <StackPanel>
+            <TextBlock Text="▶" FontSize="13" HorizontalAlignment="Center"/>
+            <TextBlock Text="New Session" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+                Command="{Binding DockSelectCommand}" CommandParameter="1">
+          <StackPanel>
+            <TextBlock Text="▥" FontSize="13" HorizontalAlignment="Center"/>
+            <TextBlock Text="Monitor" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+                Command="{Binding DockSelectCommand}" CommandParameter="2">
+          <StackPanel>
+            <TextBlock Text="⌁" FontSize="13" HorizontalAlignment="Center"/>
+            <TextBlock Text="SSH" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+                Command="{Binding DockSelectCommand}" CommandParameter="3">
+          <StackPanel>
+            <TextBlock Text="▤" FontSize="13" HorizontalAlignment="Center"/>
+            <TextBlock Text="Logs" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+                Command="{Binding DockSelectCommand}" CommandParameter="4">
+          <StackPanel>
+            <TextBlock Text="☁" FontSize="13" HorizontalAlignment="Center"/>
+            <TextBlock Text="Deploy" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+                Command="{Binding DockSelectCommand}" CommandParameter="5">
+          <StackPanel>
+            <TextBlock Text="⚙" FontSize="13" HorizontalAlignment="Center"/>
+            <TextBlock Text="Settings" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Button>
+      </StackPanel>
     </Border>
-    <TextBlock Grid.Row="1" Text="Terminal Hub" Foreground="{DynamicResource TextDimBrush}"
-               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-    <Border Grid.Row="2" Padding="12,8" Background="{DynamicResource GlassPanelBrush}">
-      <TextBlock Text="工作空间" Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+    <!-- ============ Settings overlay ============ -->
+    <Border IsVisible="{Binding SettingsOpen}"
+            HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="320"
+            Background="#E60F141F" BorderBrush="#332A3142" BorderThickness="1,0,0,0"
+            Padding="16" CornerRadius="14,0,0,0">
+      <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="设置 Settings" FontSize="14" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+          <Button Grid.Column="1" Content="✕" Background="Transparent" BorderThickness="0"
+                  Foreground="#94A3B8" Command="{Binding DockSelectCommand}" CommandParameter="5"/>
+        </Grid>
+
+        <TextBlock Text="Shell" Foreground="#94A3B8" FontSize="11"/>
+        <ComboBox SelectedIndex="{Binding ShellIndex}" HorizontalAlignment="Stretch"
+                  Background="#1A2030" BorderBrush="#2A3142" CornerRadius="6" Padding="8,4">
+          <ComboBoxItem>PowerShell (pwsh)</ComboBoxItem>
+          <ComboBoxItem>cmd.exe</ComboBoxItem>
+          <ComboBoxItem>WSL / bash</ComboBoxItem>
+          <ComboBoxItem>bash</ComboBoxItem>
+        </ComboBox>
+
+        <TextBlock Text="自定义 Shell 路径" Foreground="#94A3B8" FontSize="11"/>
+        <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="C:\\…\\pwsh.exe"
+                 Background="#1A2030" BorderBrush="#2A3142" Foreground="#E2E8F0"
+                 CornerRadius="6" Padding="8,4" FontSize="11"/>
+
+        <TextBlock Text="字体大小 Font size" Foreground="#94A3B8" FontSize="11"/>
+        <TextBox Text="{Binding Settings.FontSize, Mode=TwoWay}"
+                 Background="#1A2030" BorderBrush="#2A3142" Foreground="#E2E8F0"
+                 CornerRadius="6" Padding="8,4" FontSize="11"/>
+
+        <TextBlock Text="工作空间 Workspace" Foreground="#94A3B8" FontSize="11"/>
+        <TextBox Text="{Binding Settings.WorkspaceName}"
+                 Background="#1A2030" BorderBrush="#2A3142" Foreground="#E2E8F0"
+                 CornerRadius="6" Padding="8,4" FontSize="11"/>
+
+        <TextBlock Text="主题 Theme" Foreground="#94A3B8" FontSize="11"/>
+        <ComboBox SelectedIndex="0" HorizontalAlignment="Stretch"
+                  Background="#1A2030" BorderBrush="#2A3142" CornerRadius="6" Padding="8,4">
+          <ComboBoxItem>Dark Glass (默认)</ComboBoxItem>
+        </ComboBox>
+
+        <Button Content="保存 Save" Background="#3B82F6" Foreground="White" CornerRadius="8"
+                Padding="10,7" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                Command="{Binding SaveSettingsCommand}"/>
+      </StackPanel>
     </Border>
-  </Grid>
+  </Panel>
 </Window>
