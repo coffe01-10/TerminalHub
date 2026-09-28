@@ -17,6 +17,32 @@
   工作空间·N 终端·M 运行中·CPU/内存 sparkline、N/M 任务 · x%)。
 - 截图 `walkthrough-dashboard.png`、`walkthrough-ai.png`;127 tests green。
 
+### PR — Logs 跟随尾部 + 导出可见行 (`feat/logs-follow-export`)
+- **自动跟随尾部 (Follow)**: `LogsViewModel.FollowTail`（默认开 = 列表钉在最新行）。
+  视图侧取 ListBox 内层 `ScrollViewer`，在 `ScrollChanged` 里按事件语义分流：**只有位移
+  变、extent 不变**的事件（滚轮/拖动/键盘）才算用户意图 —— 离开底部 →
+  `UpdateFollowFromScroll(false)` 暂停跟随，回到底部自动恢复；**extent 增长**（新行
+  到达）且正在跟随时在事件内同步 `ScrollToEnd()`（此刻 extent 已含新行，落在真实底部，
+  不是陈旧 extent 上的假滚动）。暂停时列表右下角浮现「⬇ 跟随」悬浮按钮
+  （`FollowPaused` 通知属性驱动 IsVisible；特意不用 `!` 反向绑定 —— headless 下反向
+  绑定不随变更刷新）→ `ResumeFollowCommand` 恢复并滚到底。新行到来绝不悄悄恢复跟随。
+- **导出可见行**: 工具行新增「⬇ 导出」，把当前过滤后的 `Entries` 一次性写出（与复制
+  同格式 `HH:mm:ss [level] (source) msg`）。桌面走 StorageProvider SaveFileDialog
+  （建议名 `export-<ts>.log`，可选 .log/.txt；取消 → 状态行「已取消导出」）；无窗口
+  （headless/自动化）、picker 抛错或 10s 无响应（Linux X11 无 xdg-desktop-portal 时
+  DBus 调用会永久挂起，实测）→ 回落 `~/.config/terminalhub/logs/export-<ts>.log`，
+  状态行「已导出 N 行 → 路径」。与「⬇ 写文件」实时 sink（`terminalhub-*.log`）完全
+  独立。工具行 StackPanel → WrapPanel（352px 右栏内 4 个按钮自动换行不裁切）。
+- **验证**: 134 tests green（本 PR +7：Follow 状态机 VM 层默认/上滚暂停/新行不打扰/
+  回底恢复、ResumeFollow、导出仅含过滤行/空列表提示/picker 路径与取消、真实
+  MainWindow 端到端 ×2 —— 导出 e2e headless 走完整链路（按钮绑定 → 命令 → 落盘断言
+  内容）；`ScrollChanged` 在 headless 平台不触发，滚动→暂停→恢复的视图接线在
+  DISPLAY=:7 实机验证：上滚暂停、按钮浮现、再进 60 行视口纹丝不动、点「⬇ 跟随」跳回
+  FOLLOW_120 底部、后续行自动钉底。截图 `logs-follow-paused.png`（暂停态 + 悬浮按钮）、
+  `logs-follow-resumed.png`（恢复后钉在最新行）。备注：实机期间另一 worktree 实例
+  共享 :7、完全叠窗，坐标点击会串窗 —— 端到端断言一律以 headless 测试为准。
+
+
 ### PR #14 — 视觉打磨对照 mockup (`feat/visual-polish`)
 - 会话卡片：tag pill 改为着色底（`TagPillBrush` = 30% 透明度 tag 色，对照
   mockup 蓝/绿/粉药丸）；active 卡片加强霓虹（`#38BDF8` 边 + `0 0 22` 发光 +

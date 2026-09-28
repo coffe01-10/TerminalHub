@@ -1,8 +1,13 @@
+using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
+using TerminalHub.App.Views;
 using TerminalHub.Core.Logging;
 using TerminalHub.Core.Monitoring;
 using TerminalHub.Core.Settings;
+using TerminalHub.Pty;
 using Xunit;
 
 namespace TerminalHub.Tests;
@@ -34,12 +39,15 @@ public class LogsPanelTests
 
     private static (DashboardViewModel dash, LogsViewModel logs, SessionLogFile file) MakeLogs(
         int bufferCapacity = LogsViewModel.DefaultBufferCapacity,
-        Func<string, Task>? copyToClipboard = null)
+        Func<string, Task>? copyToClipboard = null,
+        string? exportDir = null,
+        Func<Task<string?>>? promptExportPath = null)
     {
         var dash = new DashboardViewModel(new FakeMonitor());
         var file = new SessionLogFile();
         var logs = new LogsViewModel(dash, file, () => ["Terminal 01", "Terminal 02"],
-            bufferCapacity: bufferCapacity, copyToClipboard: copyToClipboard);
+            bufferCapacity: bufferCapacity, copyToClipboard: copyToClipboard,
+            logDir: exportDir, promptExportPath: promptExportPath);
         logs.RefreshSessions();
         return (dash, logs, file);
     }
@@ -238,6 +246,218 @@ public class LogsPanelTests
         Assert.Contains("(Terminal 02) watch out", text);
         Assert.Equal(2, text.Split('\n').Length);
         Assert.Contains("已复制 2 行", logs.StatusText);
+    }
+
+    [AvaloniaFact]
+    public async Task FollowTail_DefaultsTrue_ScrollUpPauses_NewLinesDoNotSilentlyResume()
+    {
+        var (dash, logs, _) = MakeLogs();
+        Assert.True(logs.FollowTail); // pinned to the newest line by default
+
+        logs.UpdateFollowFromScroll(atBottom: false); // user scrolled away from the bottom
+        Assert.False(logs.FollowTail);
+
+        dash.AppendOutput("info", "paused 1", "Terminal 01");
+        dash.AppendOutput("info", "paused 2", "Terminal 01");
+        await Until(() => logs.Entries.Count == 2);
+        Assert.False(logs.FollowTail); // incoming lines must not flip following back on
+
+        logs.UpdateFollowFromScroll(atBottom: true); // scrolled back to the bottom
+        Assert.True(logs.FollowTail);
+    }
+
+    [AvaloniaFact]
+    public void ResumeFollowCommand_RestoresFollow()
+    {
+        var (dash, logs, _) = MakeLogs();
+        logs.UpdateFollowFromScroll(atBottom: false);
+        Assert.False(logs.FollowTail);
+
+        logs.ResumeFollowCommand.Execute(null); // 「⬇ 跟随」 button
+        Assert.True(logs.FollowTail);
+
+        // Pausing again still works after a resume (button ↔ scroll cycle).
+        logs.UpdateFollowFromScroll(atBottom: false);
+        Assert.False(logs.FollowTail);
+    }
+
+    [AvaloniaFact]
+    public async Task ExportVisible_WritesOnlyFilteredLines_ToDefaultDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var (dash, logs, _) = MakeLogs(exportDir: dir); // dir intentionally not pre-created
+        try
+        {
+            dash.AppendOutput("info", "keep me", "Terminal 01");
+            dash.AppendOutput("info", "drop me", "Terminal 02");
+            await Until(() => logs.Entries.Count == 2);
+            logs.FilterText = "keep";
+            Assert.Single(logs.Entries);
+
+            await logs.ExportVisibleCommand.ExecuteAsync(null);
+            Assert.Contains("已导出 1 行", logs.StatusText);
+            Assert.Contains(dir, logs.StatusText);
+
+            var path = Assert.Single(Directory.GetFiles(dir));
+            Assert.EndsWith(".log", path);
+            var content = File.ReadAllText(path);
+            Assert.Contains("[info]", content);
+            Assert.Contains("(Terminal 01) keep me", content);
+            Assert.DoesNotContain("drop me", content); // export follows the active filter
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ExportVisible_EmptyEntries_ReportsAndWritesNothing()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var (_, logs, _) = MakeLogs(exportDir: dir);
+
+        await logs.ExportVisibleCommand.ExecuteAsync(null);
+        Assert.Contains("没有可导出的行", logs.StatusText);
+        Assert.False(Directory.Exists(dir));
+    }
+
+    [AvaloniaFact]
+    public async Task ExportVisible_UsesPickerPath_AndCancelWritesNothing()
+    {
+        var (dash, logs, _) = MakeLogs();
+        dash.AppendOutput("info", "export me", "Terminal 01");
+        await Until(() => logs.Entries.Count == 1);
+
+        // Dismissed dialog → no write, status notes the cancel.
+        string? chosen = null;
+        var pickerDash = new DashboardViewModel(new FakeMonitor());
+        var pickerLogs = new LogsViewModel(pickerDash, new SessionLogFile(),
+            () => [], promptExportPath: () => Task.FromResult(chosen));
+        pickerDash.AppendOutput("info", "never written", "Terminal 01");
+        await Until(() => pickerLogs.Entries.Count == 1);
+        await pickerLogs.ExportVisibleCommand.ExecuteAsync(null);
+        Assert.Contains("已取消导出", pickerLogs.StatusText);
+        pickerLogs.Dispose();
+
+        // Chosen path (.txt) → written there verbatim.
+        var tmp = Path.Combine(Path.GetTempPath(), "th-export-" + Guid.NewGuid().ToString("N") + ".txt");
+        var (dash2, logs2, _) = MakeLogs(promptExportPath: () => Task.FromResult<string?>(tmp));
+        try
+        {
+            dash2.AppendOutput("info", "via picker", "Terminal 01");
+            await Until(() => logs2.Entries.Count == 1);
+            await logs2.ExportVisibleCommand.ExecuteAsync(null);
+            Assert.Contains("已导出 1 行", logs2.StatusText);
+            Assert.True(File.Exists(tmp));
+            Assert.Contains("via picker", File.ReadAllText(tmp));
+        }
+        finally
+        {
+            if (File.Exists(tmp)) File.Delete(tmp);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ExportVisible_UI_EndToEnd_ButtonBinds_AndWritesThroughRealWindow()
+    {
+        // Full chain on the real MainWindow: XAML button → command → picker wiring
+        // (headless: no dialog → default path) → file on disk. Avoids the shared
+        // DISPLAY flakiness of live verification.
+        PtySessionFactory.UseMock = true;
+        var logsDir = Path.Combine(Path.GetDirectoryName(SettingsStore.DefaultPath())!, "logs");
+        var before = Directory.Exists(logsDir)
+            ? Directory.GetFiles(logsDir, "export-*.log").ToHashSet() : [];
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2; // Logs
+            await Task.Delay(150);
+
+            // The ⬇ 导出 button in the real visual tree is bound to the export command.
+            var exportBtn = window.GetVisualDescendants().OfType<Button>()
+                .Single(b => ReferenceEquals(b.Command, vm.Logs.ExportVisibleCommand));
+            Assert.NotNull(exportBtn);
+
+            for (var i = 0; i < 5; i++)
+                vm.Dashboard.AppendOutput("info", $"ui-export-{i}", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 5);
+            vm.Logs.FilterText = "ui-export-"; // isolate our lines from any startup noise
+            await Task.Delay(100);
+            Assert.Equal(5, vm.Logs.Entries.Count);
+
+            await vm.Logs.ExportVisibleCommand.ExecuteAsync(null);
+            Assert.Contains("已导出 5 行", vm.Logs.StatusText);
+
+            var created = Directory.GetFiles(logsDir, "export-*.log")
+                .Where(f => !before.Contains(f)).ToList();
+            var file = Assert.Single(created);
+            try
+            {
+                Assert.EndsWith(".log", file);
+                var content = File.ReadAllText(file);
+                Assert.Contains("(Terminal 01) ui-export-4", content);
+            }
+            finally { File.Delete(file); }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task FollowTail_UI_EndToEnd_ButtonVisibility_And_Resume()
+    {
+        // Real window + real bindings. (The ScrollViewer's ScrollChanged doesn't fire
+        // under the headless platform, so the scroll→pause wiring is live-verified on
+        // a real X display; here we verify the parts the headless UI can prove: the
+        // ⬇ 跟随 button exists, binds to ResumeFollowCommand, mirrors FollowPaused,
+        // and the command restores FollowTail.)
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2; // Logs
+            await Task.Delay(150);
+
+            var followBtn = window.GetVisualDescendants().OfType<Button>()
+                .Single(b => ReferenceEquals(b.Command, vm.Logs.ResumeFollowCommand));
+
+            Assert.True(vm.Logs.FollowTail);   // default: pinned to newest
+            Assert.False(followBtn.IsVisible); // …so the resume button is hidden
+
+            vm.Logs.UpdateFollowFromScroll(atBottom: false); // what a user scroll-up does
+            Assert.False(vm.Logs.FollowTail);
+            Assert.True(followBtn.IsVisible);  // paused → floating ⬇ 跟随 appears
+
+            // Frames for docs: paused (button floating over the list) and resumed.
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-follow-paused.png"));
+
+            vm.Logs.ResumeFollowCommand.Execute(null); // clicking it
+            Assert.True(vm.Logs.FollowTail);
+            Assert.False(followBtn.IsVisible); // …hides again
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-follow-on.png"));
+
+            // Incoming lines don't disturb the follow state in either direction.
+            vm.Logs.UpdateFollowFromScroll(atBottom: false);
+            for (var i = 0; i < 3; i++)
+                vm.Dashboard.AppendOutput("info", $"ui-follow-{i}", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 3);
+            Assert.False(vm.Logs.FollowTail); // new lines never silently resume
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [Fact]

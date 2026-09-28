@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
 
 namespace TerminalHub.App.Views;
@@ -8,6 +10,9 @@ namespace TerminalHub.App.Views;
 public partial class MainWindow : Window
 {
     private MainWindowViewModel Vm => (MainWindowViewModel)DataContext!;
+
+    /// <summary>Inner ScrollViewer of the Logs list; drives the follow-tail state machine.</summary>
+    private ScrollViewer? _logsScroll;
 
     public MainWindow()
     {
@@ -27,6 +32,40 @@ public partial class MainWindow : Window
             FitToScreen();
             _ = Vm.SpawnStartupSessionsAsync();
         };
+        // The Logs tab may start hidden (IsVisible), so template/loaded race each other —
+        // attach idempotently from whichever fires first.
+        LogsList.TemplateApplied += (_, _) => AttachLogsScrollViewer();
+        LogsList.Loaded += (_, _) => AttachLogsScrollViewer();
+        Vm.Logs.PropertyChanged += OnLogsPropertyChanged;
+    }
+
+    private void AttachLogsScrollViewer()
+    {
+        if (_logsScroll is not null) return;
+        _logsScroll = LogsList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (_logsScroll is not null)
+            _logsScroll.ScrollChanged += OnLogsScrollChanged;
+    }
+
+    /// <summary>Follow-tail, view side. A scroll whose offset changed while the extent
+    /// did not carries user intent (wheel / thumb / keyboard): at the bottom → follow,
+    /// elsewhere → pause. Extent growth (new lines) with following on → pin to the newest
+    /// line; this runs inside ScrollChanged, when the extent already includes the new
+    /// rows, so ScrollToEnd lands on the real bottom instead of a stale one.</summary>
+    private void OnLogsScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (_logsScroll is not { } sv) return;
+        if (e.OffsetDelta.Y != 0 && e.ExtentDelta.Y == 0)
+            Vm.Logs.UpdateFollowFromScroll(sv.Offset.Y + sv.Viewport.Height >= sv.Extent.Height - 4);
+        else if (e.ExtentDelta.Y > 0 && Vm.Logs.FollowTail)
+            sv.ScrollToEnd();
+    }
+
+    /// <summary>「⬇ 跟随」clicked (FollowTail went true) — jump to the newest line.</summary>
+    private void OnLogsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LogsViewModel.FollowTail) && Vm.Logs.FollowTail)
+            _logsScroll?.ScrollToEnd();
     }
 
     /// <summary>Never open larger than the working area — the floating dock must stay on-screen.</summary>
