@@ -4,6 +4,14 @@
 
 ## 2026-09-28
 
+### PR #25 — Logs 搜索高亮 + 上一条/下一条 (`feat/logs-search-nav`)
+- **高亮**: 扩展 `HighlightTextBlock`（`UseRegex`）；Logs 列表 Message / Source 在
+  字面或正则过滤下黄粗高亮匹配段；过滤空或坏正则 → 无高亮。底栏 Search 仍走字面。
+- **导航**: 「▲ 上一条」「▼ 下一条」在已过滤 `Entries` 间跳转；端点禁用不环绕；
+  导航暂停 Follow；选中滚入视图；状态行 `匹配 N/M`。
+- 级别 chip / 会话过滤 / Follow / 导出 / 过滤持久化保持。
+- 176 tests green；worktree `/workspace/TerminalHub-logs2`；工具 Claude Code · GLM-5.3。
+
 ### pending / next Deploy slice — 多发布配置档 + 最近产物 (`feat/deploy-profiles-recent`)
 - **配置档**: Deploy 坞按钮右键可保存 / 切换 / 删除命名发布配置。每条含名称、
   可选仓库根目录（空 = 仍从当前工作目录向上查找脚本和产物）、可选 RID

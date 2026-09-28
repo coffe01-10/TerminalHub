@@ -3,14 +3,14 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 17:00 CST（Devin B 新窗口 PR #20） · 维护：Devin（PO）
+最后更新：2026-09-28 17:14 CST（Logs #25 search-nav 开 PR） · 维护：Devin（PO）
 
 ## 分工
 
 | 线 | 负责人 | 工具 | 工作区 |
 |----|--------|------|--------|
 | 壳 / Files / SSH / Codex / 视觉 / 合 PR | **Devin** | 本地 Devin CLI `swe-2-max`（tmux `mf-terminal-hub`） | `/workspace/TerminalHub` |
-| Logs | **GLM** | ZCode · GLM-5.3 | `/workspace/TerminalHub-logs` |
+| Logs | **GLM** | Claude Code · GLM-5.3 | `/workspace/TerminalHub-logs2` |
 | Deploy | **Grok** | Grok Build | `/workspace/TerminalHub-deploy` |
 
 互相可指派：冒烟、`dotnet test`、截图、rebase、审 PR。推自己分支 / `--force-with-lease` **不必问用户**。
@@ -18,6 +18,7 @@
 
 ## 进行中
 
+- [ ] **Logs 搜索高亮 + 上一条/下一条** — **GLM** · `feat/logs-search-nav` · PR #25 · worktree `/workspace/TerminalHub-logs2`
 - [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 

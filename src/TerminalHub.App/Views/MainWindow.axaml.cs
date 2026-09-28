@@ -67,11 +67,15 @@ public partial class MainWindow : Window
             sv.ScrollToEnd();
     }
 
-    /// <summary>「⬇ 跟随」clicked (FollowTail went true) — jump to the newest line.</summary>
+    /// <summary>「⬇ 跟随」clicked (FollowTail went true) — jump to the newest line.
+    /// 「上一条/下一条」(SelectedIndex changed) — bring the selected match into view.</summary>
     private void OnLogsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(LogsViewModel.FollowTail) && Vm.Logs.FollowTail)
             _logsScroll?.ScrollToEnd();
+        else if (e.PropertyName == nameof(LogsViewModel.SelectedIndex)
+                 && Vm.Logs.SelectedEntry is { } entry)
+            LogsList.ScrollIntoView(entry);
     }
 
     /// <summary>Never open larger than the working area — the floating dock must stay on-screen.</summary>

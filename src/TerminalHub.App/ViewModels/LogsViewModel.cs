@@ -63,6 +63,23 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// the bottom resumes. New lines while paused never flip this back on.</summary>
     [ObservableProperty] private bool _followTail = true;
 
+    /// <summary>Index of the selected entry inside <see cref="Entries"/> (-1 = none);
+    /// two-way bound to the list, driven by「上一条/下一条」or a plain click.</summary>
+    [ObservableProperty] private int _selectedIndex = -1;
+
+    /// <summary>The selected entry, or null — what the view scrolls into view on nav.</summary>
+    public LogEntry? SelectedEntry
+        => SelectedIndex >= 0 && SelectedIndex < Entries.Count ? Entries[SelectedIndex] : null;
+
+    /// <summary>Text filter active and not broken → match navigation is meaningful.</summary>
+    public bool HasTextFilter => !string.IsNullOrEmpty(FilterText) && !_regexInvalid;
+
+    /// <summary>「上一条」enabled: a match before the selection exists (no wrap).</summary>
+    public bool CanGoPrevMatch => HasTextFilter && SelectedIndex > 0;
+
+    /// <summary>「下一条」enabled: a match after the selection exists (from -1, the first).</summary>
+    public bool CanGoNextMatch => HasTextFilter && Entries.Count > 0 && SelectedIndex < Entries.Count - 1;
+
     /// <summary>True while following is paused — drives the floating「⬇ 跟随」button.</summary>
     public bool FollowPaused => !FollowTail;
 
@@ -128,6 +145,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _promptExportPath = promptExportPath;
         _persistFilters = persistFilters;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
+        Entries.CollectionChanged += OnEntriesChanged;
         Refilter();
         if (fileLogging) FileLogging = true; // goes through OnFileLoggingChanged
     }
@@ -179,6 +197,37 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
                 // Output trimmed its oldest line (Remove) — our buffer keeps its own copy.
                 break;
         }
+    }
+
+    /// <summary>Selection bookkeeping over the filtered view: a refilter invalidates
+    /// the selection outright, live churn only shifts/clamps it, and the nav buttons'
+    /// enabled state follows the new count either way.</summary>
+    private void OnEntriesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Reset:
+                SelectedIndex = -1; // filter/level/session changed → restart from the first match
+                break;
+            case NotifyCollectionChangedAction.Remove when SelectedIndex >= 0 && e.OldStartingIndex >= 0:
+                var removed = e.OldItems?.Count ?? 0;
+                if (e.OldStartingIndex + removed <= SelectedIndex)
+                    SelectedIndex -= removed;                 // evicted before the selection → keep the same entry
+                else if (e.OldStartingIndex <= SelectedIndex)
+                    SelectedIndex = e.OldStartingIndex - 1;   // the selected entry itself was evicted
+                break;
+        }
+        if (SelectedIndex >= Entries.Count)
+            SelectedIndex = Entries.Count - 1;
+        OnPropertyChanged(nameof(CanGoPrevMatch));
+        OnPropertyChanged(nameof(CanGoNextMatch));
+    }
+
+    partial void OnSelectedIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(SelectedEntry));
+        OnPropertyChanged(nameof(CanGoPrevMatch));
+        OnPropertyChanged(nameof(CanGoNextMatch));
     }
 
     private bool Matches(LogEntry e)
@@ -319,6 +368,32 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// <summary>「⬇ 跟随」button: resume tail-following; the view scrolls to bottom.</summary>
     [RelayCommand]
     private void ResumeFollow() => FollowTail = true;
+
+    /// <summary>「上一条」: step to the previous filtered entry; stops at the top (no wrap).</summary>
+    [RelayCommand]
+    private void GoPrevMatch()
+    {
+        if (!CanGoPrevMatch) return;
+        SelectMatch(SelectedIndex - 1);
+    }
+
+    /// <summary>「下一条」: step to the next filtered entry; stops at the bottom (no wrap).
+    /// With nothing selected yet, starts at the first match.</summary>
+    [RelayCommand]
+    private void GoNextMatch()
+    {
+        if (!CanGoNextMatch) return;
+        SelectMatch(Math.Max(SelectedIndex + 1, 0));
+    }
+
+    /// <summary>Select a match by index: pause tail-following (the user is inspecting,
+    /// new lines must not yank the view away) and show the position in the status row.</summary>
+    private void SelectMatch(int index)
+    {
+        SelectedIndex = Math.Clamp(index, 0, Entries.Count - 1);
+        FollowTail = false;
+        StatusText = $"匹配 {SelectedIndex + 1}/{Entries.Count}";
+    }
 
     /// <summary>Default export destination: `export-&lt;ts&gt;.log` in the file sink's dir.</summary>
     public string DefaultExportPath()
