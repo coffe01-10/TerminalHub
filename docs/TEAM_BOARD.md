@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 17:14 CST（Logs #25 search-nav 开 PR） · 维护：Devin（PO）
+最后更新：2026-09-28 17:40 CST（Devin B Files open-in-terminal PR #31） · 维护：Devin（PO）
 
 ## 分工
 
@@ -29,6 +29,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #31 Files「在此打开终端」+「复制路径」（dir→cd / file→父目录 / 剪贴板）— Devin B · `feat/files-open-in-terminal`
 - [x] PR #21 工具栏 CWD 真动作（⟳刷新 + ←/→ 历史 + /proc 轮询 + OSC7)— GLM WIP · Devin 接管 · `feat/toolbar-cwd-nav` · `main@2613f93`
 - [x] PR #20 「↗ 在新窗口打开」会话弹出独立窗（detach/收回 + 弹出期输出保留）— Devin B · `feat/open-new-window` · `main@5cc06e9`
 - [x] PR #17 Logs 级别筛选 chip 条 + 过滤持久化 — GLM · `feat/logs-level-filter-persist` · `main@c30b204`

@@ -4,6 +4,23 @@
 
 ## 2026-09-28
 
+### PR #31 — Files「在此打开终端」+「复制路径」 (`feat/files-open-in-terminal`)
+- **在此打开终端**: Files 工具行 ⇥ 按钮 + 条目右键菜单 —— 选中**目录** → 活动
+  PTY 真实 `cd '<path>'`（与工具栏 CWD ←/→ 同一 `ApplyDisplayedCwd` 路径：
+  `QuoteForShell` 引号转义、CWD 历史 push、路径栏与 Files 跟随）；选中**文件**
+  → cd 其父目录。无选中 / 无活动会话时 CanExecute 禁用，会话切换实时刷新。
+- **复制路径**: ⧉ 按钮 + 右键菜单把选中项绝对路径写入剪贴板（复用
+  `CopyTextToClipboardAsync` best-effort）；`StatusText` 显示
+  「终端已 cd → …」「已复制 …」。
+- **解耦**: `FilesViewModel` 只持回调（`openTerminalAt`/`copyTextAsync`/
+  `hasActiveSession`），由 `MainWindowViewModel` 注入真实 shell 动作。
+- **验证**: 181 tests green（+5 `FilesOpenInTerminalTests`：VM 层 dir/file/
+  禁用态/复制 spy + headless 端到端 mock PTY 缓冲含 `cd`、CWD chrome 同步、
+  历史可回退）。DISPLAY=:7 实机：`/tmp/00-demo-open` ⇥ → 终端
+  `cd '/tmp/00-demo-open'` 执行、提示符跟随、卡片缩略图同步；⧉ 后
+  `xclip -o` 读到 `/tmp/00-demo-open`。
+- 截图 `docs/screenshots/files-open-in-terminal.png`。
+
 ### PR #25 — Logs 搜索高亮 + 上一条/下一条 (`feat/logs-search-nav`)
 - **高亮**: 扩展 `HighlightTextBlock`（`UseRegex`）；Logs 列表 Message / Source 在
   字面或正则过滤下黄粗高亮匹配段；过滤空或坏正则 → 无高亮。底栏 Search 仍走字面。
