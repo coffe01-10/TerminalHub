@@ -49,6 +49,19 @@
   MainWindow 端到端保持 Logs tab）。worktree `/workspace/TerminalHub-logs2`；
   工具 Claude Code · GLM-5.3。
 
+### pending / next Deploy slice — 发布实时输出进 Output + 运行中可取消 (`feat/deploy-publish-stream-cancel`)
+- **实时输出**: Publish 会话的 PTY stdout/stderr 原样进入底部 Output，`source` 为 `deploy`
+  （不再用会话名 `Publish`）。不造进度条、百分比或假徽章。其它会话仍用会话名。
+  开始推流时（首行）以及退出时聚焦 Output 页。开始打包 / 成功 / 失败 / 已在运行 /
+  配置档 / 最近产物这些状态行保持不变。
+- **取消**: 打包进行中 Deploy 坞右键「取消打包 Cancel」可用，按钮文案为「打包中」；
+  空闲时该项禁用、文案回到 Deploy。取消会杀掉发布进程（Linux 上若子进程是会话/进程组
+  leader，则 `SIGHUP` 再 `SIGKILL` 整个进程组，Windows 仍是 `entireProcessTree`）。
+  退出记一条 `publish cancelled`（source `deploy`），`PublishBusy` 回到 false，可再次打包。
+  空闲时取消只警告一次；重复取消不再多记。
+- 配置档与最近产物（PR #22）行为不变。
+- 实机截图：`docs/screenshots/deploy-stream-cancel.png`（Output `deploy` 流 + 右键「取消打包」）。
+
 ### PR #26 — Logs 按会话筛选记忆 (`feat/logs-pin-session-filters`)
 - **per-session 记忆**: 会话下拉选中具名会话时，其筛选组合（FilterText /
   UseRegex / 级别 chip / 保留历史）按**会话名**记进
@@ -69,6 +82,7 @@
   各会话独立、快照 + `ApplySessionFilterMap` 跨 VM 往返、SettingsStore 落盘
   → 重启恢复（mock PTY 起启动会话））。worktree `/workspace/TerminalHub-logs2`；
   工具 Claude Code · GLM-5.3。
+
 
 ### PR #25 — Logs 搜索高亮 + 上一条/下一条 (`feat/logs-search-nav`)
 - **高亮**: 扩展 `HighlightTextBlock`（`UseRegex`）；Logs 列表 Message / Source 在

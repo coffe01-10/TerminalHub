@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using TerminalHub.Core.Pty;
 using TerminalHub.Pty;
 using Xunit;
@@ -65,5 +67,99 @@ public class LinuxPtyTests
             Assert.True(DateTime.UtcNow < deadline, "timed out waiting for pwd");
             await Task.Delay(60);
         }
+    }
+
+    /// <summary>
+    /// Non-interactive bash keeps script children in its process group.
+    /// Kill must signal that group; killing only the shell pid leaves them running.
+    /// </summary>
+    [Fact]
+    public async Task Kill_SignalsProcessGroup_SoScriptChildDies()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+
+        var dir = Path.Combine(Path.GetTempPath(), "th-pgid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var script = Path.Combine(dir, "hold.sh");
+        File.WriteAllText(script, "#!/bin/bash\nset +m\nsleep 120 &\necho CHILD:$!\nwait\n");
+        var child = 0;
+        using var pty = new LinuxPtySession();
+        try
+        {
+            var output = new List<byte>();
+            var exited = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            pty.OutputReceived += (_, d) => { lock (output) output.AddRange(d.ToArray()); };
+            pty.Exited += (_, code) => exited.TrySetResult(code);
+
+            await pty.StartAsync(new PtyOptions
+            {
+                Shell = "/bin/bash",
+                Arguments = script,
+                WorkingDirectory = dir,
+                Columns = 80,
+                Rows = 24,
+            });
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+            while (true)
+            {
+                string text;
+                lock (output) text = Encoding.UTF8.GetString(output.ToArray());
+                var match = Regex.Match(text, @"CHILD:(\d+)");
+                if (match.Success)
+                {
+                    child = int.Parse(match.Groups[1].Value);
+                    break;
+                }
+                Assert.True(DateTime.UtcNow < deadline, "timed out waiting for child pid: " + text);
+                await Task.Delay(50);
+            }
+
+            var leader = pty.ProcessId ?? 0;
+            Assert.True(leader > 1);
+            Assert.Equal(leader, ProcessGroupOf(child));
+
+            pty.Kill();
+            await exited.Task.WaitAsync(TimeSpan.FromSeconds(8));
+
+            var gone = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+            while (DateTime.UtcNow < gone && ProcessAlive(child))
+                await Task.Delay(40);
+            Assert.False(ProcessAlive(child), $"child {child} still running after process-group kill");
+        }
+        finally
+        {
+            if (child > 0) Native.kill(child, 9);
+            try { Directory.Delete(dir, true); } catch { /* best effort */ }
+        }
+    }
+
+    private static bool ProcessAlive(int pid)
+    {
+        if (pid <= 0) return false;
+        try
+        {
+            var stat = File.ReadAllText($"/proc/{pid}/stat");
+            var rp = stat.LastIndexOf(')');
+            if (rp < 0 || rp + 2 >= stat.Length) return true;
+            var state = stat[rp + 2];
+            return state is not ('Z' or 'X');
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
+    private static int ProcessGroupOf(int pid)
+    {
+        var stat = File.ReadAllText($"/proc/{pid}/stat");
+        var rp = stat.LastIndexOf(')');
+        var rest = stat[(rp + 2)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return int.Parse(rest[2]);
+    }
+
+    private static class Native
+    {
+        [DllImport("libc")]
+        public static extern int kill(int pid, int sig);
     }
 }

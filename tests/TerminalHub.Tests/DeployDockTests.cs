@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
 using TerminalHub.App.Views;
 using TerminalHub.Core.Deploy;
@@ -507,6 +508,157 @@ public class DeployDockTests
     }
 
     [AvaloniaFact]
+    public async Task PublishPtyLines_StreamIntoOutput_AsDeploy_OtherSessionsKeepTheirName()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: false);
+        var vm = new MainWindowViewModel();
+        try
+        {
+            await vm.NewSessionCommand.ExecuteAsync(null);
+            await WaitFor(() => vm.SessionCards.Count == 1);
+            var plain = vm.SessionCards.Single();
+            vm.Dashboard.SelectedBottomTab = 2;
+            plain.Model.Emulator.SendText("PLAIN_SESSION_TOKEN\r");
+            await WaitFor(() => vm.Dashboard.OutputLog.Any(l => l.Message.Contains("PLAIN_SESSION_TOKEN")));
+            Assert.All(
+                vm.Dashboard.OutputLog.Where(l => l.Message.Contains("PLAIN_SESSION_TOKEN")),
+                l => Assert.Equal(plain.Name, l.Source));
+            Assert.Equal(2, vm.Dashboard.SelectedBottomTab);
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.SessionCards.Any(c => c.Name == "Publish" && c.Model.IsRunning));
+            Assert.True(vm.IsPublishRunning);
+            Assert.True(vm.PublishBusy());
+            Assert.Equal("打包中", vm.DeployDockCaption);
+
+            var publish = vm.SessionCards.Single(c => c.Name == "Publish");
+            vm.Dashboard.SelectedBottomTab = 2;
+            publish.Model.Emulator.SendText("PUBLISH_STREAM_TOKEN\r");
+            await WaitFor(() => vm.Dashboard.OutputLog.Any(l =>
+                l.Message.Contains("PUBLISH_STREAM_TOKEN") && l.Source == "deploy"));
+            Assert.All(
+                vm.Dashboard.OutputLog.Where(l => l.Message.Contains("PUBLISH_STREAM_TOKEN")),
+                l => Assert.Equal("deploy", l.Source));
+            Assert.DoesNotContain(vm.Dashboard.OutputLog, l =>
+                l.Message.Contains("PUBLISH_STREAM_TOKEN") && l.Source == "Publish");
+            Assert.Equal(0, vm.Dashboard.SelectedBottomTab);
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Message.Contains("publish start"));
+        }
+        finally
+        {
+            vm.Dispose();
+            Directory.Delete(root, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task CancelPublish_StopsSession_ReportsCancel_ThenAnotherPublishCanStart()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: false);
+        var vm = new MainWindowViewModel();
+        try
+        {
+            vm.CancelPublishCommand.Execute(null);
+            await FlushUi();
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Message.Contains("publish is not running"));
+            var idleWarnings = vm.Dashboard.OutputLog.Count(l => l.Message.Contains("publish is not running"));
+            vm.CancelPublishCommand.Execute(null);
+            await FlushUi();
+            Assert.Equal(idleWarnings, vm.Dashboard.OutputLog.Count(l => l.Message.Contains("publish is not running")));
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.PublishBusy());
+            Assert.True(vm.IsPublishRunning);
+
+            vm.CancelPublishCommand.Execute(null);
+            await WaitFor(() => vm.Dashboard.OutputLog.Any(l =>
+                l.Source == "deploy" && l.Message.Contains("publish cancelled") && l.Message.Contains("已取消打包")));
+            Assert.False(vm.PublishBusy());
+            Assert.False(vm.IsPublishRunning);
+            Assert.Equal("Deploy", vm.DeployDockCaption);
+            Assert.DoesNotContain(vm.Dashboard.OutputLog, l => l.Message.Contains("publish failed"));
+
+            vm.CancelPublishCommand.Execute(null);
+            await FlushUi();
+            Assert.Equal(idleWarnings + 1, vm.Dashboard.OutputLog.Count(l => l.Message.Contains("publish is not running")));
+            vm.CancelPublishCommand.Execute(null);
+            await FlushUi();
+            Assert.Equal(idleWarnings + 1, vm.Dashboard.OutputLog.Count(l => l.Message.Contains("publish is not running")));
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.SessionCards.Count(c => c.Name == "Publish" && c.Model.IsRunning) == 1);
+            Assert.Equal(2, vm.SessionCards.Count(c => c.Name == "Publish"));
+            Assert.True(vm.PublishBusy());
+            Assert.True(vm.IsPublishRunning);
+        }
+        finally
+        {
+            vm.Dispose();
+            Directory.Delete(root, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task DeployMenu_CancelEnabledOnlyWhilePublishRunning()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: false);
+        var previous = Directory.GetCurrentDirectory();
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            Directory.SetCurrentDirectory(root);
+            window.Show();
+            await FlushUi();
+            var vm = (MainWindowViewModel)window.DataContext!;
+            var deploy = window.FindControl<Button>("DeployDockButton");
+            Assert.NotNull(deploy);
+
+            window.RefreshDeployContextMenu();
+            var flyout = Assert.IsType<MenuFlyout>(deploy!.ContextFlyout);
+            var republish = Assert.IsAssignableFrom<MenuItem>(flyout.Items[0]!);
+            Assert.Contains("重新打包", republish.Header?.ToString());
+            var cancel = MenuByHeader(flyout, "取消打包");
+            Assert.Contains("Cancel", cancel.Header?.ToString());
+            Assert.False(cancel.IsEnabled);
+            Assert.False(vm.IsPublishRunning);
+            Assert.Equal("Deploy", DockCaption(deploy));
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.PublishBusy());
+            window.RefreshDeployContextMenu();
+            Assert.True(vm.IsPublishRunning);
+            Assert.True(cancel.IsEnabled);
+            await WaitFor(() => DockCaption(deploy) == "打包中");
+
+            cancel.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await WaitFor(() => !vm.PublishBusy() && vm.Dashboard.OutputLog.Any(l =>
+                l.Source == "deploy" && l.Message.Contains("publish cancelled")));
+            window.RefreshDeployContextMenu();
+            Assert.False(vm.IsPublishRunning);
+            Assert.False(cancel.IsEnabled);
+            await WaitFor(() => DockCaption(deploy) == "Deploy");
+
+            republish.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await WaitFor(() => vm.SessionCards.Any(c => c.Name == "Publish" && c.Model.IsRunning));
+            window.RefreshDeployContextMenu();
+            Assert.True(cancel.IsEnabled);
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Message.Contains("force republish"));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previous);
+            window.Close();
+            Directory.Delete(root, true);
+        }
+    }
+
+    [AvaloniaFact]
     public void PublishProfileWindow_ApplyDraft_RoundTripsFields()
     {
         var dialog = new PublishProfileWindow();
@@ -524,6 +676,11 @@ public class DeployDockTests
     private static MenuItem MenuByHeader(MenuFlyout flyout, string startsWith) =>
         flyout.Items.OfType<MenuItem>().Single(i =>
             i.Header is string header && header.StartsWith(startsWith, StringComparison.Ordinal));
+
+    private static string? DockCaption(Button deploy) =>
+        deploy.GetVisualDescendants().OfType<TextBlock>()
+            .Select(t => t.Text)
+            .FirstOrDefault(t => t is "Deploy" or "打包中");
 
     private static MenuItem OnlyChild(MenuItem menu) =>
         Assert.Single(menu.Items.OfType<MenuItem>());

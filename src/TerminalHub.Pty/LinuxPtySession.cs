@@ -187,8 +187,27 @@ public sealed class LinuxPtySession : IPtySession
     public void Kill()
     {
         if (!IsRunning || _childPid <= 0) return;
-        try { Native.kill(_childPid, Native.SIGHUP); } catch { }
-        try { Native.kill(_childPid, Native.SIGKILL); } catch { }
+        // forkpty/login_tty puts the child in its own session, so it is the
+        // process-group leader (pgid == pid). Signal the group — SIGHUP then
+        // SIGKILL — so script children (dotnet publish, sleep, …) die with the
+        // shell. Never signal pgid 0/-1 (our group, or every process we can reach).
+        // If the child is not a leader, or still shares our group, fall back to its pid.
+        var child = _childPid;
+        var pgid = Native.getpgid(child);
+        var mine = Native.getpgid(0);
+        if (pgid > 1 && pgid == child && pgid != mine)
+        {
+            Signal(-pgid, Native.SIGHUP);
+            Signal(-pgid, Native.SIGKILL);
+        }
+        Signal(child, Native.SIGHUP);
+        Signal(child, Native.SIGKILL);
+
+        static void Signal(int pid, int sig)
+        {
+            if (pid == 0 || pid == -1) return;
+            try { Native.kill(pid, sig); } catch { /* already reaped, or not a group */ }
+        }
     }
 
     public void Dispose()
@@ -230,6 +249,7 @@ public sealed class LinuxPtySession : IPtySession
         [DllImport("libc")] public static extern int close(int fd);
         [DllImport("libc")] public static extern int ioctl(int fd, uint request, ref Winsize winp);
         [DllImport("libc")] public static extern int kill(int pid, int sig);
+        [DllImport("libc")] public static extern int getpgid(int pid);
         [DllImport("libc")] public static extern int getpid();
         [DllImport("libc")] public static extern int waitpid(int pid, ref int status, int options);
         [DllImport("libc")] public static extern int chdir(byte[] path);
