@@ -1,0 +1,76 @@
+# Build
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+# VS / Rider / VS Code
+.vs/
+.idea/
+*.rsuser
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Avalonia / WinUI / WPF
+*.pfx
+*.appx
+*.msix
+*.appxbundle
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx.manifest
+
+# Installer output
+scripts/installer/Output/
+packaging/dist/
+*.exe
+!scripts/**/*.exe
+*.msi
+*.zip
+!docs/**/*.png
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.tmp
+
+# Test / coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# Devin / agent scratch
+.devin/
