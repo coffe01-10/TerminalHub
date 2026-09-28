@@ -177,6 +177,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Live-bound font size → writes through to settings + notifies TerminalView.</summary>
+    public double FontSize
+    {
+        get => _settings.FontSize;
+        set
+        {
+            if (_settings.FontSize == value) return;
+            _settings.FontSize = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string WorkspaceNameLive
+    {
+        get => _settings.WorkspaceName;
+        set { _settings.WorkspaceName = value; WorkspaceName = value; OnPropertyChanged(); }
+    }
+
     [RelayCommand]
     private void SaveSettings()
     {

@@ -76,4 +76,31 @@ public class UiSmokeTests
         Assert.True(File.Exists(Path.Combine(outDir, "assistant.png")));
         window.Close();
     }
+
+    /// <summary>End-to-end: real Linux PTY through the UI pipeline (skipped off-Linux).</summary>
+    [AvaloniaFact]
+    public async Task RealPty_EndToEnd()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        PtySessionFactory.UseMock = false;
+
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(600);
+
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        Assert.NotEmpty(vm.SessionCards);
+
+        var emu = vm.ActiveSession!.Emulator;
+        emu.SendText("echo E2E_$((6*7))\r");
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (emu.Buffer.TailText(30).Contains("E2E_42")) { window.Close(); return; }
+            await Task.Delay(100);
+        }
+        Assert.Fail("real PTY output never reached the screen buffer");
+        window.Close();
+    }
 }

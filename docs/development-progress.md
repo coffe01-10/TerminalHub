@@ -1,0 +1,60 @@
+# Development progress — Terminal Hub / 终端控制中心
+
+> Autonomous build log. PRs merge to `main` when green.
+
+## 2026-09-28
+
+### PR #1 — Solution skeleton (`feat/solution-skeleton`) ✅ merged
+- Stack chosen: **Avalonia 11** (`net8.0`) — WinUI 3/WPF cannot compile on the
+  Linux dev box; Avalonia still ships as a normal Windows desktop app with a
+  Windows packaging path (PRODUCT.md fallback option).
+- Projects: `TerminalHub.Core` (contracts/logic), `TerminalHub.Pty`
+  (ConPTY + forkpty), `TerminalHub.App` (Avalonia UI), `TerminalHub.Tests`.
+- `IPtySession` abstraction; `MockPtySession`; `AppSettings`/`SettingsStore`
+  (JSON in `%APPDATA%/TerminalHub` / `~/.config/terminalhub`); `SystemMonitor`
+  (CPU/Mem/Disk/Net + top processes — Windows P/Invoke + Linux /proc);
+  `SessionManager` with 开发/测试/部署/Codex tags; `IAiAssistant` + mock.
+- Single-instance mutex; `--mock` flag.
+- Tests: 6 smoke tests green.
+
+### PR #2 — Terminal emulation core (`feat/terminal-core`) ✅ merged
+- `VtParser`: CSI/OSC/DCS state machine — SGR 16/256/truecolor, DECSTBM scroll
+  regions, alt screen (1049), DEC line-drawing charset, incremental UTF-8,
+  DA/DSR responses, origin/insert modes, pending-wrap.
+- `ScreenBuffer`: scrollback, CJK double-width cells, dirty tracking, resize,
+  `TailText`/`RowText` for thumbnails.
+- `TerminalEmulator`: IPtySession ↔ buffer, resize plumbing, input.
+- `LinuxPtySession` rewritten for post-fork safety (pre-allocated argv/envp,
+  pre-warmed stubs, child calls only chdir/execve/kill) — fixed test-host
+  deadlock/crash.
+- Tests: 34 green incl. real forkpty echo/cwd.
+
+### PR #3 — Shell chrome (`feat/dashboard-ui`) ✅ merged
+- Full window matching both mockups; verified via headless-rendered PNGs:
+  - Title bar: Terminal Hub / 终端控制中心 + ⚙ — ▢ ✕, "Windows System"
+  - Left: session cards (status dot, tag pills, live previews, active glow), + 新建终端 Ctrl N
+  - Center: traffic lights + tab strip, toolbar (⟳ → breadcrumb, ◫ 分屏,
+    ↗ 在新窗口打开, ⋯), TerminalView, assistant progress bar,
+    "Ask Codex or type a command…" input, Output/Debug/Problems(2)/Search panel
+  - Right: Processes/Files/Logs/SSH/Codex tabs; live PID/NAME/CPU/MEM table;
+    System Monitor (CPU/Mem sparklines, Disk bar, Net ↓↑ dual sparkline);
+    Codex checklist (done/active/pending) + 建议任务 + 描述你想做的任务…
+  - Floating dock: New Session(glow)/Monitor/SSH/Logs/Deploy(stub)/Settings
+  - Status bar: 工作空间 · N 个终端 · M 运行中 · CPU · 内存 · sparkline
+- Headless UI test renders both dashboard + Codex frames to PNG.
+- Real-PTY end-to-end UI test: bash echo → screen buffer (36 tests green).
+
+### PR #4 — Packaging + docs (`feat/packaging-docs`)
+- `packaging/TerminalHub.iss` — Inno Setup (x64, zh+en, desktop icon,
+  single-instance-friendly uninstall/taskkill)
+- `scripts/publish-windows.ps1` — `dotnet publish win-x64` single-file +
+  iscc invocation
+- README refreshed; PRODUCT.md checkboxes updated.
+
+## Known gaps / Windows-only items
+- `ConPtySession` compiles on Linux but only *runs* on Windows — needs a
+  Windows smoke pass (`dotnet run --project src/TerminalHub.App`).
+- Acrylic/Mica: approximated with translucent brushes; native Mica is a
+  WinUI-only path (out of scope for Avalonia).
+- Session thumbnails render text preview (not bitmap) — DESIGN.md allows this.
+- Deploy + SSH + Files tabs are stubs per MVP scope.
