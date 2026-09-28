@@ -21,6 +21,55 @@
   `xclip -o` 读到 `/tmp/00-demo-open`。
 - 截图 `docs/screenshots/files-open-in-terminal.png`。
 
+### PR #29 — 会话快捷键 + ••• 会话菜单 (`feat/session-shortcuts`)
+- **Ctrl+W** 关当前会话、**Ctrl+Tab / Ctrl+Shift+Tab** 双向循环会话卡 —
+  窗口级 Tunnel `KeyDown` handler 抢在 TerminalView 之前(否则 Ctrl+W 被
+  shell 吃掉当 kill-word、Ctrl+Tab 被当 `\t` 补全),走正常激活路径
+  (分屏时分配到聚焦窗格)。
+- **••• 菜单**:`Button.Flyout` + `MenuFlyout` —— 关闭会话 / 下一个会话 /
+  上一个会话 / 复制 CWD(`CopyActiveCwd` 写剪贴板 + Output 记 `ui` 行),
+  菜单项命令绑定 VM 命令。
+- **验证**:6 个新测 —— `KeyPress` 真输入管线 Ctrl+W 关会话 / Ctrl+Tab
+  双向循环(含 wrap)、CycleSession 环绕、CloseActiveSession 杀 PTY+
+  激活下一个、CopyActiveCwd 写 ui 日志、••• flyout 菜单项命令绑定。
+  DISPLAY=:7 实机:Ctrl+W 关 T02(tab 消失)、Ctrl+Tab/Shift+Tab 双向、
+  ••• 菜单点开 +「复制 CWD」→ Output `已复制 CWD: /home/box`。
+- 截图 `session-shortcuts.png`。180+ tests green。
+
+### PR #27 — Logs 点击跳到会话 (`feat/logs-click-jump-session`)
+- **双击 / 「↗ 跳到会话」**: Logs 列表行的 `LogEntry.Source` 若是会话名，则激活对
+  应 `SessionCard` / `ActiveSession`（经 `MainWindowViewModel.TryActivateSessionByName`）；
+  **Logs 页保持打开**（不改 `SelectedRightTab`）。状态行 `已跳到「Terminal 03」`。
+- **健壮**: Source 空 → `该行没有会话来源`；未知名（如 `deploy`）→ `未找到会话「…」`；
+  无选中 → `没有选中的日志行`；不抛。优先双击，避免与上一条/下一条的单击选中冲突；
+  按钮 / Enter 走 `JumpToSessionCommand`（选中行）。
+- **接线**: `LogsViewModel` 注入 `Func<string, bool>? activateSession`；宿主只翻会话，
+  不碰 Deploy/Files/SSH/PTY/toolbar。
+- **验证**: 183 tests green（本 PR +3：已知 Source 激活 + 状态、缺失/未知软提示、
+  MainWindow 端到端保持 Logs tab）。worktree `/workspace/TerminalHub-logs2`；
+  工具 Claude Code · GLM-5.3。
+
+### PR #26 — Logs 按会话筛选记忆 (`feat/logs-pin-session-filters`)
+- **per-session 记忆**: 会话下拉选中具名会话时，其筛选组合（FilterText /
+  UseRegex / 级别 chip / 保留历史）按**会话名**记进
+  `AppSettings.LogsSessionFilters`（新 JSON dict + `LogsSessionFilterState`）。
+  切换会话恢复该会话上次的组合；未配置 → 默认（空文本 / 非正则 / 全部 / 不保留）。
+  「全部会话」(index 0) 仍是全局 `LogsFilterText` 一族字段的落点 —— 即全局兜底。
+- **写入时机**: 每次过滤变化即把当前组合写进当前选择的槽位（具名会话 → map
+  条目；index 0 → VM 内的全局快照），`PersistLogsFilters` 落盘时同时写全局
+  字段（「全部」最后组合，具名会话上的修改不污染它）与整份会话 map。
+  刻意不在 `OnSessionFilterChanging` 按旧索引保存：`RefreshSessions` 先重绑
+  名单再设索引，旧索引届时可能指向别的会话名会写错键；逐次写入无此竞态。
+- **切换恢复**: `OnSessionFilterIndexChanged` → `RestoreFiltersFor`，恢复期间
+  复用 `_restoringFilters` 抑制写回（无 load→save 循环）；恢复非默认组合时
+  状态行提示 `已恢复「Terminal 01」筛选`（复用现有 `StatusText`，无新增
+  chrome）。`RefreshSessions` 不清 map，重绑后索引变化同样恢复；JSON 里的
+  null state / 空会话名跳过不炸。
+- **验证**: 180 tests green（本 PR +4：切换恢复 / 未配置默认 / 提示、全局与
+  各会话独立、快照 + `ApplySessionFilterMap` 跨 VM 往返、SettingsStore 落盘
+  → 重启恢复（mock PTY 起启动会话））。worktree `/workspace/TerminalHub-logs2`；
+  工具 Claude Code · GLM-5.3。
+
 ### PR #25 — Logs 搜索高亮 + 上一条/下一条 (`feat/logs-search-nav`)
 - **高亮**: 扩展 `HighlightTextBlock`（`UseRegex`）；Logs 列表 Message / Source 在
   字面或正则过滤下黄粗高亮匹配段；过滤空或坏正则 → 无高亮。底栏 Search 仍走字面。

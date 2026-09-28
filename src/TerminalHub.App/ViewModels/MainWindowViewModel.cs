@@ -163,10 +163,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             v => _settings.SessionLogToFile = v,
             copyToClipboard: CopyTextToClipboardAsync,
             promptExportPath: PromptExportPathAsync,
-            persistFilters: PersistLogsFilters);
-        // Replay the filters saved from the previous run (never writes back).
+            persistFilters: PersistLogsFilters,
+            activateSession: TryActivateSessionByName);
+        // Replay the filters saved from the previous run (never writes back):
+        // the global combo for「全部会话」, plus each named session's own memory.
         Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
             _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear);
+        Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
@@ -322,6 +325,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _sessions.Activate(card.Model);
     }
 
+    /// <summary>Logs jump-to-session: activate the card whose name matches
+    /// <paramref name="name"/>. Keeps the Logs tab open (does not touch
+    /// <see cref="SelectedRightTab"/>). Unknown / missing → false.</summary>
+    private bool TryActivateSessionByName(string name)
+    {
+        var card = SessionCards.FirstOrDefault(c =>
+            string.Equals(c.Name, name, StringComparison.Ordinal));
+        if (card is null) return false;
+        _sessions.Activate(card.Model);
+        return true;
+    }
+
     [RelayCommand]
     private void CloseSession(SessionCardViewModel? card)
     {
@@ -329,6 +344,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, card.Model));
         _sessions.Close(card.Model);
         if (vm is not null) SessionCards.Remove(vm);
+    }
+
+    /// <summary>Ctrl+W / 「••• → 关闭会话」: close the currently active session.</summary>
+    [RelayCommand]
+    private void CloseActiveSession() => CloseSession(ActiveCard);
+
+    /// <summary>Ctrl+Tab / Ctrl+Shift+Tab: cycle session cards (wraps).</summary>
+    public void CycleSession(int direction)
+    {
+        if (SessionCards.Count == 0) return;
+        var idx = ActiveCard is null ? -1 : SessionCards.IndexOf(ActiveCard);
+        var next = SessionCards[(idx + direction + SessionCards.Count) % SessionCards.Count];
+        // Goes through the normal activation path (syncs ActiveSession,
+        // split-pane assignment to the focused pane, Output/Logs switch).
+        ActiveCard = next;
+    }
+
+    [RelayCommand] private void CycleSessionNext() => CycleSession(+1);
+    [RelayCommand] private void CycleSessionPrev() => CycleSession(-1);
+
+    /// <summary>「••• → 复制 CWD」: copy the active session's real working directory.</summary>
+    [RelayCommand]
+    private void CopyActiveCwd()
+    {
+        var cwd = ActiveSession?.WorkingDirectory;
+        if (string.IsNullOrEmpty(cwd)) return;
+        _ = CopyTextToClipboardAsync(cwd);
+        Dashboard.AppendOutput("info", $"已复制 CWD: {cwd}", "ui");
     }
 
     /// <summary>「↗ 在新窗口打开」: detach the given (or active) session into a
@@ -823,13 +866,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SaveSettingsInternal() => _settingsStore.Save(_settings);
 
     /// <summary>Logs filter changed → copy into <see cref="_settings"/> and save
-    /// (small JSON; every change is fine, no debounce needed).</summary>
+    /// (small JSON; every change is fine, no debounce needed). The global fields keep
+    /// 「全部会话」's last known combo; named sessions persist in their own map.</summary>
     private void PersistLogsFilters()
     {
-        _settings.LogsFilterText = Logs.FilterText;
-        _settings.LogsUseRegex = Logs.UseRegex;
-        _settings.LogsLevelFilterIndex = Logs.LevelFilterIndex;
-        _settings.LogsRetainHistoryOnClear = Logs.RetainHistoryOnClear;
+        var global = Logs.SnapshotGlobalFilters();
+        _settings.LogsFilterText = global.FilterText;
+        _settings.LogsUseRegex = global.UseRegex;
+        _settings.LogsLevelFilterIndex = global.LevelFilterIndex;
+        _settings.LogsRetainHistoryOnClear = global.RetainHistoryOnClear;
+        _settings.LogsSessionFilters = Logs.SnapshotSessionFilters();
         SaveSettingsInternal();
     }
 
