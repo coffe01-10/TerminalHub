@@ -9,6 +9,9 @@ namespace TerminalHub.App.ViewModels;
 public partial class FilesViewModel : ViewModelBase
 {
     private readonly Func<string?> _sessionCwd;
+    private readonly Action<string>? _openTerminalAt;
+    private readonly Func<string, Task>? _copyTextAsync;
+    private readonly Func<bool>? _hasActiveSession;
     private bool _initialized;
 
     /// <summary>One clickable breadcrumb segment.</summary>
@@ -27,10 +30,30 @@ public partial class FilesViewModel : ViewModelBase
     [ObservableProperty] private bool _canGoUp;
 
     /// <param name="sessionCwd">Returns the active session's working dir (may be null/empty).</param>
-    public FilesViewModel(Func<string?>? sessionCwd = null)
+    /// <param name="openTerminalAt">Sends a real `cd` into the active terminal session.</param>
+    /// <param name="copyTextAsync">Best-effort clipboard copy (owned by the shell VM).</param>
+    /// <param name="hasActiveSession">Whether a live session exists to receive `cd`.</param>
+    public FilesViewModel(Func<string?>? sessionCwd = null,
+                          Action<string>? openTerminalAt = null,
+                          Func<string, Task>? copyTextAsync = null,
+                          Func<bool>? hasActiveSession = null)
     {
         _sessionCwd = sessionCwd ?? (() => null);
+        _openTerminalAt = openTerminalAt;
+        _copyTextAsync = copyTextAsync;
+        _hasActiveSession = hasActiveSession;
     }
+
+    /// <summary>Selection change arms/disarms the entry commands.</summary>
+    partial void OnSelectedEntryChanged(FileEntry? value)
+    {
+        OpenInTerminalCommand.NotifyCanExecuteChanged();
+        CopyPathCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Active-session churn also gates 「在此打开终端」 — the shell VM
+    /// calls this whenever ActiveSession changes.</summary>
+    public void NotifySessionAvailability() => OpenInTerminalCommand.NotifyCanExecuteChanged();
 
     /// <summary>
     /// First visit to the Files tab lands in the active session's cwd (else ~).
@@ -143,6 +166,35 @@ public partial class FilesViewModel : ViewModelBase
 
     /// <summary>Jump to the active terminal session's working directory.</summary>
     [RelayCommand] private void GoToSessionDir() => NavigateTo(NonEmpty(_sessionCwd()) ?? Home());
+
+    /// <summary>「在此打开终端」: cd the active terminal into the selected directory;
+    /// for a file, cd to its parent dir (we don't launch editors). No-op without a
+    /// selection or a live session.</summary>
+    [RelayCommand(CanExecute = nameof(CanSendToTerminal))]
+    private void OpenInTerminal(FileEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e is null || _openTerminalAt is null) return;
+        var dir = e.IsDirectory ? e.FullPath : Path.GetDirectoryName(e.FullPath);
+        if (string.IsNullOrEmpty(dir)) return;
+        _openTerminalAt(dir);
+        StatusText = $"终端已 cd → {dir}";
+    }
+
+    private bool CanSendToTerminal(FileEntry? entry)
+        => (entry ?? SelectedEntry) is not null && (_hasActiveSession?.Invoke() ?? true);
+
+    /// <summary>「复制路径」: absolute path of the selection to the clipboard.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task CopyPath(FileEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e is null) return;
+        if (_copyTextAsync is not null) await _copyTextAsync(e.FullPath);
+        StatusText = $"已复制 {e.FullPath}";
+    }
+
+    private bool HasSelection(FileEntry? entry) => (entry ?? SelectedEntry) is not null;
 
     [RelayCommand]
     private void NavigateCrumb(Crumb? crumb)

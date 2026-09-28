@@ -78,9 +78,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _sessions.Activate(value.Model);
     }
 
-    /// <summary>Active-session change also arms/disarms the popout toolbar button.</summary>
+    /// <summary>Active-session change arms/disarms popout + Files' terminal button.</summary>
     partial void OnActiveSessionChanged(TerminalSessionModel? value)
-        => OpenInNewWindowCommand.NotifyCanExecuteChanged();
+    {
+        OpenInNewWindowCommand.NotifyCanExecuteChanged();
+        Files.NotifySessionAvailability();
+    }
 
     /// <summary>Assign a session to a pane, keeping the two panes distinct.</summary>
     private void AssignToPane(int pane, TerminalSessionModel s)
@@ -150,7 +153,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
         Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.LocalAiAssistant(),
             msg => Dashboard.AppendOutput("info", msg, "codex"));
-        Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory);
+        Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory,
+            openTerminalAt: CdActiveSessionTo,
+            copyTextAsync: CopyTextToClipboardAsync,
+            hasActiveSession: () => ActiveSession is not null);
         Logs = new LogsViewModel(Dashboard, _sessionLog,
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
@@ -976,6 +982,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         UpdateCwdNavFlags();
         if (sendCd && ActiveSession.IsRunning)
             ActiveSession.Emulator.SendText($"cd {QuoteForShell(path)}\r");
+    }
+
+    /// <summary>Files「在此打开终端」target: real `cd` into the active PTY and
+    /// sync the CWD chrome (path bar / history / Files) via the same path the
+    /// toolbar ←/→ uses.</summary>
+    private void CdActiveSessionTo(string path)
+    {
+        if (ActiveSession is null) return;
+        ApplyDisplayedCwd(path, sendCd: true, recordHistory: true);
     }
 
     private static string QuoteForShell(string path)

@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 17:31 CST（Logs #27 click-jump-session 开 PR；#26 记完成） · 维护：Devin（PO）
+最后更新：2026-09-28 17:40 CST（Devin B Files open-in-terminal PR #31） · 维护：Devin（PO）
 
 ## 分工
 
@@ -28,6 +28,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #31 Files「在此打开终端」+「复制路径」（dir→cd / file→父目录 / 剪贴板）— Devin B · `feat/files-open-in-terminal`
 - [x] PR #29 会话快捷键 + ••• 菜单（Ctrl+W 关会话 / Ctrl+Tab 双向循环 / 复制 CWD）— Devin · `feat/session-shortcuts` · `main@6cc8405`
 - [x] PR #27 Logs 点击跳到会话（双击 / 「跳到会话」）— GLM · `feat/logs-click-jump-session` · `main@779de78`
 - [x] PR #26 Logs 按会话筛选记忆（切换恢复各自筛选）— GLM · `feat/logs-pin-session-filters` · `main@fe75b42`
