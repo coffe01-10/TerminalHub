@@ -102,7 +102,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _settings.SessionLogToFile,
             v => _settings.SessionLogToFile = v,
             copyToClipboard: CopyTextToClipboardAsync,
-            promptExportPath: PromptExportPathAsync);
+            promptExportPath: PromptExportPathAsync,
+            persistFilters: PersistLogsFilters);
+        // Replay the filters saved from the previous run (never writes back).
+        Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
+            _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
@@ -489,6 +493,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private void SaveSettingsInternal() => _settingsStore.Save(_settings);
+
+    /// <summary>Logs filter changed → copy into <see cref="_settings"/> and save
+    /// (small JSON; every change is fine, no debounce needed).</summary>
+    private void PersistLogsFilters()
+    {
+        _settings.LogsFilterText = Logs.FilterText;
+        _settings.LogsUseRegex = Logs.UseRegex;
+        _settings.LogsLevelFilterIndex = Logs.LevelFilterIndex;
+        _settings.LogsRetainHistoryOnClear = Logs.RetainHistoryOnClear;
+        SaveSettingsInternal();
+    }
 
     [RelayCommand]
     private void SubmitCommandInput()
