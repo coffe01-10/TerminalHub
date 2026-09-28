@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using Avalonia.Data.Converters;
+using Avalonia;
 using Avalonia.Media;
 using TerminalHub.Core.AI;
 using TerminalHub.Core.Logging;
@@ -149,6 +150,30 @@ public sealed class BoolToTextWrappingConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is TextWrapping.Wrap;
+}
+
+/// <summary>Logs.CompactDensity → list FontSize: on ≈8.5, off (default) 9.5.</summary>
+public sealed class BoolToLogsFontSizeConverter : IValueConverter
+{
+    public static readonly BoolToLogsFontSizeConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? 8.5 : 9.5;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is double d && d < 9.0;
+}
+
+/// <summary>Logs.CompactDensity → ListBoxItem Padding: on ≈2,0 · off (default) 4,1.</summary>
+public sealed class BoolToLogsItemPaddingConverter : IValueConverter
+{
+    public static readonly BoolToLogsItemPaddingConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? new Thickness(2, 0) : new Thickness(4, 1);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is Thickness t && t.Top < 1;
 }
 
 /// <summary>Logs list timestamp: values[0]=DateTime Time, values[1]=bool UseRelativeTimestamps → label.</summary>

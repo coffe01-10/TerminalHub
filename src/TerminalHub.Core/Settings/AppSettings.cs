@@ -58,6 +58,9 @@ public sealed class AppSettings
     /// <summary>Logs panel: wrap long message lines in the list (default on). Off = NoWrap for dense one-line scanning; horizontal scroll when needed.</summary>
     public bool LogsWrapLines { get; set; } = true;
 
+    /// <summary>Logs panel: compact list density (default off). On = smaller FontSize (~8.5) and tighter Padding (~2,0) for denser scanning.</summary>
+    public bool LogsCompactDensity { get; set; }
+
     /// <summary>Logs panel: ring-buffer capacity (UI presets 500 / 2000 / 5000; default 2000). Survives restarts.</summary>
     public int LogsBufferCapacity { get; set; } = 2000;
 

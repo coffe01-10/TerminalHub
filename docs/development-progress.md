@@ -4,7 +4,21 @@
 
 ## 2026-09-28
 
-### pending / next Deploy slice — 打包中实时耗时 + 复制上次成功产物路径 (`feat/deploy-live-elapsed-copy-path`)
+### pending — Logs 紧凑密度 toggle (`feat/logs-compact-density`) · PR #40
+- **「紧凑」chip**: 「换行」旁 `timechip` ToggleButton；关（默认）= FontSize 9.5 /
+  Padding 4,1；开 ≈ FontSize 8.5 / Padding 2,0。`Classes.compact` 绑
+  `Logs.CompactDensity`，ListBoxItem 样式刷新；行内 TextBlock /
+  `HighlightTextBlock` 经 `BoolToLogsFontSizeConverter` 同步字号。
+- **持久化**: 全局 `AppSettings.LogsCompactDensity`（默认 false）；经同一
+  `PersistLogsFilters` 落盘（与 wrap/relative 同路）；**不是** per-session。
+- **边界**: 只动 Logs + AppSettings；不动 Deploy/Files/SSH/Core PTY。
+- **验证**: 220 tests green（+2：SettingsStore 往返、MainWindow「紧凑」Toggle
+  默认关绑定 + compact class）。worktree `/workspace/TerminalHub-logs2`；
+  工具 Grok Build / Claude Code OK。
+- 截图 `docs/screenshots/logs-compact-density.png`（「紧凑」chip 可见且优选开）。
+  已对齐 `origin/main` @ `a6c34a6`（含 #37/#39）。
+
+### PR #37 — Deploy 打包中实时耗时 + 复制上次成功产物路径 (`feat/deploy-live-elapsed-copy-path`)
 - **实时耗时**: `IsPublishRunning` 时 Deploy 坞状态行显示 `打包中 · Ns` / `打包中 · NmNs`，
   基于真实 `_publishAttemptStartedAt`，`DispatcherTimer` ~1s 刷新；复用
   `LastPublishResults.FormatDuration` 风格（`FormatLiveElapsed`：0→`0s`）。结束后停表，
@@ -13,10 +27,9 @@
   「打开上次成功产物」一致（`CanOpen`）；点击经 `CopyTextToClipboardAsync` 写绝对路径，
   Output `source=deploy` 记「已复制产物路径 …」；目录消失则禁用/警告。
 - **验证**: `dotnet test -c Release` 212+ green；不动 Files/Logs/SSH。
-- 截图 `docs/screenshots/deploy-live-elapsed-copy-path.png`（DISPLAY=:7：Deploy 右键菜单
-  「复制上次成功产物路径」启用可见）。基线 `origin/main` @ `671b516`（含 #39）。
+- 截图 `docs/screenshots/deploy-live-elapsed-copy-path.png`。已合 `main@a6c34a6`。
 
-### pending — Logs 环形缓冲容量 presets (`feat/logs-buffer-capacity`)
+### PR #39 — Logs 环形缓冲容量 presets (`feat/logs-buffer-capacity`)
 - **「容量」chips**: 级别 /「相对」/「换行」旁（同 WrapPanel）`capchip` ToggleButton
   条 **500 / 2000 / 5000**；默认 **2000**。缩小容量会丢弃最旧行并刷新
   `Entries`；`StatusText`「缓冲容量 → N」。
@@ -29,7 +42,7 @@
   MainWindow capchip 绑定 + 截图）。worktree `/workspace/TerminalHub-logs2`；
   工具 Grok Build / Claude Code OK。
 - 截图 `docs/screenshots/logs-buffer-capacity.png`（「容量」+ 500/2000/5000 可见；
-  500 选中 + StatusText）。已合 `main@671b516`（#39）。
+  500 选中 + StatusText）。已合 `main@671b516`。
 
 ### PR #38 — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
 - **「换行」chip**: 级别 chip /「相对」旁 `timechip` ToggleButton；开（默认）=

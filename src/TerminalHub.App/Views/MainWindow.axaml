@@ -802,7 +802,7 @@
                     </ToggleButton.Styles>
                   </ToggleButton>
                 </Grid>
-                <!-- level filter: exclusive chip bar (全部/info/warn/error) + timestamp / wrap / 容量 -->
+                <!-- level filter: exclusive chip bar (全部/info/warn/error) + timestamp / wrap / compact / 容量 -->
                 <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
                   <ToggleButton Classes="levelchip" Content="全部"
                                 IsChecked="{Binding Logs.LevelAllSelected}"
@@ -824,6 +824,10 @@
                   <ToggleButton Classes="timechip" Content="换行" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.WrapLines}"
                                 ToolTip.Tip="换行：开（默认）=长消息自动折行；关=单行显示并允许横向滚动，便于密扫。"/>
+                  <!-- compact density: off(default)=FontSize 9.5 / Padding 4,1 · on≈8.5 / 2,0 -->
+                  <ToggleButton Classes="timechip" Content="紧凑" Margin="4,0,0,0"
+                                IsChecked="{Binding Logs.CompactDensity}"
+                                ToolTip.Tip="紧凑密度：关（默认）=字号 9.5 / 内边距 4,1；开=字号约 8.5 / 内边距约 2,0，便于密扫更多行。"/>
                   <!-- ring-buffer capacity presets (exclusive chips; default 2000) -->
                   <TextBlock Text="容量" FontSize="10" Foreground="#64748B"
                              VerticalAlignment="Center" Margin="10,0,4,0"
@@ -903,13 +907,19 @@
                              DoubleTapped="OnLogsEntryDoubleTapped"
                              KeyDown="OnLogsListKeyDown"
                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                             Background="Transparent" BorderThickness="0" Padding="4">
+                             Background="Transparent" BorderThickness="0" Padding="4"
+                             Classes.compact="{Binding Logs.CompactDensity}">
                       <ListBox.Styles>
+                        <!-- density: Classes.compact bound to Logs.CompactDensity refreshes Padding/FontSize -->
                         <Style Selector="ListBoxItem">
                           <Setter Property="Padding" Value="4,1"/>
                           <Setter Property="Background" Value="Transparent"/>
                           <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                           <Setter Property="FontSize" Value="9.5"/>
+                        </Style>
+                        <Style Selector="ListBox.compact ListBoxItem">
+                          <Setter Property="Padding" Value="2,0"/>
+                          <Setter Property="FontSize" Value="8.5"/>
                         </Style>
                       </ListBox.Styles>
                       <ListBox.ItemTemplate>
@@ -917,7 +927,8 @@
                           <!-- Message and Source reuse the Search tab's highlighter:
                                literal case-insensitive, or regex when the .* toggle is on. -->
                           <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Foreground="#64748B">
+                            <TextBlock Foreground="#64748B"
+                                       FontSize="{Binding $parent[ListBox].DataContext.Logs.CompactDensity, Converter={x:Static vm:BoolToLogsFontSizeConverter.Instance}}">
                               <TextBlock.Text>
                                 <MultiBinding Converter="{x:Static vm:LogTimestampConverter.Instance}">
                                   <Binding Path="Time"/>
@@ -926,12 +937,15 @@
                               </TextBlock.Text>
                             </TextBlock>
                             <TextBlock Text="{Binding Level, StringFormat='[{0}]'}"
+                                       FontSize="{Binding $parent[ListBox].DataContext.Logs.CompactDensity, Converter={x:Static vm:BoolToLogsFontSizeConverter.Instance}}"
                                        Foreground="{Binding Level, Converter={x:Static vm:LogLevelConverter.Instance}}"/>
                             <ctl:HighlightTextBlock LineText="{Binding Source, StringFormat='({0})'}" Foreground="#7C8AA5"
+                                                    FontSize="{Binding $parent[ListBox].DataContext.Logs.CompactDensity, Converter={x:Static vm:BoolToLogsFontSizeConverter.Instance}}"
                                                     Query="{Binding $parent[ListBox].DataContext.Logs.FilterText}"
                                                     UseRegex="{Binding $parent[ListBox].DataContext.Logs.UseRegex}"
                                                     IsVisible="{Binding Source, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
                             <ctl:HighlightTextBlock LineText="{Binding Message}" Foreground="#CBD5E1"
+                                                    FontSize="{Binding $parent[ListBox].DataContext.Logs.CompactDensity, Converter={x:Static vm:BoolToLogsFontSizeConverter.Instance}}"
                                                     TextWrapping="{Binding $parent[ListBox].DataContext.Logs.WrapLines, Converter={x:Static vm:BoolToTextWrappingConverter.Instance}}"
                                                     Query="{Binding $parent[ListBox].DataContext.Logs.FilterText}"
                                                     UseRegex="{Binding $parent[ListBox].DataContext.Logs.UseRegex}"/>
