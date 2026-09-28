@@ -104,8 +104,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly HashSet<Guid> _publishIds = new();
     private int _publishStarting;
 
-    /// <summary>Per-session CWD back/forward stacks (keyed by session id).</summary>
+    /// <summary>Per-session CWD back/forward stacks (keyed by session id).
+    /// Mutated from UI (nav commands), PTY thread (OSC 7) and monitor thread
+    /// (poll) — all accesses go under this lock.</summary>
     private readonly Dictionary<Guid, CwdHistory> _cwdHistories = new();
+    private readonly object _cwdLock = new();
 
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
@@ -608,12 +611,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private CwdHistory HistoryFor(TerminalSessionModel s)
     {
-        if (!_cwdHistories.TryGetValue(s.Id, out var h))
+        lock (_cwdLock)
         {
-            h = new CwdHistory();
-            _cwdHistories[s.Id] = h;
+            if (!_cwdHistories.TryGetValue(s.Id, out var h))
+            {
+                h = new CwdHistory();
+                _cwdHistories[s.Id] = h;
+            }
+            return h;
         }
-        return h;
     }
 
     private void UpdateBreadcrumbFrom(string? cwd)
@@ -633,8 +639,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
         var h = HistoryFor(ActiveSession);
-        CanCwdBack = h.CanGoBack;
-        CanCwdForward = h.CanGoForward;
+        lock (_cwdLock)
+        {
+            CanCwdBack = h.CanGoBack;
+            CanCwdForward = h.CanGoForward;
+        }
     }
 
     private void OnSessionCwdReported(TerminalSessionModel s, string path)
@@ -642,8 +651,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(path)) return;
         path = CwdHistory.Normalize(path);
         if (path.Length == 0) return;
-        s.WorkingDirectory = path;
-        HistoryFor(s).Push(path);
+        lock (_cwdLock)
+        {
+            s.WorkingDirectory = path;
+            HistoryFor(s).Push(path);
+        }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             if (!ReferenceEquals(ActiveSession, s)) return;
@@ -667,7 +679,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void CwdBack()
     {
         if (ActiveSession is null) return;
-        var path = HistoryFor(ActiveSession).Back();
+        string? path;
+        lock (_cwdLock) path = HistoryFor(ActiveSession).Back();
         if (path is null) return;
         ApplyDisplayedCwd(path, sendCd: true, recordHistory: false);
     }
@@ -676,7 +689,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void CwdForward()
     {
         if (ActiveSession is null) return;
-        var path = HistoryFor(ActiveSession).Forward();
+        string? path;
+        lock (_cwdLock) path = HistoryFor(ActiveSession).Forward();
         if (path is null) return;
         ApplyDisplayedCwd(path, sendCd: true, recordHistory: false);
     }
@@ -686,9 +700,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (ActiveSession is null) return;
         path = CwdHistory.Normalize(path);
         if (path.Length == 0) return;
-        ActiveSession.WorkingDirectory = path;
-        if (recordHistory)
-            HistoryFor(ActiveSession).Push(path);
+        lock (_cwdLock)
+        {
+            ActiveSession.WorkingDirectory = path;
+            if (recordHistory)
+                HistoryFor(ActiveSession).Push(path);
+        }
         UpdateBreadcrumbFrom(path);
         Files.NavigateTo(path);
         UpdateCwdNavFlags();
@@ -816,6 +833,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void OnSampled(ISystemMonitor m)
     {
         _statusCpu.Add(m.Current.CpuPercent);
+        PollCwdChanges();
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             RefreshCounts();
@@ -823,6 +841,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             MemText = $"内存 {FmtGb(m.Current.MemoryUsedBytes)} / {FmtGb(m.Current.MemoryTotalBytes)}";
             StatusSpark = _statusCpu.ToArray();
         });
+    }
+
+    /// <summary>Poll every session's real CWD (Linux /proc/&lt;pid&gt;/cwd) once per
+    /// monitor tick — bash doesn't emit OSC 7 by default, so this is how a plain
+    /// `cd` keeps the toolbar path + per-session history fresh.</summary>
+    private void PollCwdChanges()
+    {
+        foreach (var s in _sessions.Sessions)
+        {
+            var probed = ProcessCwd.TryRead(s.Pty);
+            if (string.IsNullOrEmpty(probed)) continue;
+            var norm = CwdHistory.Normalize(probed);
+            if (norm.Length == 0) continue;
+            lock (_cwdLock)
+            {
+                if (string.Equals(CwdHistory.Normalize(s.WorkingDirectory), norm,
+                        StringComparison.Ordinal))
+                    continue;
+            }
+            OnSessionCwdReported(s, norm);
+        }
     }
 
     public static string FmtGb(double bytes) => $"{bytes / (1024.0 * 1024 * 1024):0.0} GB";

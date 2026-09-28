@@ -65,6 +65,8 @@ public class ToolbarCwdNavTests
             emu.Parser.Feed($"\u001b]7;file://{fullB}\u0007");
             await Until(() => string.Equals(
                 CwdNorm(vm.ActiveSession.WorkingDirectory), CwdNorm(fullB), StringComparison.Ordinal));
+            // CanCwdBack/CanCwdForward update on the UI thread (posted) — wait for it.
+            await Until(() => vm.CanCwdBack);
 
             Assert.True(vm.CanCwdBack);
             Assert.False(vm.CanCwdForward);
