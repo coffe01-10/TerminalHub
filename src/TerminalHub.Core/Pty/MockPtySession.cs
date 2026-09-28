@@ -14,6 +14,7 @@ public sealed class MockPtySession : IPtySession
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsRunning { get; private set; }
     public int? ExitCode { get; private set; }
+    public int? ProcessId => null;
 
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
     public event Action<IPtySession, int>? Exited;

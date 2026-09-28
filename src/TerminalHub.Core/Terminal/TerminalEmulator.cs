@@ -23,6 +23,12 @@ public sealed class TerminalEmulator : IDisposable
         remove => Buffer.TitleChanged -= value;
     }
 
+    public event Action<string>? CwdChanged
+    {
+        add => Buffer.CwdChanged += value;
+        remove => Buffer.CwdChanged -= value;
+    }
+
     public TerminalEmulator(IPtySession? pty = null, int columns = 120, int rows = 30)
     {
         Buffer = new ScreenBuffer(columns, rows);

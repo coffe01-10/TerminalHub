@@ -447,8 +447,48 @@ public sealed class VtParser
             case 8: break;   // hyperlink — ignore payload
             case 9: case 777: break; // notifications
             case 4: break;   // palette query/set
-            case 7: break;   // cwd report (OSC 7) — could track cwd
+            case 7: // cwd report (OSC 7) — file://host/path or absolute path
+                if (TryParseOsc7(text, out var cwd))
+                    _buffer.SetCwd(cwd);
+                break;
             default: break;
         }
     }
+
+    /// <summary>Parse OSC 7 payload: <c>file://host/path</c>, <c>file:///path</c>, or a bare absolute path.</summary>
+    public static bool TryParseOsc7(string text, out string cwd)
+    {
+        cwd = "";
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        text = text.Trim();
+        // Bare absolute path (some shells).
+        if (text.StartsWith('/') || (text.Length >= 3 && char.IsLetter(text[0]) && text[1] == ':'))
+        {
+            cwd = text;
+            return true;
+        }
+        if (!text.StartsWith("file:", StringComparison.OrdinalIgnoreCase)) return false;
+        try
+        {
+            if (Uri.TryCreate(text, UriKind.Absolute, out var uri))
+            {
+                // file:///path → LocalPath; file://host/path → AbsolutePath
+                // (LocalPath becomes a UNC-looking \\host\path on some runtimes).
+                var candidate = uri.Host.Length > 0 && uri.Host is not "localhost" and not "127.0.0.1"
+                    ? uri.AbsolutePath
+                    : (uri.IsFile ? uri.LocalPath : uri.AbsolutePath);
+                if (candidate.StartsWith("\\", StringComparison.Ordinal)
+                    || candidate.StartsWith("//", StringComparison.Ordinal))
+                    candidate = uri.AbsolutePath;
+                cwd = Uri.UnescapeDataString(candidate);
+                // AbsolutePath is always /-separated; normalize to OS separators.
+                if (Path.DirectorySeparatorChar != '/')
+                    cwd = cwd.Replace('/', Path.DirectorySeparatorChar);
+                return cwd.Length > 0;
+            }
+        }
+        catch (UriFormatException) { }
+        return false;
+    }
+
 }

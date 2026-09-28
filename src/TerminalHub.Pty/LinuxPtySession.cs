@@ -23,6 +23,7 @@ public sealed class LinuxPtySession : IPtySession
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsRunning { get; private set; }
     public int? ExitCode { get; private set; }
+    public int? ProcessId => _childPid > 0 ? _childPid : null;
 
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
     public event Action<IPtySession, int>? Exited;

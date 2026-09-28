@@ -28,6 +28,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _workspaceName;
     [ObservableProperty] private string _statusLine = "";
     [ObservableProperty] private string _breadcrumb = "";
+    [ObservableProperty] private bool _canCwdBack;
+    [ObservableProperty] private bool _canCwdForward;
     [ObservableProperty] private bool _assistantMode;
     [ObservableProperty] private int _terminalCount;
     [ObservableProperty] private int _runningCount;
@@ -101,6 +103,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Publish sessions we spawned, so exit can be reported once.</summary>
     private readonly HashSet<Guid> _publishIds = new();
     private int _publishStarting;
+
+    /// <summary>Per-session CWD back/forward stacks (keyed by session id).</summary>
+    private readonly Dictionary<Guid, CwdHistory> _cwdHistories = new();
 
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
@@ -600,6 +605,104 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SaveSettingsInternal();
     }
 
+
+    private CwdHistory HistoryFor(TerminalSessionModel s)
+    {
+        if (!_cwdHistories.TryGetValue(s.Id, out var h))
+        {
+            h = new CwdHistory();
+            _cwdHistories[s.Id] = h;
+        }
+        return h;
+    }
+
+    private void UpdateBreadcrumbFrom(string? cwd)
+    {
+        Breadcrumb = string.IsNullOrEmpty(cwd)
+            ? ""
+            : (OperatingSystem.IsWindows()
+                ? cwd.Replace('\\', '〉').Replace("〉", " > ")
+                : "~/" + System.IO.Path.GetFileName(cwd));
+    }
+
+    private void UpdateCwdNavFlags()
+    {
+        if (ActiveSession is null)
+        {
+            CanCwdBack = CanCwdForward = false;
+            return;
+        }
+        var h = HistoryFor(ActiveSession);
+        CanCwdBack = h.CanGoBack;
+        CanCwdForward = h.CanGoForward;
+    }
+
+    private void OnSessionCwdReported(TerminalSessionModel s, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        path = CwdHistory.Normalize(path);
+        if (path.Length == 0) return;
+        s.WorkingDirectory = path;
+        HistoryFor(s).Push(path);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(ActiveSession, s)) return;
+            UpdateBreadcrumbFrom(path);
+            UpdateCwdNavFlags();
+        });
+    }
+
+    /// <summary>Re-read the active session CWD (Linux /proc if possible) and sync toolbar + Files.</summary>
+    [RelayCommand]
+    private void RefreshCwd()
+    {
+        if (ActiveSession is null) return;
+        var probed = ProcessCwd.TryRead(ActiveSession.Pty);
+        var path = !string.IsNullOrEmpty(probed) ? probed! : ActiveSession.WorkingDirectory;
+        if (string.IsNullOrEmpty(path)) return;
+        ApplyDisplayedCwd(path, sendCd: false, recordHistory: true);
+    }
+
+    [RelayCommand]
+    private void CwdBack()
+    {
+        if (ActiveSession is null) return;
+        var path = HistoryFor(ActiveSession).Back();
+        if (path is null) return;
+        ApplyDisplayedCwd(path, sendCd: true, recordHistory: false);
+    }
+
+    [RelayCommand]
+    private void CwdForward()
+    {
+        if (ActiveSession is null) return;
+        var path = HistoryFor(ActiveSession).Forward();
+        if (path is null) return;
+        ApplyDisplayedCwd(path, sendCd: true, recordHistory: false);
+    }
+
+    private void ApplyDisplayedCwd(string path, bool sendCd, bool recordHistory)
+    {
+        if (ActiveSession is null) return;
+        path = CwdHistory.Normalize(path);
+        if (path.Length == 0) return;
+        ActiveSession.WorkingDirectory = path;
+        if (recordHistory)
+            HistoryFor(ActiveSession).Push(path);
+        UpdateBreadcrumbFrom(path);
+        Files.NavigateTo(path);
+        UpdateCwdNavFlags();
+        if (sendCd && ActiveSession.IsRunning)
+            ActiveSession.Emulator.SendText($"cd {QuoteForShell(path)}\r");
+    }
+
+    private static string QuoteForShell(string path)
+    {
+        if (OperatingSystem.IsWindows())
+            return "\"" + path.Replace("\"", "\"\"") + "\"";
+        return "'" + path.Replace("'", "'\\''") + "'";
+    }
+
     [RelayCommand]
     private void SubmitCommandInput()
     {
@@ -650,6 +753,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         _sessionNames[s.Id] = s.Name;
         s.Pty.OutputReceived += OnPtyOutput;
+        if (!string.IsNullOrEmpty(s.WorkingDirectory))
+            HistoryFor(s).Push(s.WorkingDirectory);
+        s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             var card = new SessionCardViewModel(s);
@@ -665,6 +771,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         s.Pty.OutputReceived -= OnPtyOutput;
         _lineDecoders.Remove(s.Id);
         _sessionNames.Remove(s.Id);
+        _cwdHistories.Remove(s.Id);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             if (IsSplit)
@@ -694,10 +801,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!ReferenceEquals(ActiveCard, target))
             ActiveCard = target;
         Dashboard.RefreshSearch();
-        var cwd = ActiveSession?.WorkingDirectory ?? "";
-        Breadcrumb = string.IsNullOrEmpty(cwd)
-            ? ""
-            : (OperatingSystem.IsWindows() ? cwd.Replace('\\', '〉').Replace("〉", " > ") : "~/" + System.IO.Path.GetFileName(cwd));
+        UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
+        UpdateCwdNavFlags();
     }
 
     private void RefreshCounts()
