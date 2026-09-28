@@ -4,7 +4,7 @@
 
 ## 2026-09-28
 
-### PR ? — 工具栏 CWD 真动作 ⟳/←/→ (`feat/toolbar-cwd-nav`)
+### PR #21 — 工具栏 CWD 真动作 ⟳/←/→ (`feat/toolbar-cwd-nav`)
 - **真实 CWD 链路**:`IPtySession.ProcessId`(Linux forkpty 子 pid /
   ConPTY process id / Mock null)+ `ProcessCwd.TryRead`(Linux 读
   `/proc/<pid>/cwd`,读不到回退会话记录值);同时解析 **OSC 7**
