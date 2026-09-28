@@ -254,6 +254,24 @@ public partial class MainWindow : Window
         }
     }
 
+
+    /// <summary>Double-click a log row → activate the session named in Source.
+    /// Prefer double-click over single-click so match-nav selection stays usable.</summary>
+    private void OnLogsEntryDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Control c && c.DataContext is LogEntry entry)
+            Vm.Logs.JumpToSessionEntry(entry);
+    }
+
+    private void OnLogsListKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            Vm.Logs.JumpToSessionCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     private void OnAssistantInputKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)

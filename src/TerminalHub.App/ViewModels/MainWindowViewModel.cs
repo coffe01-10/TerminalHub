@@ -157,10 +157,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             v => _settings.SessionLogToFile = v,
             copyToClipboard: CopyTextToClipboardAsync,
             promptExportPath: PromptExportPathAsync,
-            persistFilters: PersistLogsFilters);
-        // Replay the filters saved from the previous run (never writes back).
+            persistFilters: PersistLogsFilters,
+            activateSession: TryActivateSessionByName);
+        // Replay the filters saved from the previous run (never writes back):
+        // the global combo for「全部会话」, plus each named session's own memory.
         Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
             _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear);
+        Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
@@ -314,6 +317,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (card is null) return;
         _sessions.Activate(card.Model);
+    }
+
+    /// <summary>Logs jump-to-session: activate the card whose name matches
+    /// <paramref name="name"/>. Keeps the Logs tab open (does not touch
+    /// <see cref="SelectedRightTab"/>). Unknown / missing → false.</summary>
+    private bool TryActivateSessionByName(string name)
+    {
+        var card = SessionCards.FirstOrDefault(c =>
+            string.Equals(c.Name, name, StringComparison.Ordinal));
+        if (card is null) return false;
+        _sessions.Activate(card.Model);
+        return true;
     }
 
     [RelayCommand]
@@ -845,13 +860,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SaveSettingsInternal() => _settingsStore.Save(_settings);
 
     /// <summary>Logs filter changed → copy into <see cref="_settings"/> and save
-    /// (small JSON; every change is fine, no debounce needed).</summary>
+    /// (small JSON; every change is fine, no debounce needed). The global fields keep
+    /// 「全部会话」's last known combo; named sessions persist in their own map.</summary>
     private void PersistLogsFilters()
     {
-        _settings.LogsFilterText = Logs.FilterText;
-        _settings.LogsUseRegex = Logs.UseRegex;
-        _settings.LogsLevelFilterIndex = Logs.LevelFilterIndex;
-        _settings.LogsRetainHistoryOnClear = Logs.RetainHistoryOnClear;
+        var global = Logs.SnapshotGlobalFilters();
+        _settings.LogsFilterText = global.FilterText;
+        _settings.LogsUseRegex = global.UseRegex;
+        _settings.LogsLevelFilterIndex = global.LevelFilterIndex;
+        _settings.LogsRetainHistoryOnClear = global.RetainHistoryOnClear;
+        _settings.LogsSessionFilters = Logs.SnapshotSessionFilters();
         SaveSettingsInternal();
     }
 

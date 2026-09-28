@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TerminalHub.Core.Logging;
+using TerminalHub.Core.Settings;
 
 namespace TerminalHub.App.ViewModels;
 
@@ -29,11 +30,23 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     private readonly Func<string, Task>? _copyToClipboard;
     private readonly Func<Task<string?>>? _promptExportPath;
     private readonly Action? _persistFilters;
+    /// <summary>Host activates a session by card name; returns false when unknown.</summary>
+    private readonly Func<string, bool>? _activateSession;
     private readonly int _capacity;
 
-    /// <summary>True while <see cref="ApplyPersistedFilters"/> is replaying saved values —
-    /// suppresses the write-back so a load never triggers a save.</summary>
+    /// <summary>True while saved values are being replayed (<see cref="ApplyPersistedFilters"/>
+    /// or a session-switch restore) — suppresses the write-back so a load never triggers a save.</summary>
     private bool _restoringFilters;
+
+    /// <summary>Per-session filter memory: session name → its last filter combo
+    /// (seeded from settings via <see cref="ApplySessionFilterMap"/>). Survives
+    /// <see cref="RefreshSessions"/> rebinding — entries are only ever added/replaced.</summary>
+    private readonly Dictionary<string, LogsSessionFilterState> _sessionFilters = new();
+
+    /// <summary>「全部会话」(dropdown index 0)'s remembered combo — the global fallback.
+    /// Kept in the VM (not read live) so it stays correct even while a named
+    /// session's filters are showing.</summary>
+    private LogsSessionFilterState _globalFilters = new();
 
     /// <summary>Deep history of session lines; independent of Output's display cap.</summary>
     private readonly List<LogEntry> _buffer = [];
@@ -133,7 +146,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         int bufferCapacity = DefaultBufferCapacity,
         Func<string, Task>? copyToClipboard = null,
         Func<Task<string?>>? promptExportPath = null,
-        Action? persistFilters = null)
+        Action? persistFilters = null,
+        Func<string, bool>? activateSession = null)
     {
         _dashboard = dashboard;
         _file = file;
@@ -144,6 +158,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _copyToClipboard = copyToClipboard;
         _promptExportPath = promptExportPath;
         _persistFilters = persistFilters;
+        _activateSession = activateSession;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Entries.CollectionChanged += OnEntriesChanged;
         Refilter();
@@ -151,7 +166,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Restore the filter state saved from a previous run (level index clamped to
-    /// the bar). The restore itself never writes back: <see cref="PersistFilters"/> is
+    /// the bar). The restore itself never writes back: <see cref="SaveCurrentFilters"/> is
     /// suppressed while applying, so loading cannot trigger a save.</summary>
     public void ApplyPersistedFilters(string? filterText, bool useRegex, int levelFilterIndex, bool retainHistoryOnClear)
     {
@@ -164,7 +179,50 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             RetainHistoryOnClear = retainHistoryOnClear;
         }
         finally { _restoringFilters = false; }
+        // These are「全部会话」's globals (startup always selects index 0) — remember
+        // them as that slot's combo so switching back to index 0 restores them.
+        if (SessionFilterIndex == 0)
+            _globalFilters = CurrentFilterState();
     }
+
+    /// <summary>Seed the per-session filter memory (session name → last combo), as loaded
+    /// from settings. Replaces any previous seed; entries are cloned so the VM never
+    /// aliases the settings objects.</summary>
+    public void ApplySessionFilterMap(IReadOnlyDictionary<string, LogsSessionFilterState>? map)
+    {
+        _sessionFilters.Clear();
+        if (map is null) return;
+        foreach (var (name, state) in map)
+        {
+            if (string.IsNullOrEmpty(name) || state is null) continue; // corrupt JSON — skip
+            _sessionFilters[name] = Clone(state);
+        }
+    }
+
+    /// <summary>Copy of the per-session filter map (for persistence).</summary>
+    public Dictionary<string, LogsSessionFilterState> SnapshotSessionFilters()
+        => _sessionFilters.ToDictionary(kv => kv.Key, kv => Clone(kv.Value));
+
+    /// <summary>Copy of「全部会话」's remembered combo — the global-slot values
+    /// <c>AppSettings.LogsFilterText</c> &amp; co. persist.</summary>
+    public LogsSessionFilterState SnapshotGlobalFilters() => Clone(_globalFilters);
+
+    /// <summary>The currently visible filter combo as a persistable snapshot.</summary>
+    private LogsSessionFilterState CurrentFilterState() => new()
+    {
+        FilterText = FilterText,
+        UseRegex = UseRegex,
+        LevelFilterIndex = LevelFilterIndex,
+        RetainHistoryOnClear = RetainHistoryOnClear,
+    };
+
+    private static LogsSessionFilterState Clone(LogsSessionFilterState s) => new()
+    {
+        FilterText = s.FilterText,
+        UseRegex = s.UseRegex,
+        LevelFilterIndex = s.LevelFilterIndex,
+        RetainHistoryOnClear = s.RetainHistoryOnClear,
+    };
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -264,21 +322,70 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             if (Matches(e)) Entries.Add(e);
     }
 
-    partial void OnFilterTextChanged(string value) { UpdateRegex(); Refilter(); PersistFilters(); }
-    partial void OnUseRegexChanged(bool value) { UpdateRegex(); Refilter(); PersistFilters(); }
+    partial void OnFilterTextChanged(string value) { UpdateRegex(); Refilter(); SaveCurrentFilters(); }
+    partial void OnUseRegexChanged(bool value) { UpdateRegex(); Refilter(); SaveCurrentFilters(); }
     partial void OnLevelFilterIndexChanged(int value)
     {
         Refilter();
         foreach (var chip in LevelChipProps) OnPropertyChanged(chip);
-        PersistFilters();
+        SaveCurrentFilters();
     }
-    partial void OnSessionFilterIndexChanged(int value) => Refilter();
-    partial void OnRetainHistoryOnClearChanged(bool value) => PersistFilters();
+    partial void OnRetainHistoryOnClearChanged(bool value) => SaveCurrentFilters();
 
-    /// <summary>Filter change → save callback (wired by MainWindowViewModel to settings + disk).</summary>
-    private void PersistFilters()
+    /// <summary>Session switch → swap the visible combo to the new selection's remembered
+    /// state. Nothing needs saving on the way out: every filter change (and every
+    /// restore) leaves the outgoing selection's slot holding exactly its combo, so the
+    /// map is already current. (Saving here by index would also be wrong —
+    /// <see cref="RefreshSessions"/> rebinds names before setting the index.)</summary>
+    partial void OnSessionFilterIndexChanged(int value)
     {
-        if (!_restoringFilters) _persistFilters?.Invoke();
+        RestoreFiltersFor(value);
+        Refilter();
+    }
+
+    /// <summary>Restore the filter combo belonging to <paramref name="index"/>: its map
+    /// entry for a named session (defaults when never configured), or
+    /// <see cref="_globalFilters"/> for「全部会话」. Suppressed via
+    /// <see cref="_restoringFilters"/> so the restore itself never writes back or loops.</summary>
+    private void RestoreFiltersFor(int index)
+    {
+        var name = index > 0 && index < SessionNames.Count ? SessionNames[index] : null;
+        LogsSessionFilterState? saved = null;
+        if (name is not null)
+            _sessionFilters.TryGetValue(name, out saved);
+        else if (index == 0)
+            saved = _globalFilters;
+        var restore = saved ?? new LogsSessionFilterState();
+        _restoringFilters = true;
+        try
+        {
+            FilterText = restore.FilterText;
+            UseRegex = restore.UseRegex;
+            LevelFilterIndex = Math.Clamp(restore.LevelFilterIndex, 0, LevelNames.Length);
+            RetainHistoryOnClear = restore.RetainHistoryOnClear;
+        }
+        finally { _restoringFilters = false; }
+        // Brief hint when a named session's saved (non-default) combo came back.
+        if (name is not null && saved is not null && IsNonDefault(saved))
+            StatusText = $"已恢复「{name}」筛选";
+    }
+
+    private static bool IsNonDefault(LogsSessionFilterState s)
+        => !string.IsNullOrEmpty(s.FilterText) || s.UseRegex
+           || s.LevelFilterIndex != 0 || s.RetainHistoryOnClear;
+
+    /// <summary>Filter change → record the combo under the active selection's key
+    /// (its map entry for a named session, <see cref="_globalFilters"/> for
+    /// 「全部会话」), then hand it to the save callback (wired by MainWindowViewModel
+    /// to settings + disk).</summary>
+    private void SaveCurrentFilters()
+    {
+        if (_restoringFilters) return;
+        if (SessionFilterIndex == 0)
+            _globalFilters = CurrentFilterState();
+        else if (SessionFilterIndex > 0 && SessionFilterIndex < SessionNames.Count)
+            _sessionFilters[SessionNames[SessionFilterIndex]] = CurrentFilterState();
+        _persistFilters?.Invoke();
     }
 
     private void UpdateRegex()
@@ -437,7 +544,43 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Rebuild the session-name filter list (call when sessions change).</summary>
+
+    /// <summary>「跳到会话」: activate the session named in the selected entry's
+    /// <see cref="LogEntry.Source"/>. Missing/unknown source → status note, no crash.
+    /// The host keeps the Logs tab open (activation only flips ActiveSession/card).</summary>
+    [RelayCommand]
+    private void JumpToSession() => JumpToSessionEntry(SelectedEntry);
+
+    /// <summary>Double-click / Enter path — jump using the tapped entry (not just
+    /// the current selection), so a double-tap does not fight match-nav selection.</summary>
+    public void JumpToSessionEntry(LogEntry? entry)
+    {
+        if (entry is null)
+        {
+            StatusText = "没有选中的日志行";
+            return;
+        }
+        var source = entry.Source;
+        if (string.IsNullOrEmpty(source))
+        {
+            StatusText = "该行没有会话来源";
+            return;
+        }
+        if (_activateSession is null)
+        {
+            StatusText = $"无法跳到「{source}」";
+            return;
+        }
+        if (_activateSession(source))
+            StatusText = $"已跳到「{source}」";
+        else
+            StatusText = $"未找到会话「{source}」";
+    }
+
+    /// <summary>Rebuild the session-name filter list (call when sessions change). The
+    /// selection follows its name; when the rebind lands on a different index, the new
+    /// selection's filters are restored as with any switch. The per-session filter
+    /// map is never cleared here — dropped sessions simply keep their entry.</summary>
     public void RefreshSessions()
     {
         var selected = SessionFilterIndex > 0 && SessionFilterIndex < SessionNames.Count

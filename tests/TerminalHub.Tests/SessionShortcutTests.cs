@@ -94,7 +94,7 @@ public class SessionShortcutTests
         var (window, vm) = await Boot();
         var count = vm.SessionCards.Count;
 
-        window.KeyPress(Avalonia.Input.Key.W, Avalonia.Input.RawInputModifiers.Control);
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.W, Avalonia.Input.RawInputModifiers.Control);
         await Task.Delay(300);
 
         Assert.Equal(count - 1, vm.SessionCards.Count);
@@ -109,11 +109,11 @@ public class SessionShortcutTests
         var cards = vm.SessionCards.ToList();
         var startIdx = cards.IndexOf(vm.ActiveCard!);
 
-        window.KeyPress(Avalonia.Input.Key.Tab, Avalonia.Input.RawInputModifiers.Control);
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Tab, Avalonia.Input.RawInputModifiers.Control);
         await Task.Delay(150);
         Assert.Same(cards[(startIdx + 1) % cards.Count], vm.ActiveCard);
 
-        window.KeyPress(Avalonia.Input.Key.Tab,
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Tab,
             Avalonia.Input.RawInputModifiers.Control | Avalonia.Input.RawInputModifiers.Shift);
         await Task.Delay(150);
         Assert.Same(cards[startIdx], vm.ActiveCard);
