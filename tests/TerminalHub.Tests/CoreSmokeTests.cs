@@ -79,10 +79,10 @@ public class CoreSmokeTests
     }
 
     [Fact]
-    public void MockAiAssistant_HasChecklistAndSuggestions()
+    public void LocalAiAssistant_HasChecklistAndSuggestions()
     {
-        using var ai = new MockAiAssistant();
-        Assert.Equal(5, ai.Checklist.Count);
+        var ai = new LocalAiAssistant();
+        Assert.NotEmpty(ai.Checklist);
         Assert.NotEmpty(ai.Suggestions);
         Assert.Contains(ai.Checklist, c => c.State == ChecklistState.Active);
     }

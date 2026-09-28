@@ -20,9 +20,13 @@ public sealed record SuggestedTask
     public string Icon { get; init; } = "📁";
 }
 
+/// <summary>A chat row in the Codex panel (sender label + text).</summary>
+public sealed record ChatMessage(string Sender, string Text);
+
 /// <summary>
-/// AI assistant hook. MVP ships a mock; a real provider can implement this later.
-/// No paid API calls are allowed in the default build.
+/// AI assistant hook. The default build ships a deterministic local
+/// implementation (<see cref="LocalAiAssistant"/>); a real provider can
+/// implement this later. No paid API calls are allowed in the default build.
 /// </summary>
 public interface IAiAssistant
 {
@@ -31,15 +35,19 @@ public interface IAiAssistant
 
     IReadOnlyList<ChecklistItem> Checklist { get; }
     IReadOnlyList<SuggestedTask> Suggestions { get; }
+    IReadOnlyList<ChatMessage> Messages { get; }
 
     /// <summary>0-100 progress for the center progress bar, or null when idle.</summary>
     int? ProgressPercent { get; }
 
     event Action? Changed;
 
-    /// <summary>Submit natural-language task text ("描述你想做的任务…").</summary>
-    Task SubmitTaskAsync(string text, CancellationToken cancellationToken = default);
+    /// <summary>Submit natural-language task text ("描述你想做的任务…"). Returns the reply.</summary>
+    Task<string> SubmitTaskAsync(string text, CancellationToken cancellationToken = default);
 
-    /// <summary>Accept a suggestion (starts mock execution).</summary>
-    Task RunSuggestionAsync(SuggestedTask task, CancellationToken cancellationToken = default);
+    /// <summary>Accept a suggestion → checklist item. Returns the reply.</summary>
+    Task<string> RunSuggestionAsync(SuggestedTask task, CancellationToken cancellationToken = default);
+
+    /// <summary>Toggle a checklist item's done state by index.</summary>
+    void ToggleItem(int index);
 }

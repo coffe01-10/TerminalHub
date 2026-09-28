@@ -4,6 +4,34 @@
 
 ## 2026-09-28
 
+### PR #13 — Codex 本地助手 + Problems 真实计数 (`feat/codex-problems`)
+- **LocalAiAssistant** 替换 MockAiAssistant（删掉定时器假进度）：确定性规则
+  回复、无网络/付费 API。清单是真实可变状态源 —— `ProgressPercent =
+  done/total` 直接驱动中部进度条；`Changed` 事件刷新 UI。
+- **任务清单三态**: done/active/pending；点击行即可 Done↔Pending 勾选；
+  无 active 时新加入项自动激活。中部进度条（`Assistant.ProgressPercent`）
+  与清单实时联动。
+- **建议任务**: 卡片整卡可点 → `RunSuggestionAsync` 追加清单项（pending，
+  空档时激活）+ Output 记录 `Codex: 已将「…」加入任务清单`。
+- **NL 输入双入口**: 右栏「描述你想做的任务…」+ 中部「输入命令，或 ? 开头
+  向 Codex 提问…」(`?`/`ai:` 前缀走助手，其余仍是 shell 命令）。回复追加到
+  Codex 面板消息区（你/Codex 行）与 Output（`Codex 收到任务` + `Codex:` 行），
+  关键词命中本地模板（test/deploy/ssh/日志/文件/重构），否则按标点拆成 ≤4 步
+  加入清单。
+- **Problems 真计数**: `LineClassifier`(Core.GeneratedRegex）启发式分类：
+  error/exception/fatal/failed/command not found/permission denied/no such
+  file/`exit code 2`/`exit_code_1`/`exited with 3`/中文错误词 → error;
+  warn/deprecated → warn。Problems 只收 error 级，徽章=真实条数、0 时隐藏；
+  Problems 面板有计数文案 + 「清空」按钮（`ClearProblems`）+ 空态提示。
+- 验证（DISPLAY=:7 实机）: Codex 建议点击→清单+1+消息；右栏输入
+  "deploy the app"→清单+1+模板回复；中部 `? list files`→清单+1；勾选
+  「读取项目结构」done→pending；`ls /nonexistent` → Problems 徽章=1 →
+  清空归零隐藏。截图 `codex-panel.png`、`problems-list.png`、
+  `problems-cleared.png`。
+- 110 tests green（+23:LocalAiAssistant 提交/拆解/建议/激活/勾选进度、
+  LineClassifier 13 例、headless Problems 计数清空、Codex 提交/建议/勾选、
+  `?` 路由）。
+
 ### PR #1 — Solution skeleton (`feat/solution-skeleton`) ✅ merged
 - Stack chosen: **Avalonia 11** (`net8.0`) — WinUI 3/WPF cannot compile on the
   Linux dev box; Avalonia still ships as a normal Windows desktop app with a
@@ -187,6 +215,7 @@
   WinUI-only path (out of scope for Avalonia).
 - Session thumbnails render text preview (not bitmap) — DESIGN.md allows this;
   now colored per-line dominant foreground + 10 lines.
-- Remaining stubs: **Codex/Ai right-rail tab** is still a mock assistant panel.
+- Codex 助手现为本地规则实现（LocalAiAssistant），无 LLM；接入真实模型
+  需实现 IAiAssistant 并替换构造处（MainWindowViewModel）。
 - Window bottom may clip ~80px under compositor-less X11/Xvfb at 800px screen
   height (status bar row hidden); dock remains usable, normal desktops unaffected.

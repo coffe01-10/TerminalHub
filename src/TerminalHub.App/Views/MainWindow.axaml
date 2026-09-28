@@ -213,7 +213,7 @@
 
             <!-- Command input -->
             <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="4,2">
-              <TextBox Text="{Binding CommandInput}" Watermark="Ask Codex or type a command…"
+              <TextBox Text="{Binding CommandInput}" Watermark="输入命令，或 ? 开头向 Codex 提问…"
                        Background="#1A2030" CornerRadius="8" BorderBrush="#2A3142" BorderThickness="1"
                        Foreground="#E2E8F0" Padding="10,5" FontSize="12"
                        KeyDown="OnCommandInputKeyDown"/>
@@ -325,9 +325,20 @@
                       </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Problems -->
-                    <ListBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
-                             ItemsSource="{Binding Dashboard.Problems}"
+                    <!-- Problems: real errors from session output; clearable -->
+                    <DockPanel IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}">
+                      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="8,4,8,0">
+                        <TextBlock VerticalAlignment="Center" FontSize="10" Foreground="#64748B"
+                                   Text="{Binding Dashboard.ProblemCount, StringFormat='会话输出中的 error / exception / 非零退出:{0} 条'}"/>
+                        <Button Grid.Column="1" Content="清空" FontSize="10" Padding="10,2"
+                                Background="#1A2030" Foreground="#94A3B8" CornerRadius="6" BorderThickness="0"
+                                IsVisible="{Binding Dashboard.HasProblems}"
+                                Command="{Binding Dashboard.ClearProblemsCommand}"/>
+                      </Grid>
+                      <TextBlock DockPanel.Dock="Top" Margin="8,4,8,0" FontSize="10" Foreground="#64748B"
+                                 IsVisible="{Binding !Dashboard.HasProblems}"
+                                 Text="暂无问题 —— 会话输出中的错误会出现在这里"/>
+                    <ListBox ItemsSource="{Binding Dashboard.Problems}"
                              Background="Transparent" BorderThickness="0" Padding="6">
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">
@@ -347,6 +358,7 @@
                         </DataTemplate>
                       </ListBox.ItemTemplate>
                     </ListBox>
+                    </DockPanel>
 
                     <!-- Search: filter active-session scrollback+screen, matched terms highlighted -->
                     <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
@@ -838,7 +850,7 @@
 
               <!-- ===== Codex assistant ===== -->
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
-                    RowDefinitions="Auto,Auto,Auto,*,Auto">
+                    RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
                 <Grid ColumnDefinitions="*,Auto" Margin="2,2">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Border Width="22" Height="22" CornerRadius="6" Background="#26303F">
@@ -859,50 +871,75 @@
                   <ItemsControl ItemsSource="{Binding Assistant.Checklist}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="ai:ChecklistItem">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Ellipse Width="14" Height="14" VerticalAlignment="Center"
-                                   Stroke="{Binding State, Converter={x:Static vm:ChecklistRingConverter.Instance}}"
-                                   StrokeThickness="1.5"
-                                   Fill="{Binding State, Converter={x:Static vm:ChecklistFillConverter.Instance}}"/>
-                          <TextBlock Text="{Binding Text}" FontSize="11" VerticalAlignment="Center"
-                                     Foreground="{Binding State, Converter={x:Static vm:ChecklistTextConverter.Instance}}"/>
-                        </StackPanel>
+                        <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
+                                Command="{Binding $parent[ItemsControl].DataContext.Assistant.ToggleItemCommand}"
+                                CommandParameter="{Binding}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="14" Height="14" VerticalAlignment="Center"
+                                     Stroke="{Binding State, Converter={x:Static vm:ChecklistRingConverter.Instance}}"
+                                     StrokeThickness="1.5"
+                                     Fill="{Binding State, Converter={x:Static vm:ChecklistFillConverter.Instance}}"/>
+                            <TextBlock Text="{Binding Text}" FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{Binding State, Converter={x:Static vm:ChecklistTextConverter.Instance}}"/>
+                          </StackPanel>
+                        </Button>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                 </StackPanel>
 
-                <DockPanel Grid.Row="3" Margin="0,6,0,0">
+                <ScrollViewer Grid.Row="3" MaxHeight="110" VerticalScrollBarVisibility="Auto" Margin="0,2"
+                              IsVisible="{Binding Assistant.HasMessages}">
+                  <ItemsControl ItemsSource="{Binding Assistant.Messages}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="ai:ChatMessage">
+                        <Grid ColumnDefinitions="42,*" Margin="0,1">
+                          <TextBlock Text="{Binding Sender}" FontSize="9" Foreground="#38BDF8" VerticalAlignment="Top"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="10" Foreground="#CBD5E1"
+                                     TextWrapping="Wrap"/>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+
+                <DockPanel Grid.Row="4" Margin="0,6,0,0">
                   <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
                     <TextBlock Text="建议任务" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
                     <Border Grid.Column="1" CornerRadius="6" Background="#1A2030" Padding="8,2">
-                      <TextBlock Text="全部 ⌄" FontSize="10" Foreground="#94A3B8"/>
+                      <TextBlock Text="点击加入清单" FontSize="10" Foreground="#94A3B8"/>
                     </Border>
                   </Grid>
                   <ScrollViewer VerticalScrollBarVisibility="Hidden">
                     <ItemsControl ItemsSource="{Binding Assistant.Suggestions}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="ai:SuggestedTask">
-                          <Border CornerRadius="8" Background="#CC141B29" BorderBrush="#332A3142"
-                                  BorderThickness="1" Padding="8" Margin="0,0,0,6">
-                            <Grid ColumnDefinitions="Auto,*">
-                              <Border Width="24" Height="24" CornerRadius="6" Background="#26303F" VerticalAlignment="Top">
-                                <TextBlock Text="{Binding Icon}" FontSize="11" Foreground="#38BDF8"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                              </Border>
-                              <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="1">
-                                <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
-                                <TextBlock Text="{Binding Description}" FontSize="9.5" Foreground="#64748B" TextWrapping="Wrap"/>
-                              </StackPanel>
-                            </Grid>
-                          </Border>
+                          <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Cursor="Hand"
+                                  Command="{Binding $parent[ItemsControl].DataContext.Assistant.RunSuggestionCommand}"
+                                  CommandParameter="{Binding}">
+                            <Border CornerRadius="8" Background="#CC141B29" BorderBrush="#332A3142"
+                                    BorderThickness="1" Padding="8" Margin="0,0,0,6">
+                              <Grid ColumnDefinitions="Auto,*">
+                                <Border Width="24" Height="24" CornerRadius="6" Background="#26303F" VerticalAlignment="Top">
+                                  <TextBlock Text="{Binding Icon}" FontSize="11" Foreground="#38BDF8"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="1">
+                                  <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                  <TextBlock Text="{Binding Description}" FontSize="9.5" Foreground="#64748B" TextWrapping="Wrap"/>
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </Button>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </ScrollViewer>
                 </DockPanel>
 
-                <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <Grid Grid.Row="5" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
                   <TextBox Text="{Binding Assistant.TaskInput}" Watermark="描述你想做的任务…"
                            Background="#1A2030" CornerRadius="8" BorderBrush="#2A3142" BorderThickness="1"
                            Foreground="#E2E8F0" Padding="10,5" FontSize="11"

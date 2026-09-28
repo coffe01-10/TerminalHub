@@ -203,4 +203,90 @@ public class UiSmokeTests
         Assert.Contains(vm.Dashboard.SearchHits, h => h.Text.Contains("E2E_42"));
         window.Close();
     }
+
+    /// <summary>Problems badge counts real error-classified output and clears.</summary>
+    [AvaloniaFact]
+    public async Task Problems_RealCount_AndClear()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(400);
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+
+        Assert.Equal(0, vm.Dashboard.ProblemCount);
+        Assert.False(vm.Dashboard.HasProblems);
+
+        // Type a line the classifier flags as error through the mock PTY.
+        vm.ActiveSession!.Emulator.SendText("echo fatal: boom happened\r");
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && vm.Dashboard.ProblemCount == 0)
+            await Task.Delay(80);
+        Assert.True(vm.Dashboard.ProblemCount > 0, "error line never reached Problems");
+        Assert.True(vm.Dashboard.HasProblems);
+        Assert.Contains(vm.Dashboard.Problems, p => p.Message.Contains("fatal"));
+
+        vm.Dashboard.ClearProblemsCommand.Execute(null);
+        Assert.Equal(0, vm.Dashboard.ProblemCount);
+        Assert.False(vm.Dashboard.HasProblems);
+        Assert.Empty(vm.Dashboard.Problems);
+        window.Close();
+    }
+
+    /// <summary>Codex: NL submit + suggestion insertion + checklist toggle, all local.</summary>
+    [AvaloniaFact]
+    public async Task Codex_NlSubmit_Suggestion_Toggle()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(400);
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+
+        // NL submit via the shared query path (right-panel input + "?"-prompt).
+        var itemsBefore = vm.Assistant.Checklist.Count;
+        await vm.Assistant.SubmitQueryAsync("帮我跑一遍测试");
+        await Task.Delay(200);
+        Assert.True(vm.Assistant.Checklist.Count > itemsBefore);
+        Assert.NotEmpty(vm.Assistant.Messages);
+        Assert.Contains(vm.Dashboard.OutputLog, l => l.Message.Contains("Codex:"));
+        Assert.Contains(vm.Dashboard.OutputLog, l => l.Message.Contains("Codex 收到任务"));
+
+        // Suggestion click → checklist item + Output info line.
+        itemsBefore = vm.Assistant.Checklist.Count;
+        await vm.Assistant.RunSuggestionCommand.ExecuteAsync(vm.Assistant.Suggestions[0]);
+        await Task.Delay(200);
+        Assert.Equal(itemsBefore + 1, vm.Assistant.Checklist.Count);
+
+        // Checklist toggle → progress follows real state.
+        var doneBefore = vm.Assistant.Checklist.Count(c => c.State == TerminalHub.Core.AI.ChecklistState.Done);
+        var pending = vm.Assistant.Checklist
+            .First(c => c.State == TerminalHub.Core.AI.ChecklistState.Pending);
+        vm.Assistant.ToggleItemCommand.Execute(pending);
+        await Task.Delay(200);
+        Assert.Equal(doneBefore + 1,
+            vm.Assistant.Checklist.Count(c => c.State == TerminalHub.Core.AI.ChecklistState.Done));
+        Assert.True(vm.Assistant.ProgressPercent is null or >= 0 and <= 100);
+        window.Close();
+    }
+
+    /// <summary>Middle "?" prompt routes to the local assistant, not the shell.</summary>
+    [AvaloniaFact]
+    public async Task CommandInput_QuestionPrefix_RoutesToCodex()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(400);
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+
+        var itemsBefore = vm.Assistant.Checklist.Count;
+        vm.CommandInput = "? 帮我看看日志";
+        vm.SubmitCommandInputCommand.Execute(null);
+        await Task.Delay(300);
+
+        Assert.True(vm.Assistant.Checklist.Count > itemsBefore);
+        Assert.Contains(vm.Dashboard.OutputLog, l => l.Message.Contains("Codex 收到任务: 帮我看看日志"));
+        window.Close();
+    }
 }
