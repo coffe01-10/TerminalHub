@@ -83,6 +83,10 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// Off: NoWrap for dense one-line scanning (list gains horizontal scroll). Global preference.</summary>
     [ObservableProperty] private bool _wrapLines = true;
 
+    /// <summary>On: denser Logs list (FontSize ~8.5, Padding ~2,0). Off (default): FontSize 9.5, Padding 4,1.
+    /// Global preference (not per-session).</summary>
+    [ObservableProperty] private bool _compactDensity;
+
     /// <summary>Ring-buffer capacity (any ≥1; toolbar chips offer 500/2000/5000).
     /// Changing trims oldest lines when over the new limit and refreshes <see cref="Entries"/>.</summary>
     public int BufferCapacity
@@ -267,7 +271,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// the bar). The restore itself never writes back: <see cref="SaveCurrentFilters"/> is
     /// suppressed while applying, so loading cannot trigger a save.</summary>
     public void ApplyPersistedFilters(string? filterText, bool useRegex, int levelFilterIndex, bool retainHistoryOnClear,
-        bool useRelativeTimestamps = false, bool wrapLines = true)
+        bool useRelativeTimestamps = false, bool wrapLines = true, bool compactDensity = false)
     {
         _restoringFilters = true;
         try
@@ -278,6 +282,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             RetainHistoryOnClear = retainHistoryOnClear;
             UseRelativeTimestamps = useRelativeTimestamps;
             WrapLines = wrapLines;
+            CompactDensity = compactDensity;
         }
         finally { _restoringFilters = false; }
         // These are「全部会话」's globals (startup always selects index 0) — remember
@@ -435,6 +440,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     partial void OnRetainHistoryOnClearChanged(bool value) => SaveCurrentFilters();
     partial void OnUseRelativeTimestampsChanged(bool value) => SaveCurrentFilters();
     partial void OnWrapLinesChanged(bool value) => SaveCurrentFilters();
+    partial void OnCompactDensityChanged(bool value) => SaveCurrentFilters();
 
     /// <summary>Session switch → swap the visible combo to the new selection's remembered
     /// state. Nothing needs saving on the way out: every filter change (and every

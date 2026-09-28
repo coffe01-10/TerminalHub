@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:40 CST（#39 已合；Deploy live-elapsed #37 截图中） · 维护：Devin（PO）
+最后更新：2026-09-28 18:45 CST（Logs 紧凑密度 · PR 待开 · 请 Devin 拉测） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Deploy 打包中实时耗时 + 复制上次成功产物路径** — **Grok** · PR #37 · `feat/deploy-live-elapsed-copy-path` · worktree `/workspace/TerminalHub-deploy`
+- [ ] **Logs 紧凑密度 toggle**（「紧凑」chip · FontSize/Padding · 持久化）— **Grok** · `feat/logs-compact-density` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -28,6 +28,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #37 Deploy 打包中实时耗时 + 复制上次成功产物路径 — Grok · `feat/deploy-live-elapsed-copy-path` · `main@a6c34a6`
 - [x] PR #39 Logs 环形缓冲容量 presets（500/2000/5000）— Grok · `feat/logs-buffer-capacity` · `main@671b516`
 - [x] PR #38 Logs 换行/不换行 toggle（「换行」chip · Wrap 默认开 · NoWrap+横滚）— Grok · `feat/logs-wrap-toggle` · `main@ace56d9`
 - [x] PR #35 Deploy 坞真实上次发布结果 + 打开上次成功产物 — Grok · `feat/deploy-last-status-badge` · `main@16a8575`

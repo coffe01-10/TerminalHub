@@ -286,7 +286,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // the global combo for「全部会话」, plus each named session's own memory.
         Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
             _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear,
-            _settings.LogsUseRelativeTimestamps, _settings.LogsWrapLines);
+            _settings.LogsUseRelativeTimestamps, _settings.LogsWrapLines,
+            _settings.LogsCompactDensity);
         Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
@@ -1221,6 +1222,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settings.LogsRetainHistoryOnClear = global.RetainHistoryOnClear;
         _settings.LogsUseRelativeTimestamps = Logs.UseRelativeTimestamps;
         _settings.LogsWrapLines = Logs.WrapLines;
+        _settings.LogsCompactDensity = Logs.CompactDensity;
         _settings.LogsBufferCapacity = Logs.BufferCapacity;
         _settings.LogsSessionFilters = Logs.SnapshotSessionFilters();
         SaveSettingsInternal();

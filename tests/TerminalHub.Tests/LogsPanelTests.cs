@@ -1666,6 +1666,85 @@ public class LogsPanelTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task CompactDensity_Preference_SurvivesRestart_ViaSettingsStore()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        try
+        {
+            var vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.False(vm.Logs.CompactDensity); // default off
+            vm.Logs.CompactDensity = true;
+
+            var onDisk = new SettingsStore(settingsPath).Load();
+            Assert.True(onDisk.LogsCompactDensity);
+            vm.Dispose();
+
+            var vm2 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.True(vm2.Logs.CompactDensity);
+            // Restoring must not write back on its own — flip off and confirm save.
+            var savesBefore = File.ReadAllText(settingsPath);
+            vm2.Logs.CompactDensity = false;
+            var onDisk2 = new SettingsStore(settingsPath).Load();
+            Assert.False(onDisk2.LogsCompactDensity);
+            Assert.NotEqual(savesBefore, File.ReadAllText(settingsPath));
+            vm2.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task CompactDensity_UI_ToggleBinds_DefaultOff()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2;
+            await Task.Delay(150);
+
+            var toggle = window.GetVisualDescendants().OfType<ToggleButton>()
+                .Single(t => (string?)t.Content == "紧凑");
+            Assert.False(toggle.IsChecked);
+            Assert.False(vm.Logs.CompactDensity);
+
+            toggle.IsChecked = true;
+            await Task.Delay(150);
+            Assert.True(vm.Logs.CompactDensity);
+            Assert.True(toggle.IsChecked);
+
+            var list = window.GetVisualDescendants().OfType<ListBox>()
+                .Single(lb => lb.Name == "LogsList");
+            Assert.Contains("compact", list.Classes);
+
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            // Capture with compact on — docs screenshot wants「紧凑」visible and preferably on.
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-compact-density.png"));
+
+            toggle.IsChecked = false;
+            await Task.Delay(100);
+            Assert.False(vm.Logs.CompactDensity);
+            Assert.DoesNotContain("compact", list.Classes);
+        }
+        finally
+        {
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.CompactDensity = false;
+            }
+            window.Close();
+        }
+    }
+
     // ===== ring-buffer capacity presets (500 / 2000 / 5000) =====
 
     [Fact]
