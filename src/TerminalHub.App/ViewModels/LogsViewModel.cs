@@ -28,7 +28,12 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     private readonly Action<bool>? _persistFileLogging;
     private readonly Func<string, Task>? _copyToClipboard;
     private readonly Func<Task<string?>>? _promptExportPath;
+    private readonly Action? _persistFilters;
     private readonly int _capacity;
+
+    /// <summary>True while <see cref="ApplyPersistedFilters"/> is replaying saved values —
+    /// suppresses the write-back so a load never triggers a save.</summary>
+    private bool _restoringFilters;
 
     /// <summary>Deep history of session lines; independent of Output's display cap.</summary>
     private readonly List<LogEntry> _buffer = [];
@@ -52,6 +57,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _statusText = "";
     /// <summary>On: clearing the Output panel keeps this panel's buffered history. Off (default): follow the clear.</summary>
     [ObservableProperty] private bool _retainHistoryOnClear;
+
     /// <summary>On (default): the list stays pinned to the newest line — new lines auto-scroll
     /// to the bottom. User scroll-up pauses it; the「⬇ 跟随」button or scrolling back to
     /// the bottom resumes. New lines while paused never flip this back on.</summary>
@@ -62,6 +68,44 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 
     partial void OnFollowTailChanged(bool value) => OnPropertyChanged(nameof(FollowPaused));
 
+    /// <summary>Chip names for the exclusive level bar — index i ↔ <see cref="LevelFilterIndex"/> i.</summary>
+    private static readonly string[] LevelChipProps =
+        [nameof(LevelAllSelected), nameof(LevelInfoSelected), nameof(LevelWarnSelected), nameof(LevelErrorSelected)];
+
+    /// <summary>Level chip bar (全部/info/warn/error). Each chip mirrors <see cref="LevelFilterIndex"/>;
+    /// checking one selects it, and the checked chip cannot be unchecked (the bar is exclusive).</summary>
+    public bool LevelAllSelected
+    {
+        get => LevelFilterIndex == 0;
+        set => SelectLevelChip(0, value);
+    }
+
+    public bool LevelInfoSelected
+    {
+        get => LevelFilterIndex == 1;
+        set => SelectLevelChip(1, value);
+    }
+
+    public bool LevelWarnSelected
+    {
+        get => LevelFilterIndex == 2;
+        set => SelectLevelChip(2, value);
+    }
+
+    public bool LevelErrorSelected
+    {
+        get => LevelFilterIndex == 3;
+        set => SelectLevelChip(3, value);
+    }
+
+    private void SelectLevelChip(int index, bool selected)
+    {
+        if (selected) { LevelFilterIndex = index; return; }
+        // Clicking the checked chip tries to uncheck it — re-assert instead so the
+        // bar always has exactly one selection.
+        if (LevelFilterIndex == index) OnPropertyChanged(LevelChipProps[index]);
+    }
+
     public LogsViewModel(
         DashboardViewModel dashboard,
         SessionLogFile file,
@@ -71,7 +115,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         string? logDir = null,
         int bufferCapacity = DefaultBufferCapacity,
         Func<string, Task>? copyToClipboard = null,
-        Func<Task<string?>>? promptExportPath = null)
+        Func<Task<string?>>? promptExportPath = null,
+        Action? persistFilters = null)
     {
         _dashboard = dashboard;
         _file = file;
@@ -81,9 +126,26 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _capacity = Math.Max(1, bufferCapacity);
         _copyToClipboard = copyToClipboard;
         _promptExportPath = promptExportPath;
+        _persistFilters = persistFilters;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Refilter();
         if (fileLogging) FileLogging = true; // goes through OnFileLoggingChanged
+    }
+
+    /// <summary>Restore the filter state saved from a previous run (level index clamped to
+    /// the bar). The restore itself never writes back: <see cref="PersistFilters"/> is
+    /// suppressed while applying, so loading cannot trigger a save.</summary>
+    public void ApplyPersistedFilters(string? filterText, bool useRegex, int levelFilterIndex, bool retainHistoryOnClear)
+    {
+        _restoringFilters = true;
+        try
+        {
+            FilterText = filterText ?? "";
+            UseRegex = useRegex;
+            LevelFilterIndex = Math.Clamp(levelFilterIndex, 0, LevelNames.Length);
+            RetainHistoryOnClear = retainHistoryOnClear;
+        }
+        finally { _restoringFilters = false; }
     }
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -153,10 +215,22 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             if (Matches(e)) Entries.Add(e);
     }
 
-    partial void OnFilterTextChanged(string value) { UpdateRegex(); Refilter(); }
-    partial void OnUseRegexChanged(bool value) { UpdateRegex(); Refilter(); }
-    partial void OnLevelFilterIndexChanged(int value) => Refilter();
+    partial void OnFilterTextChanged(string value) { UpdateRegex(); Refilter(); PersistFilters(); }
+    partial void OnUseRegexChanged(bool value) { UpdateRegex(); Refilter(); PersistFilters(); }
+    partial void OnLevelFilterIndexChanged(int value)
+    {
+        Refilter();
+        foreach (var chip in LevelChipProps) OnPropertyChanged(chip);
+        PersistFilters();
+    }
     partial void OnSessionFilterIndexChanged(int value) => Refilter();
+    partial void OnRetainHistoryOnClearChanged(bool value) => PersistFilters();
+
+    /// <summary>Filter change → save callback (wired by MainWindowViewModel to settings + disk).</summary>
+    private void PersistFilters()
+    {
+        if (!_restoringFilters) _persistFilters?.Invoke();
+    }
 
     private void UpdateRegex()
     {

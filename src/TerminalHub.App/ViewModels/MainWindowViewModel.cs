@@ -60,16 +60,43 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnSettingsOpenChanged(bool value)
         => DockHighlight = value ? 5 : (SelectedRightTab switch { 0 => 1, 2 => 3, 3 => 2, _ => -1 });
 
-    /// <summary>Selection sync: ListBox.SelectedItem drives activation.</summary>
+    /// <summary>Selection sync: ListBox.SelectedItem drives activation. In split
+    /// mode the picked card is assigned to the focused pane.</summary>
     partial void OnActiveCardChanged(SessionCardViewModel? value)
     {
-        if (value is not null && !ReferenceEquals(value.Model, _sessions.Active))
+        if (value is null) return;
+        if (IsSplit && value.Model is { } picked)
+        {
+            AssignToPane(FocusedPane, picked);
+            if (!ReferenceEquals(picked, _sessions.Active))
+                _sessions.Activate(picked);
+            return;
+        }
+        if (!ReferenceEquals(value.Model, _sessions.Active))
             _sessions.Activate(value.Model);
     }
 
     /// <summary>Active-session change also arms/disarms the popout toolbar button.</summary>
     partial void OnActiveSessionChanged(TerminalSessionModel? value)
         => OpenInNewWindowCommand.NotifyCanExecuteChanged();
+
+    /// <summary>Assign a session to a pane, keeping the two panes distinct.</summary>
+    private void AssignToPane(int pane, TerminalSessionModel s)
+    {
+        if (pane == 0)
+        {
+            LeftPane = s;
+            if (ReferenceEquals(RightPane, s))
+                RightPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, s));
+        }
+        else
+        {
+            RightPane = s;
+            if (ReferenceEquals(LeftPane, s))
+                LeftPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, s))
+                           ?? s; // only one session exists — left keeps it
+        }
+    }
 
     private readonly SparklineBuffer _statusCpu = new(40);
 
@@ -116,7 +143,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _settings.SessionLogToFile,
             v => _settings.SessionLogToFile = v,
             copyToClipboard: CopyTextToClipboardAsync,
-            promptExportPath: PromptExportPathAsync);
+            promptExportPath: PromptExportPathAsync,
+            persistFilters: PersistLogsFilters);
+        // Replay the filters saved from the previous run (never writes back).
+        Logs.ApplyPersistedFilters(_settings.LogsFilterText, _settings.LogsUseRegex,
+            _settings.LogsLevelFilterIndex, _settings.LogsRetainHistoryOnClear);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
@@ -195,6 +226,74 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var tags = new[] { SessionTag.Dev, SessionTag.Test, SessionTag.Deploy };
         var tag = tags[SessionCards.Count % tags.Length];
         await CreateSessionAsync(null, tag, "");
+    }
+
+    /// <summary>Toolbar「◫ 分屏」: side-by-side panes, each with its own PTY/Emulator.
+    /// Left pane = the session that was active when split opened; right pane =
+    /// the next session (a new one is spawned if only one exists). Pane clicks
+    /// move focus (and thus ActiveSession/Output/Search) to that pane's session;
+    /// clicking a sidebar card assigns it to the focused pane.</summary>
+    [ObservableProperty] private bool _isSplit;
+    [ObservableProperty] private TerminalSessionModel? _leftPane;
+    [ObservableProperty] private TerminalSessionModel? _rightPane;
+    /// <summary>0 = left pane focused, 1 = right.</summary>
+    [ObservableProperty] private int _focusedPane;
+
+    [RelayCommand]
+    private void ToggleSplit()
+    {
+        if (IsSplit) { ExitSplit(); return; }
+        _ = EnterSplitAsync();
+    }
+
+    private async Task EnterSplitAsync()
+    {
+        // Read _sessions.Active directly — the ActiveSession property lags one
+        // UI-thread post behind Activate() and would give us the stale session.
+        var left = _sessions.Active ?? _sessions.Sessions.FirstOrDefault();
+        var other = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, left));
+        if (left is null && other is null)
+        {
+            await NewSession();
+            left = _sessions.Active;
+        }
+        if (other is null)
+        {
+            Dashboard.AppendOutput("info", "分屏: 只有一个会话,为右栏新建一个…", "split");
+            var prev = left;
+            await NewSession();                       // activates the new session
+            other = _sessions.Active;
+            if (prev is not null) _sessions.Activate(prev); // keep focus on the left pane
+        }
+        if (other is null)
+        {
+            Dashboard.AppendOutput("warn", "分屏: 无法创建第二个会话", "split");
+            return;
+        }
+        LeftPane = left;
+        RightPane = other;
+        FocusedPane = 0;
+        IsSplit = true;
+        Dashboard.AppendOutput("info",
+            $"分屏: 左 {left?.Name ?? "—"} ｜ 右 {other.Name} · 点击窗格聚焦,点会话卡分配到该窗格", "split");
+    }
+
+    private void ExitSplit()
+    {
+        IsSplit = false;
+        LeftPane = RightPane = null;
+        FocusedPane = 0;
+        Dashboard.AppendOutput("info", "分屏: 已退出,回到单视图", "split");
+    }
+
+    /// <summary>Pane pointer-press → that pane's session becomes active (its
+    /// output feeds Output/Logs/Search; the middle input targets it too).</summary>
+    public void FocusPane(int pane)
+    {
+        FocusedPane = pane;
+        var s = pane == 0 ? LeftPane : RightPane;
+        if (s is not null && !ReferenceEquals(s, _sessions.Active))
+            _sessions.Activate(s);
     }
 
     [RelayCommand]
@@ -549,6 +648,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void SaveSettingsInternal() => _settingsStore.Save(_settings);
 
+    /// <summary>Logs filter changed → copy into <see cref="_settings"/> and save
+    /// (small JSON; every change is fine, no debounce needed).</summary>
+    private void PersistLogsFilters()
+    {
+        _settings.LogsFilterText = Logs.FilterText;
+        _settings.LogsUseRegex = Logs.UseRegex;
+        _settings.LogsLevelFilterIndex = Logs.LevelFilterIndex;
+        _settings.LogsRetainHistoryOnClear = Logs.RetainHistoryOnClear;
+        SaveSettingsInternal();
+    }
+
     [RelayCommand]
     private void SubmitCommandInput()
     {
@@ -616,6 +726,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _sessionNames.Remove(s.Id);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            if (IsSplit)
+            {
+                if (ReferenceEquals(RightPane, s))
+                    RightPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, LeftPane));
+                if (ReferenceEquals(LeftPane, s))
+                    LeftPane = _sessions.Sessions.FirstOrDefault();
+                if (LeftPane is null && RightPane is null)
+                {
+                    IsSplit = false;
+                    FocusedPane = 0;
+                }
+            }
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
             if (vm is not null) SessionCards.Remove(vm);
             RefreshCounts();

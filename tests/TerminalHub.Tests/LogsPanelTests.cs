@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
@@ -41,13 +42,14 @@ public class LogsPanelTests
         int bufferCapacity = LogsViewModel.DefaultBufferCapacity,
         Func<string, Task>? copyToClipboard = null,
         string? exportDir = null,
-        Func<Task<string?>>? promptExportPath = null)
+        Func<Task<string?>>? promptExportPath = null,
+        Action? persistFilters = null)
     {
         var dash = new DashboardViewModel(new FakeMonitor());
         var file = new SessionLogFile();
         var logs = new LogsViewModel(dash, file, () => ["Terminal 01", "Terminal 02"],
             bufferCapacity: bufferCapacity, copyToClipboard: copyToClipboard,
-            logDir: exportDir, promptExportPath: promptExportPath);
+            logDir: exportDir, promptExportPath: promptExportPath, persistFilters: persistFilters);
         logs.RefreshSessions();
         return (dash, logs, file);
     }
@@ -94,6 +96,107 @@ public class LogsPanelTests
         await Task.Delay(20);
         Assert.Single(logs.Entries);
         Assert.Equal("Terminal 02", logs.Entries[0].Source);
+    }
+
+    [AvaloniaFact]
+    public async Task LevelChips_Exclusive_AndStillFilter()
+    {
+        var (dash, logs, _) = MakeLogs();
+        dash.AppendOutput("info", "fine", "Terminal 01");
+        dash.AppendOutput("warn", "careful", "Terminal 02");
+        await Until(() => logs.Entries.Count == 2);
+
+        // Bar starts on「全部」; the other chips are off.
+        Assert.True(logs.LevelAllSelected);
+        Assert.False(logs.LevelWarnSelected);
+
+        logs.LevelWarnSelected = true; // what a chip click does
+        Assert.Equal(2, logs.LevelFilterIndex);
+        Assert.False(logs.LevelAllSelected); // chip props follow the index → exclusive bar
+        Assert.Single(logs.Entries);
+        Assert.Equal("careful", logs.Entries[0].Message);
+
+        // Clicking the checked chip cannot deselect it — exactly one chip stays on.
+        logs.LevelWarnSelected = false;
+        Assert.True(logs.LevelWarnSelected);
+        Assert.Equal(2, logs.LevelFilterIndex);
+
+        logs.LevelErrorSelected = true; // switching chips moves the single selection
+        Assert.Equal(3, logs.LevelFilterIndex);
+        Assert.False(logs.LevelWarnSelected);
+        Assert.Empty(logs.Entries);
+    }
+
+    [AvaloniaFact]
+    public async Task PersistedFilters_RestoreClamped_RestoreNeverSaves()
+    {
+        var saves = 0;
+        var (dash, logs, _) = MakeLogs(persistFilters: () => saves++);
+        dash.AppendOutput("error", "boom", "Terminal 01");
+        await Until(() => logs.Entries.Count == 1);
+
+        logs.ApplyPersistedFilters("boom", useRegex: true, levelFilterIndex: 9, retainHistoryOnClear: true);
+        Assert.Equal("boom", logs.FilterText);
+        Assert.True(logs.UseRegex);
+        Assert.Equal(3, logs.LevelFilterIndex); // 9 clamps into the chip bar (error)
+        Assert.True(logs.RetainHistoryOnClear);
+        Assert.Equal(0, saves); // restoring is a pure load — it must not write back
+
+        logs.LevelWarnSelected = true; // chip click → save
+        Assert.Empty(logs.Entries);    // the error line no longer matches the warn chip
+        logs.FilterText = "careful";   // text change → save
+        Assert.Equal(2, saves);
+        logs.LevelErrorSelected = true; // chip click back → save
+        logs.FilterText = "boom";       // text change → save
+        Assert.Equal(4, saves);
+        Assert.Single(logs.Entries);
+        Assert.Equal("boom", logs.Entries[0].Message); // filter state really applied
+        await Task.CompletedTask;
+    }
+
+    [AvaloniaFact]
+    public async Task FilterPersistence_SurvivesRestart_ViaSettingsStore()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        try
+        {
+            // First run: filter changes land in AppSettings on disk immediately.
+            var vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            vm.Logs.FilterText = "error";
+            vm.Logs.UseRegex = true;
+            vm.Logs.LevelErrorSelected = true; // chip click persists the level too
+            vm.Logs.RetainHistoryOnClear = true;
+
+            var onDisk = new SettingsStore(settingsPath).Load();
+            Assert.Equal("error", onDisk.LogsFilterText);
+            Assert.True(onDisk.LogsUseRegex);
+            Assert.Equal(3, onDisk.LogsLevelFilterIndex);
+            Assert.True(onDisk.LogsRetainHistoryOnClear);
+            vm.Dispose();
+
+            // Second run: a fresh VM restores what the first run saved.
+            var vm2 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.Equal("error", vm2.Logs.FilterText);
+            Assert.True(vm2.Logs.UseRegex);
+            Assert.Equal(3, vm2.Logs.LevelFilterIndex);
+            Assert.True(vm2.Logs.LevelErrorSelected); // restored index lights the chip
+            Assert.True(vm2.Logs.RetainHistoryOnClear);
+            vm2.Dispose();
+
+            // A stale/out-of-range saved index clamps into the bar instead of breaking startup.
+            var store = new SettingsStore(settingsPath);
+            var raw = store.Load();
+            raw.LogsLevelFilterIndex = 42;
+            store.Save(raw);
+            var vm3 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            Assert.Equal(3, vm3.Logs.LevelFilterIndex);
+            vm3.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 
     [AvaloniaFact]
@@ -405,6 +508,13 @@ public class LogsPanelTests
         }
         finally
         {
+            // Filter state persists to the shared settings.json now — leave it clean.
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
+            }
             window.Close();
         }
     }
@@ -456,6 +566,74 @@ public class LogsPanelTests
         }
         finally
         {
+            // Filter state persists to the shared settings.json now — leave it clean.
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
+            }
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task LevelChips_UI_EndToEnd_ChipsReplaceLevelComboBox()
+    {
+        // Real window + real bindings: the level selector is a chip bar (levelchip
+        // ToggleButtons driving LevelFilterIndex two-way), not a level ComboBox;
+        // the session ComboBox survives next to it.
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2; // Logs
+            await Task.Delay(150);
+
+            var chips = window.GetVisualDescendants().OfType<ToggleButton>()
+                .Where(t => t.Classes.Contains("levelchip")).ToList();
+            Assert.Equal(4, chips.Count);
+            Assert.All(new[] { "全部", "info", "warn", "error" },
+                label => Assert.Contains(chips, c => (string?)c.Content == label));
+
+            // Session filter is still the ComboBox it always was.
+            Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(),
+                c => ReferenceEquals(c.ItemsSource, vm.Logs.SessionNames));
+
+            // Clicking a chip drives LevelFilterIndex through the two-way binding…
+            for (var i = 0; i < 3; i++)
+                vm.Dashboard.AppendOutput("info", $"chip-info-{i}", "Terminal 01");
+            vm.Dashboard.AppendOutput("error", "chip-error", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 4);
+
+            chips.Single(c => (string?)c.Content == "error").IsChecked = true;
+            await Task.Delay(100);
+            Assert.Equal(3, vm.Logs.LevelFilterIndex);
+            Assert.True(chips.Single(c => (string?)c.Content == "error").IsChecked);
+            Assert.False(chips.Single(c => (string?)c.Content == "全部").IsChecked);
+            await Until(() => vm.Logs.Entries.Count == 1); // …and really filters the list
+            Assert.Equal("chip-error", vm.Logs.Entries[0].Message);
+
+            // Frame for docs: the chip bar with「error」selected, list filtered to it.
+            for (var i = 0; i < 3; i++)
+                vm.Dashboard.AppendOutput("error", $"chip-error-more-{i}", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count == 4);
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-level-chips.png"));
+        }
+        finally
+        {
+            // Filter state persists to the shared settings.json now — leave it clean.
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
+            }
             window.Close();
         }
     }

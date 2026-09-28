@@ -4,6 +4,46 @@
 
 ## 2026-09-28
 
+### PR #18 — 「◫ 分屏」真双会话并排 (`feat/split-pane`)
+- **真分屏**:中部视口拆为 `GridSplitter` 左右双栏(可拖),各绑
+  `LeftPane`/`RightPane` 的 Emulator —— 两个会话、两套 PTY、两套
+  ANSI 解析器,输入零串扰;工具栏「◫ 分屏」接 `ToggleSplitCommand`,
+  IsSplit 时按钮着色,再点回单视图。
+- **会话选取**:进分屏 左=当前活动会话、右=下一个会话;仅一个会话时自动
+  新建第二个(不多建);会话被关闭时所属窗格自动换成幸存会话,双空自动退出。
+- **聚焦模型**:点窗格 → `FocusPane` → 该窗格会话成为 `ActiveSession`
+  (中部输入行/Output/Logs/Search/Breadcrumb 自动跟随);分屏中点左侧
+  会话卡 → 分配到聚焦的窗格,两侧保持不同会话;聚焦窗格霓虹描边。
+- **验证**:140 tests green(+6 `SplitPaneTests`:进出/双会话独立
+  Emulator/`LFT`/`RGT` 输入互不出现/聚焦切换/卡片分配/单会话自动补+
+  反复开关无泄漏/右栏关闭回落)。DISPLAY=:7 实机:双栏各 `echo`
+  独立标记不串扰、焦点描边与会话卡激活联动、退出回单视图。
+- 截图 `split-pane.png`。
+
+### PR 待定 — Logs 级别筛选条 + 过滤持久化 (`feat/logs-level-filter-persist`)
+- **级别筛选条 (chip bar)**: 级别 ComboBox（All Levels/info/warn/error）换成与
+  「.* / ⬇ 写文件 / 📌 保留历史」同款暗色 chip 的**互斥选中条**（`#1A2030` 底 +
+  `#2A3142` 边，选中 → `#38BDF8` 字 / `#3B82F6` 边，样式集中在 Logs Grid.Styles 的
+  `ToggleButton.levelchip`）。VM 侧新增 `LevelAllSelected` / `LevelInfoSelected` /
+  `LevelWarnSelected` / `LevelErrorSelected` 四个镜像属性：getter 读
+  `LevelFilterIndex`，setter 选中即设索引 —— 过滤逻辑零改动（仍是 0/1/2/3 索引）；
+  点已选中的 chip 只会重新断言选中（`SelectLevelChip` 推回通知），条上**永远恰好
+  一个选中**，不会出现全不选。会话下拉挪到 chip 条下一行整宽，不再和级别挤一行。
+- **过滤持久化**: `AppSettings` 新增 `LogsFilterText` / `LogsUseRegex` /
+  `LogsLevelFilterIndex` / `LogsRetainHistoryOnClear`（默认 ""/false/0/false）。
+  `LogsViewModel` 加 `persistFilters` 回调（对齐 `persistFileLogging` 风格），
+  FilterText/UseRegex/LevelFilterIndex/RetainHistoryOnClear 任一变化即回调 →
+  MainWindowViewModel 写回 `_settings` + `SaveSettingsInternal()`（小 JSON，逐次
+  保存，不做防抖）。启动时 `ApplyPersistedFilters(...)` 回放上次的选择，level 索引
+  `Math.Clamp` 到 0..3；回放期间 `_restoringFilters` 抑制回调 —— **加载绝不触发
+  保存**，无 load→save 循环。`SessionFilterIndex` 不持久化（会话名是动态的）。
+- **验证**: 138 tests green（本 PR +4：chip 互斥/点击已选中不断言 + 过滤仍生效、
+  回放 clamp 且回放不写回 + 变化逐次回调、SettingsStore 落盘→重启新 VM 恢复 +
+  越界索引 clamp、真实 MainWindow 端到端 —— 4 个 `levelchip` ToggleButton 双向
+  绑定驱动 `LevelFilterIndex` 并真过滤列表、会话 ComboBox 仍在）。UI e2e 结束时
+  把过滤器复位，避免测试把共享 `~/.config/terminalhub/settings.json` 留脏。
+  截图 `logs-level-chips.png`（「error」chip 选中蓝高亮，列表只剩 error 行）。
+
 ### PR #15 — 整窗 mockup 走查 + 缺口修复 (`feat/walkthrough-polish`)
 - **缩略图再加密**: 12 行（原 10),`MinHeight` 80→92、行高收紧 —— 卡片更像
   mockup 的迷你终端，保留每行 ANSI 主色。
