@@ -146,7 +146,7 @@
 - Installed on box: `x11-apps` (xwd), `imagemagick` for capture; existing
   `xdotool`/`xvfb` used.
 
-### PR #10 — dock/chrome polish + Debug/Search (`feat/dock-debug-search`)
+### PR #11 — dock/chrome polish + Debug/Search (`feat/dock-debug-search`)
 - **Dock click fix (real bug)**: `DockSelectCommand` was `RelayCommand<int>` while
   XAML passes `CommandParameter="2"` as *string* → silent no-op since the dock
   shipped; every dock button was dead. Signature now `DockSelect(object?)` +
