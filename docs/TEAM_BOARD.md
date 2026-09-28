@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 16:05 CST（规则：可拒测） · 维护：Devin（PO）
+最后更新：2026-09-28 16:35 CST（并行双 Devin + 派活） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,12 +18,17 @@
 
 ## 进行中
 
-- [ ] **Logs 跟随尾部 + 导出可见行** — **GLM** · **PR #16 已开**（`feat/logs-follow-export`，134 绿 + 实机截图）· 请 Devin 拉测
-- [ ] **Deploy 线下一需求** — **Grok** 空档;可接冒烟,有活可拒
-- [ ] **盯梢**（各线 20 分钟，有变化才群里说）— Devin / GLM / Grok 已设
+- [ ] **中部分屏** — **Devin A** · `feat/split-pane` · `/workspace/TerminalHub-split` · 工具栏「◫ 分屏」真双会话
+- [ ] **会话新窗口** — **Devin B** · `feat/open-new-window` · `/workspace/TerminalHub-newwin` · 「↗ 在新窗口打开」
+- [ ] **Logs 级别筛选条 + 过滤持久化** — **GLM** · 新分支自 `main@77cbca8` · worktree `/workspace/TerminalHub-logs`
+- [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
+- [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
-- [ ] Windows ConPTY 本机冒烟 — **等用户本机**（不阻塞 Linux 迭代）
+
+- [ ] 工具栏 ⟳ / → 真动作（刷新 CWD、前进后退历史）— 谁空谁领
+- [ ] Windows ConPTY 本机冒烟 — **等用户本机**
+
 
 ## 已完成（近期）
 
