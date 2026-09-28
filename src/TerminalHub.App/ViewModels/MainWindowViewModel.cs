@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TerminalHub.Core.Deploy;
@@ -50,41 +51,95 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _deployDockTip = DeployDockTipIdle;
 
     private const string DeployDockTipIdle =
-        "点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物、打开上次成功产物。打包进行中可右键「取消打包」。";
+        "点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物、打开/复制上次成功产物路径。打包进行中可右键「取消打包」。";
 
     private const string DeployDockTipRunning =
         "打包进行中。右键「取消打包 Cancel」终止发布进程组。普通点击不会再次启动。";
+
+    /// <summary>UI-thread timer that refreshes the live packing elapsed on the dock (~1s).</summary>
+    private DispatcherTimer? _publishElapsedTimer;
+
+    /// <summary>Optional clock for tests; defaults to UTC now. Live elapsed uses the real attempt stamp.</summary>
+    internal Func<DateTimeOffset> UtcNow { get; set; } = static () => DateTimeOffset.UtcNow;
 
     /// <summary>Dock caption: idle reads Deploy; a running publish reads 打包中.</summary>
     public string DeployDockCaption => IsPublishRunning ? "打包中" : "Deploy";
 
     /// <summary>
     /// Short last-outcome text from the real exit record. Empty until a publish has finished.
-    /// Stays visible in the property while a later publish is running; the dock binds
-    /// <see cref="LastPublishBadge"/>, which hides during that run.
+    /// Stays available while a later publish is running; the dock binds <see cref="LastPublishBadge"/>.
     /// </summary>
     public string LastPublishSummary => LastPublishResults.FormatBadge(_settings.LastPublishResult);
 
-    /// <summary>Status line under the Deploy caption. Empty while a publish is running.</summary>
-    public string LastPublishBadge => IsPublishRunning ? "" : LastPublishSummary;
+    /// <summary>
+    /// Status line under the Deploy caption. Idle: last outcome badge. Running: live
+    /// <c>打包中 · Ns</c> from <see cref="_publishAttemptStartedAt"/> (same duration wording).
+    /// </summary>
+    public string LastPublishBadge => IsPublishRunning
+        ? LastPublishResults.FormatLiveBadge(CurrentPublishElapsedMs())
+        : LastPublishSummary;
 
     public bool HasLastPublishBadge => LastPublishBadge.Length > 0;
 
     /// <summary>True when the stored last-success folder still exists on disk.</summary>
     public bool CanOpenLastSuccessfulArtifact => LastPublishResults.CanOpen(_settings.LastPublishResult);
 
+    /// <summary>Same gate as open-last: success path exists on disk.</summary>
+    public bool CanCopyLastSuccessfulArtifact => CanOpenLastSuccessfulArtifact;
+
     partial void OnIsPublishRunningChanged(bool value)
     {
+        if (value) StartPublishElapsedTimer();
+        else StopPublishElapsedTimer();
         DeployDockTip = ComposeDeployDockTip(value);
         OnPropertyChanged(nameof(DeployDockCaption));
         OnPropertyChanged(nameof(LastPublishBadge));
         OnPropertyChanged(nameof(HasLastPublishBadge));
     }
 
+    private void StartPublishElapsedTimer()
+    {
+        if (_publishElapsedTimer is not null) return;
+        _publishElapsedTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _publishElapsedTimer.Tick += OnPublishElapsedTick;
+        _publishElapsedTimer.Start();
+        // Immediate paint so the first second is not blank until the first tick.
+        NotifyPublishElapsed();
+    }
+
+    private void StopPublishElapsedTimer()
+    {
+        if (_publishElapsedTimer is null) return;
+        _publishElapsedTimer.Stop();
+        _publishElapsedTimer.Tick -= OnPublishElapsedTick;
+        _publishElapsedTimer = null;
+    }
+
+    private void OnPublishElapsedTick(object? sender, EventArgs e) => NotifyPublishElapsed();
+
+    private void NotifyPublishElapsed()
+    {
+        OnPropertyChanged(nameof(LastPublishBadge));
+        OnPropertyChanged(nameof(HasLastPublishBadge));
+        DeployDockTip = ComposeDeployDockTip(true);
+    }
+
+    private long CurrentPublishElapsedMs()
+    {
+        DateTimeOffset started;
+        lock (_publishLock) started = _publishAttemptStartedAt;
+        return ElapsedMs(started, UtcNow());
+    }
+
     private string ComposeDeployDockTip(bool? running = null)
     {
         var isRunning = running ?? IsPublishRunning;
         var head = isRunning ? DeployDockTipRunning : DeployDockTipIdle;
+        if (isRunning)
+        {
+            var live = LastPublishResults.FormatLiveElapsed(CurrentPublishElapsedMs());
+            head = $"{head} 已耗时 {live}。";
+        }
         var detail = LastPublishResults.FormatTooltip(_settings.LastPublishResult);
         if (isRunning && detail == "尚未打包") return head;
         return head + "\n" + detail;
@@ -737,9 +792,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Dashboard.AppendOutput("warn",
                 "Deploy: 上次成功产物不存在 / last successful artifact missing", "deploy");
             OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
+            OnPropertyChanged(nameof(CanCopyLastSuccessfulArtifact));
             return;
         }
         OpenRecentArtifact(path);
+    }
+
+    /// <summary>
+    /// Copy the last successful artifact directory path. Same enable gate as open-last;
+    /// vanishes between menu open and click → Output warn, no throw.
+    /// </summary>
+    public void CopyLastSuccessfulArtifactPath()
+    {
+        Dashboard.SelectedBottomTab = 0;
+        var path = _settings.LastPublishResult?.ArtifactPath;
+        if (!CanCopyLastSuccessfulArtifact || string.IsNullOrWhiteSpace(path))
+        {
+            Dashboard.AppendOutput("warn",
+                "Deploy: 上次成功产物不存在 / last successful artifact missing", "deploy");
+            OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
+            OnPropertyChanged(nameof(CanCopyLastSuccessfulArtifact));
+            return;
+        }
+        _ = CopyTextToClipboardAsync(path);
+        Dashboard.AppendOutput("info", $"已复制产物路径 {path}", "deploy");
     }
 
     private IReadOnlyList<RecentArtifact> RefreshRecentArtifacts(string? start)
@@ -1055,6 +1131,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(LastPublishBadge));
         OnPropertyChanged(nameof(HasLastPublishBadge));
         OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
+        OnPropertyChanged(nameof(CanCopyLastSuccessfulArtifact));
         DeployDockTip = ComposeDeployDockTip();
     }
 
@@ -1441,6 +1518,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _disposed = true;   // popout Closed handlers must not reattach anymore
+        StopPublishElapsedTimer();
         // Kill detached PTYs before closing their windows — OnPopoutClosed removes
         // them from DetachedSessions, so disposing after the closes would leak them.
         foreach (var s in DetachedSessions) s.Dispose();

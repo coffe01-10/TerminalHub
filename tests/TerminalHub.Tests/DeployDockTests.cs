@@ -701,15 +701,20 @@ public class DeployDockTests
             var openLast = MenuByHeader(flyout, "打开上次成功产物");
             Assert.Contains("Open last success", openLast.Header?.ToString());
             Assert.False(openLast.IsEnabled);
+            var copyLast = MenuByHeader(flyout, "复制上次成功产物路径");
+            Assert.Contains("Copy last artifact path", copyLast.Header?.ToString());
+            Assert.False(copyLast.IsEnabled);
+            Assert.Equal(openLast.IsEnabled, copyLast.IsEnabled);
             var recent = MenuByHeader(flyout, "最近产物");
             Assert.Contains("linux-x64", recent.Items.OfType<MenuItem>().First().Tag?.ToString());
 
             vm.DeployFromDock(forceRepublish: true, root);
             await WaitFor(() => vm.IsPublishRunning);
             Assert.Equal("打包中", vm.DeployDockCaption);
-            Assert.Equal("", vm.LastPublishBadge);
-            Assert.False(vm.HasLastPublishBadge);
+            Assert.StartsWith("打包中 ·", vm.LastPublishBadge);
+            Assert.True(vm.HasLastPublishBadge);
             Assert.Equal("", vm.LastPublishSummary);
+            Assert.Contains("已耗时", vm.DeployDockTip);
 
             vm.SessionCards.Single(c => c.Name == "Publish").Model.Emulator.SendText("exit\r");
             await WaitFor(() => vm.Settings.LastPublishResult?.Outcome == LastPublishResults.Success);
@@ -738,6 +743,8 @@ public class DeployDockTests
 
             window.RefreshDeployContextMenu();
             Assert.True(openLast.IsEnabled);
+            Assert.True(copyLast.IsEnabled);
+            Assert.True(vm.CanCopyLastSuccessfulArtifact);
             Assert.Contains("linux-x64", recent.Items.OfType<MenuItem>().First().Tag?.ToString());
 
             openLast.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
@@ -745,10 +752,18 @@ public class DeployDockTests
             Assert.Contains(vm.Dashboard.OutputLog, l =>
                 l.Source == "deploy" && l.Message.Contains(stored.ArtifactPath));
 
+            copyLast.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await FlushUi();
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Level == "info"
+                && l.Message.Contains("已复制产物路径")
+                && l.Message.Contains(stored.ArtifactPath));
+
             vm.DeployFromDock(forceRepublish: true, root);
             await WaitFor(() => vm.SessionCards.Any(c => c.Name == "Publish" && c.Model.IsRunning));
             Assert.Equal("打包中", vm.DeployDockCaption);
-            Assert.Equal("", vm.LastPublishBadge);
+            Assert.StartsWith("打包中 ·", vm.LastPublishBadge);
+            Assert.True(vm.HasLastPublishBadge);
             Assert.StartsWith("成功", vm.LastPublishSummary);
             vm.SessionCards.Last(c => c.Name == "Publish").Model.Pty.Kill();
             await WaitFor(() => vm.Settings.LastPublishResult!.Outcome == LastPublishResults.Fail);
@@ -762,9 +777,11 @@ public class DeployDockTests
 
             Directory.Delete(expected, true);
             Assert.False(vm.CanOpenLastSuccessfulArtifact);
+            Assert.False(vm.CanCopyLastSuccessfulArtifact);
             Assert.Equal(expected, Path.GetFullPath(vm.Settings.LastPublishResult.ArtifactPath));
             window.RefreshDeployContextMenu();
             Assert.False(openLast.IsEnabled);
+            Assert.False(copyLast.IsEnabled);
             var warns = vm.Dashboard.OutputLog.Count(l => l.Message.Contains("last successful artifact missing"));
             openLast.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             vm.OpenLastSuccessfulArtifact();
@@ -772,6 +789,13 @@ public class DeployDockTests
             Assert.True(vm.Dashboard.OutputLog.Count(l =>
                 l.Source == "deploy" && l.Level == "warn"
                 && l.Message.Contains("last successful artifact missing")) > warns);
+            var warns2 = vm.Dashboard.OutputLog.Count(l => l.Message.Contains("last successful artifact missing"));
+            copyLast.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            vm.CopyLastSuccessfulArtifactPath();
+            await FlushUi();
+            Assert.True(vm.Dashboard.OutputLog.Count(l =>
+                l.Source == "deploy" && l.Level == "warn"
+                && l.Message.Contains("last successful artifact missing")) > warns2);
 
             reloaded = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
             Assert.Equal(LastPublishResults.Fail, reloaded.Settings.LastPublishResult!.Outcome);
@@ -809,8 +833,10 @@ public class DeployDockTests
             vm.DeployFromDock(forceRepublish: true, root);
             await WaitFor(() => vm.IsPublishRunning);
             Assert.Equal("打包中", vm.DeployDockCaption);
-            Assert.Equal("", vm.LastPublishBadge);
+            Assert.StartsWith("打包中 ·", vm.LastPublishBadge);
+            Assert.True(vm.HasLastPublishBadge);
             Assert.DoesNotContain("尚未打包", vm.DeployDockTip);
+            Assert.Contains("已耗时", vm.DeployDockTip);
 
             vm.CancelPublishCommand.Execute(null);
             await WaitFor(() => vm.Settings.LastPublishResult?.Outcome == LastPublishResults.Cancelled);
@@ -836,7 +862,8 @@ public class DeployDockTests
             vm.DeployFromDock(forceRepublish: true, root);
             await WaitFor(() => vm.IsPublishRunning);
             Assert.Equal("打包中", vm.DeployDockCaption);
-            Assert.Equal("", vm.LastPublishBadge);
+            Assert.StartsWith("打包中 ·", vm.LastPublishBadge);
+            Assert.True(vm.HasLastPublishBadge);
             Assert.StartsWith("已取消", vm.LastPublishSummary);
             Assert.Contains("exit -1", vm.DeployDockTip);
 

@@ -138,6 +138,20 @@ public static class LastPublishResults
         return seconds == 0 ? $"{minutes}m" : $"{minutes}m{seconds}s";
     }
 
+    /// <summary>
+    /// Live packing elapsed for the dock. Zero shows <c>0s</c>; otherwise same wording as
+    /// <see cref="FormatDuration"/> so idle badges and the running line stay consistent.
+    /// </summary>
+    public static string FormatLiveElapsed(long elapsedMs)
+    {
+        if (elapsedMs <= 0) return "0s";
+        return FormatDuration(elapsedMs);
+    }
+
+    /// <summary>Status-line text while a publish is running, e.g. <c>打包中 · 8s</c>.</summary>
+    public static string FormatLiveBadge(long elapsedMs) =>
+        $"打包中 · {FormatLiveElapsed(elapsedMs)}";
+
     private static bool IsKnown(LastPublishResult? result) =>
         result is not null && result.Outcome is Success or Fail or Cancelled;
 }

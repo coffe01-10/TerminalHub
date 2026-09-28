@@ -4,6 +4,18 @@
 
 ## 2026-09-28
 
+### pending / next Deploy slice — 打包中实时耗时 + 复制上次成功产物路径 (`feat/deploy-live-elapsed-copy-path`)
+- **实时耗时**: `IsPublishRunning` 时 Deploy 坞状态行显示 `打包中 · Ns` / `打包中 · NmNs`，
+  基于真实 `_publishAttemptStartedAt`，`DispatcherTimer` ~1s 刷新；复用
+  `LastPublishResults.FormatDuration` 风格（`FormatLiveElapsed`：0→`0s`）。结束后停表，
+  空闲仍显示上次结果徽章。Tooltip 含「已耗时 …」。
+- **复制路径**: 右键「复制上次成功产物路径 Copy last artifact path」，门控与
+  「打开上次成功产物」一致（`CanOpen`）；点击经 `CopyTextToClipboardAsync` 写绝对路径，
+  Output `source=deploy` 记「已复制产物路径 …」；目录消失则禁用/警告。
+- **验证**: `dotnet test -c Release` 212+ green；不动 Files/Logs/SSH。
+- 截图 `docs/screenshots/deploy-live-elapsed-copy-path.png`（DISPLAY=:7：Deploy 右键菜单
+  「复制上次成功产物路径」启用可见）。基线 `origin/main` @ `671b516`（含 #39）。
+
 ### pending — Logs 环形缓冲容量 presets (`feat/logs-buffer-capacity`)
 - **「容量」chips**: 级别 /「相对」/「换行」旁（同 WrapPanel）`capchip` ToggleButton
   条 **500 / 2000 / 5000**；默认 **2000**。缩小容量会丢弃最旧行并刷新
@@ -17,7 +29,7 @@
   MainWindow capchip 绑定 + 截图）。worktree `/workspace/TerminalHub-logs2`；
   工具 Grok Build / Claude Code OK。
 - 截图 `docs/screenshots/logs-buffer-capacity.png`（「容量」+ 500/2000/5000 可见；
-  500 选中 + StatusText）。已对齐 `origin/main` @ `ace56d9`（含 #38）。
+  500 选中 + StatusText）。已合 `main@671b516`（#39）。
 
 ### PR #38 — Logs 换行/不换行 toggle (`feat/logs-wrap-toggle`)
 - **「换行」chip**: 级别 chip /「相对」旁 `timechip` ToggleButton；开（默认）=
@@ -31,7 +43,7 @@
 - **验证**: 212 tests green（+2：SettingsStore 往返、MainWindow「换行」Toggle 默认开绑定）。
   worktree `/workspace/TerminalHub-logs2`；工具 Grok Build / Claude Code OK。
 - 截图 `docs/screenshots/logs-wrap-toggle.png`（「换行」chip 可见且默认开）。
-  已对齐 `origin/main` @ `9f5ff3d`（含 #36）。
+  已合 `main@ace56d9`。
 
 ### PR #36 — Logs 复制选中行 (`feat/logs-copy-selected-line`)
 - **CopySelectedCommand**: 若 `SelectedIndex` 有效，把该行绝对 `FormatLine`

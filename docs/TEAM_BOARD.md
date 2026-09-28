@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-09-28 18:36 CST（Logs 缓冲容量 presets · PR 待开 · 请 Devin 拉测） · 维护：Devin（PO）
+最后更新：2026-09-28 18:40 CST（#39 已合；Deploy live-elapsed #37 截图中） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,8 +18,7 @@
 
 ## 进行中
 
-- [ ] **Logs 环形缓冲容量 presets**（「容量」500/2000/5000 · 默认 2000 · 缩小 trim + 持久化）— **Grok** · `feat/logs-buffer-capacity` · worktree `/workspace/TerminalHub-logs2`
-- [ ] **Deploy last-status 徽标 + 打开上次成功产物** — **Grok** · `feat/deploy-last-status-badge` · worktree `/workspace/TerminalHub-deploy`
+- [ ] **Deploy 打包中实时耗时 + 复制上次成功产物路径** — **Grok** · PR #37 · `feat/deploy-live-elapsed-copy-path` · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -29,7 +28,9 @@
 
 ## 已完成（近期）
 
+- [x] PR #39 Logs 环形缓冲容量 presets（500/2000/5000）— Grok · `feat/logs-buffer-capacity` · `main@671b516`
 - [x] PR #38 Logs 换行/不换行 toggle（「换行」chip · Wrap 默认开 · NoWrap+横滚）— Grok · `feat/logs-wrap-toggle` · `main@ace56d9`
+- [x] PR #35 Deploy 坞真实上次发布结果 + 打开上次成功产物 — Grok · `feat/deploy-last-status-badge` · `main@16a8575`
 - [x] PR #36 Logs 复制选中行（⧉ 复制选中 + Ctrl+C）— Grok · `feat/logs-copy-selected-line` · `main@9f5ff3d`
 - [x] PR #30 Logs 时间戳相对/绝对切换（相对 chip + 列表相对标签；导出仍绝对）— Grok · Devin 拉测修列表绑定 · `feat/logs-timestamp-toggle` · `main@c7b6fec`
 - [x] PR #33 看板补 #31 merge SHA — Devin B · `main@e99950f`

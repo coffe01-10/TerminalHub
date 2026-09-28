@@ -185,4 +185,44 @@ public class LastPublishResultTests
             ArtifactPath = "",
         }));
     }
+
+    [Fact]
+    public void FormatLiveElapsed_MatchesDurationStyle()
+    {
+        Assert.Equal("0s", LastPublishResults.FormatLiveElapsed(0));
+        Assert.Equal("0s", LastPublishResults.FormatLiveElapsed(-5));
+        Assert.Equal("1s", LastPublishResults.FormatLiveElapsed(1200));
+        Assert.Equal(LastPublishResults.FormatDuration(65_000),
+            LastPublishResults.FormatLiveElapsed(65_000));
+        Assert.Equal("打包中 · 0s", LastPublishResults.FormatLiveBadge(0));
+        Assert.Equal("打包中 · 1s", LastPublishResults.FormatLiveBadge(1200));
+        Assert.Equal($"打包中 · {LastPublishResults.FormatDuration(65_000)}",
+            LastPublishResults.FormatLiveBadge(65_000));
+    }
+
+    [Fact]
+    public void CanOpen_IsCopyGate()
+    {
+        var missing = new LastPublishResult
+        {
+            Outcome = LastPublishResults.Success,
+            ArtifactPath = Path.Combine(Path.GetTempPath(), $"th-missing-{Guid.NewGuid():N}"),
+        };
+        Assert.False(LastPublishResults.CanOpen(missing));
+
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"th-copy-{Guid.NewGuid():N}"));
+        try
+        {
+            var ok = new LastPublishResult
+            {
+                Outcome = LastPublishResults.Success,
+                ArtifactPath = dir.FullName,
+            };
+            Assert.True(LastPublishResults.CanOpen(ok));
+        }
+        finally
+        {
+            if (Directory.Exists(dir.FullName)) Directory.Delete(dir.FullName, true);
+        }
+    }
 }
