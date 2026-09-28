@@ -2054,4 +2054,183 @@ public class LogsPanelTests
         }
     }
 
+    [Fact]
+    public void FindAdjacentLevel_FindsPrevNext_CaseInsensitive_NoWrap()
+    {
+        var t = DateTime.Now;
+        LogEntry E(string level, string msg) => new(t, level, msg, "s");
+        var entries = new[]
+        {
+            E("info", "i0"),
+            E("ERROR", "e1"),   // case-insensitive
+            E("warn", "w2"),
+            E("error", "e3"),
+            E("info", "i4"),
+            E("Error", "e5"),
+        };
+
+        // Next from -1 → first error
+        Assert.Equal(1, LogsViewModel.FindAdjacentLevel(entries, -1, "error", +1));
+        // Next from first error → second
+        Assert.Equal(3, LogsViewModel.FindAdjacentLevel(entries, 1, "error", +1));
+        // Next from last error → none
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, 5, "error", +1));
+        // Prev from last error → previous
+        Assert.Equal(3, LogsViewModel.FindAdjacentLevel(entries, 5, "error", -1));
+        // Prev from first error → none
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, 1, "error", -1));
+        // Prev with nothing selected → none
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, -1, "error", -1));
+
+        // Same helper works for warn
+        Assert.Equal(2, LogsViewModel.FindAdjacentLevel(entries, -1, "warn", +1));
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, 2, "warn", +1));
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, 2, "warn", -1));
+
+        // Empty / nullish / zero direction
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(Array.Empty<LogEntry>(), 0, "error", +1));
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, 0, "error", 0));
+        Assert.Equal(-1, LogsViewModel.FindAdjacentLevel(entries, 0, "", +1));
+    }
+
+    [AvaloniaFact]
+    public async Task LevelJump_GoNextPrevError_StepsThroughErrors_NoWrap_PausesFollow()
+    {
+        var (dash, logs, _) = MakeLogs();
+        dash.AppendOutput("info", "i0", "Terminal 01");
+        dash.AppendOutput("error", "e1", "Terminal 01");
+        dash.AppendOutput("warn", "w2", "Terminal 01");
+        dash.AppendOutput("error", "e3", "Terminal 01");
+        dash.AppendOutput("info", "i4", "Terminal 01");
+        dash.AppendOutput("error", "e5", "Terminal 01");
+        await Until(() => logs.Entries.Count == 6);
+
+        // On「全部」: jump only among error rows in current Entries.
+        Assert.True(logs.LevelAllSelected);
+        Assert.Equal(-1, logs.SelectedIndex);
+        Assert.False(logs.CanGoPrevError);
+        Assert.True(logs.CanGoNextError);
+
+        logs.GoNextErrorCommand.Execute(null);
+        Assert.Equal(1, logs.SelectedIndex);
+        Assert.Equal("e1", logs.SelectedEntry!.Message);
+        Assert.False(logs.FollowTail); // same as match nav
+        Assert.Contains("error 2/6", logs.StatusText);
+        Assert.False(logs.CanGoPrevError); // first error: no wrap
+        Assert.True(logs.CanGoNextError);
+
+        logs.GoNextErrorCommand.Execute(null);
+        Assert.Equal(3, logs.SelectedIndex);
+        Assert.Equal("e3", logs.SelectedEntry!.Message);
+        Assert.True(logs.CanGoPrevError);
+
+        logs.GoNextErrorCommand.Execute(null);
+        Assert.Equal(5, logs.SelectedIndex);
+        Assert.Equal("e5", logs.SelectedEntry!.Message);
+        Assert.False(logs.CanGoNextError); // last error: no wrap
+        Assert.True(logs.CanGoPrevError);
+
+        // Extra presses stay put
+        for (var i = 0; i < 5; i++) logs.GoNextErrorCommand.Execute(null);
+        Assert.Equal(5, logs.SelectedIndex);
+
+        logs.GoPrevErrorCommand.Execute(null);
+        Assert.Equal(3, logs.SelectedIndex);
+        Assert.Contains("error 4/6", logs.StatusText);
+
+        for (var i = 0; i < 10; i++) logs.GoPrevErrorCommand.Execute(null);
+        Assert.Equal(1, logs.SelectedIndex);
+        Assert.False(logs.CanGoPrevError);
+    }
+
+    [AvaloniaFact]
+    public async Task LevelJump_Disabled_WhenNoErrorNeighbor_AndRespectsCurrentFilter()
+    {
+        var (dash, logs, _) = MakeLogs();
+        dash.AppendOutput("info", "only-info", "Terminal 01");
+        dash.AppendOutput("warn", "only-warn", "Terminal 01");
+        await Until(() => logs.Entries.Count == 2);
+
+        Assert.False(logs.CanGoPrevError);
+        Assert.False(logs.CanGoNextError);
+        logs.GoNextErrorCommand.Execute(null);
+        Assert.Equal(-1, logs.SelectedIndex);
+        Assert.True(logs.FollowTail); // no jump → follow stays on
+
+        dash.AppendOutput("error", "e-hidden-by-level", "Terminal 01");
+        await Until(() => logs.LevelErrorCount == 1);
+        // Level filter to info → error not in Entries → buttons stay off
+        logs.LevelInfoSelected = true;
+        Assert.Single(logs.Entries);
+        Assert.False(logs.CanGoNextError);
+        Assert.False(logs.CanGoPrevError);
+
+        // Back to「全部」→ error visible again
+        logs.LevelAllSelected = true;
+        Assert.True(logs.CanGoNextError);
+        logs.GoNextErrorCommand.Execute(null);
+        Assert.Equal("e-hidden-by-level", logs.SelectedEntry!.Message);
+    }
+
+    [AvaloniaFact]
+    public async Task LevelJump_UI_EndToEnd_ButtonsBind_Screenshot()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        try
+        {
+            window.Show();
+            await Task.Delay(400);
+            var vm = (MainWindowViewModel)window.DataContext!;
+            vm.SelectedRightTab = 2; // Logs
+            await Task.Delay(150);
+
+            vm.Dashboard.AppendOutput("info", "jump-info-0", "Terminal 01");
+            vm.Dashboard.AppendOutput("error", "jump-err-1", "Terminal 01");
+            vm.Dashboard.AppendOutput("warn", "jump-warn-2", "Terminal 01");
+            vm.Dashboard.AppendOutput("error", "jump-err-3", "Terminal 01");
+            vm.Dashboard.AppendOutput("info", "jump-info-4", "Terminal 01");
+            vm.Dashboard.AppendOutput("error", "jump-err-5", "Terminal 01");
+            await Until(() => vm.Logs.Entries.Count >= 6 && vm.Logs.LevelErrorCount >= 3);
+
+            Assert.True(vm.Logs.LevelAllSelected);
+
+            var prevErr = window.GetVisualDescendants().OfType<Button>()
+                .Single(b => ReferenceEquals(b.Command, vm.Logs.GoPrevErrorCommand));
+            var nextErr = window.GetVisualDescendants().OfType<Button>()
+                .Single(b => ReferenceEquals(b.Command, vm.Logs.GoNextErrorCommand));
+            Assert.Equal("▲ error", prevErr.Content);
+            Assert.Equal("▼ error", nextErr.Content);
+            Assert.False(prevErr.IsEnabled);
+            Assert.True(nextErr.IsEnabled);
+
+            nextErr.Command!.Execute(null);
+            await Task.Delay(100);
+            Assert.Equal(1, vm.Logs.SelectedIndex);
+            Assert.Equal("jump-err-1", vm.Logs.SelectedEntry!.Message);
+            Assert.False(vm.Logs.FollowTail);
+            Assert.False(prevErr.IsEnabled); // still first error
+            Assert.True(nextErr.IsEnabled);
+
+            nextErr.Command!.Execute(null);
+            await Task.Delay(80);
+            Assert.Equal(3, vm.Logs.SelectedIndex);
+            Assert.True(prevErr.IsEnabled);
+
+            var outDir = Path.Combine(AppContext.BaseDirectory, "ui-snapshots");
+            Directory.CreateDirectory(outDir);
+            window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "logs-jump-level.png"));
+        }
+        finally
+        {
+            if (window.DataContext is MainWindowViewModel vmCleanup)
+            {
+                vmCleanup.Logs.FilterText = "";
+                vmCleanup.Logs.UseRegex = false;
+                vmCleanup.Logs.LevelFilterIndex = 0;
+            }
+            window.Close();
+        }
+    }
+
 }
