@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TerminalHub.Core.Logging;
 using TerminalHub.Core.Monitoring;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Sessions;
@@ -34,8 +35,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _selectedRightTab;
     [ObservableProperty] private bool _settingsOpen;
 
-    /// <summary>AssistantMode mirrors the Codex right-rail tab.</summary>
-    partial void OnSelectedRightTabChanged(int value) => AssistantMode = value == 4;
+    /// <summary>Title-bar OS label ("Windows System" in the mockup — follows the real OS).</summary>
+    public string OsLabel => OperatingSystem.IsWindows() ? "Windows System"
+        : OperatingSystem.IsLinux() ? "Linux System"
+        : OperatingSystem.IsMacOS() ? "macOS System"
+        : "本机";
+
+    /// <summary>AssistantMode mirrors the Codex right-rail tab; Files lazy-inits on first visit.</summary>
+    partial void OnSelectedRightTabChanged(int value)
+    {
+        AssistantMode = value == 4;
+        if (value == 1) Files.EnsureSessionDir();
+    }
 
     /// <summary>Selection sync: ListBox.SelectedItem drives activation.</summary>
     partial void OnActiveCardChanged(SessionCardViewModel? value)
@@ -48,6 +59,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
+    public FilesViewModel Files { get; }
 
     public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null)
     {
@@ -61,6 +73,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Dashboard = new DashboardViewModel(_monitor);
         Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.MockAiAssistant());
+        Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory);
 
         _sessions.SessionAdded += OnSessionAdded;
         _sessions.SessionRemoved += OnSessionRemoved;
@@ -212,8 +225,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         CommandInput = "";
     }
 
+    /// <summary>Per-session UTF-8 line decoders feeding the real Output log.</summary>
+    private readonly Dictionary<Guid, Utf8LineDecoder> _lineDecoders = new();
+
+    private void OnPtyOutput(IPtySession pty, ReadOnlyMemory<byte> data)
+    {
+        if (!_lineDecoders.TryGetValue(pty.Id, out var dec))
+        {
+            dec = new Utf8LineDecoder();
+            dec.LineReceived += line => Dashboard.AppendOutput(ClassifyLine(line), line);
+            _lineDecoders[pty.Id] = dec;
+        }
+        dec.Feed(data.Span);
+    }
+
+    private static string ClassifyLine(string line)
+    {
+        if (line.Contains("error", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("fail", StringComparison.OrdinalIgnoreCase)) return "error";
+        if (line.Contains("warn", StringComparison.OrdinalIgnoreCase)) return "warn";
+        return "info";
+    }
+
     private void OnSessionAdded(TerminalSessionModel s)
     {
+        s.Pty.OutputReceived += OnPtyOutput;
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             var card = new SessionCardViewModel(s);
@@ -226,6 +262,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnSessionRemoved(TerminalSessionModel s)
     {
+        s.Pty.OutputReceived -= OnPtyOutput;
+        _lineDecoders.Remove(s.Id);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
@@ -269,6 +307,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     public static string FmtGb(double bytes) => $"{bytes / (1024.0 * 1024 * 1024):0.0} GB";
+
+    /// <summary>"512 MB"-style byte formatting for file sizes.</summary>
+    public static string FmtBytes(long bytes)
+    {
+        if (bytes >= 1L << 30) return $"{bytes / (double)(1L << 30):0.0} GB";
+        if (bytes >= 1L << 20) return $"{bytes / (double)(1L << 20):0.0} MB";
+        if (bytes >= 1L << 10) return $"{bytes / 1024.0:0} KB";
+        return $"{bytes} B";
+    }
 
     public void PersistSettings() => _settingsStore.Save(_settings);
 

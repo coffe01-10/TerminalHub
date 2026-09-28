@@ -42,13 +42,39 @@ public sealed class BytesConverter : IValueConverter
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        var bytes = value is double d ? d : 0;
+        var bytes = value switch
+        {
+            double d => d,
+            long l => l,
+            int i => i,
+            _ => 0d,
+        };
         if (bytes >= 1L << 30) return $"{bytes / (1L << 30):0.0} GB";
         if (bytes >= 1L << 20) return $"{bytes / (1L << 20):0} MB";
         if (bytes >= 1L << 10) return $"{bytes / (1L << 10):0} KB";
         return $"{bytes:0} B";
     }
 
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
+/// <summary>IsDirectory → dir names get a blue tint, files stay near-white.</summary>
+public sealed class DirNameConverter : IValueConverter
+{
+    public static readonly DirNameConverter Instance = new();
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true
+            ? new SolidColorBrush(Color.Parse("#7DD3FC"))
+            : new SolidColorBrush(Color.Parse("#E2E8F0"));
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
+/// <summary>Non-empty string → true (status line visibility).</summary>
+public sealed class StringNotEmptyConverter : IValueConverter
+{
+    public static readonly StringNotEmptyConverter Instance = new();
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => !string.IsNullOrEmpty(value as string);
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
