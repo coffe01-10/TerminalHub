@@ -60,7 +60,8 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: false);
-        var vm = new MainWindowViewModel();
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var vm = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
         try
         {
             vm.DeployFromDock(forceRepublish: false, root);
@@ -92,6 +93,7 @@ public class DeployDockTests
         {
             vm.Dispose();
             Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
         }
     }
 
@@ -100,7 +102,8 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: false);
-        var vm = new MainWindowViewModel();
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var vm = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
         try
         {
             vm.DeployFromDock(false, root);
@@ -109,11 +112,15 @@ public class DeployDockTests
             await WaitFor(() => vm.Dashboard.OutputLog.Any(l =>
                 l.Source == "deploy" && l.Level == "error"
                 && l.Message.Contains("publish failed") && l.Message.Contains("打包失败")));
+            Assert.Equal(LastPublishResults.Fail, vm.Settings.LastPublishResult?.Outcome);
+            Assert.Equal(-1, vm.Settings.LastPublishResult!.ExitCode);
+            AssertDurationBadge(vm.LastPublishBadge, "失败 exit -1");
         }
         finally
         {
             vm.Dispose();
             Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
         }
     }
 
@@ -300,7 +307,8 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: true);
-        var vm = new MainWindowViewModel();
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var vm = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
         try
         {
             vm.DeployFromDock(true, root);
@@ -316,6 +324,7 @@ public class DeployDockTests
         {
             vm.Dispose();
             Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
         }
     }
 
@@ -558,7 +567,8 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: false);
-        var vm = new MainWindowViewModel();
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var vm = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
         try
         {
             vm.CancelPublishCommand.Execute(null);
@@ -599,6 +609,7 @@ public class DeployDockTests
         {
             vm.Dispose();
             Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
         }
     }
 
@@ -607,8 +618,9 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: false);
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
         var previous = Directory.GetCurrentDirectory();
-        var window = new MainWindow { Width = 1200, Height = 800 };
+        var window = new MainWindow(new SettingsStore(settingsPath)) { Width = 1200, Height = 800 };
         try
         {
             Directory.SetCurrentDirectory(root);
@@ -655,6 +667,190 @@ public class DeployDockTests
             Directory.SetCurrentDirectory(previous);
             window.Close();
             Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task LastPublish_Success_PersistsBadge_OpensArtifact_DisablesWhenMissing()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: true);
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var previous = Directory.GetCurrentDirectory();
+        var window = new MainWindow(new SettingsStore(settingsPath)) { Width = 1200, Height = 800 };
+        MainWindowViewModel? vm = null;
+        MainWindowViewModel? reloaded = null;
+        try
+        {
+            Directory.SetCurrentDirectory(root);
+            window.Show();
+            await FlushUi();
+            vm = (MainWindowViewModel)window.DataContext!;
+            Assert.Equal("", vm.LastPublishSummary);
+            Assert.Equal("", vm.LastPublishBadge);
+            Assert.False(vm.HasLastPublishBadge);
+            Assert.False(vm.CanOpenLastSuccessfulArtifact);
+            Assert.Contains("尚未打包", vm.DeployDockTip);
+            Assert.Equal("Deploy", vm.DeployDockCaption);
+
+            window.RefreshDeployContextMenu();
+            var deploy = window.FindControl<Button>("DeployDockButton");
+            Assert.NotNull(deploy);
+            var flyout = Assert.IsType<MenuFlyout>(deploy!.ContextFlyout);
+            var openLast = MenuByHeader(flyout, "打开上次成功产物");
+            Assert.Contains("Open last success", openLast.Header?.ToString());
+            Assert.False(openLast.IsEnabled);
+            var recent = MenuByHeader(flyout, "最近产物");
+            Assert.Contains("linux-x64", recent.Items.OfType<MenuItem>().First().Tag?.ToString());
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.IsPublishRunning);
+            Assert.Equal("打包中", vm.DeployDockCaption);
+            Assert.Equal("", vm.LastPublishBadge);
+            Assert.False(vm.HasLastPublishBadge);
+            Assert.Equal("", vm.LastPublishSummary);
+
+            vm.SessionCards.Single(c => c.Name == "Publish").Model.Emulator.SendText("exit\r");
+            await WaitFor(() => vm.Settings.LastPublishResult?.Outcome == LastPublishResults.Success);
+            var expected = Path.GetFullPath(Path.Combine(root, "artifacts", "publish", "linux-x64"));
+            var stored = vm.Settings.LastPublishResult!;
+            Assert.Equal(0, stored.ExitCode);
+            Assert.True(stored.DurationMs >= 0);
+            Assert.NotEqual(default, stored.FinishedAt);
+            Assert.Equal(expected, Path.GetFullPath(stored.ArtifactPath));
+            Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(stored.RepoRoot));
+            AssertDurationBadge(vm.LastPublishSummary, "成功");
+            Assert.Equal(vm.LastPublishSummary, vm.LastPublishBadge);
+            Assert.True(vm.HasLastPublishBadge);
+            Assert.True(vm.CanOpenLastSuccessfulArtifact);
+            Assert.Contains("exit 0", vm.DeployDockTip);
+            Assert.Equal("Deploy", vm.DeployDockCaption);
+            await WaitFor(() => deploy.GetVisualDescendants().OfType<TextBlock>()
+                .Any(t => t.IsVisible && t.Text == vm.LastPublishBadge));
+
+            var loaded = new SettingsStore(settingsPath).Load();
+            Assert.Equal(LastPublishResults.Success, loaded.LastPublishResult!.Outcome);
+            Assert.Equal(stored.ArtifactPath, loaded.LastPublishResult.ArtifactPath);
+            Assert.Equal(0, loaded.LastPublishResult.ExitCode);
+            Assert.Equal(stored.DurationMs, loaded.LastPublishResult.DurationMs);
+            Assert.Equal(stored.FinishedAt, loaded.LastPublishResult.FinishedAt);
+
+            window.RefreshDeployContextMenu();
+            Assert.True(openLast.IsEnabled);
+            Assert.Contains("linux-x64", recent.Items.OfType<MenuItem>().First().Tag?.ToString());
+
+            openLast.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await FlushUi();
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Message.Contains(stored.ArtifactPath));
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.SessionCards.Any(c => c.Name == "Publish" && c.Model.IsRunning));
+            Assert.Equal("打包中", vm.DeployDockCaption);
+            Assert.Equal("", vm.LastPublishBadge);
+            Assert.StartsWith("成功", vm.LastPublishSummary);
+            vm.SessionCards.Last(c => c.Name == "Publish").Model.Pty.Kill();
+            await WaitFor(() => vm.Settings.LastPublishResult!.Outcome == LastPublishResults.Fail);
+            Assert.Equal(-1, vm.Settings.LastPublishResult!.ExitCode);
+            AssertDurationBadge(vm.LastPublishBadge, "失败 exit -1");
+            Assert.Equal(expected, Path.GetFullPath(vm.Settings.LastPublishResult.ArtifactPath));
+            Assert.True(vm.CanOpenLastSuccessfulArtifact);
+            Assert.Contains("exit -1", vm.DeployDockTip);
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Message.Contains("publish failed"));
+
+            Directory.Delete(expected, true);
+            Assert.False(vm.CanOpenLastSuccessfulArtifact);
+            Assert.Equal(expected, Path.GetFullPath(vm.Settings.LastPublishResult.ArtifactPath));
+            window.RefreshDeployContextMenu();
+            Assert.False(openLast.IsEnabled);
+            var warns = vm.Dashboard.OutputLog.Count(l => l.Message.Contains("last successful artifact missing"));
+            openLast.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            vm.OpenLastSuccessfulArtifact();
+            await FlushUi();
+            Assert.True(vm.Dashboard.OutputLog.Count(l =>
+                l.Source == "deploy" && l.Level == "warn"
+                && l.Message.Contains("last successful artifact missing")) > warns);
+
+            reloaded = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
+            Assert.Equal(LastPublishResults.Fail, reloaded.Settings.LastPublishResult!.Outcome);
+            Assert.Equal(-1, reloaded.Settings.LastPublishResult.ExitCode);
+            Assert.StartsWith("失败", reloaded.LastPublishBadge);
+            Assert.False(reloaded.CanOpenLastSuccessfulArtifact);
+            Assert.Contains("exit -1", reloaded.DeployDockTip);
+            Assert.Equal("Deploy", reloaded.DeployDockCaption);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previous);
+            window.Close();
+            vm?.Dispose();
+            reloaded?.Dispose();
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task LastPublish_Cancel_RecordsCancelledOutcome_HidesBadgeWhileRunning()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: false);
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var vm = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
+        MainWindowViewModel? reloaded = null;
+        try
+        {
+            Assert.Equal("", vm.LastPublishSummary);
+            Assert.Contains("尚未打包", vm.DeployDockTip);
+            Assert.False(vm.CanOpenLastSuccessfulArtifact);
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.IsPublishRunning);
+            Assert.Equal("打包中", vm.DeployDockCaption);
+            Assert.Equal("", vm.LastPublishBadge);
+            Assert.DoesNotContain("尚未打包", vm.DeployDockTip);
+
+            vm.CancelPublishCommand.Execute(null);
+            await WaitFor(() => vm.Settings.LastPublishResult?.Outcome == LastPublishResults.Cancelled);
+            Assert.False(vm.PublishBusy());
+            Assert.False(vm.IsPublishRunning);
+            Assert.Equal("Deploy", vm.DeployDockCaption);
+            Assert.Equal(-1, vm.Settings.LastPublishResult!.ExitCode);
+            Assert.True(vm.Settings.LastPublishResult.DurationMs >= 0);
+            Assert.NotEqual(default, vm.Settings.LastPublishResult.FinishedAt);
+            Assert.Equal("", vm.Settings.LastPublishResult.ArtifactPath);
+            AssertDurationBadge(vm.LastPublishBadge, "已取消");
+            Assert.Contains("exit -1", vm.DeployDockTip);
+            Assert.Contains(vm.Dashboard.OutputLog, l =>
+                l.Source == "deploy" && l.Message.Contains("publish cancelled"));
+            Assert.DoesNotContain(vm.Dashboard.OutputLog, l => l.Message.Contains("publish failed"));
+            Assert.False(vm.CanOpenLastSuccessfulArtifact);
+
+            var loaded = new SettingsStore(settingsPath).Load();
+            Assert.Equal(LastPublishResults.Cancelled, loaded.LastPublishResult!.Outcome);
+            Assert.Equal(-1, loaded.LastPublishResult.ExitCode);
+            Assert.Equal(vm.Settings.LastPublishResult.DurationMs, loaded.LastPublishResult.DurationMs);
+
+            vm.DeployFromDock(forceRepublish: true, root);
+            await WaitFor(() => vm.IsPublishRunning);
+            Assert.Equal("打包中", vm.DeployDockCaption);
+            Assert.Equal("", vm.LastPublishBadge);
+            Assert.StartsWith("已取消", vm.LastPublishSummary);
+            Assert.Contains("exit -1", vm.DeployDockTip);
+
+            reloaded = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
+            Assert.Equal(LastPublishResults.Cancelled, reloaded.Settings.LastPublishResult!.Outcome);
+            Assert.StartsWith("已取消", reloaded.LastPublishBadge);
+            Assert.Contains("exit -1", reloaded.DeployDockTip);
+        }
+        finally
+        {
+            vm.Dispose();
+            reloaded?.Dispose();
+            Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
         }
     }
 
@@ -684,4 +880,7 @@ public class DeployDockTests
 
     private static MenuItem OnlyChild(MenuItem menu) =>
         Assert.Single(menu.Items.OfType<MenuItem>());
+
+    private static void AssertDurationBadge(string? text, string prefix) =>
+        Assert.Matches("^" + System.Text.RegularExpressions.Regex.Escape(prefix) + @" · (<1s|\d+m\d+s|\d+m|\d+s)$", text);
 }

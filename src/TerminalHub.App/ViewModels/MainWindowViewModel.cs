@@ -50,7 +50,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _deployDockTip = DeployDockTipIdle;
 
     private const string DeployDockTipIdle =
-        "点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物。打包进行中可右键「取消打包」。";
+        "点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物、打开上次成功产物。打包进行中可右键「取消打包」。";
 
     private const string DeployDockTipRunning =
         "打包进行中。右键「取消打包 Cancel」终止发布进程组。普通点击不会再次启动。";
@@ -58,10 +58,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Dock caption: idle reads Deploy; a running publish reads 打包中.</summary>
     public string DeployDockCaption => IsPublishRunning ? "打包中" : "Deploy";
 
+    /// <summary>
+    /// Short last-outcome text from the real exit record. Empty until a publish has finished.
+    /// Stays visible in the property while a later publish is running; the dock binds
+    /// <see cref="LastPublishBadge"/>, which hides during that run.
+    /// </summary>
+    public string LastPublishSummary => LastPublishResults.FormatBadge(_settings.LastPublishResult);
+
+    /// <summary>Status line under the Deploy caption. Empty while a publish is running.</summary>
+    public string LastPublishBadge => IsPublishRunning ? "" : LastPublishSummary;
+
+    public bool HasLastPublishBadge => LastPublishBadge.Length > 0;
+
+    /// <summary>True when the stored last-success folder still exists on disk.</summary>
+    public bool CanOpenLastSuccessfulArtifact => LastPublishResults.CanOpen(_settings.LastPublishResult);
+
     partial void OnIsPublishRunningChanged(bool value)
     {
-        DeployDockTip = value ? DeployDockTipRunning : DeployDockTipIdle;
+        DeployDockTip = ComposeDeployDockTip(value);
         OnPropertyChanged(nameof(DeployDockCaption));
+        OnPropertyChanged(nameof(LastPublishBadge));
+        OnPropertyChanged(nameof(HasLastPublishBadge));
+    }
+
+    private string ComposeDeployDockTip(bool? running = null)
+    {
+        var isRunning = running ?? IsPublishRunning;
+        var head = isRunning ? DeployDockTipRunning : DeployDockTipIdle;
+        var detail = LastPublishResults.FormatTooltip(_settings.LastPublishResult);
+        if (isRunning && detail == "尚未打包") return head;
+        return head + "\n" + detail;
     }
 
     /// <summary>Title-bar OS label ("Windows System" in the mockup — follows the real OS).</summary>
@@ -135,6 +161,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly Dictionary<Guid, string> _publishRoots = new();
     /// <summary>Publish ids the user asked to cancel. Exit then logs cancelled, not a generic failure.</summary>
     private readonly HashSet<Guid> _publishCancelled = new();
+    /// <summary>When each publish session was armed, so exit can store duration.</summary>
+    private readonly Dictionary<Guid, DateTimeOffset> _publishStartedAt = new();
+    /// <summary>Start stamp for the in-flight attempt, including cancel-before-id and spawn failure.</summary>
+    private DateTimeOffset _publishAttemptStartedAt;
     /// <summary>Publish sessions whose first script line already focused the Output tab.</summary>
     private readonly HashSet<Guid> _publishOutputArmed = new();
     private readonly object _publishLock = new();
@@ -173,6 +203,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         _settingsStore = settingsStore ?? new SettingsStore();
         _settings = _settingsStore.Load();
+        DeployDockTip = ComposeDeployDockTip();
         _workspaceName = _settings.WorkspaceName;
 
         _monitor = monitor ?? new SystemMonitor();
@@ -692,6 +723,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OpenArtifactFolder([new ArtifactLocator.ArtifactDir(path, files)]);
     }
 
+    /// <summary>
+    /// Open the last successful publish folder with the same file-manager path as a recent-artifact click.
+    /// A missing directory stays stored and is reported; the menu item is disabled in that case.
+    /// </summary>
+    public void OpenLastSuccessfulArtifact()
+    {
+        Dashboard.SelectedBottomTab = 0;
+        var path = _settings.LastPublishResult?.ArtifactPath;
+        if (!CanOpenLastSuccessfulArtifact)
+        {
+            Dashboard.AppendOutput("warn",
+                "Deploy: 上次成功产物不存在 / last successful artifact missing", "deploy");
+            OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
+            return;
+        }
+        OpenRecentArtifact(path);
+    }
+
     private IReadOnlyList<RecentArtifact> RefreshRecentArtifacts(string? start)
     {
         RecentArtifacts = RecentArtifactList.List(start);
@@ -765,6 +814,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             _publishStarting++;
             _idleCancelWarned = false;
+            _publishAttemptStartedAt = DateTimeOffset.UtcNow;
         }
         RefreshPublishRunning();
         _ = SpawnPublishAsync(plan);
@@ -786,6 +836,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                         spawned = pty.Id;
                         _publishIds.Add(pty.Id);
                         _publishRoots[pty.Id] = plan.RepoRoot;
+                        _publishStartedAt[pty.Id] = _publishAttemptStartedAt;
                         if (_cancelPendingStart)
                         {
                             _publishCancelled.Add(pty.Id);
@@ -818,16 +869,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             bool cancelled;
+            bool record;
+            string? root = null;
+            DateTimeOffset started;
             lock (_publishLock)
             {
                 cancelled = _cancelPendingStart
                     || (spawned != Guid.Empty && _publishCancelled.Contains(spawned));
                 if (spawned != Guid.Empty)
                 {
-                    _publishIds.Remove(spawned);
+                    // False when ReportPublishExit already consumed this id.
+                    record = _publishIds.Remove(spawned);
+                    _publishRoots.TryGetValue(spawned, out root);
                     _publishRoots.Remove(spawned);
                     _publishCancelled.Remove(spawned);
                     _publishOutputArmed.Remove(spawned);
+                    if (!_publishStartedAt.Remove(spawned, out started))
+                        started = _publishAttemptStartedAt;
+                }
+                else
+                {
+                    record = true;
+                    started = _publishAttemptStartedAt;
                 }
                 _cancelPendingStart = false;
             }
@@ -837,6 +900,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             else
                 Dashboard.AppendOutput("error",
                     $"Deploy: 启动失败 / publish failed to start — {ex.Message}", "deploy");
+            if (record)
+            {
+                var outcome = cancelled ? LastPublishResults.Cancelled : LastPublishResults.Fail;
+                var rootCopy = root;
+                var startedCopy = started;
+                RunOnUi(() => RecordPublishOutcome(outcome, -1, rootCopy, null, startedCopy));
+            }
         }
         finally
         {
@@ -918,6 +988,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         bool cancelled;
         string? root;
+        DateTimeOffset started;
         lock (_publishLock)
         {
             if (!_publishIds.Remove(id)) return;
@@ -925,9 +996,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _publishOutputArmed.Remove(id);
             _publishRoots.TryGetValue(id, out root);
             _publishRoots.Remove(id);
+            if (!_publishStartedAt.Remove(id, out started))
+                started = _publishAttemptStartedAt;
         }
         RefreshPublishRunning();
         Dashboard.SelectedBottomTab = 0;
+        string? artifact = null;
         if (cancelled)
             Dashboard.AppendOutput("warn",
                 "Deploy: 已取消打包 / publish cancelled", "deploy");
@@ -937,12 +1011,50 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 "Deploy: 打包成功 / publish succeeded。再次点击 Deploy 打开产物目录 artifacts/publish。",
                 "deploy");
             if (!string.IsNullOrWhiteSpace(root))
+            {
                 AnnounceRecentArtifacts(root);
+                artifact = RecentArtifacts.FirstOrDefault()?.Path;
+            }
         }
         else
             Dashboard.AppendOutput("error",
                 $"Deploy: 打包失败 / publish failed (exit {code})。请查看 Publish 终端输出。",
                 "deploy");
+
+        RecordPublishOutcome(
+            cancelled ? LastPublishResults.Cancelled : code == 0 ? LastPublishResults.Success : LastPublishResults.Fail,
+            code,
+            root,
+            artifact,
+            started);
+    }
+
+    /// <summary>Persist a real terminal outcome and refresh dock bindings. No invented success.</summary>
+    private void RecordPublishOutcome(
+        string outcome, int exitCode, string? repoRoot, string? artifactPath, DateTimeOffset started)
+    {
+        var finished = DateTimeOffset.UtcNow;
+        LastPublishResults.Record(
+            _settings, outcome, exitCode, finished, ElapsedMs(started, finished), repoRoot, artifactPath);
+        PersistSettings();
+        NotifyLastPublish();
+    }
+
+    private static long ElapsedMs(DateTimeOffset started, DateTimeOffset finished)
+    {
+        if (started == default) return 0;
+        var ms = (finished - started).TotalMilliseconds;
+        if (double.IsNaN(ms) || ms <= 0) return 0;
+        return ms >= long.MaxValue ? long.MaxValue : (long)ms;
+    }
+
+    private void NotifyLastPublish()
+    {
+        OnPropertyChanged(nameof(LastPublishSummary));
+        OnPropertyChanged(nameof(LastPublishBadge));
+        OnPropertyChanged(nameof(HasLastPublishBadge));
+        OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
+        DeployDockTip = ComposeDeployDockTip();
     }
 
     private void PrintPublishHints(string reason)
@@ -1337,6 +1449,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _publishIds.Clear();
             _publishRoots.Clear();
             _publishCancelled.Clear();
+            _publishStartedAt.Clear();
             _publishOutputArmed.Clear();
             _cancelPendingStart = false;
         }
