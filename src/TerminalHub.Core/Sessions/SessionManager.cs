@@ -65,6 +65,29 @@ public sealed class SessionManager
         session.Dispose();
     }
 
+    /// <summary>Detach a session without killing it: leaves the list, fires
+    /// <see cref="SessionRemoved"/>, drops active selection — but the child process
+    /// and emulator stay alive. Ownership transfers to the caller (e.g. a popout
+    /// window); hand it back via <see cref="Reattach"/> or dispose it yourself.
+    /// Returns null when the session is not in this manager.</summary>
+    public TerminalSessionModel? Detach(TerminalSessionModel session)
+    {
+        if (!Sessions.Remove(session)) return null;
+        SessionRemoved?.Invoke(session);
+        if (ReferenceEquals(Active, session))
+            Activate(Sessions.LastOrDefault());
+        return session;
+    }
+
+    /// <summary>Re-adopt a detached session into the list and activate it.</summary>
+    public void Reattach(TerminalSessionModel session)
+    {
+        if (Sessions.Contains(session)) return;
+        Sessions.Add(session);
+        SessionAdded?.Invoke(session);
+        Activate(session);
+    }
+
     /// <summary>Rename a session (tab title).</summary>
     public void Rename(TerminalSessionModel session, string name) => session.Name = name;
 }
