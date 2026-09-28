@@ -32,6 +32,14 @@ public sealed class AppSettings
     public string WorkspaceName { get; set; } = "MangaFlow";
     /// <summary>When true, session output is also written to a local log file.</summary>
     public bool SessionLogToFile { get; set; }
+    /// <summary>Logs panel: last text filter ("" = none). Survives restarts.</summary>
+    public string LogsFilterText { get; set; } = "";
+    /// <summary>Logs panel: treat <see cref="LogsFilterText"/> as a regex.</summary>
+    public bool LogsUseRegex { get; set; }
+    /// <summary>Logs panel: 0=全部, 1=info, 2=warn, 3=error (clamped on load).</summary>
+    public int LogsLevelFilterIndex { get; set; }
+    /// <summary>Logs panel: keep the buffered history when the Output panel is cleared.</summary>
+    public bool LogsRetainHistoryOnClear { get; set; }
     /// <summary>Saved SSH connections for the right-rail SSH tab.</summary>
     public List<TerminalHub.Core.Ssh.SshHost> SshHosts { get; set; } = [];
     public List<StartupSession> StartupSessions { get; set; } =
