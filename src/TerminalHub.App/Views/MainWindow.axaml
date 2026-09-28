@@ -1141,14 +1141,16 @@
           </StackPanel>
         </Button>
         <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
-             Right-click also switches publish profiles and opens recent artifacts. -->
+             Right-click also switches publish profiles, opens recent artifacts, and cancels a running publish. -->
         <Button x:Name="DeployDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4"
-                ToolTip.Tip="点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物。">
+                ToolTip.Tip="{Binding DeployDockTip}">
           <Button.ContextFlyout>
             <MenuFlyout Opening="OnDeployMenuOpening">
               <MenuItem Header="重新打包 Republish" Click="OnRepublishMenuClick"/>
+              <MenuItem Header="取消打包 Cancel" Click="OnCancelPublishMenuClick"
+                        IsEnabled="{Binding IsPublishRunning}"/>
               <Separator/>
               <MenuItem Header="配置档 Profiles">
                 <MenuItem Header="（无已存配置）" IsEnabled="False"/>
@@ -1165,7 +1167,7 @@
           </Button.ContextFlyout>
           <StackPanel>
             <TextBlock Text="☁" FontSize="13" HorizontalAlignment="Center"/>
-            <TextBlock Text="Deploy" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+            <TextBlock Text="{Binding DeployDockCaption}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"

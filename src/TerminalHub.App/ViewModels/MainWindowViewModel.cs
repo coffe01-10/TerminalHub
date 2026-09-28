@@ -43,6 +43,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Dock index of the active surface (-1 when a tab has no dock item).</summary>
     [ObservableProperty] private int _dockHighlight = -1;
 
+    /// <summary>True while a dock publish is starting or its session is still running.</summary>
+    [ObservableProperty] private bool _isPublishRunning;
+
+    /// <summary>Deploy dock tooltip. Idle text, or a cancel hint while a publish is running.</summary>
+    [ObservableProperty] private string _deployDockTip = DeployDockTipIdle;
+
+    private const string DeployDockTipIdle =
+        "点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物。打包进行中可右键「取消打包」。";
+
+    private const string DeployDockTipRunning =
+        "打包进行中。右键「取消打包 Cancel」终止发布进程组。普通点击不会再次启动。";
+
+    /// <summary>Dock caption: idle reads Deploy; a running publish reads 打包中.</summary>
+    public string DeployDockCaption => IsPublishRunning ? "打包中" : "Deploy";
+
+    partial void OnIsPublishRunningChanged(bool value)
+    {
+        DeployDockTip = value ? DeployDockTipRunning : DeployDockTipIdle;
+        OnPropertyChanged(nameof(DeployDockCaption));
+    }
+
     /// <summary>Title-bar OS label ("Windows System" in the mockup — follows the real OS).</summary>
     public string OsLabel => OperatingSystem.IsWindows() ? "Windows System"
         : OperatingSystem.IsLinux() ? "Linux System"
@@ -109,7 +130,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly HashSet<Guid> _publishIds = new();
     /// <summary>Repo root of each publish session, so a successful exit can rescan artifacts.</summary>
     private readonly Dictionary<Guid, string> _publishRoots = new();
+    /// <summary>Publish ids the user asked to cancel. Exit then logs cancelled, not a generic failure.</summary>
+    private readonly HashSet<Guid> _publishCancelled = new();
+    /// <summary>Publish sessions whose first script line already focused the Output tab.</summary>
+    private readonly HashSet<Guid> _publishOutputArmed = new();
+    private readonly object _publishLock = new();
     private int _publishStarting;
+    /// <summary>Cancel arrived before the PTY id existed. Applied when the session is created.</summary>
+    private bool _cancelPendingStart;
+    /// <summary>Idle cancel already logged, so a second click does not repeat the warning.</summary>
+    private bool _idleCancelWarned;
 
     /// <summary>Per-session CWD back/forward stacks (keyed by session id).
     /// Mutated from UI (nav commands), PTY thread (OSC 7) and monitor thread
@@ -695,16 +725,40 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         Dashboard.AppendOutput("info", $"Deploy: 开始打包 / publish start — {plan.DisplayCommand}", "deploy");
-        _publishStarting++;
+        Dashboard.SelectedBottomTab = 0;
+        lock (_publishLock)
+        {
+            _publishStarting++;
+            _idleCancelWarned = false;
+        }
+        RefreshPublishRunning();
         _ = SpawnPublishAsync(plan);
     }
 
     private async Task SpawnPublishAsync(PublishPlan plan)
     {
+        var spawned = Guid.Empty;
         try
         {
             var session = await _sessions.CreateAsync(
-                PtySessionFactory.Create,
+                () =>
+                {
+                    // Register the id before StartAsync so the first subscribed
+                    // script line is already known to be a publish stream.
+                    var pty = PtySessionFactory.Create();
+                    lock (_publishLock)
+                    {
+                        spawned = pty.Id;
+                        _publishIds.Add(pty.Id);
+                        _publishRoots[pty.Id] = plan.RepoRoot;
+                        if (_cancelPendingStart)
+                        {
+                            _publishCancelled.Add(pty.Id);
+                            _cancelPendingStart = false;
+                        }
+                    }
+                    return pty;
+                },
                 new PtyOptions
                 {
                     Shell = plan.Shell,
@@ -713,37 +767,136 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 },
                 "Publish",
                 SessionTag.Deploy);
-            _publishIds.Add(session.Id);
-            _publishRoots[session.Id] = plan.RepoRoot;
             session.Pty.Exited += (_, code) => RunOnUi(() => ReportPublishExit(session.Id, code));
             if (!session.IsRunning)
                 ReportPublishExit(session.Id, session.Pty.ExitCode ?? -1);
+            Dashboard.SelectedBottomTab = 0;
             Dashboard.AppendOutput("info",
                 "Deploy: 已启动会话 Publish · 标签 部署控制 (Deploy)。结束时 Output 会显示成功或失败。",
                 "deploy");
+
+            bool cancelNow;
+            lock (_publishLock) cancelNow = _publishCancelled.Contains(session.Id);
+            if (cancelNow && session.IsRunning)
+                session.Pty.Kill();
         }
         catch (Exception ex)
         {
-            Dashboard.AppendOutput("error",
-                $"Deploy: 启动失败 / publish failed to start — {ex.Message}", "deploy");
+            bool cancelled;
+            lock (_publishLock)
+            {
+                cancelled = _cancelPendingStart
+                    || (spawned != Guid.Empty && _publishCancelled.Contains(spawned));
+                if (spawned != Guid.Empty)
+                {
+                    _publishIds.Remove(spawned);
+                    _publishRoots.Remove(spawned);
+                    _publishCancelled.Remove(spawned);
+                    _publishOutputArmed.Remove(spawned);
+                }
+                _cancelPendingStart = false;
+            }
+            if (cancelled)
+                Dashboard.AppendOutput("warn",
+                    "Deploy: 已取消打包 / publish cancelled", "deploy");
+            else
+                Dashboard.AppendOutput("error",
+                    $"Deploy: 启动失败 / publish failed to start — {ex.Message}", "deploy");
         }
         finally
         {
-            _publishStarting--;
+            lock (_publishLock) _publishStarting--;
+            RunOnUi(RefreshPublishRunning);
         }
     }
 
-    private bool PublishBusy() =>
-        _publishStarting > 0
-        || _sessions.Sessions.Any(s => _publishIds.Contains(s.Id) && s.IsRunning);
+    /// <summary>True while a publish is starting or its session is still alive.</summary>
+    public bool PublishBusy()
+    {
+        lock (_publishLock)
+        {
+            if (_publishStarting > 0) return true;
+            return _sessions.Sessions.Any(s => _publishIds.Contains(s.Id) && s.IsRunning);
+        }
+    }
+
+    private void RefreshPublishRunning()
+    {
+        var running = PublishBusy();
+        if (IsPublishRunning != running)
+            IsPublishRunning = running;
+    }
+
+    /// <summary>
+    /// Stop the running publish. Signals the session PTY (process group on Linux)
+    /// and lets the exit handler log the cancel. Idle and double-cancel are safe.
+    /// </summary>
+    [RelayCommand]
+    private void CancelPublish()
+    {
+        List<TerminalSessionModel> toKill = [];
+        var warnIdle = false;
+        lock (_publishLock)
+        {
+            var ids = _publishIds.ToArray();
+            var pending = _publishStarting > 0;
+            if (ids.Length == 0 && !pending)
+            {
+                if (!_idleCancelWarned)
+                {
+                    _idleCancelWarned = true;
+                    warnIdle = true;
+                }
+            }
+            else
+            {
+                var newly = false;
+                foreach (var id in ids)
+                    if (_publishCancelled.Add(id)) newly = true;
+                if (pending && !_cancelPendingStart)
+                {
+                    _cancelPendingStart = true;
+                    newly = true;
+                }
+                if (!newly) return;
+                foreach (var id in ids)
+                {
+                    var session = _sessions.Sessions.FirstOrDefault(s => s.Id == id && s.IsRunning);
+                    if (session is not null) toKill.Add(session);
+                }
+            }
+        }
+
+        if (warnIdle)
+        {
+            Dashboard.SelectedBottomTab = 0;
+            Dashboard.AppendOutput("warn",
+                "Deploy: 没有进行中的打包 / publish is not running", "deploy");
+            return;
+        }
+
+        foreach (var session in toKill)
+            session.Pty.Kill();
+    }
 
     private void ReportPublishExit(Guid id, int code)
     {
-        if (!_publishIds.Remove(id)) return;
-        _publishRoots.TryGetValue(id, out var root);
-        _publishRoots.Remove(id);
+        bool cancelled;
+        string? root;
+        lock (_publishLock)
+        {
+            if (!_publishIds.Remove(id)) return;
+            cancelled = _publishCancelled.Remove(id);
+            _publishOutputArmed.Remove(id);
+            _publishRoots.TryGetValue(id, out root);
+            _publishRoots.Remove(id);
+        }
+        RefreshPublishRunning();
         Dashboard.SelectedBottomTab = 0;
-        if (code == 0)
+        if (cancelled)
+            Dashboard.AppendOutput("warn",
+                "Deploy: 已取消打包 / publish cancelled", "deploy");
+        else if (code == 0)
         {
             Dashboard.AppendOutput("info",
                 "Deploy: 打包成功 / publish succeeded。再次点击 Deploy 打开产物目录 artifacts/publish。",
@@ -989,7 +1142,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 var level = ClassifyLine(line);
                 var name = _sessionNames.GetValueOrDefault(pty.Id, "session");
-                Dashboard.AppendOutput(level, line, name);
+                bool publish;
+                bool focusOutput;
+                lock (_publishLock)
+                {
+                    publish = _publishIds.Contains(pty.Id);
+                    focusOutput = publish && _publishOutputArmed.Add(pty.Id);
+                }
+                // Publish script bytes are real PTY output. Show them as deploy
+                // without inventing progress text. Other sessions keep their name.
+                if (focusOutput)
+                    RunOnUi(() => Dashboard.SelectedBottomTab = 0);
+                Dashboard.AppendOutput(level, line, publish ? "deploy" : name);
                 _sessionLog.Write(name, level, line);
             };
             dec.RawLineReceived += raw =>
@@ -1123,7 +1287,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         DetachedSessions.Clear();
         foreach (var w in _popouts.ToArray()) w.Close();
         _popouts.Clear();
-        _publishIds.Clear();
+        lock (_publishLock)
+        {
+            _publishIds.Clear();
+            _publishRoots.Clear();
+            _publishCancelled.Clear();
+            _publishOutputArmed.Clear();
+            _cancelPendingStart = false;
+        }
         PersistSettings();
         Logs.Dispose();
         _sessionLog.Dispose();

@@ -4,7 +4,7 @@ using TerminalHub.Core.Monitoring;
 
 namespace TerminalHub.App.ViewModels;
 
-/// <summary>Bottom-panel log entry (Output tab). Source = session name, "" for app events.</summary>
+/// <summary>Bottom-panel log entry (Output tab). Source is the session name, "deploy" for publish output, or "" for app events.</summary>
 public sealed record LogEntry(DateTime Time, string Level, string Message, string Source = "");
 
 /// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
