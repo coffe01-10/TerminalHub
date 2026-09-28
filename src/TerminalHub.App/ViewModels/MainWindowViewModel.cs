@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TerminalHub.Core.Deploy;
 using TerminalHub.Core.Logging;
 using TerminalHub.Core.Monitoring;
 using TerminalHub.Core.Pty;
@@ -65,6 +66,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private readonly SparklineBuffer _statusCpu = new(40);
+
+    /// <summary>Set by the Deploy button on Ctrl+pointer-press; consumed by the next dock Deploy.</summary>
+    private bool _deployCtrlHeld;
+
+    /// <summary>Publish sessions we spawned, so exit can be reported once.</summary>
+    private readonly HashSet<Guid> _publishIds = new();
+    private int _publishStarting;
 
     public DashboardViewModel Dashboard { get; }
     public AiPanelViewModel Assistant { get; }
@@ -235,51 +243,161 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             case 1: DockHighlight = 1; SelectedRightTab = 0; break;
             case 2: DockHighlight = 2; SelectedRightTab = 3; break;
             case 3: DockHighlight = 3; SelectedRightTab = 2; break;
-            case 4: Dashboard.SelectedBottomTab = 0; DeployArtifacts(); break;
+            case 4:
+                var force = _deployCtrlHeld;
+                _deployCtrlHeld = false;
+                DeployFromDock(force);
+                break;
             case 5: SettingsOpen = !SettingsOpen; break;
         }
     }
 
+    /// <summary>One-shot arm from Ctrl+pointer-press on the Deploy button. Cleared when the click runs.</summary>
+    public void ArmDeployCtrl(bool force) => _deployCtrlHeld = force;
+
     /// <summary>
-    /// Deploy dock button: open the publish artifacts folder if it exists,
-    /// otherwise print publish instructions to Output.
+    /// Deploy dock.
+    /// Plain click opens <c>artifacts/publish</c> when it has files, and starts the
+    /// platform publish script when it does not. <paramref name="forceRepublish"/>
+    /// (Ctrl+click, or the dock menu「重新打包」) always starts the script.
+    /// <paramref name="startDirectory"/> is the walk-up start; null uses the process working directory.
     /// </summary>
-    private void DeployArtifacts()
+    public void DeployFromDock(bool forceRepublish, string? startDirectory = null)
     {
-        var found = TerminalHub.Core.Deploy.ArtifactLocator.Find(Directory.GetCurrentDirectory());
-        if (found.Count > 0)
-        {
-            foreach (var d in found)
-            {
-                Dashboard.AppendOutput("info", $"Deploy: 产物目录 {d.Path}", "deploy");
-                foreach (var f in d.Files)
-                {
-                    var fi = new FileInfo(f);
-                    Dashboard.AppendOutput("info", $"  {fi.Name}  ({FmtBytes(fi.Length)})", "deploy");
-                }
-            }
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found[0].Path)
-                    { UseShellExecute = true });
-                Dashboard.AppendOutput("info", "Deploy: 已在文件管理器中打开产物目录", "deploy");
-            }
-            catch
-            {
-                Dashboard.AppendOutput("warn", "Deploy: 无法打开文件管理器 — 请手动访问上面目录", "deploy");
-            }
-        }
+        Dashboard.SelectedBottomTab = 0;
+        if (forceRepublish)
+            Dashboard.AppendOutput("info", "Deploy: 重新打包 / force republish", "deploy");
+
+        var start = string.IsNullOrWhiteSpace(startDirectory)
+            ? Directory.GetCurrentDirectory()
+            : startDirectory;
+        var found = ArtifactLocator.Find(start);
+        if (PublishPlanner.Decide(found.Count > 0, forceRepublish) == DeployAction.OpenArtifacts)
+            OpenArtifactFolder(found);
         else
+            StartPublish(start);
+    }
+
+    private void OpenArtifactFolder(IReadOnlyList<ArtifactLocator.ArtifactDir> found)
+    {
+        foreach (var d in found)
         {
-            Dashboard.AppendOutput("info", "Deploy: 尚未发现发布产物 (artifacts/publish)", "deploy");
-            Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
-                ? "  打包 Windows: scripts\\publish-windows.ps1 (需 Inno Setup)"
-                : "  打包 Linux:   ./scripts/publish-linux.sh  → artifacts/publish/linux-x64/", "deploy");
-            Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
-                ? "  打包 Linux:   ./scripts/publish-linux.sh"
-                : "  打包 Windows: scripts\\publish-windows.ps1 (需在 Windows + Inno Setup)", "deploy");
-            Dashboard.AppendOutput("info", "  发布完成后再次点击 Deploy 打开产物目录", "deploy");
+            Dashboard.AppendOutput("info", $"Deploy: 产物目录 {d.Path}", "deploy");
+            foreach (var f in d.Files)
+            {
+                var fi = new FileInfo(f);
+                Dashboard.AppendOutput("info", $"  {fi.Name}  ({FmtBytes(fi.Length)})", "deploy");
+            }
         }
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found[0].Path)
+                { UseShellExecute = true });
+            Dashboard.AppendOutput("info", "Deploy: 已在文件管理器中打开产物目录", "deploy");
+        }
+        catch
+        {
+            Dashboard.AppendOutput("warn", "Deploy: 无法打开文件管理器 — 请手动访问上面目录", "deploy");
+        }
+        Dashboard.AppendOutput("info",
+            "Deploy: 重新发布请按住 Ctrl 再点 Deploy，或右键菜单「重新打包」。", "deploy");
+    }
+
+    private void StartPublish(string startDir)
+    {
+        if (PublishBusy())
+        {
+            Dashboard.AppendOutput("warn",
+                "Deploy: 打包进行中 / publish already running — 请等待当前 Publish 会话结束", "deploy");
+            return;
+        }
+
+        var platform = PublishPlanner.CurrentPlatform;
+        var winShell = platform == PublishPlatform.Windows ? ResolveWindowsPublishShell() : null;
+        var plan = PublishPlanner.TryPlan(startDir, platform, winShell);
+        if (plan is null)
+        {
+            PrintPublishHints("Deploy: 找不到发布脚本 / publish script not found");
+            return;
+        }
+
+        Dashboard.AppendOutput("info", $"Deploy: 开始打包 / publish start — {plan.DisplayCommand}", "deploy");
+        _publishStarting++;
+        _ = SpawnPublishAsync(plan);
+    }
+
+    private async Task SpawnPublishAsync(PublishPlan plan)
+    {
+        try
+        {
+            var session = await _sessions.CreateAsync(
+                PtySessionFactory.Create,
+                new PtyOptions
+                {
+                    Shell = plan.Shell,
+                    Arguments = plan.Arguments,
+                    WorkingDirectory = plan.WorkingDirectory,
+                },
+                "Publish",
+                SessionTag.Deploy);
+            _publishIds.Add(session.Id);
+            session.Pty.Exited += (_, code) => RunOnUi(() => ReportPublishExit(session.Id, code));
+            if (!session.IsRunning)
+                ReportPublishExit(session.Id, session.Pty.ExitCode ?? -1);
+            Dashboard.AppendOutput("info",
+                "Deploy: 已启动会话 Publish · 标签 部署控制 (Deploy)。结束时 Output 会显示成功或失败。",
+                "deploy");
+        }
+        catch (Exception ex)
+        {
+            Dashboard.AppendOutput("error",
+                $"Deploy: 启动失败 / publish failed to start — {ex.Message}", "deploy");
+        }
+        finally
+        {
+            _publishStarting--;
+        }
+    }
+
+    private bool PublishBusy() =>
+        _publishStarting > 0
+        || _sessions.Sessions.Any(s => _publishIds.Contains(s.Id) && s.IsRunning);
+
+    private void ReportPublishExit(Guid id, int code)
+    {
+        if (!_publishIds.Remove(id)) return;
+        Dashboard.SelectedBottomTab = 0;
+        if (code == 0)
+            Dashboard.AppendOutput("info",
+                "Deploy: 打包成功 / publish succeeded。再次点击 Deploy 打开产物目录 artifacts/publish。",
+                "deploy");
+        else
+            Dashboard.AppendOutput("error",
+                $"Deploy: 打包失败 / publish failed (exit {code})。请查看 Publish 终端输出。",
+                "deploy");
+    }
+
+    private void PrintPublishHints(string reason)
+    {
+        Dashboard.AppendOutput("warn", reason, "deploy");
+        Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
+            ? "  打包 Windows: scripts\\publish-windows.ps1 (需 Inno Setup)"
+            : "  打包 Linux:   ./scripts/publish-linux.sh  → artifacts/publish/linux-x64/", "deploy");
+        Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
+            ? "  打包 Linux:   ./scripts/publish-linux.sh"
+            : "  打包 Windows: scripts\\publish-windows.ps1 (需在 Windows + Inno Setup)", "deploy");
+        Dashboard.AppendOutput("info", "  在仓库根目录运行上述命令，完成后再次点击 Deploy 打开产物目录", "deploy");
+    }
+
+    private static string ResolveWindowsPublishShell() =>
+        PublishPlanner.ResolveWindowsShell(name =>
+            PublishPlanner.NameOnPath(name, Environment.GetEnvironmentVariable("PATH"), windows: true));
+
+    private static void RunOnUi(Action action)
+    {
+        var ui = Avalonia.Threading.Dispatcher.UIThread;
+        if (ui.CheckAccess()) action();
+        else ui.Post(action);
     }
 
     /// <summary>Shell ComboBox index ⇄ ShellKind.</summary>
@@ -456,6 +574,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _publishIds.Clear();
         PersistSettings();
         Logs.Dispose();
         _sessionLog.Dispose();

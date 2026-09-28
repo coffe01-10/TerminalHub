@@ -94,6 +94,26 @@
 - 79 tests green（LogsPanelTests 14 个：深缓冲/容量/重放/清空两策略/正则好坏模式/
   复制/清空/实时会话名增改删）。
 
+### Deploy — one-click publish (`feat/deploy-run-publish`)
+- **Deploy dock** runs the platform publish script, in addition to opening artifacts:
+  - Plain click, artifacts present → same as PR #9 (list files, open the folder in
+    the file manager) plus an Output hint for how to republish.
+  - Plain click, nothing published → new terminal session named `Publish`, tagged
+    `部署控制` (`SessionTag.Deploy`), running `./scripts/publish-linux.sh`
+    (Linux/macOS, via `bash`) or `pwsh`/`powershell -File scripts\publish-windows.ps1`
+    (Windows; pwsh preferred when it is on PATH).
+  - **重新打包**: hold Ctrl and click Deploy, or right-click the button →
+    「重新打包 Republish」. That always starts the publish session, even when
+    artifacts already exist. Stale outputs are not auto-detected — use this path
+    to rebuild. A second click while that session is still running does not
+    spawn another one.
+- Output lines use source `deploy`: 开始打包 / publish start, 打包成功 / publish
+  succeeded, 打包失败 / publish failed (exit code). The bottom panel switches to
+  the Output tab for these.
+- `PublishPlanner` in Core decides open-vs-publish and locates the script by
+  walking up from the working directory. `ArtifactLocator` is unchanged.
+- Tooltip on the dock button states the same click / Ctrl / right-click rules.
+
 ### PR #9 — Deploy action + colored thumbnails (`feat/deploy-thumbnails`)
 - **Deploy dock button** is real now (was stub):
   `ArtifactLocator` walks up from CWD to find `artifacts/publish/<rid>/`

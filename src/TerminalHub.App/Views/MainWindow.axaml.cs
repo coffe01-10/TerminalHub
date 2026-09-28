@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using TerminalHub.App.ViewModels;
 
 namespace TerminalHub.App.Views;
@@ -15,6 +16,12 @@ public partial class MainWindow : Window
         if (!OperatingSystem.IsWindows())
             TransparencyLevelHint = new[] { Avalonia.Controls.WindowTransparencyLevel.None };
         DataContext = new MainWindowViewModel();
+        // Button marks pointer events handled before instance handlers, so listen with handledEventsToo.
+        // Press runs before the release click, which is what DockSelectCommand executes.
+        DeployDockButton.AddHandler(InputElement.PointerPressedEvent, OnDeployPointerPressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        DeployDockButton.AddHandler(InputElement.PointerReleasedEvent, OnDeployPointerReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += (_, _) =>
         {
             FitToScreen();
@@ -32,6 +39,21 @@ public partial class MainWindow : Window
         if (Width > maxW) Width = maxW;
         if (Height > maxH) Height = maxH;
     }
+
+    private void OnDeployPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var left = e.GetCurrentPoint(DeployDockButton).Properties.IsLeftButtonPressed;
+        Vm.ArmDeployCtrl(left && e.KeyModifiers.HasFlag(KeyModifiers.Control));
+    }
+
+    private void OnDeployPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        // Class handler already ran the command. Drop a modifier that never became a click.
+        Vm.ArmDeployCtrl(false);
+    }
+
+    private void OnRepublishMenuClick(object? sender, RoutedEventArgs e)
+        => Vm.DeployFromDock(forceRepublish: true);
 
     private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
     {
