@@ -124,6 +124,33 @@
 - Installed on box: `x11-apps` (xwd), `imagemagick` for capture; existing
   `xdotool`/`xvfb` used.
 
+### PR #10 — dock/chrome polish + Debug/Search (`feat/dock-debug-search`)
+- **Dock click fix (real bug)**: `DockSelectCommand` was `RelayCommand<int>` while
+  XAML passes `CommandParameter="2"` as *string* → silent no-op since the dock
+  shipped; every dock button was dead. Signature now `DockSelect(object?)` +
+  `int.TryParse`. Added `ZIndex=100` on the pill for layering safety.
+- Dock polish: `Button.dock` style + `:pointerover` + `dock-active` class bound to
+  `DockHighlight` (neon-blue pill outline on the active surface); Monitor/SSH/Logs
+  map to right tabs, Settings toggles the drawer (all verified clickable on
+  DISPLAY=:7 — Settings opened, SSH switched, persisted hosts still there).
+- **Debug tab** (was stub): `Utf8LineDecoder.RawLineReceived` emits pre-strip
+  lines → `AnsiText.DebugEscape` (ESC→␛, BEL→␇, C0→^X, tab→⇥) → `DebugLog`
+  (cap 300) with session source + ms timestamps.
+- **Search tab** (was stub box): `SearchQuery` filters active session's
+  scrollback+screen via `ScreenBuffer.SearchLines` (case-insensitive, capped 200,
+  global line numbers); hits rendered with `HighlightTextBlock` (yellow-bold
+  matches) + "N 处匹配 / 无匹配" status.
+- Thumbnails denser: 10 lines, 6.5pt font, tighter line-height — keeps per-line
+  ANSI dominant color.
+- Window: `FitToScreen` clamps to working area at open; `AcrylicBlur` kept for
+  Windows but forced off on non-Windows at runtime (no compositor → renders
+  black).
+- Verified live on DISPLAY=:7: SSH dock click → SSH tab (persisted host list),
+  Debug shows `␛[01;34m…` raw lines incl. `MARKER_X7_21`, Search "MARKER" →
+  2 hits highlighted. `dock-debug-search.png`, `debug-panel.png`.
+- 78 tests green (+8: SearchLines, DebugEscape, RawLineReceived, dock nav incl.
+  string param, Debug log, Search VM, dense preview).
+
 ### PR #4 — Packaging + docs (`feat/packaging-docs`)
 - `packaging/TerminalHub.iss` — Inno Setup (x64, zh+en, desktop icon,
   single-instance-friendly uninstall/taskkill)
@@ -136,5 +163,8 @@
   Windows smoke pass (`dotnet run --project src/TerminalHub.App`).
 - Acrylic/Mica: approximated with translucent brushes; native Mica is a
   WinUI-only path (out of scope for Avalonia).
-- Session thumbnails render text preview (not bitmap) — DESIGN.md allows this.
-- Deploy + SSH + Files tabs are stubs per MVP scope.
+- Session thumbnails render text preview (not bitmap) — DESIGN.md allows this;
+  now colored per-line dominant foreground + 10 lines.
+- Remaining stubs: **Codex/Ai right-rail tab** is still a mock assistant panel.
+- Window bottom may clip ~80px under compositor-less X11/Xvfb at 800px screen
+  height (status bar row hidden); dock remains usable, normal desktops unaffected.

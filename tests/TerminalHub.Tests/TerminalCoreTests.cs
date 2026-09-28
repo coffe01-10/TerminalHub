@@ -308,4 +308,36 @@ public class TerminalCoreTests
         Assert.Equal("#080808", TerminalColor.Indexed(232).ToRgbHex());
         Assert.Equal("#010203", TerminalColor.Rgb(1, 2, 3).ToRgbHex());
     }
+
+    [Fact]
+    public void SearchLines_FindsAcrossScreen_CaseInsensitive()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("\u001b[1;1HFOO bar\r\nnothing\r\nfoo baz");
+        var hits = b.SearchLines("foo");
+        Assert.Equal(2, hits.Count);
+        Assert.All(hits, h => Assert.Contains("foo", h.Text, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SearchLines_IncludesScrollback_AndCapsMax()
+    {
+        var (p, b) = Make(20, 2);
+        // 6 lines in a 2-row buffer → 4 land in scrollback
+        p.Feed("hit0\r\nhit1\r\nhit2\r\nhit3\r\nhit4\r\nhit5\r\n");
+        Assert.True(b.ScrollbackCount > 0);
+        var hits = b.SearchLines("hit", 3);
+        Assert.Equal(3, hits.Count);
+        Assert.Equal(0, hits[0].Line); // oldest scrollback line first
+        Assert.Contains("hit0", hits[0].Text);
+    }
+
+    [Fact]
+    public void SearchLines_EmptyTerm_NoHits()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("hello");
+        Assert.Empty(b.SearchLines(""));
+        Assert.Empty(b.SearchLines("   "));
+    }
 }

@@ -100,13 +100,13 @@
                           <TextBlock Text="{Binding TagText}" FontSize="9" Foreground="{Binding TagBrush}"/>
                         </Border>
                       </Grid>
-                      <Border CornerRadius="6" Background="#F20A0D14" Padding="5" MinHeight="88">
+                      <Border CornerRadius="6" Background="#F20A0D14" Padding="4" MinHeight="80">
                         <ItemsControl ItemsSource="{Binding PreviewLines}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
                               <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}"
                                          FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
-                                         FontSize="7" TextWrapping="NoWrap"/>
+                                         FontSize="6.5" LineHeight="7.5" TextWrapping="NoWrap"/>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -301,10 +301,29 @@
                       </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Debug -->
-                    <TextBlock IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
-                               Text="调试输出 — no debug session active" Foreground="#64748B"
-                               FontSize="11" Margin="10,8"/>
+                    <!-- Debug: raw session lines (pre-ANSI-strip, control bytes escaped) -->
+                    <ListBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
+                             ItemsSource="{Binding Dashboard.DebugLog}"
+                             Background="Transparent" BorderThickness="0" Padding="6">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="Padding" Value="2,1"/>
+                          <Setter Property="Background" Value="Transparent"/>
+                          <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                          <Setter Property="FontSize" Value="10"/>
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LogEntry">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Time, StringFormat='{}{0:HH:mm:ss.fff}'}" Foreground="#475569"/>
+                            <TextBlock IsVisible="{Binding Source, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"
+                                       Text="{Binding Source, StringFormat='({0})'}" Foreground="#64748B"/>
+                            <TextBlock Text="{Binding Message}" Foreground="#8B9DB8"/>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
 
                     <!-- Problems -->
                     <ListBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
@@ -329,11 +348,41 @@
                       </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Search -->
-                    <TextBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
-                             Watermark="Search output…" Margin="8,6" FontSize="11"
-                             Background="#1A2030" BorderBrush="#2A3142" Foreground="#E2E8F0"
-                             CornerRadius="6" Padding="8,4"/>
+                    <!-- Search: filter active-session scrollback+screen, matched terms highlighted -->
+                    <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
+                          RowDefinitions="Auto,Auto,*">
+                      <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,0">
+                        <TextBox Text="{Binding Dashboard.SearchQuery}"
+                                 Watermark="在当前会话中搜索…" FontSize="11"
+                                 Background="#1A2030" BorderBrush="#2A3142" Foreground="#E2E8F0"
+                                 CornerRadius="6" Padding="8,4"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Dashboard.SearchStatus}"
+                                   Foreground="#64748B" FontSize="10" Margin="10,0"
+                                   VerticalAlignment="Center" MinWidth="70"/>
+                      </Grid>
+                      <TextBlock Grid.Row="1" Text="作用域: 当前活动会话 scrollback + 屏幕"
+                                 Foreground="#475569" FontSize="9" Margin="10,4,0,2"/>
+                      <ListBox Grid.Row="2" ItemsSource="{Binding Dashboard.SearchHits}"
+                               Background="Transparent" BorderThickness="0" Padding="6">
+                        <ListBox.Styles>
+                          <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="2,1"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+                            <Setter Property="FontSize" Value="10"/>
+                          </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Text="{Binding Line, StringFormat='L{0}'}" Foreground="#475569" MinWidth="40"/>
+                              <ctl:HighlightTextBlock LineText="{Binding Text}" Foreground="#CBD5E1"
+                                                    Query="{Binding $parent[ListBox].DataContext.Dashboard.SearchQuery}"/>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                    </Grid>
                   </Panel>
                 </Border>
               </Grid>
@@ -847,9 +896,28 @@
 
     <!-- ============ Floating action dock ============ -->
     <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,40"
-            CornerRadius="16" Padding="6"
+            CornerRadius="16" Padding="6" ZIndex="100"
             Background="#D91B2333" BorderBrush="#403B82F6" BorderThickness="1"
             BoxShadow="0 8 30 0 #80000000">
+      <Border.Styles>
+        <Style Selector="Button.dock">
+          <Setter Property="Padding" Value="12,6"/>
+          <Setter Property="CornerRadius" Value="10"/>
+          <Setter Property="Background" Value="Transparent"/>
+          <Setter Property="Foreground" Value="#94A3B8"/>
+          <Setter Property="BorderThickness" Value="1"/>
+          <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.dock:pointerover">
+          <Setter Property="Background" Value="#4026303F"/>
+          <Setter Property="Foreground" Value="#E2E8F0"/>
+        </Style>
+        <Style Selector="Button.dock.dock-active">
+          <Setter Property="Background" Value="#333B82F6"/>
+          <Setter Property="BorderBrush" Value="#8038BDF8"/>
+          <Setter Property="Foreground" Value="#E2F0FF"/>
+        </Style>
+      </Border.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
         <Button Classes="primary" Padding="12,6" CornerRadius="10"
                 Command="{Binding DockSelectCommand}" CommandParameter="0">
@@ -864,35 +932,35 @@
             <TextBlock Text="New Session" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                 Command="{Binding DockSelectCommand}" CommandParameter="1">
           <StackPanel>
             <TextBlock Text="▥" FontSize="13" HorizontalAlignment="Center"/>
             <TextBlock Text="Monitor" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
                 Command="{Binding DockSelectCommand}" CommandParameter="2">
           <StackPanel>
             <TextBlock Text="⌁" FontSize="13" HorizontalAlignment="Center"/>
             <TextBlock Text="SSH" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
                 Command="{Binding DockSelectCommand}" CommandParameter="3">
           <StackPanel>
             <TextBlock Text="▤" FontSize="13" HorizontalAlignment="Center"/>
             <TextBlock Text="Logs" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4">
           <StackPanel>
             <TextBlock Text="☁" FontSize="13" HorizontalAlignment="Center"/>
             <TextBlock Text="Deploy" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0"/>
           </StackPanel>
         </Button>
-        <Button Padding="12,6" CornerRadius="10" Background="Transparent" Foreground="#94A3B8"
+        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"
                 Command="{Binding DockSelectCommand}" CommandParameter="5">
           <StackPanel>
             <TextBlock Text="⚙" FontSize="13" HorizontalAlignment="Center"/>

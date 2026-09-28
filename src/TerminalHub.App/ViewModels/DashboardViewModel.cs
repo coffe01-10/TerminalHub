@@ -19,10 +19,45 @@ public partial class DashboardViewModel : ViewModelBase
     public ObservableCollection<ProcessInfo> Processes { get; } = [];
     public ObservableCollection<LogEntry> OutputLog { get; } = [];
     public ObservableCollection<LogEntry> Problems { get; } = [];
+    /// <summary>Raw (pre-ANSI-strip, escaped) session lines for the Debug tab.</summary>
+    public ObservableCollection<LogEntry> DebugLog { get; } = [];
+    /// <summary>Search hits over the active session's scrollback+screen.</summary>
+    public ObservableCollection<TerminalHub.Core.Terminal.ScreenBuffer.SearchHit> SearchHits { get; } = [];
 
     [ObservableProperty] private int _selectedRightTab;       // 0 Proc 1 Files 2 Logs 3 Ssh 4 Codex
     [ObservableProperty] private int _selectedBottomTab;      // 0 Output 1 Debug 2 Problems 3 Search
     [ObservableProperty] private int _problemCount;
+    [ObservableProperty] private string _searchQuery = "";
+    [ObservableProperty] private string _searchStatus = "";
+
+    /// <summary>Supplies the buffer to search (active session); set by the shell VM.</summary>
+    public Func<TerminalHub.Core.Terminal.ScreenBuffer?>? BufferSource { get; set; }
+
+    partial void OnSearchQueryChanged(string value) => RefreshSearch();
+    partial void OnSelectedBottomTabChanged(int value)
+    {
+        if (value == 3) RefreshSearch();
+    }
+
+    public void RefreshSearch()
+    {
+        SearchHits.Clear();
+        var buf = BufferSource?.Invoke();
+        var q = SearchQuery;
+        if (buf is null)
+        {
+            SearchStatus = "无活动会话";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            SearchStatus = "";
+            return;
+        }
+        foreach (var h in buf.SearchLines(q.Trim())) SearchHits.Add(h);
+        SearchStatus = SearchHits.Count == 0 ? "无匹配" : $"{SearchHits.Count} 处匹配";
+    }
+
     public bool HasProblems => ProblemCount > 0;
     partial void OnProblemCountChanged(int value) => OnPropertyChanged(nameof(HasProblems));
     [ObservableProperty] private string _cpuPercent = "0%";
@@ -74,6 +109,15 @@ public partial class DashboardViewModel : ViewModelBase
 
     private const int MaxOutputLines = 500;
     private const int MaxProblemLines = 200;
+    private const int MaxDebugLines = 300;
+
+    /// <summary>Append a raw (ANSI-escaped) line to the Debug tab.</summary>
+    public void AppendDebug(string message, string source = "")
+        => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            DebugLog.Add(new LogEntry(DateTime.Now, "debug", message, source));
+            while (DebugLog.Count > MaxDebugLines) DebugLog.RemoveAt(0);
+        });
 
     /// <summary>Append a line from a real session stream (PTY output) or an app event.</summary>
     public void AppendOutput(string level, string message, string source = "")
