@@ -18,19 +18,19 @@
 
 ## 进行中
 
-- [ ] **Logs 级别筛选条 + 过滤持久化** — **GLM** · `feat/logs-level-filter-persist` · base `main@ce29090` · worktree `/workspace/TerminalHub-logs`
 - [ ] **Deploy 多配置档 + 最近产物** — **Grok** · 新分支 · worktree `/workspace/TerminalHub-deploy`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
 
-- [ ] 工具栏 ⟳ / → 真动作（刷新 CWD、前进后退历史）— 谁空谁领
 - [ ] Windows ConPTY 本机冒烟 — **等用户本机**
 
 
 ## 已完成（近期）
 
+- [x] PR #21 工具栏 CWD 真动作（⟳刷新 + ←/→ 历史 + /proc 轮询 + OSC7)— GLM WIP · Devin 接管 · `feat/toolbar-cwd-nav`
 - [x] PR #20 「↗ 在新窗口打开」会话弹出独立窗（detach/收回 + 弹出期输出保留）— Devin B · `feat/open-new-window` · `main@5cc06e9`
+- [x] PR #17 Logs 级别筛选 chip 条 + 过滤持久化 — GLM · `feat/logs-level-filter-persist` · `main@c30b204`
 - [x] PR #18 「◫ 分屏」真双会话并排（双 PTY/Emulator + 窗格聚焦 + 卡片分配）— Devin A · `feat/split-pane` · `main@8b2f309`
 - [x] PR #15 整窗 mockup 走查（缩略图加密 + Codex ⚙）— Devin · `main@bf955fb`
 - [x] PR #14 视觉打磨(tag pills / 蓝 pill tabs / 霓虹 active / 真实进度行) — Devin · `main@8eadef0`

@@ -14,6 +14,9 @@ public interface IPtySession : IDisposable
     /// <summary>Exit code after the child process terminates, if known.</summary>
     int? ExitCode { get; }
 
+    /// <summary>OS process id of the child shell, if known (used to probe CWD on Linux).</summary>
+    int? ProcessId { get; }
+
     /// <summary>Raw output bytes emitted by the child process.</summary>
     event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
 

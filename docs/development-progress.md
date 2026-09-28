@@ -4,6 +4,30 @@
 
 ## 2026-09-28
 
+<<<<<<< HEAD
+### PR #21 — 工具栏 CWD 真动作 ⟳/←/→ (`feat/toolbar-cwd-nav`)
+- **真实 CWD 链路**:`IPtySession.ProcessId`(Linux forkpty 子 pid /
+  ConPTY process id / Mock null)+ `ProcessCwd.TryRead`(Linux 读
+  `/proc/<pid>/cwd`,读不到回退会话记录值);同时解析 **OSC 7**
+  (`VtParser.TryParseOsc7`:file://host/path 与裸绝对路径)→
+  `ScreenBuffer.Cwd`/`CwdChanged` → 路径条 + 历史。
+- **轮询**(本 PR 补):bash 默认不发 OSC 7 —— `OnSampled`(1s tick)里
+  `PollCwdChanges` 对每个会话读 `/proc` CWD,变化即
+  `OnSessionCwdReported`(规范化 + push 历史 + 活动会话刷新路径条)。
+  历史栈访问全程 `_cwdLock`(UI/PTY/monitor 三线程都会碰)。
+- **← / → / ⟳**:per-session `CwdHistory` 栈(浏览器语义:新路径截断
+  forward);按钮绑定 `CwdBackCommand`/`CwdForwardCommand`/
+  `RefreshCwdCommand`,`CanCwdBack/CanCwdForward` 驱动禁用态;←/→ 真往
+  shell 发 `cd '<path>'`,⟳ 重读 /proc 同步路径条 + Files 面板
+  (`NavigateTo`)——不写死假路径。
+- **会话隔离**:history 按 session id 存,会话切换/关闭各自跟随;
+  `cd` 后 ~1s 内路径条自动更新。
+- **验证**:152 tests green(GLM +8:CwdHistory push/back/forward/规范化、
+  OSC7→历史→Files 联动、⟳ 回退、按钮绑定;本 PR 修 1 个异步断言等待)。
+  DISPLAY=:7 实机:`cd /tmp` → 路径条 `~/tmp` 自动变 → ← 发
+  `cd '/home/box'` → → 发 `cd '/tmp'` → ⟳ 一致。截图
+  `toolbar-cwd-nav.png`。
+
 ### PR #20 — 「↗ 在新窗口打开」会话弹出独立窗 (`feat/open-new-window`)
 - **真弹出**: 工具栏空壳按钮接上 `OpenInNewWindowCommand` —— 把当前（或选中）
   会话 detach 出主列表,弹出为独立 Avalonia `SessionWindow`,含完整

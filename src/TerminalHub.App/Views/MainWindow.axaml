@@ -184,22 +184,28 @@
                       Command="{Binding NewSessionCommand}"/>
             </Grid>
 
-            <!-- Toolbar -->
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
-              <Button Content="⟳" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"/>
-              <Button Grid.Column="1" Content="→" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"/>
-              <TextBlock Grid.Column="2" Text="{Binding Breadcrumb}" FontSize="11"
+            <!-- Toolbar: ← back / ⟳ refresh CWD / → forward + path -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
+              <Button Content="←" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"
+                      Command="{Binding CwdBackCommand}" IsEnabled="{Binding CanCwdBack}"
+                      ToolTip.Tip="后退目录历史"/>
+              <Button Grid.Column="1" Content="⟳" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"
+                      Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新 CWD"/>
+              <Button Grid.Column="2" Content="→" Background="Transparent" BorderThickness="0" Foreground="#94A3B8" Padding="6,0"
+                      Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
+                      ToolTip.Tip="前进目录历史"/>
+              <TextBlock Grid.Column="3" Text="{Binding Breadcrumb}" FontSize="11"
                          Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,0,0"/>
-              <Button Grid.Column="3" Content="◫ 分屏" Background="Transparent" BorderThickness="0"
+              <Button Grid.Column="4" Content="◫ 分屏" Background="Transparent" BorderThickness="0"
                       Foreground="{Binding IsSplit, Converter={x:Static vm:BoolBrushConverter.Instance}}"
                       FontSize="11" Padding="6,0"
                       Command="{Binding ToggleSplitCommand}"
                       ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。"/>
-              <Button Grid.Column="4" Content="↗ 在新窗口打开" Background="Transparent" BorderThickness="0"
+              <Button Grid.Column="5" Content="↗ 在新窗口打开" Background="Transparent" BorderThickness="0"
                       Foreground="#94A3B8" FontSize="11" Padding="6,0"
                       Command="{Binding OpenInNewWindowCommand}"
                       ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）"/>
-              <Button Grid.Column="5" Content="•••" Background="Transparent" BorderThickness="0"
+              <Button Grid.Column="6" Content="•••" Background="Transparent" BorderThickness="0"
                       Foreground="#94A3B8" Padding="6,0"/>
             </Grid>
 

@@ -20,6 +20,7 @@ public sealed class ConPtySession : IPtySession
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsRunning => _process is { HasExited: false };
     public int? ExitCode => _process is { HasExited: true } p ? p.ExitCode : null;
+    public int? ProcessId => _process?.Id;
 
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
     public event Action<IPtySession, int>? Exited;

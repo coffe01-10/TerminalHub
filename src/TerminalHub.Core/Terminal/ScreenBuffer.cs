@@ -48,6 +48,9 @@ public sealed class ScreenBuffer
     public bool OnAlternateScreen { get; private set; }
     public string Title { get; private set; } = "";
     public event Action<string>? TitleChanged;
+    /// <summary>Last CWD reported by the shell (OSC 7), if any.</summary>
+    public string? Cwd { get; private set; }
+    public event Action<string>? CwdChanged;
 
     public ScreenBuffer(int columns = 80, int rows = 24)
     {
@@ -420,6 +423,14 @@ public sealed class ScreenBuffer
     {
         Title = title;
         TitleChanged?.Invoke(title);
+    }
+
+    public void SetCwd(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        if (string.Equals(Cwd, path, StringComparison.Ordinal)) return;
+        Cwd = path;
+        CwdChanged?.Invoke(path);
     }
 
     public void AlignTest() // DECALN: fill screen with 'E'
