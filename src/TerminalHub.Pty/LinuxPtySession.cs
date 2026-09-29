@@ -23,6 +23,7 @@ public sealed class LinuxPtySession : IPtySession
     // Read-loop / waitpid-watcher / Write / UI threads all touch these.
     private volatile bool _isRunning;
     private volatile bool _hasExitCode;
+    private volatile bool _disposed;
     private int _exitCode;
 
     public Guid Id { get; } = Guid.NewGuid();
@@ -69,7 +70,9 @@ public sealed class LinuxPtySession : IPtySession
             if (cwdBytes is not null)
                 Native.chdir(cwdBytes);
             Native.execve(exeBytes, _argvBlock, _envpBlock);
-            Native.kill(Native.getpid(), Native.SIGKILL); // exec failed
+            // exec failed: exit with 127 (the shell convention for a command we
+            // could not run). Killing ourselves instead would surface as a
+            // signal death and the parent would report a meaningless -1.
             Native._exit(127);
         }
 
@@ -216,9 +219,13 @@ public sealed class LinuxPtySession : IPtySession
                 _exitCode = Native.WIFEXITED(status) ? Native.WEXITSTATUS(status) : -1;
                 _hasExitCode = true;
                 _isRunning = false;
+                // After Dispose the owner is gone — a late Exited callback would
+                // touch already-torn-down views. The code itself stays queryable.
+                if (_disposed) return;
                 // Do NOT cancel the read loop here — it drains the kernel-buffered
                 // tail itself and exits on EIO. Cancelling would truncate output.
                 await Task.Delay(50); // let the read loop deliver the last chunks first
+                if (_disposed) return;
                 Exited?.Invoke(this, _exitCode);
                 return;
             }
@@ -281,6 +288,7 @@ public sealed class LinuxPtySession : IPtySession
 
     public void Dispose()
     {
+        _disposed = true;
         Kill();
         _readLoopCts?.Cancel();
         // Wait for the read loop BEFORE closing the fd — otherwise the loop could

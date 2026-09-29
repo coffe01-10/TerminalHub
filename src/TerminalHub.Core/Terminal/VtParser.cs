@@ -27,6 +27,9 @@ public sealed class VtParser
     // OSC/DCS string accumulation — bounded: a runaway program emitting an
     // unterminated OSC must not grow memory without limit.
     private const int MaxOscBytes = 64 * 1024;
+    // OSC command digits are capped far below that — no legitimate OSC code
+    // needs more digits, and an unterminated digit flood must not grow _osc.
+    private const int MaxOscCommandDigits = 8;
     private const int MaxCsiParams = 64;
     private const int MaxIntermediates = 8;
     private readonly StringBuilder _osc = new();
@@ -38,6 +41,10 @@ public sealed class VtParser
     private int _utf8Min;
     /// <summary>The last emitted rune was U+200D ZWJ — the next rune joins the same cluster.</summary>
     private bool _afterZwj;
+
+    // OSC/DCS byte-level UTF-8 tracking: a CJK trail byte such as 0x9C (in
+    // "本" = E6 9C AC) is payload data, not the 8-bit ST terminator (0x9C).
+    private int _stringUtf8Remaining;
 
     // Replies (DA / DECRPM / OSC queries / kitty flags) are queued while parsing
     // under SyncRoot and written back AFTER the lock is released — ConPtySession.Write
@@ -98,8 +105,13 @@ public sealed class VtParser
             case State.Osc: OscByte(b); break;
             case State.Dcs:
             case State.SosPmApc:
-                if (b == 0x07 || b == 0x9C) Enter(State.Ground);   // BEL / ST
-                else if (b == 0x1B) Enter(State.Escape);           // ESC \ handled via Escape
+                // BEL/ESC can never occur inside a UTF-8 sequence; 0x9C CAN —
+                // only treat it as ST when no continuation byte is pending.
+                if (b == 0x07) { _stringUtf8Remaining = 0; Enter(State.Ground); }              // BEL
+                else if (b == 0x9C && _stringUtf8Remaining == 0) { _stringUtf8Remaining = 0; Enter(State.Ground); } // ST
+                else if (b == 0x1B) { _stringUtf8Remaining = 0; Enter(State.Escape); }         // ESC \ handled via Escape
+                else if (_stringUtf8Remaining > 0 && b is >= 0x80 and < 0xC0) _stringUtf8Remaining--;
+                else if (b >= 0xC0) _stringUtf8Remaining = b >= 0xF0 ? 3 : b >= 0xE0 ? 2 : 1;
                 break;
             case State.EscIntermediate: EscIntermediateByte(b); break;
             case State.CharsetDesignate: CharsetByte(b); break;
@@ -127,6 +139,7 @@ public sealed class VtParser
         {
             _osc.Clear();
             _oscCommand = -1;
+            _stringUtf8Remaining = 0;
         }
     }
 
@@ -351,8 +364,8 @@ public sealed class VtParser
             case 'L': b.InsertLines(Param(0)); break;
             case 'M': b.DeleteLines(Param(0)); break;
             case 'P': b.DeleteChars(Param(0)); break;
-            case 'S': b.ScrollUpRegion(0, b.Rows - 1, Param(0)); break;
-            case 'T': b.ScrollDownRegion(0, b.Rows - 1, Param(0)); break;
+            case 'S': b.ScrollUpRegion(b.ScrollRegionTop, b.ScrollRegionBottom, Param(0)); break;
+            case 'T': b.ScrollDownRegion(b.ScrollRegionTop, b.ScrollRegionBottom, Param(0)); break;
             case 'X': b.EraseChars(Param(0)); break;
             case '@': b.InsertChars(Param(0)); break;
             case 'm': HandleSgr(); break;
@@ -513,15 +526,36 @@ public sealed class VtParser
     private void OscByte(byte b)
     {
         if (b == 0x07) { DispatchOsc(); Enter(State.Ground); return; }  // BEL
-        if (b == 0x9C) { DispatchOsc(); Enter(State.Ground); return; }  // ST (8-bit)
         if (b == 0x1B) { DispatchOsc(); Enter(State.Escape); return; }  // ESC \ (7-bit ST)
+        // 0x9C is the 8-bit ST — but also a legal UTF-8 trail byte, so only
+        // terminate when no multi-byte sequence is in progress.
+        if (b == 0x9C && _stringUtf8Remaining == 0) { DispatchOsc(); Enter(State.Ground); return; }
+
+        // Payload arrives as a UTF-8 byte stream: track lead/continuation bytes
+        // so CJK trail bytes (incl. 0x9C) are kept as data, never terminators.
+        if (_stringUtf8Remaining > 0)
+        {
+            if (b is >= 0x80 and < 0xC0)
+            {
+                _stringUtf8Remaining--;
+                if (_oscCommand >= 0 && _osc.Length < MaxOscBytes) _osc.Append((char)b);
+                return;
+            }
+            _stringUtf8Remaining = 0;   // invalid continuation — resync, handle byte below
+        }
+        else if (b >= 0xC0)
+        {
+            _stringUtf8Remaining = b >= 0xF0 ? 3 : b >= 0xE0 ? 2 : 1;
+            if (_oscCommand >= 0 && _osc.Length < MaxOscBytes) _osc.Append((char)b);
+            return;
+        }
 
         if (_oscCommand < 0)
         {
             if (_oscCommand == -2) return;      // malformed OSC — swallow until terminator
             if (char.IsDigit((char)b))
             {
-                _osc.Append((char)b);
+                if (_osc.Length < MaxOscCommandDigits) _osc.Append((char)b);
             }
             else if (b == (byte)';')
             {

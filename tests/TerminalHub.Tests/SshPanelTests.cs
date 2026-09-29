@@ -25,6 +25,15 @@ public class SshPanelTests
         Assert.Equal("-p 22 example.com", h.SshArguments);
     }
 
+    [Fact]
+    public void SshHost_TargetWithWhitespace_IsQuoted()
+    {
+        // A host containing spaces must reach ssh as ONE argument instead of
+        // being split into a mangled remote command.
+        var h = new SshHost { Host = "my host", User = "u" };
+        Assert.Equal("-p 22 \"u@my host\"", h.SshArguments);
+    }
+
     private static (SshViewModel vm, List<SshHost> store, List<SshHost> connected) MakeVm(bool sshAvailable = true)
     {
         var store = new List<SshHost>();

@@ -466,4 +466,95 @@ public class TerminalCoreTests
         b.Backspace();                              // cursor was at 2 → lands on 1 (continuation)
         Assert.Equal(0, b.CursorX);                 // snapped to the glyph's lead cell
     }
+
+    // ---------- regressions: 2026-09 code-review fixes ----------
+
+    [Fact]
+    public void Osc_TrailByte0x9CInsideCjk_DoesNotTerminate()
+    {
+        // "本" = E6 9C AC: the 0x9C trail byte is payload data, not the 8-bit ST.
+        var (p, b) = Make();
+        p.Feed("\u001b]0;标题本\u001b\\");
+        Assert.Equal("标题本", b.Title);
+    }
+
+    [Fact]
+    public void Osc_CommandDigitFlood_IsBoundedAndRecovers()
+    {
+        var (p, b) = Make();
+        p.Feed("\u001b]0" + new string('9', 100_000) + ";junk\u0007");  // flood swallowed
+        p.Feed("\u001b]0;after\u0007");                                 // parser recovered
+        Assert.Equal("after", b.Title);
+        p.Feed("ok");
+        Assert.Equal('o', b.CellAt(0, 0).Char);
+    }
+
+    [Fact]
+    public void CsiScrollUp_LargeCount_CompletesImmediately()
+    {
+        var (p, b) = Make(10, 4);
+        p.Feed("AAAA");
+        p.Feed("\u001b[1000000S");
+        // Region-height clamp: everything scrolled away, cursor intact.
+        Assert.Equal(' ', b.CellAt(0, 0).Char);
+    }
+
+    [Fact]
+    public void CsiScrollUp_RespectsScrollRegion()
+    {
+        var (p, b) = Make(10, 4);
+        p.Feed("top\r\nA\r\nB\r\nbot");
+        p.Feed("\u001b[2;3r");                       // DECSTBM rows 2..3
+        p.Feed("\u001b[S");                          // scroll region up by 1
+        Assert.Equal('t', b.CellAt(0, 0).Char);      // row 1 untouched
+        Assert.Equal('B', b.CellAt(1, 0).Char);      // row 2 <- row 3
+        Assert.Equal(' ', b.CellAt(2, 0).Char);      // row 3 blanked
+        Assert.Equal('b', b.CellAt(3, 0).Char);      // row 4 untouched
+    }
+
+    [Fact]
+    public void Resize_Shrink_KeepsBottomRows_PushesTopToScrollback()
+    {
+        var (p, b) = Make(10, 4);
+        p.Feed("L1\r\nL2\r\nL3\r\nL4");
+        b.Resize(10, 2);
+        Assert.Equal(2, b.ScrollbackCount);
+        Assert.Equal('L', b.CellAt(0, 0).Char);
+        Assert.Equal('3', b.CellAt(0, 1).Char);      // screen rows are L3, L4
+        Assert.Equal('4', b.CellAt(1, 1).Char);
+        Assert.Equal('1', b.GetScrollbackRow(0)[1].Char);
+        Assert.Equal('2', b.GetScrollbackRow(1)[1].Char);
+    }
+
+    [Fact]
+    public void WideChar_LastColumn_NoAutoWrap_StaysOnLine()
+    {
+        var (p, b) = Make(5, 4);
+        p.Feed("\u001b[?7l");                        // DECAWM off
+        p.Feed("abcd中");
+        Assert.Equal('中', b.CellAt(0, 4).Char);
+        Assert.Equal(0, b.CursorY);                  // no wrap with autowrap disabled
+    }
+
+    [Fact]
+    public void SoftHyphen_OccupiesOneCell()
+    {
+        var (p, b) = Make();
+        p.Feed("a­b");
+        Assert.Equal('b', b.CellAt(0, 2).Char);      // U+00AD took a cell
+    }
+
+    [Theory]
+    [InlineData(0x23F0)] // ⏰
+    [InlineData(0x2705)] // ✅
+    [InlineData(0x2B50)] // ⭐
+    [InlineData(0x26BD)] // ⚽
+    public void BmpEmoji_EastAsianWide_AreTwoCells(int rune)
+        => Assert.Equal(2, GraphemeWidth.OfRune(rune));
+
+    [Theory]
+    [InlineData(0x23ED)] // not EAW=W (verified against the Unicode table)
+    [InlineData(0x23F1)]
+    public void BmpAmbiguousEmoji_AreOneCell(int rune)
+        => Assert.Equal(1, GraphemeWidth.OfRune(rune));
 }

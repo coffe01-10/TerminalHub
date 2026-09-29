@@ -54,18 +54,35 @@ public sealed class TerminalEmulator : IDisposable
 
     /// <summary>xterm mouse report; coordinates are zero-based terminal cells.</summary>
     public void SendMouse(int button, int column, int row, bool released = false,
-        bool motion = false, int modifiers = 0)
+        bool motion = false, int modifiers = 0, int count = 1)
     {
         var tracking = Buffer.MouseTracking;
         if (tracking == 0 || (motion && (tracking == 1000 || (tracking == 1002 && button == 3)))) return;
+        if (count < 1) count = 1;
         var code = button | modifiers | (motion ? 32 : 0);
         var x = Math.Clamp(column, 0, Buffer.Columns - 1) + 1;
         var y = Math.Clamp(row, 0, Buffer.Rows - 1) + 1;
         if (Buffer.SgrMouse)
-            SendText($"\x1b[<{code};{x};{y}{(released ? 'm' : 'M')}");
+        {
+            // count > 1 (wheel gestures): emit the report N times in ONE write.
+            var one = $"\x1b[<{code};{x};{y}{(released ? 'm' : 'M')}";
+            SendText(count == 1 ? one : string.Concat(Enumerable.Repeat(one, count)));
+        }
         else if (x <= 223 && y <= 223)
-            SendBytes([0x1b, (byte)'[', (byte)'M', (byte)((released ? 3 | modifiers : code) + 32),
-                (byte)(x + 32), (byte)(y + 32)]);
+        {
+            var bytes = new byte[6 * count];
+            var cb = (byte)((released ? 3 | modifiers : code) + 32);
+            for (var i = 0; i < count; i++)
+            {
+                bytes[i * 6] = 0x1b;
+                bytes[i * 6 + 1] = (byte)'[';
+                bytes[i * 6 + 2] = (byte)'M';
+                bytes[i * 6 + 3] = cb;
+                bytes[i * 6 + 4] = (byte)(x + 32);
+                bytes[i * 6 + 5] = (byte)(y + 32);
+            }
+            SendBytes(bytes);
+        }
     }
 
     public void SendFocus(bool focused)

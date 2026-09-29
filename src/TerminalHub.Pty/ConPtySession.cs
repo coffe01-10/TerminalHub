@@ -80,9 +80,19 @@ public sealed class ConPtySession : IPtySession
         _process.EnableRaisingEvents = true;
         _process.Exited += (_, _) =>
         {
-            var code = 0;
+            // Default -1 ("unknown"), NOT 0: a race that makes ExitCode throw
+            // must not be reported as a successful exit.
+            var code = -1;
             var p = _process;
-            try { if (p is not null) code = p.ExitCode; } catch { }
+            try
+            {
+                if (p is not null)
+                {
+                    if (!p.HasExited) p.WaitForExit(1000);
+                    code = p.ExitCode;
+                }
+            }
+            catch { }
             _exitCode = code;
             _hasExitCode = true;
             Exited?.Invoke(this, code);
@@ -137,9 +147,19 @@ public sealed class ConPtySession : IPtySession
                 throw new InvalidOperationException($"CreateProcess failed: {err}");
             }
 
-            Native.CloseHandle(pi.hProcess);
-            Native.CloseHandle(pi.hThread);
-            return Process.GetProcessById(pi.dwProcessId);
+            // Keep hProcess open until GetProcessById succeeds: for a shell that
+            // exits within microseconds the open handle keeps the PID resolvable;
+            // after the close a vanished PID would throw here and look like a
+            // startup failure.
+            try
+            {
+                return Process.GetProcessById(pi.dwProcessId);
+            }
+            finally
+            {
+                Native.CloseHandle(pi.hProcess);
+                Native.CloseHandle(pi.hThread);
+            }
         }
         finally
         {
@@ -178,12 +198,18 @@ public sealed class ConPtySession : IPtySession
         var off = 0;
         while (off < tmp.Length)
         {
-            if (!Native.WriteFile(_ptyIn, ref tmp[off], tmp.Length - off, out var written, IntPtr.Zero) || written <= 0)
+            try
             {
-                Debug.WriteLine($"ConPTY WriteFile failed: {Marshal.GetLastWin32Error()}");
-                break;
+                // Race with Dispose closing the handle mid-write: ObjectDisposed
+                // means the session is gone, not an error worth crashing the UI for.
+                if (!Native.WriteFile(_ptyIn, ref tmp[off], tmp.Length - off, out var written, IntPtr.Zero) || written <= 0)
+                {
+                    Debug.WriteLine($"ConPTY WriteFile failed: {Marshal.GetLastWin32Error()}");
+                    break;
+                }
+                off += written;
             }
-            off += written;
+            catch (ObjectDisposedException) { return; }
         }
     }
 
@@ -205,26 +231,37 @@ public sealed class ConPtySession : IPtySession
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Kill();
         _readCts?.Cancel();
+        // Close the pseudo console FIRST: conhost holds duplicates of the pipe
+        // ends, so closing our copies alone never unblocks the reader — the old
+        // order burned the full 300ms wait and relied on ObjectDisposed inside
+        // ReadFile to unwind the thread.
+        if (_hpc != IntPtr.Zero)
+        {
+            Native.ClosePseudoConsole(_hpc);
+            _hpc = IntPtr.Zero;
+        }
         // Cache the exit code before releasing the Process object — IsRunning
         // and ExitCode keep answering correctly after the handle is gone.
         var p = _process;
         _process = null;
         if (p is not null)
         {
-            try { if (!_hasExitCode && p.HasExited) { _exitCode = p.ExitCode; _hasExitCode = true; } }
+            try
+            {
+                if (!_hasExitCode)
+                {
+                    p.WaitForExit(2000);   // Kill() is asynchronous — give it a moment
+                    if (p.HasExited) { _exitCode = p.ExitCode; _hasExitCode = true; }
+                }
+            }
             catch { /* handle already gone — exit code stays unknown */ }
             p.Dispose();
         }
         _ptyIn?.Dispose();
         _ptyOut?.Dispose();
-        // Closing the pipe ends breaks the blocked ReadFile; give the thread a
-        // moment to unwind so it never outlives the handles it uses.
+        // The closed pseudo console broke the blocked ReadFile; wait briefly so
+        // the reader never touches a disposed handle.
         try { _readTask?.Wait(300); } catch { }
-        if (_hpc != IntPtr.Zero)
-        {
-            Native.ClosePseudoConsole(_hpc);
-            _hpc = IntPtr.Zero;
-        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using TerminalHub.Core.Monitoring;
 
@@ -113,27 +115,57 @@ public partial class DashboardViewModel : ViewModelBase
     private const int MaxProblemLines = 200;
     private const int MaxDebugLines = 300;
 
+    // PTY read threads can emit thousands of lines per second — one
+    // Dispatcher.Post per line floods the UI queue and freezes the window.
+    // Lines queue here and a single scheduled flush drains them all.
+    private readonly ConcurrentQueue<(string level, string message, string source)> _pendingOutput = new();
+    private readonly ConcurrentQueue<(string message, string source)> _pendingDebug = new();
+    private int _outputFlushScheduled;
+    private int _debugFlushScheduled;
+
     /// <summary>Append a raw (ANSI-escaped) line to the Debug tab.</summary>
     public void AppendDebug(string message, string source = "")
-        => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        _pendingDebug.Enqueue((message, source));
+        if (Interlocked.Exchange(ref _debugFlushScheduled, 1) == 0)
+            Avalonia.Threading.Dispatcher.UIThread.Post(FlushDebug, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    private void FlushDebug()
+    {
+        // Release the flag BEFORE draining so lines enqueued mid-drain schedule
+        // another flush instead of waiting for the next Append.
+        _debugFlushScheduled = 0;
+        var now = DateTime.Now;
+        while (_pendingDebug.TryDequeue(out var e))
         {
-            DebugLog.Add(new LogEntry(DateTime.Now, "debug", message, source));
-            while (DebugLog.Count > MaxDebugLines) DebugLog.RemoveAt(0);
-        });
+            DebugLog.Add(new LogEntry(now, "debug", e.message, e.source));
+        }
+        while (DebugLog.Count > MaxDebugLines) DebugLog.RemoveAt(0);
+    }
 
     /// <summary>Append a line from a real session stream (PTY output) or an app event.</summary>
     public void AppendOutput(string level, string message, string source = "")
-        => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        _pendingOutput.Enqueue((level, message, source));
+        if (Interlocked.Exchange(ref _outputFlushScheduled, 1) == 0)
+            Avalonia.Threading.Dispatcher.UIThread.Post(FlushOutput, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    private void FlushOutput()
+    {
+        _outputFlushScheduled = 0;
+        var now = DateTime.Now;
+        while (_pendingOutput.TryDequeue(out var e))
         {
-            OutputLog.Add(new LogEntry(DateTime.Now, level, message, source));
-            while (OutputLog.Count > MaxOutputLines) OutputLog.RemoveAt(0);
-            if (level == "error")
-            {
-                Problems.Add(new LogEntry(DateTime.Now, level, message, source));
-                while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
-                ProblemCount = Problems.Count;
-            }
-        });
+            OutputLog.Add(new LogEntry(now, e.level, e.message, e.source));
+            if (e.level == "error")
+                Problems.Add(new LogEntry(now, e.level, e.message, e.source));
+        }
+        while (OutputLog.Count > MaxOutputLines) OutputLog.RemoveAt(0);
+        while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
+        ProblemCount = Problems.Count;
+    }
 
     [CommunityToolkit.Mvvm.Input.RelayCommand]
     public void ClearOutput()

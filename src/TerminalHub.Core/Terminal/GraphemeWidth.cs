@@ -32,6 +32,9 @@ public static class GraphemeWidth
         if (rune is 0x200D or 0xFE0E or 0xFE0F) return true;         // ZWJ, VS15/VS16
         if (rune is >= 0xFE00 and <= 0xFE0F) return true;           // VS1..VS16
         if (rune is >= 0xE0100 and <= 0xE01EF) return true;         // VS17..VS256
+        // U+00AD SOFT HYPHEN is category Format but renders as a visible
+        // hyphen in terminals — wcwidth treats it as 1 cell, not zero.
+        if (rune is 0x00AD) return false;
         var category = rune <= 0xFFFF
             ? CharUnicodeInfo.GetUnicodeCategory((char)rune)
             : CharUnicodeInfo.GetUnicodeCategory(char.ConvertFromUtf32(rune), 0);
@@ -61,6 +64,30 @@ public static class GraphemeWidth
         rune >= 0x1100 && (
             rune <= 0x115F ||                                       // Hangul Jamo
             rune is 0x2329 or 0x232A ||
+            // Discrete EAW=W emoji ranges in the BMP, outside the big CJK blocks
+            // (each missing range drifts the cursor one column per character):
+            (rune >= 0x231A && rune <= 0x231B) ||                   // ⌚⌛
+            (rune >= 0x23E9 && rune <= 0x23EC) ||                   // ⏩⏪⏭⏮
+            rune is 0x23F0 or 0x23F3 ||                             // ⏰⏳
+            (rune >= 0x25FD && rune <= 0x25FE) ||                   // ◼◻
+            (rune >= 0x2614 && rune <= 0x2615) ||                   // ☔☕
+            (rune >= 0x2648 && rune <= 0x2653) ||                   // ♈..♓
+            rune is 0x267F or 0x2693 or 0x26A1 ||                   // ♿⚓⚡
+            (rune >= 0x26AA && rune <= 0x26AB) ||                   // ⚪⚫
+            (rune >= 0x26BD && rune <= 0x26BE) ||                   // ⚽⚾
+            (rune >= 0x26C4 && rune <= 0x26C5) ||                   // ⛄⛅
+            rune is 0x26CE or 0x26D4 or 0x26EA ||                   // ⛎🚫⛪
+            (rune >= 0x26F2 && rune <= 0x26F3) ||                   // ⛲⛳
+            rune is 0x26F5 or 0x26FA or 0x26FD ||                   // ⛵⛺⛽
+            rune is 0x2705 ||                                       // ✅
+            (rune >= 0x270A && rune <= 0x270B) ||                   // ✊✋
+            rune is 0x2728 or 0x274C or 0x274E ||                   // ✨❌❎
+            (rune >= 0x2753 && rune <= 0x2755) ||                   // ❓❔❕
+            rune is 0x2757 ||                                       // ❗
+            (rune >= 0x2795 && rune <= 0x2797) ||                   // ➕➖➗
+            rune is 0x27B0 or 0x27BF ||                             // ➿➾
+            (rune >= 0x2B1B && rune <= 0x2B1C) ||                   // ⬛⬜
+            rune is 0x2B50 or 0x2B55 ||                             // ⭐⭕
             (rune >= 0x2E80 && rune <= 0xA4CF && rune != 0x303F) || // CJK radicals .. Yi
             (rune >= 0xAC00 && rune <= 0xD7A3) ||                   // Hangul syllables
             (rune >= 0xF900 && rune <= 0xFAFF) ||                   // CJK compat ideographs

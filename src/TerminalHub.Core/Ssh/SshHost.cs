@@ -19,11 +19,17 @@ public sealed record SshHost
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Target : Name;
 
-    /// <summary>Arguments passed to the `ssh` binary.</summary>
+    /// <summary>Arguments passed to the `ssh` binary. A target containing
+    /// whitespace is quoted so it reaches ssh as one argument — ssh then fails
+    /// to resolve it, which is a clear error instead of a mangled command line
+    /// where the tail is silently treated as the remote command.</summary>
     [JsonIgnore]
-    public string SshArguments => $"-p {Port} {Target}";
+    public string SshArguments => $"-p {Port} {QuoteIfNeeded(Target)}";
 
     /// <summary>Full command line (for logs / display).</summary>
     [JsonIgnore]
     public string CommandLine => $"ssh {SshArguments}";
+
+    private static string QuoteIfNeeded(string s)
+        => s.Length > 0 && s.Any(char.IsWhiteSpace) ? $"\"{s}\"" : s;
 }

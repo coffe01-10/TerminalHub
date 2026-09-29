@@ -177,9 +177,16 @@ public sealed class SystemMonitor : ISystemMonitor
                 if (nic.OperationalStatus != OperationalStatus.Up ||
                     nic.NetworkInterfaceType is NetworkInterfaceType.Loopback)
                     continue;
-                var s = nic.GetIPv4Statistics();
-                rx += s.BytesReceived;
-                tx += s.BytesSent;
+                // Per-adapter isolation: tunnel/virtual adapters (Tailscale,
+                // WireGuard) can throw on GetIPv4Statistics — one bad adapter
+                // must not zero out the whole sample.
+                try
+                {
+                    var s = nic.GetIPv4Statistics();
+                    rx += s.BytesReceived;
+                    tx += s.BytesSent;
+                }
+                catch (InvalidOperationException) { }
             }
             var now = DateTime.UtcNow;
             var elapsed = (now - _lastNetSample).TotalSeconds;

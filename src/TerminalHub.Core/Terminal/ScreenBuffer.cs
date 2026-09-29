@@ -291,7 +291,9 @@ public sealed class ScreenBuffer
             _pendingWrap = false;
         }
 
-        if (width == 2 && CursorX == Columns - 1)
+        // A wide glyph at the last column only wraps when DECAWM is on; with
+        // autowrap disabled it overwrites the last column and stays there.
+        if (width == 2 && CursorX == Columns - 1 && AutoWrap)
         {
             _wrapped[CursorY] = true;
             LineFeed();
@@ -428,9 +430,17 @@ public sealed class ScreenBuffer
 
     // ---------- scrolling ----------
 
+    /// <summary>Current DECSTBM bounds, 0-based inclusive — CSI S/T scroll this region.</summary>
+    public int ScrollRegionTop => _scrollTop;
+    public int ScrollRegionBottom => _scrollBottom;
+
     /// <summary>Scroll [top..bottom] up n lines; top lines of the *full screen* go to scrollback.</summary>
     public void ScrollUpRegion(int top, int bottom, int n)
     {
+        if (bottom <= top || n <= 0) return;
+        // Scrolling more than the region height equals clearing it — clamp so a
+        // runaway "CSI 999999S" cannot loop full-screen copies for minutes.
+        n = Math.Min(n, bottom - top + 1);
         _lastGlyphRow = -1;
         for (var i = 0; i < n; i++)
         {
@@ -460,6 +470,8 @@ public sealed class ScreenBuffer
 
     public void ScrollDownRegion(int top, int bottom, int n)
     {
+        if (bottom <= top || n <= 0) return;
+        n = Math.Min(n, bottom - top + 1);   // same clamp as ScrollUpRegion
         _lastGlyphRow = -1;
         var blank = TerminalCell.Blank(CurrentBg);
         for (var i = 0; i < n; i++)
@@ -675,9 +687,30 @@ public sealed class ScreenBuffer
         var newWrapped = new bool[rows];
         var copyRows = Math.Min(rows, Rows);
         var copyCols = Math.Min(columns, Columns);
+        // Shrinking rows: keep the BOTTOM rows (prompt/cursor area) and push the
+        // cut top rows into scrollback — dropping the bottom would erase the
+        // line the user is currently editing.
+        var lostRows = Rows - copyRows;
+        if (lostRows > 0 && !OnAlternateScreen)
+        {
+            for (var r = 0; r < lostRows; r++)
+            {
+                var rowArr = new TerminalCell[Columns];
+                Array.Copy(_screen, r * Columns, rowArr, 0, Columns);
+                _scrollback.Add(rowArr);
+                _scrollWrapped.Add(_wrapped[r]);
+                if (_scrollback.Count > _scrollbackLimit)
+                {
+                    _scrollback.RemoveAt(0);
+                    _scrollWrapped.RemoveAt(0);
+                }
+            }
+            ScrollbackChanged?.Invoke(lostRows);
+            CursorY = Math.Max(0, CursorY - lostRows);
+        }
         for (var r = 0; r < copyRows; r++)
-            Array.Copy(_screen, r * Columns, newScreen, r * columns, copyCols);
-        Array.Copy(_wrapped, 0, newWrapped, 0, copyRows);
+            Array.Copy(_screen, (lostRows + r) * Columns, newScreen, r * columns, copyCols);
+        Array.Copy(_wrapped, lostRows, newWrapped, 0, copyRows);
         _screen = newScreen;
         _wrapped = newWrapped;
         if (_savedScreen is { } saved)
@@ -685,8 +718,8 @@ public sealed class ScreenBuffer
             var resized = NewBlankScreen(columns, rows);
             var savedWrapped = new bool[rows];
             for (var r = 0; r < copyRows; r++)
-                Array.Copy(saved, r * Columns, resized, r * columns, copyCols);
-            Array.Copy(_savedWrapped!, 0, savedWrapped, 0, copyRows);
+                Array.Copy(saved, (lostRows + r) * Columns, resized, r * columns, copyCols);
+            Array.Copy(_savedWrapped!, lostRows, savedWrapped, 0, copyRows);
             _savedScreen = resized;
             _savedWrapped = savedWrapped;
         }

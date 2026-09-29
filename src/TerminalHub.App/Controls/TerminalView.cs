@@ -178,7 +178,9 @@ public class TerminalView : Control
         if (next is not null)
         {
             next.Parser.DefaultColorQuery = TerminalPalette.QueryDefaultColor;
-            next.Buffer.ScrollbackChanged += OnScrollbackChanged;
+            // Conditional like Changed above — a detached StagePreview must not
+            // stay in the buffer's delegate list after it leaves the tree.
+            if (_attached) next.Buffer.ScrollbackChanged += OnScrollbackChanged;
         }
         ResetScroll();
         MeasureGlyphs();
@@ -196,6 +198,7 @@ public class TerminalView : Control
         base.OnAttachedToVisualTree(e);
         _attached = true;
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
+        if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
         ThemeManager.Changed += OnThemeChanged;
         // A hidden ancestor flip (single↔split, pop-out dock) arranges us again
         // without touching Bounds/IsVisible — recheck the emulator size on every
@@ -212,6 +215,10 @@ public class TerminalView : Control
         _blink.Stop();
         LayoutUpdated -= OnLayoutUpdated;
         if (_emulator is not null) _emulator.Changed -= OnBufferChanged;
+        // Without this a detached StagePreview (session popped out) stays in the
+        // buffer's delegate list until the session closes — repeated popout/
+        // reattach accumulates dead visual subtrees (and their text caches).
+        if (_emulator is not null) _emulator.Buffer.ScrollbackChanged -= OnScrollbackChanged;
         ThemeManager.Changed -= OnThemeChanged;
         base.OnDetachedFromVisualTree(e);
     }
@@ -961,8 +968,10 @@ public class TerminalView : Control
         {
             var delta = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
             var button = e.Delta.Y != 0 ? (delta > 0 ? 64 : 65) : (delta > 0 ? 66 : 67);
-            for (var i = 0; i < Math.Ceiling(Math.Abs(delta)); i++)
-                ReportMouse(e, button);
+            // One PTY write for the whole gesture — a per-step write floods the
+            // pipe and the CLI's input loop on high-resolution trackpads.
+            var steps = Math.Min((int)Math.Ceiling(Math.Abs(delta)), 200);
+            if (steps > 0) ReportMouse(e, button, count: steps);
             e.Handled = true;
             return;
         }
@@ -999,7 +1008,8 @@ public class TerminalView : Control
     private bool ApplicationOwnsMouse(KeyModifiers modifiers) =>
         !IsPreview && _emulator?.Buffer.MouseTracking > 0 && !modifiers.HasFlag(KeyModifiers.Shift);
 
-    private void ReportMouse(PointerEventArgs e, int button, bool released = false, bool motion = false)
+    private void ReportMouse(PointerEventArgs e, int button, bool released = false, bool motion = false,
+        int count = 1)
     {
         if (_emulator is null) return;
         var p = e.GetPosition(this);
@@ -1009,7 +1019,7 @@ public class TerminalView : Control
         _lastMouseCell = cell;
         var modifiers = (e.KeyModifiers.HasFlag(KeyModifiers.Alt) ? 8 : 0)
             | (e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 16 : 0);
-        _emulator.SendMouse(button, cell.Item1, cell.Item2, released, motion, modifiers);
+        _emulator.SendMouse(button, cell.Item1, cell.Item2, released, motion, modifiers, count);
     }
 
     /// <summary>Map a point to (absolute buffer line, column) of the cell under it.</summary>

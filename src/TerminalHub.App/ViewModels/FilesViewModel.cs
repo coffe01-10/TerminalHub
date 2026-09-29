@@ -114,7 +114,22 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         _watcher.Created += OnDirectoryChanged;
         _watcher.Deleted += OnDirectoryChanged;
         _watcher.Renamed += OnDirectoryChanged;
+        // Buffer overflow (npm install / build output) makes the watcher stop
+        // raising events entirely — rebuild it and refresh once when that happens.
+        _watcher.Error += OnWatcherError;
         _watcher.EnableRaisingEvents = true;
+    }
+
+    private void OnWatcherError(object sender, ErrorEventArgs e)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed) return;
+            _watcher?.Dispose();
+            _watcher = null;
+            WatchDirectory();          // _watcher is null → guard passes, watcher rebuilt
+            NavigateTo(CurrentPath);
+        });
     }
 
     private void OnDirectoryChanged(object sender, FileSystemEventArgs e)
