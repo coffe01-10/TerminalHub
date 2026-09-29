@@ -20,9 +20,14 @@ public sealed class LinuxPtySession : IPtySession
     private IntPtr _argvBlock, _envpBlock;
     private readonly List<IntPtr> _allocations = new();
 
+    // Read-loop / waitpid-watcher / Write / UI threads all touch these.
+    private volatile bool _isRunning;
+    private volatile bool _hasExitCode;
+    private int _exitCode;
+
     public Guid Id { get; } = Guid.NewGuid();
-    public bool IsRunning { get; private set; }
-    public int? ExitCode { get; private set; }
+    public bool IsRunning => _isRunning;
+    public int? ExitCode => _hasExitCode ? _exitCode : null;
     public int? ProcessId => _childPid > 0 ? _childPid : null;
 
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
@@ -30,8 +35,7 @@ public sealed class LinuxPtySession : IPtySession
 
     public Task StartAsync(PtyOptions options, CancellationToken cancellationToken = default)
     {
-        var parts = (options.Shell + " " + options.Arguments)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var parts = SplitCommandLine(options.Shell + " " + options.Arguments);
         if (parts.Length == 0) throw new ArgumentException("Empty shell command");
 
         var exeBytes = ToNativeString(ResolveExecutable(parts[0]));
@@ -45,9 +49,19 @@ public sealed class LinuxPtySession : IPtySession
         WarmChildPath();
 
         var win = new Winsize { ws_row = (ushort)options.Rows, ws_col = (ushort)options.Columns };
-        int pid = Native.forkpty(out int master, IntPtr.Zero, IntPtr.Zero, ref win);
-        if (pid < 0)
-            throw new InvalidOperationException($"forkpty failed: errno={Marshal.GetLastWin32Error()}");
+        int pid;
+        try
+        {
+            pid = Native.forkpty(out var masterFd, IntPtr.Zero, IntPtr.Zero, ref win);
+            if (pid < 0)
+                throw new InvalidOperationException($"forkpty failed: errno={Marshal.GetLastWin32Error()}");
+            _masterFd = masterFd;
+        }
+        catch
+        {
+            FreeNativeAllocations(); // argv/envp blocks — no child will inherit them
+            throw;
+        }
 
         if (pid == 0)
         {
@@ -59,14 +73,49 @@ public sealed class LinuxPtySession : IPtySession
             Native._exit(127);
         }
 
-        _masterFd = master;
         _childPid = pid;
-        IsRunning = true;
+        _isRunning = true;
+        // The child execs from its own private copies — the parent's argv/envp
+        // blocks can go now instead of staying pinned for the session's lifetime.
+        FreeNativeAllocations();
 
         _readLoopCts = new CancellationTokenSource();
         _readLoop = Task.Run(() => ReadLoop(_readLoopCts.Token), CancellationToken.None);
         _ = Task.Run(WatchChild);
         return Task.CompletedTask;
+    }
+
+    /// <summary>Whitespace split that honors "..." and '...' quoting and \
+    /// backslash escapes (outside single quotes, like a POSIX shell).</summary>
+    private static string[] SplitCommandLine(string cmdline)
+    {
+        var parts = new List<string>();
+        var sb = new StringBuilder();
+        var quote = '\0';
+        var esc = false;
+        foreach (var c in cmdline)
+        {
+            if (esc) { sb.Append(c); esc = false; continue; }
+            if (c == '\\' && quote != '\'') { esc = true; continue; }
+            if (quote == '\0' && (c == '"' || c == '\'')) { quote = c; continue; }
+            if (c == quote) { quote = '\0'; continue; }
+            if (quote == '\0' && char.IsWhiteSpace(c))
+            {
+                if (sb.Length > 0) { parts.Add(sb.ToString()); sb.Clear(); }
+                continue;
+            }
+            sb.Append(c);
+        }
+        if (esc) sb.Append('\\'); // trailing backslash kept verbatim
+        if (sb.Length > 0) parts.Add(sb.ToString());
+        return parts.ToArray();
+    }
+
+    private void FreeNativeAllocations()
+    {
+        foreach (var p in _allocations) Marshal.FreeHGlobal(p);
+        _allocations.Clear();
+        _argvBlock = _envpBlock = IntPtr.Zero;
     }
 
     private static void WarmChildPath()
@@ -97,14 +146,7 @@ public sealed class LinuxPtySession : IPtySession
 
     private IntPtr BuildEnvironmentBlock(PtyOptions options)
     {
-        var env = new List<string>();
-        foreach (var key in Environment.GetEnvironmentVariables().Keys)
-            env.Add($"{key}={Environment.GetEnvironmentVariable(key.ToString()!)}");
-        env.RemoveAll(e => e.StartsWith("TERM=") || e.StartsWith("COLORTERM="));
-        env.Add("TERM=xterm-256color");
-        env.Add("COLORTERM=truecolor");
-        foreach (var kv in options.Environment)
-            env.Add($"{kv.Key}={kv.Value}");
+        var env = PtyEnvironment.Build(options).Select(pair => $"{pair.Key}={pair.Value}").ToList();
 
         var block = Marshal.AllocHGlobal((env.Count + 1) * IntPtr.Size);
         _allocations.Add(block);
@@ -133,22 +175,32 @@ public sealed class LinuxPtySession : IPtySession
     private void ReadLoop(CancellationToken ct)
     {
         var buffer = new byte[64 * 1024];
-        while (!ct.IsCancellationRequested && IsRunning)
+        // poll() drives the loop: cancellation is observed within 100ms, and a
+        // blocked read() can never outlive Dispose (close() does not reliably
+        // wake a read() already in progress on Linux).
+        var fds = new PollFd { Fd = _masterFd, Events = Native.POLLIN };
+        try
         {
-            int n;
-            try { n = Native.read(_masterFd, buffer, buffer.Length); }
-            catch { break; }
-
-            if (n <= 0)
+            while (!ct.IsCancellationRequested)
             {
-                if (n == 0 || !IsRunning || ct.IsCancellationRequested) break;
-                Thread.Sleep(5);
-                continue;
+                int ready;
+                try { ready = Native.poll(ref fds, 1, 100); }
+                catch { break; }
+                if (ready <= 0) continue;           // timeout → re-check ct; EINTR → retry
+
+                int n;
+                try { n = Native.read(_masterFd, buffer, buffer.Length); }
+                catch { break; }
+                // After POLLHUP, read() still returns the kernel-buffered tail
+                // before reporting EIO/EOF — so the child's final output survives
+                // its exit (the old IsRunning gate dropped it).
+                if (n <= 0) break;
+                var chunk = new byte[n];
+                Array.Copy(buffer, chunk, n);
+                OutputReceived?.Invoke(this, chunk);
             }
-            var chunk = new byte[n];
-            Array.Copy(buffer, chunk, n);
-            OutputReceived?.Invoke(this, chunk);
         }
+        catch (ObjectDisposedException) { /* master fd closed beneath us */ }
     }
 
     private async Task WatchChild()
@@ -159,11 +211,15 @@ public sealed class LinuxPtySession : IPtySession
             var r = Native.waitpid(_childPid, ref status, Native.WNOHANG);
             if (r == _childPid)
             {
-                IsRunning = false;
-                ExitCode = Native.WIFEXITED(status) ? Native.WEXITSTATUS(status) : -1;
-                await Task.Delay(50); // let the read loop drain
-                _readLoopCts?.Cancel();
-                Exited?.Invoke(this, ExitCode.Value);
+                // Publish exit code first — the volatile flag orders the write
+                // so readers can never observe a torn int?.
+                _exitCode = Native.WIFEXITED(status) ? Native.WEXITSTATUS(status) : -1;
+                _hasExitCode = true;
+                _isRunning = false;
+                // Do NOT cancel the read loop here — it drains the kernel-buffered
+                // tail itself and exits on EIO. Cancelling would truncate output.
+                await Task.Delay(50); // let the read loop deliver the last chunks first
+                Exited?.Invoke(this, _exitCode);
                 return;
             }
             await Task.Delay(120);
@@ -174,7 +230,20 @@ public sealed class LinuxPtySession : IPtySession
     {
         if (_masterFd < 0 || !IsRunning) return;
         var tmp = data.ToArray();
-        Native.write(_masterFd, tmp, tmp.Length);
+        // Loop on short writes — a large paste can exceed the PTY kernel buffer
+        // (on Linux, 4096 bytes in canonical-echo terms); EINTR → retry.
+        var off = 0;
+        while (off < tmp.Length)
+        {
+            var n = Native.write(_masterFd, ref tmp[off], tmp.Length - off);
+            if (n < 0)
+            {
+                if (Marshal.GetLastWin32Error() == Native.EINTR) continue;
+                break;
+            }
+            if (n == 0) break;
+            off += n;
+        }
     }
 
     public void Resize(int columns, int rows)
@@ -214,15 +283,15 @@ public sealed class LinuxPtySession : IPtySession
     {
         Kill();
         _readLoopCts?.Cancel();
+        // Wait for the read loop BEFORE closing the fd — otherwise the loop could
+        // read() a stale descriptor number that the OS may have already recycled.
+        try { _readLoop?.Wait(300); } catch { }
         if (_masterFd >= 0)
         {
             try { Native.close(_masterFd); } catch { }
             _masterFd = -1;
         }
-        try { _readLoop?.Wait(300); } catch { }
-        foreach (var p in _allocations) Marshal.FreeHGlobal(p);
-        _allocations.Clear();
-        _argvBlock = _envpBlock = IntPtr.Zero;
+        FreeNativeAllocations();
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -234,18 +303,29 @@ public sealed class LinuxPtySession : IPtySession
         public ushort ws_ypixel;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PollFd
+    {
+        public int Fd;
+        public short Events;
+        public short Revents;
+    }
+
     private static class Native
     {
         public const int WNOHANG = 1;
         public const int SIGHUP = 1;
         public const int SIGKILL = 9;
+        public const int EINTR = 4; // same value on Linux and macOS
         public const uint TIOCSWINSZ = 0x5414;
+        public const short POLLIN = 0x0001;
 
         [DllImport("libc", SetLastError = true)]
         public static extern int forkpty(out int amaster, IntPtr name, IntPtr termp, ref Winsize winp);
 
         [DllImport("libc")] public static extern int read(int fd, byte[] buf, int count);
-        [DllImport("libc")] public static extern int write(int fd, byte[] buf, int count);
+        [DllImport("libc", SetLastError = true)] public static extern int write(int fd, ref byte buf, int count);
+        [DllImport("libc", SetLastError = true)] public static extern int poll(ref PollFd fds, nint nfds, int timeoutMs);
         [DllImport("libc")] public static extern int close(int fd);
         [DllImport("libc")] public static extern int ioctl(int fd, uint request, ref Winsize winp);
         [DllImport("libc")] public static extern int kill(int pid, int sig);

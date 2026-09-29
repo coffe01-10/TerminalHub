@@ -13,6 +13,28 @@ Match the design mockups in [`docs/design/`](docs/design/):
 - Right: Processes / Files / Logs / SSH + CPU · Mem · Disk · Net widgets **or** AI assistant checklist
 - Bottom: New Session · Monitor · SSH · Logs · Deploy · Settings dock
 
+The main workspace uses a Stage Manager-style session shelf: live thumbnails tilt
+in perspective around the active session, flatten on hover, and animate when
+selected. The foreground terminal expands with a damped spring without restarting
+its PTY. Output and the inspector start collapsed; use the title-bar controls or
+`Ctrl+Shift+J` / `Ctrl+Shift+B` to toggle them — bare Ctrl+letter chords stay
+reserved for the shell (^B tmux prefix, ^W readline delete-word, ^J newline …).
+`Ctrl+Shift+W` closes the active session, `Ctrl+Shift+N` opens a new one.
+Input goes directly into the terminal.
+The centered dock reveals near the bottom edge by default. Settings offers
+auto-hide, always visible (with reserved space), and hidden modes. These choices
+are remembered. Smaller windows use a narrower, scrollable shelf. Click a thumbnail or use
+`Ctrl+Tab` / `Ctrl+Shift+Tab` to switch sessions.
+
+Current native renders: [1440 × 900](docs/screenshots/stage-1440.png) ·
+[1100 × 680](docs/screenshots/stage-1100.png).
+
+The focused layout/input tests use temporary settings and remove them on exit:
+
+```powershell
+dotnet test --filter FullyQualifiedName~StageLayoutTests
+```
+
 Full requirements: [`docs/PRODUCT.md`](docs/PRODUCT.md)  
 Layout regions: [`docs/design/DESIGN.md`](docs/design/DESIGN.md)
 

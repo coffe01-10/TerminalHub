@@ -227,8 +227,13 @@ public class DeployDockTests
 
             var deploy = window.FindControl<Button>("DeployDockButton");
             Assert.NotNull(deploy);
-            var center = CenterInWindow(window, deploy!);
             var vm = (MainWindowViewModel)window.DataContext!;
+            // The dock auto-hides: hover the bottom strip first so it slides up,
+            // THEN measure the button center — measuring while hidden yields the
+            // translateY(130px)-shifted position outside the window.
+            window.MouseMove(new Point(window.Bounds.Width / 2, window.Bounds.Height - 40));
+            await Task.Delay(500);
+            var center = CenterInWindow(window, deploy!);
             Click(window, center, RawInputModifiers.None);
             await FlushUi();
             Assert.DoesNotContain(vm.SessionCards, c => c.Name == "Publish");

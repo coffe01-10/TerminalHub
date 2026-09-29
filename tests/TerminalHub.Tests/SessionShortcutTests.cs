@@ -86,18 +86,46 @@ public class SessionShortcutTests
         window.Close();
     }
 
-    /// <summary>Real input pipeline: Ctrl+W must close the active session even
-    /// while the terminal has focus (window-level tunnel handler wins).</summary>
+    /// <summary>Real input pipeline: Ctrl+Shift+W must close the active session even
+    /// while the terminal has focus (window-level tunnel handler wins). Bare Ctrl+W
+    /// is a shell control byte (readline delete-word) and must reach the PTY.</summary>
     [AvaloniaFact]
     public async Task CtrlW_RealKeyPress_ClosesSession()
     {
         var (window, vm) = await Boot();
         var count = vm.SessionCards.Count;
 
-        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.W, Avalonia.Input.RawInputModifiers.Control);
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.W,
+            Avalonia.Input.RawInputModifiers.Control | Avalonia.Input.RawInputModifiers.Shift);
         await Task.Delay(300);
 
         Assert.Equal(count - 1, vm.SessionCards.Count);
+        window.Close();
+    }
+
+    /// <summary>Bare Ctrl+letter goes to the PTY as a control byte — ^W (0x17),
+    /// ^B (0x02), ^J (0x0A) must not be swallowed by app shortcuts.</summary>
+    [AvaloniaFact]
+    public async Task BareCtrlLetters_ReachPtyAsControlBytes()
+    {
+        var (window, vm) = await Boot();
+        var view = window.GetVisualDescendants().OfType<TerminalHub.App.Controls.TerminalView>()
+            .First(v => !v.IsPreview && v.IsEffectivelyVisible);
+        view.Focus();
+        await Task.Delay(100);
+        var mock = (TerminalHub.Core.Pty.MockPtySession)vm.ActiveSession!.Emulator.Pty;
+        mock.RawInput.Clear();
+
+        var before = vm.SessionCards.Count;
+        var inspectorWas = vm.InspectorVisible;
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.W, Avalonia.Input.RawInputModifiers.Control);
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.B, Avalonia.Input.RawInputModifiers.Control);
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.J, Avalonia.Input.RawInputModifiers.Control);
+        await Task.Delay(200);
+
+        Assert.Equal(before, vm.SessionCards.Count);      // ^W must NOT close the session
+        Assert.Equal(inspectorWas, vm.InspectorVisible);  // ^B must NOT toggle the inspector
+        Assert.Equal("\x17\x02\n", mock.RawInput.ToString());
         window.Close();
     }
 

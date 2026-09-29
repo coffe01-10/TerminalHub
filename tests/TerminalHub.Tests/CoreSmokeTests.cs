@@ -16,6 +16,22 @@ public class CoreSmokeTests
     }
 
     [Fact]
+    public void ResolveShellCommand_HonorsOverride_AndCustomPath()
+    {
+        // Per-session kind overrides the configured default.
+        var s = new AppSettings { Shell = ShellKind.Bash };
+        Assert.Equal("bash", s.ResolveShellCommand());
+        if (OperatingSystem.IsWindows())
+            Assert.Equal("cmd.exe", s.ResolveShellCommand(ShellKind.Cmd));
+
+        // Custom kind + configured path → the path itself; empty path falls back.
+        var custom = new AppSettings { CustomShellPath = "/opt/zsh/bin/zsh" };
+        Assert.Equal("/opt/zsh/bin/zsh", custom.ResolveShellCommand(ShellKind.Custom));
+        Assert.False(string.IsNullOrWhiteSpace(
+            new AppSettings().ResolveShellCommand(ShellKind.Custom)));
+    }
+
+    [Fact]
     public void SettingsStore_RoundTrips()
     {
         var path = Path.Combine(Path.GetTempPath(), $"th-settings-{Guid.NewGuid():N}.json");

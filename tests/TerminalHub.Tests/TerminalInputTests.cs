@@ -28,7 +28,7 @@ public class TerminalInputTests
     public async Task Typing_ReachesPty_AndEnterExecutes()
     {
         var (window, vm) = await Boot();
-        var view = window.GetVisualDescendants().OfType<TerminalView>().First();
+        var view = window.GetVisualDescendants().OfType<TerminalView>().First(v => !v.IsPreview && v.IsEffectivelyVisible);
         view.Focus();
         await Task.Delay(100);
         Assert.True(view.IsFocused);

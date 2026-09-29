@@ -11,6 +11,10 @@ public sealed class MockPtySession : IPtySession
     private readonly StringBuilder _line = new();
     private bool _disposed;
 
+    /// <summary>Verbatim text of every <see cref="Write"/> so far — test hook to
+    /// observe exactly which bytes keyboard input delivered to the PTY.</summary>
+    public readonly StringBuilder RawInput = new();
+
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsRunning { get; private set; }
     public int? ExitCode { get; private set; }
@@ -31,6 +35,7 @@ public sealed class MockPtySession : IPtySession
     {
         if (!IsRunning) return;
         var text = Encoding.UTF8.GetString(data);
+        RawInput.Append(text);
         foreach (var ch in text)
         {
             if (ch is '\r' or '\n')

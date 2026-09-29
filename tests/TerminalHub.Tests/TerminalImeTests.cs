@@ -1,0 +1,210 @@
+using System.Reflection;
+using Avalonia;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Input.TextInput;
+using Avalonia.Media;
+using TerminalHub.App.Controls;
+using TerminalHub.Core.Terminal;
+using Xunit;
+
+namespace TerminalHub.Tests;
+
+public class TerminalImeTests
+{
+    private static TextInputMethodClient Client(TerminalView view) =>
+        (TextInputMethodClient)typeof(TerminalView).GetField("_imeClient",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
+
+    private static double CellWidth(TerminalView view) =>
+        (double)typeof(TerminalView).GetField("_cellW",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
+
+    private static void Draw(TerminalView view)
+    {
+        using var context = new DrawingGroup().Open();
+        view.Render(context);
+    }
+
+    private static void ClaudeFrame(TerminalEmulator emulator, string input)
+    {
+        emulator.Parser.Feed("\x1b[2J\x1b[?25l\x1b[6;1H" + new string('─', 60)
+            + "\x1b[7;1H❯ " + input + "\x1b[8;1H" + new string('─', 60)
+            + "\x1b[9;1HC-- INSERT -- manual mode on · for agents");
+    }
+
+    [AvaloniaTheory]
+    [InlineData("")]
+    [InlineData("中")]
+    [InlineData("nd大大大哒哒哒顺丰v")]
+    public void HiddenCursor_CompositionStaysInPrompt_WithoutCommittedTrail(string input)
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 10);
+        var view = new TerminalView { Emulator = emulator };
+        ClaudeFrame(emulator, input);
+        // Query before rendering as Windows can do when composition starts.
+        var client = Client(view);
+        var cellW = CellWidth(view);
+        var anchor = client.CursorRectangle;
+        Assert.Equal((2 + input.Sum(ScreenBuffer.CharWidth)) * cellW, anchor.X, 6);
+        Assert.Equal(6 * anchor.Height, anchor.Y, 6);
+        client.SetPreeditText("n'd", 3);
+        var composing = client.CursorRectangle;
+        Assert.Equal(anchor.X + 3 * cellW, composing.X, 6);
+        Assert.Equal(anchor.Y, composing.Y);
+        Draw(view);
+        Assert.Equal(composing, client.CursorRectangle);
+    }
+
+    [AvaloniaFact]
+    public void VisibleCursor_AfterEditing_DoesNotJumpToEchoedTextEnd()
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 10);
+        var view = new TerminalView { Emulator = emulator };
+        view.RaiseEvent(new TextInputEventArgs { RoutedEvent = InputElement.TextInputEvent, Text = "hello" });
+        emulator.Parser.Feed("\x1b[3;1Hhello\x1b[3;3H");
+        Draw(view);
+        var rect = Client(view).CursorRectangle;
+        Assert.Equal(2 * CellWidth(view), rect.X, 6);
+        Assert.Equal(2 * rect.Height, rect.Y, 6);
+    }
+
+    [AvaloniaFact]
+    public void StartingCompositionAfterOutput_UsesCurrentFrameBeforeRender()
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 10);
+        var view = new TerminalView { Emulator = emulator };
+        Draw(view);
+        emulator.Parser.Feed("\x1b[4;8H");
+        var client = Client(view);
+        client.SetPreeditText("ni", 1);
+        var rect = client.CursorRectangle;
+        Assert.Equal(8 * CellWidth(view), rect.X, 6);
+        Assert.Equal(3 * rect.Height, rect.Y, 6);
+    }
+
+    [AvaloniaFact]
+    public void UnborderedOutputPrompt_DoesNotStealHiddenCursor()
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 10);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("❯ old output\x1b[?25l\x1b[5;1Hcurrent");
+        var rect = Client(view).CursorRectangle;
+        Assert.Equal(7 * CellWidth(view), rect.X, 6);
+        Assert.Equal(4 * rect.Height, rect.Y, 6);
+    }
+
+    [AvaloniaFact]
+    public void ClaudeSoftwareCursor_MovesAcrossCjk_AndImeFollowsIt()
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 10);
+        var view = new TerminalView { Emulator = emulator };
+        var client = Client(view);
+        // Replay the reverse-video cursor emitted by Claude Code via ConPTY:
+        // end -> Left x3 (文) -> Right (c) -> Home -> End.
+        foreach (var (text, col) in new[]
+        {
+            ("ab中文cd\x1b[7m \x1b[27m", 10),
+            ("ab中\x1b[7m文\x1b[27mcd", 6),
+            ("ab中文\x1b[7mc\x1b[27md", 8),
+            ("\x1b[7ma\x1b[27mb中文cd", 2),
+            ("ab中文cd\x1b[7m \x1b[27m", 10),
+            ("ab中文cd  \x1b[7m \x1b[27m", 12),
+        })
+        {
+            ClaudeFrame(emulator, text);
+            var anchor = client.CursorRectangle;
+            Assert.Equal(col * CellWidth(view), anchor.X, 6);
+            Assert.Equal(6 * anchor.Height, anchor.Y, 6);
+            Draw(view);
+            Assert.Equal(anchor, client.CursorRectangle);
+            client.SetPreeditText("ni", 1);
+            Assert.Equal((col + 1) * CellWidth(view), client.CursorRectangle.X, 6);
+            client.SetPreeditText(null);
+        }
+    }
+
+    [AvaloniaFact]
+    public void ClaudeSoftwareCursor_OnWrappedRow_UsesItsOwnPosition()
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 12);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("\x1b[?25l\x1b[6;1H" + new string('─', 60)
+            + "\x1b[7;1H❯ first line\x1b[8;1H  中\x1b[7m文\x1b[27m at middle"
+            + "\x1b[9;1H  last line\x1b[10;1H" + new string('─', 60)
+            + "\x1b[11;1Hstatus");
+        var rect = Client(view).CursorRectangle;
+        Assert.Equal(4 * CellWidth(view), rect.X, 6);
+        Assert.Equal(7 * rect.Height, rect.Y, 6);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("Paper", " ")]
+    [InlineData("Paper", "文")]
+    [InlineData("Black", " ")]
+    [InlineData("Black", "文")]
+    public void ReverseVideo_DefaultColors_DrawsVisibleCursorBackground(string theme, string text)
+    {
+        var oldFg = TerminalPalette.DefaultFg;
+        var oldBg = TerminalPalette.DefaultBg;
+        try
+        {
+            TerminalPalette.SetTheme(theme);
+            using var emulator = new TerminalEmulator(columns: 60, rows: 10);
+            var view = new TerminalView { Emulator = emulator };
+            emulator.Parser.Feed("\x1b[?25l\x1b[7m" + text + "\x1b[27m");
+            var group = new DrawingGroup();
+            using (var context = group.Open()) view.Render(context);
+            var painted = Descendants(group).OfType<GeometryDrawing>()
+                .Where(d => d.Brush is ISolidColorBrush b && b.Color == TerminalPalette.DefaultFg).ToArray();
+            var cursor = Assert.Single(painted);
+            Assert.Equal(text.Sum(ScreenBuffer.CharWidth) * CellWidth(view), cursor.Geometry!.Bounds.Width, 6);
+            Assert.All(Descendants(group).OfType<GlyphRunDrawing>()
+                .Where(d => d.GlyphRun!.Characters.ToString() == text),
+                d => Assert.Equal(TerminalPalette.DefaultBg, ((ISolidColorBrush)d.Foreground!).Color));
+        }
+        finally
+        {
+            TerminalPalette.DefaultFg = oldFg;
+            TerminalPalette.DefaultBg = oldBg;
+        }
+    }
+
+    private static IEnumerable<Drawing> Descendants(Drawing drawing)
+    {
+        yield return drawing;
+        if (drawing is DrawingGroup group)
+            foreach (var child in group.Children)
+                foreach (var item in Descendants(child)) yield return item;
+    }
+
+    [AvaloniaFact]
+    public void MixedCjkText_GlyphPositionsUseTerminalCells()
+    {
+        var view = new TerminalView { Emulator = new TerminalEmulator() };
+        using var emulator = view.Emulator;
+        var group = new DrawingGroup();
+        using (var context = group.Open())
+            typeof(TerminalView).GetMethod("DrawRun", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(view, [context, "大大大v", 2, 0, Brushes.White, CellAttrs.None]);
+
+        var glyphs = Glyphs(group, Matrix.Identity).ToArray();
+        var cellW = CellWidth(view);
+        Assert.Equal(4, glyphs.Length);
+        Assert.Equal(new[] { "大", "大", "大", "v" }, glyphs.Select(g => g.Text));
+        for (var i = 0; i < glyphs.Length; i++)
+            Assert.Equal((2 + i * 2) * cellW, glyphs[i].X, 6);
+    }
+
+    private static IEnumerable<(string Text, double X)> Glyphs(Drawing drawing, Matrix transform)
+    {
+        if (drawing is DrawingGroup group)
+        {
+            var matrix = (group.Transform?.Value ?? Matrix.Identity) * transform;
+            foreach (var child in group.Children)
+                foreach (var glyph in Glyphs(child, matrix)) yield return glyph;
+        }
+        else if (drawing is GlyphRunDrawing { GlyphRun: { } run })
+            yield return (run.Characters.ToString(), run.BaselineOrigin.Transform(transform).X);
+    }
+}

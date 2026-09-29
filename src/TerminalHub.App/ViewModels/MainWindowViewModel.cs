@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Avalonia.Platform.Storage;
@@ -11,6 +12,7 @@ using TerminalHub.Core.Pty;
 using TerminalHub.Core.Sessions;
 using TerminalHub.Core.Settings;
 using TerminalHub.App.Views;
+using TerminalHub.App.Controls;
 using TerminalHub.Pty;
 
 namespace TerminalHub.App.ViewModels;
@@ -41,6 +43,39 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _commandInput = "";
     [ObservableProperty] private int _selectedRightTab;
     [ObservableProperty] private bool _settingsOpen;
+    [ObservableProperty] private bool _inspectorVisible;
+    [ObservableProperty] private bool _outputVisible;
+    [ObservableProperty] private int _dockVisibilityMode;
+    [ObservableProperty] private string _activeWorkingDirectory = "";
+    public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? "未选择会话" :
+        Path.GetFileName(ActiveWorkingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name ? name : ActiveWorkingDirectory;
+    partial void OnActiveWorkingDirectoryChanged(string value) => OnPropertyChanged(nameof(ActiveDirectoryName));
+    public int ThemeIndex
+    {
+        get => Math.Max(0, Array.IndexOf(ThemeManager.Names, _settings.Theme));
+        set
+        {
+            if (value < 0 || value >= ThemeManager.Names.Length) return;
+            _settings.Theme = ThemeManager.Names[value];
+            ThemeManager.Apply(_settings.Theme);
+            OnPropertyChanged();
+        }
+    }
+
+    [RelayCommand]
+    private void ShowWorkspace()
+    {
+        InspectorVisible = true;
+        SelectedRightTab = 1;
+        Files.NavigateTo(ActiveWorkingDirectory);
+    }
+
+    partial void OnInspectorVisibleChanged(bool value) => _settings.InspectorVisible = value;
+    partial void OnOutputVisibleChanged(bool value) => _settings.OutputVisible = value;
+    partial void OnDockVisibilityModeChanged(int value) => _settings.DockVisibilityMode = value;
+
+    [RelayCommand] private void ToggleInspector() => InspectorVisible = !InspectorVisible;
+    [RelayCommand] private void ToggleOutput() => OutputVisible = !OutputVisible;
     /// <summary>Dock index of the active surface (-1 when a tab has no dock item).</summary>
     [ObservableProperty] private int _dockHighlight = -1;
 
@@ -274,6 +309,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         _settingsStore = settingsStore ?? new SettingsStore();
         _settings = _settingsStore.Load();
+        ThemeManager.Apply(_settings.Theme);
+        _inspectorVisible = _settings.InspectorVisible;
+        _outputVisible = _settings.OutputVisible;
+        _dockVisibilityMode = _settings.DockVisibilityMode;
         DeployDockTip = ComposeDeployDockTip();
         _workspaceName = _settings.WorkspaceName;
 
@@ -328,7 +367,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
         foreach (var s in _settings.StartupSessions)
-            await CreateSessionAsync(s.Name, ParseTag(s.Tag), s.WorkingDirectory, s.Shell);
+            await CreateSessionAsync(s.Name, ParseTag(s.Tag), s.WorkingDirectory, s.Shell); // failures log to Output, next session still spawns
     }
 
     private static SessionTag ParseTag(string tag) => tag switch
@@ -341,40 +380,62 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _ => SessionTag.None,
     };
 
-    private Task<TerminalSessionModel> CreateSessionAsync(string? name, SessionTag tag, string cwd, ShellKind? shell = null)
+    private async Task<TerminalSessionModel?> CreateSessionAsync(string? name, SessionTag tag, string cwd, ShellKind? shell = null)
     {
-        var shellCmd = (shell ?? _settings.Shell) switch
-        {
-            ShellKind.Cmd => OperatingSystem.IsWindows() ? "cmd.exe" : "bash",
-            ShellKind.Wsl => OperatingSystem.IsWindows() ? "wsl.exe" : "bash",
-            ShellKind.Bash => "bash",
-            ShellKind.Custom when !string.IsNullOrWhiteSpace(_settings.CustomShellPath) => _settings.CustomShellPath,
-            ShellKind.PowerShell when OperatingSystem.IsWindows() => "pwsh",
-            _ => OperatingSystem.IsWindows() ? "pwsh" : "bash",
-        };
+        var shellCmd = _settings.ResolveShellCommand(shell);
         if (string.IsNullOrEmpty(cwd))
             cwd = OperatingSystem.IsWindows() ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        return _sessions.CreateAsync(
-            PtySessionFactory.Create,
-            new PtyOptions { Shell = shellCmd, WorkingDirectory = cwd },
-            name, tag);
+        try
+        {
+            return await _sessions.CreateAsync(
+                PtySessionFactory.Create,
+                new PtyOptions { Shell = shellCmd, WorkingDirectory = cwd,
+                    Arguments = OperatingSystem.IsWindows() && shellCmd is "pwsh" or "powershell"
+                        ? ShellIntegration.PowerShellArguments : "",
+                    Environment = OperatingSystem.IsWindows() && shellCmd == "cmd.exe"
+                        ? new Dictionary<string, string> { ["PROMPT"] = "$E]9;9;$P$E\\$P$G" }
+                        : new Dictionary<string, string>() },
+                name, tag);
+        }
+        catch (Exception ex)
+        {
+            // PTY spawn failures must be visible — a silent exception leaves the
+            // user staring at an empty stage wondering where the terminal went.
+            Dashboard.AppendOutput("error",
+                $"创建会话失败 / failed to spawn terminal — {ex.Message}", "terminal");
+            return null;
+        }
     }
 
     /// <summary>SSH tab → spawn a session running the local ssh binary.</summary>
     private void ConnectSsh(TerminalHub.Core.Ssh.SshHost host)
     {
         Dashboard.AppendOutput("info", $"SSH 连接: {host.CommandLine}", "ssh");
-        _ = _sessions.CreateAsync(
-            PtySessionFactory.Create,
-            new PtyOptions
-            {
-                Shell = "ssh",
-                Arguments = host.SshArguments,
-                WorkingDirectory = OperatingSystem.IsWindows()
-                    ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            },
-            host.DisplayName, SessionTag.Ssh);
+        _ = SpawnSshAsync(host);
+    }
+
+    /// <summary>Awaits on the caller's context (UI) — Sessions mutations stay on the UI thread.</summary>
+    private async Task SpawnSshAsync(TerminalHub.Core.Ssh.SshHost host)
+    {
+        try
+        {
+            await _sessions.CreateAsync(
+                PtySessionFactory.Create,
+                new PtyOptions
+                {
+                    Shell = "ssh",
+                    Arguments = host.SshArguments,
+                    WorkingDirectory = OperatingSystem.IsWindows()
+                        ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                },
+                host.DisplayName, SessionTag.Ssh);
+        }
+        catch (Exception ex)
+        {
+            Dashboard.AppendOutput("error",
+                $"SSH 会话创建失败 / failed to spawn ssh — {ex.Message}", "ssh");
+        }
     }
 
     [RelayCommand]
@@ -517,8 +578,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var model = card?.Model ?? ActiveSession;
         if (model is null) return;
+        // Mark before detaching — SessionRemoved fires synchronously inside
+        // Detach and must already see this as a popout, not a close.
+        model.Detached = true;
         var session = _sessions.Detach(model);
-        if (session is null) return;
+        if (session is null)
+        {
+            model.Detached = false;
+            return;
+        }
 
         DetachedSessions.Add(session);
         var win = new SessionWindow(session, FontSize);
@@ -561,6 +629,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var (card, name) = args;
         if (card is null || string.IsNullOrWhiteSpace(name)) return;
         name = name.Trim();
+        var startup = _settings.StartupSessions.FindIndex(s => s.Name == card.Name);
+        if (startup >= 0) _settings.StartupSessions[startup] = _settings.StartupSessions[startup] with { Name = name };
         _sessions.Rename(card.Model, name);
         _sessionNames[card.Model.Id] = name; // future output lines carry the new name
         card.Refresh();
@@ -634,9 +704,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         switch (index)
         {
             case 0: _ = NewSession(); break;
-            case 1: DockHighlight = 1; SelectedRightTab = 0; break;
-            case 2: DockHighlight = 2; SelectedRightTab = 3; break;
-            case 3: DockHighlight = 3; SelectedRightTab = 2; break;
+            case 1: InspectorVisible = true; DockHighlight = 1; SelectedRightTab = 0; break;
+            case 2: InspectorVisible = true; DockHighlight = 2; SelectedRightTab = 3; break;
+            case 3: InspectorVisible = true; DockHighlight = 3; SelectedRightTab = 2; break;
             case 4:
                 var force = _deployCtrlHeld;
                 _deployCtrlHeld = false;
@@ -1216,6 +1286,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ShellKind.Cmd => 1,
             ShellKind.Wsl => 2,
             ShellKind.Bash => 3,
+            ShellKind.Custom => 4,
             _ => 0,
         };
         set
@@ -1225,6 +1296,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 1 => ShellKind.Cmd,
                 2 => ShellKind.Wsl,
                 3 => ShellKind.Bash,
+                4 => ShellKind.Custom,
                 _ => ShellKind.PowerShell,
             };
             OnPropertyChanged();
@@ -1292,6 +1364,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void UpdateBreadcrumbFrom(string? cwd)
     {
+        ActiveWorkingDirectory = cwd ?? "";
         Breadcrumb = string.IsNullOrEmpty(cwd)
             ? ""
             : (OperatingSystem.IsWindows()
@@ -1326,9 +1399,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s))?.Refresh();
             if (!ReferenceEquals(ActiveSession, s)) return;
             UpdateBreadcrumbFrom(path);
             UpdateCwdNavFlags();
+            if (InspectorVisible && SelectedRightTab == 1) Files.NavigateTo(path);
         });
     }
 
@@ -1416,25 +1491,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ActiveSession.Emulator.SendText(text + "\r");
     }
 
-    /// <summary>Per-session UTF-8 line decoders feeding the real Output log.</summary>
-    private readonly Dictionary<Guid, Utf8LineDecoder> _lineDecoders = new();
-    private readonly Dictionary<Guid, string> _sessionNames = new();
+    /// <summary>Per-session UTF-8 line decoders feeding the real Output log.
+    /// Read/written on PTY read threads — concurrent collections only.</summary>
+    private readonly ConcurrentDictionary<Guid, Utf8LineDecoder> _lineDecoders = new();
+    private readonly ConcurrentDictionary<Guid, string> _sessionNames = new();
 
     private void OnPtyOutput(IPtySession pty, ReadOnlyMemory<byte> data)
     {
-        if (!_lineDecoders.TryGetValue(pty.Id, out var dec))
+        var dec = _lineDecoders.GetOrAdd(pty.Id, id =>
         {
-            dec = new Utf8LineDecoder();
-            dec.LineReceived += line =>
+            var d = new Utf8LineDecoder();
+            d.LineReceived += line =>
             {
                 var level = ClassifyLine(line);
-                var name = _sessionNames.GetValueOrDefault(pty.Id, "session");
+                var name = _sessionNames.GetValueOrDefault(id, "session");
                 bool publish;
                 bool focusOutput;
                 lock (_publishLock)
                 {
-                    publish = _publishIds.Contains(pty.Id);
-                    focusOutput = publish && _publishOutputArmed.Add(pty.Id);
+                    publish = _publishIds.Contains(id);
+                    focusOutput = publish && _publishOutputArmed.Add(id);
                 }
                 // Publish script bytes are real PTY output. Show them as deploy
                 // without inventing progress text. Other sessions keep their name.
@@ -1443,12 +1519,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 Dashboard.AppendOutput(level, line, publish ? "deploy" : name);
                 _sessionLog.Write(name, level, line);
             };
-            dec.RawLineReceived += raw =>
+            d.RawLineReceived += raw =>
                 Dashboard.AppendDebug(
                     TerminalHub.Core.Logging.AnsiText.DebugEscape(raw),
-                    _sessionNames.GetValueOrDefault(pty.Id, "session"));
-            _lineDecoders[pty.Id] = dec;
-        }
+                    _sessionNames.GetValueOrDefault(id, "session"));
+            return d;
+        });
         dec.Feed(data.Span);
     }
 
@@ -1457,10 +1533,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void OnSessionAdded(TerminalSessionModel s)
     {
         _sessionNames[s.Id] = s.Name;
-        s.Pty.OutputReceived += OnPtyOutput;
-        if (!string.IsNullOrEmpty(s.WorkingDirectory))
-            HistoryFor(s).Push(s.WorkingDirectory);
-        s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
+        // Reattach after a popout: the PTY wiring and cwd history were kept
+        // alive through the detach — re-subscribing would double every output
+        // line and every cwd report.
+        var reattach = s.Detached;
+        s.Detached = false;
+        if (!reattach)
+        {
+            s.Pty.OutputReceived += OnPtyOutput;
+            if (!string.IsNullOrEmpty(s.WorkingDirectory))
+                lock (_cwdLock) HistoryFor(s).Push(s.WorkingDirectory);
+            s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
+        }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             var card = new SessionCardViewModel(s);
@@ -1473,10 +1557,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnSessionRemoved(TerminalSessionModel s)
     {
-        s.Pty.OutputReceived -= OnPtyOutput;
-        _lineDecoders.Remove(s.Id);
-        _sessionNames.Remove(s.Id);
-        _cwdHistories.Remove(s.Id);
+        // Detach (popout) keeps the session alive off-list: PTY output keeps
+        // feeding Output/Logs, cwd history survives, and CwdChanged stays wired —
+        // everything resumes seamlessly on Reattach. A real close tears it down.
+        if (!s.Detached)
+        {
+            s.Pty.OutputReceived -= OnPtyOutput;
+            _lineDecoders.TryRemove(s.Id, out _);
+            _sessionNames.TryRemove(s.Id, out _);
+            lock (_cwdLock) _cwdHistories.Remove(s.Id);
+        }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             if (IsSplit)
@@ -1500,13 +1590,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SyncActive()
     {
         ActiveSession = _sessions.Active;
-        foreach (var c in SessionCards)
-            c.IsActive = ReferenceEquals(c.Model, ActiveSession);
         var target = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, ActiveSession));
+        var activeIndex = target is null ? 0 : SessionCards.IndexOf(target);
+        for (var i = 0; i < SessionCards.Count; i++)
+        {
+            SessionCards[i].IsActive = ReferenceEquals(SessionCards[i], target);
+            SessionCards[i].StageDistance = i - activeIndex;
+        }
         if (!ReferenceEquals(ActiveCard, target))
             ActiveCard = target;
         Dashboard.RefreshSearch();
         UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
+        if (InspectorVisible && SelectedRightTab == 1) Files.NavigateTo(ActiveWorkingDirectory);
         UpdateCwdNavFlags();
     }
 
@@ -1536,7 +1631,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// `cd` keeps the toolbar path + per-session history fresh.</summary>
     private void PollCwdChanges()
     {
-        foreach (var s in _sessions.Sessions)
+        foreach (var s in _sessions.Snapshot)
         {
             var probed = ProcessCwd.TryRead(s.Pty);
             if (string.IsNullOrEmpty(probed)) continue;
@@ -1586,6 +1681,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         PersistSettings();
         Logs.Dispose();
+        Files.Dispose();
         _sessionLog.Dispose();
         _monitor.Dispose();
         foreach (var c in SessionCards) c.Model.Dispose();

@@ -63,6 +63,30 @@ public class PopoutWindowTests
         stray.Dispose();
     }
 
+    [Fact]
+    public async Task AutoNamedSession_SkipsNamesTakenByExplicitlyNamedSessions()
+    {
+        var mgr = new SessionManager();
+        // Startup sessions carry explicit names and never bump the auto counter —
+        // the next auto-named session must still pick an unused number.
+        for (var i = 1; i <= 3; i++)
+            await mgr.CreateAsync(() => new MockPtySession(),
+                new PtyOptions { Shell = "mock" }, $"Terminal {i:D2}");
+
+        var auto = await mgr.CreateAsync(() => new MockPtySession(),
+            new PtyOptions { Shell = "mock" });
+        Assert.Equal("Terminal 04", auto.Name);
+
+        // …and a rename that claims a future number is skipped too.
+        mgr.Rename(auto, "Terminal 05");
+        var next = await mgr.CreateAsync(() => new MockPtySession(),
+            new PtyOptions { Shell = "mock" });
+        Assert.Equal("Terminal 06", next.Name);
+        Assert.Equal(5, mgr.Sessions.Select(s => s.Name).Distinct().Count());
+
+        foreach (var s in mgr.Sessions.ToArray()) mgr.Close(s);
+    }
+
     // ---------- UI: popout window lifecycle ----------
 
     private static async Task<TerminalHub.App.ViewModels.MainWindowViewModel> ShowMain()
@@ -161,4 +185,76 @@ public class PopoutWindowTests
         Assert.Empty(vm.DetachedSessions);
         Assert.False(popped.IsRunning);
     }
+
+    [AvaloniaFact]
+    public async Task Popout_PreservesCwdHistory_AndKeepsTrackingWhileDetached()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "th-pop-cwd-" + Guid.NewGuid().ToString("N"));
+        var a = Path.Combine(root, "alpha");
+        var b = Path.Combine(root, "beta");
+        var c = Path.Combine(root, "gamma");
+        Directory.CreateDirectory(a);
+        Directory.CreateDirectory(b);
+        Directory.CreateDirectory(c);
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        PtySessionFactory.UseMock = true;
+        window.Show();
+        try
+        {
+            await Task.Delay(400);
+            var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+            var target = vm.ActiveSession!;
+            var emu = target.Emulator;
+            var fullA = Path.GetFullPath(a);
+            var fullB = Path.GetFullPath(b);
+            var fullC = Path.GetFullPath(c);
+
+            // Two cwd reports → back/forward history has somewhere to go.
+            emu.Parser.Feed($"\u001b]7;file://{fullA}\u0007");
+            await Until(() => Norm(target.WorkingDirectory) == Norm(fullA));
+            emu.Parser.Feed($"\u001b]7;file://{fullB}\u0007");
+            await Until(() => Norm(target.WorkingDirectory) == Norm(fullB));
+            await Until(() => vm.CanCwdBack);
+
+            vm.OpenInNewWindowCommand.Execute(null);
+            await Task.Delay(200);
+            var pop = Assert.Single(vm.Popouts);
+
+            // Detached but still wired: a cwd report from inside the popout
+            // keeps landing in the session and its (preserved) history.
+            emu.Parser.Feed($"\u001b]7;file://{fullC}\u0007");
+            await Until(() => Norm(target.WorkingDirectory) == Norm(fullC));
+
+            pop.Close();
+            await Task.Delay(200);
+            Assert.Same(target, vm.ActiveSession);
+
+            // History survived the round trip — ← goes to B, → back to C.
+            await Until(() => vm.CanCwdBack);
+            vm.CwdBackCommand.Execute(null);
+            Assert.Equal(Norm(fullB), Norm(vm.ActiveSession!.WorkingDirectory));
+            await Until(() => vm.CanCwdForward);
+            vm.CwdForwardCommand.Execute(null);
+            Assert.Equal(Norm(fullC), Norm(vm.ActiveSession!.WorkingDirectory));
+        }
+        finally
+        {
+            window.Close();
+            try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+        }
+    }
+
+    private static async Task Until(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition()) return;
+            await Task.Delay(25);
+        }
+        Assert.True(condition(), "condition not met within timeout");
+    }
+
+    private static string Norm(string path) =>
+        TerminalHub.Core.Sessions.CwdHistory.Normalize(path);
 }

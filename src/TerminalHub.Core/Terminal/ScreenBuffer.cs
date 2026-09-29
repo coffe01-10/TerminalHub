@@ -8,6 +8,42 @@ namespace TerminalHub.Core.Terminal;
 /// </summary>
 public sealed class ScreenBuffer
 {
+    public object SyncRoot { get; } = new();
+    public bool BracketedPaste { get; set; }
+    public bool SynchronizedOutput { get; private set; }
+    private long _syncStarted;
+    private TerminalFrame? _heldFrame;
+
+    public void SetSynchronizedOutput(bool enabled)
+    {
+        if (enabled && !SynchronizedOutput)
+        {
+            _heldFrame = CaptureFrame();
+            _syncStarted = Environment.TickCount64;
+        }
+        SynchronizedOutput = enabled;
+        if (!enabled) _heldFrame = null;
+    }
+
+    public TerminalFrame CaptureFrame(int offset = 0)
+    {
+        lock (SyncRoot)
+        {
+            // A crashed/unfinished synchronized update must not freeze the screen indefinitely.
+            if (SynchronizedOutput && Environment.TickCount64 - _syncStarted < 150 && _heldFrame is { } held)
+                return held;
+            var cells = new TerminalCell[Rows * Columns];
+            Array.Fill(cells, TerminalCell.Blank(TerminalColor.Default));
+            offset = OnAlternateScreen ? 0 : Math.Clamp(offset, 0, ScrollbackCount);
+            for (var row = 0; row < Rows; row++)
+            {
+                var source = GetLine(ScrollbackCount + row - offset);
+                source[..Math.Min(source.Length, Columns)].CopyTo(cells.AsSpan(row * Columns));
+            }
+            return new TerminalFrame(Columns, Rows, cells, CursorX, CursorY,
+                CursorVisible && offset == 0, OnAlternateScreen);
+        }
+    }
     private readonly List<TerminalCell[]> _scrollback = new();
     private TerminalCell[] _screen;
     private TerminalCell[]? _savedScreen;
@@ -35,6 +71,42 @@ public sealed class ScreenBuffer
     private int _scrollTop, _scrollBottom; // inclusive
     private int _activeCharset;            // 0=G0 1=G1
     private readonly bool[] _decSpecial = new bool[2];
+
+    /// <summary>kitty progressive-enhancement keyboard flags in effect
+    /// (CSI &gt;u push / CSI &lt;u pop / CSI =u set). Bit 0 = disambiguate escape codes.</summary>
+    public int KittyKeyboardFlags { get; private set; }
+    private readonly List<int> _kittyFlagStack = new();
+
+    /// <summary>CSI &gt;flags u — save the current flags and switch to <paramref name="flags"/>.</summary>
+    public void KittyPush(int flags)
+    {
+        _kittyFlagStack.Add(KittyKeyboardFlags);
+        KittyKeyboardFlags = flags;
+    }
+
+    /// <summary>CSI &lt;count u — pop up to <paramref name="count"/> saved flag sets.</summary>
+    public void KittyPop(int count)
+    {
+        for (var i = 0; i < count && _kittyFlagStack.Count > 0; i++)
+        {
+            KittyKeyboardFlags = _kittyFlagStack[^1];
+            _kittyFlagStack.RemoveAt(_kittyFlagStack.Count - 1);
+        }
+    }
+
+    /// <summary>CSI =flags;mode u — mode 1 assign, 2 set bits, 3 clear bits.</summary>
+    public void KittySet(int flags, int mode) => KittyKeyboardFlags = mode switch
+    {
+        2 => KittyKeyboardFlags | flags,
+        3 => KittyKeyboardFlags & ~flags,
+        _ => flags,
+    };
+
+    public void ResetKittyKeyboard()
+    {
+        KittyKeyboardFlags = 0;
+        _kittyFlagStack.Clear();
+    }
 
     /// <summary>Rows touched since last <see cref="ClearDirty"/>.</summary>
     public int DirtyRowMin { get; private set; } = int.MaxValue;
@@ -324,11 +396,12 @@ public sealed class ScreenBuffer
             case 0: Fill(CursorY, CursorX, Rows - 1, Columns - 1, blank); break;
             case 1: Fill(0, 0, CursorY, CursorX, blank); break;
             case 2:
-            case 3:
                 var all = NewBlankScreen(Columns, Rows);
                 Array.Copy(all, _screen, all.Length);
-                if (mode == 3) { _scrollback.Clear(); ScrollbackChanged?.Invoke(); }
                 TouchAll();
+                break;
+            case 3: // xterm ED3: scrollback only — the visible screen stays put
+                _scrollback.Clear(); ScrollbackChanged?.Invoke();
                 break;
         }
         _pendingWrap = false;
@@ -444,6 +517,8 @@ public sealed class ScreenBuffer
 
     public void Resize(int columns, int rows)
     {
+        lock (SyncRoot)
+        {
         if (columns == Columns && rows == Rows) return;
         var newScreen = NewBlankScreen(columns, rows);
         var copyRows = Math.Min(rows, Rows);
@@ -451,6 +526,13 @@ public sealed class ScreenBuffer
         for (var r = 0; r < copyRows; r++)
             Array.Copy(_screen, r * Columns, newScreen, r * columns, copyCols);
         _screen = newScreen;
+        if (_savedScreen is { } saved)
+        {
+            var resized = NewBlankScreen(columns, rows);
+            for (var r = 0; r < copyRows; r++)
+                Array.Copy(saved, r * Columns, resized, r * columns, copyCols);
+            _savedScreen = resized;
+        }
         Columns = columns;
         Rows = rows;
         CursorX = Math.Min(CursorX, columns - 1);
@@ -459,6 +541,7 @@ public sealed class ScreenBuffer
         _scrollBottom = rows - 1;
         _pendingWrap = false;
         TouchAll();
+        }
     }
 
     // ---------- helpers ----------

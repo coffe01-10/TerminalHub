@@ -1,9 +1,12 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
+using TerminalHub.App.Controls;
 using TerminalHub.Core.Deploy;
 using TerminalHub.Core.Settings;
 
@@ -11,6 +14,12 @@ namespace TerminalHub.App.Views;
 
 public partial class MainWindow : Window
 {
+    public static readonly StyledProperty<double> ThumbnailHeightProperty =
+        AvaloniaProperty.Register<MainWindow, double>(nameof(ThumbnailHeight), 208);
+    public double ThumbnailHeight { get => GetValue(ThumbnailHeightProperty); set => SetValue(ThumbnailHeightProperty, value); }
+    private int _selectionGeneration;
+    private readonly DispatcherTimer _dockHideTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
+    private bool _stageReady;
     private MainWindowViewModel Vm => (MainWindowViewModel)DataContext!;
 
     /// <summary>Inner ScrollViewer of the Logs list; drives the follow-tail state machine.</summary>
@@ -23,10 +32,19 @@ public partial class MainWindow : Window
     public MainWindow(SettingsStore? settingsStore)
     {
         InitializeComponent();
-        // Acrylic is Windows-only eye candy; on compositor-less X11 it renders black.
-        if (!OperatingSystem.IsWindows())
-            TransparencyLevelHint = new[] { Avalonia.Controls.WindowTransparencyLevel.None };
         DataContext = new MainWindowViewModel(settingsStore: settingsStore);
+        Vm.PropertyChanged += OnStageSelectionChanged;
+        SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
+        Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
+        SizeChanged += (_, _) => UpdateStageLayout();
+        AddHandler(InputElement.PointerMovedEvent, OnDockPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
+        PointerExited += (_, _) => ScheduleDockHide();
+        _dockHideTimer.Tick += (_, _) =>
+        {
+            if (ActionDock.IsPointerOver || DeployDockButton.ContextFlyout?.IsOpen == true) return;
+            _dockHideTimer.Stop();
+            SetDockRevealed(false);
+        };
         // Button marks pointer events handled before instance handlers, so listen with handledEventsToo.
         // Press runs before the release click, which is what DockSelectCommand executes.
         DeployDockButton.AddHandler(InputElement.PointerPressedEvent, OnDeployPointerPressed,
@@ -41,12 +59,133 @@ public partial class MainWindow : Window
         {
             FitToScreen();
             _ = Vm.SpawnStartupSessionsAsync();
+            _stageReady = true;
+            UpdateDockMode();
         };
         // The Logs tab may start hidden (IsVisible), so template/loaded race each other —
         // attach idempotently from whichever fires first.
         LogsList.TemplateApplied += (_, _) => AttachLogsScrollViewer();
         LogsList.Loaded += (_, _) => AttachLogsScrollViewer();
         Vm.Logs.PropertyChanged += OnLogsPropertyChanged;
+        // Deep CWDs overflow the crumb bar; keep the tail (current dir) in view.
+        Vm.Files.Breadcrumbs.CollectionChanged += (_, _) =>
+            Dispatcher.UIThread.Post(CrumbScroll.ScrollToEnd, DispatcherPriority.Loaded);
+    }
+
+    // StageLayout grid columns: 0=shelf, 1=shelf splitter, 2=stage, 3=inspector gutter, 4=inspector.
+    private const int ShelfColumn = 0, InspectorGutterColumn = 3, InspectorColumn = 4;
+
+    private void UpdateStageLayout()
+    {
+        // Keep enough height for the full terminal grid; overflow remains scrollable.
+        var visibleCards = Math.Clamp(Vm.SessionCards.Count, 1, 5);
+        ThumbnailHeight = Math.Clamp((SessionShelf.Bounds.Height - 34 - (visibleCards - 1) * 16) / visibleCards, 208, 268);
+        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Bounds.Width < 1250 ? 232 : 280);
+        StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
+        StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? (Bounds.Width < 1250 ? 300 : 326) : 0);
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_stageReady && IsVisible && Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void OnStageSelectionChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.InspectorVisible)) UpdateStageLayout();
+        if (e.PropertyName == nameof(MainWindowViewModel.DockVisibilityMode)) UpdateDockMode();
+        if (!_stageReady || e.PropertyName != nameof(MainWindowViewModel.ActiveSession)) return;
+        var generation = ++_selectionGeneration;
+        // SyncActive finishes binding the new card before we locate its visual.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_stageReady || generation != _selectionGeneration || !IsVisible) return;
+            var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
+                .FirstOrDefault(c => ReferenceEquals(c.DataContext, Vm.ActiveCard));
+            var origin = card?.TranslatePoint(new Point(0, card.Bounds.Height / 2), StageWindow);
+            StageWindow.ActivateFrom(((origin?.Y ?? StageWindow.Bounds.Height / 2) - StageWindow.Bounds.Height / 2) * .3);
+            if (Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
+            if (IsActive && !Vm.IsSplit && Vm.ActiveSession is not null) MainTerminal.Focus();
+        });
+    }
+
+    private void OnDockPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_stageReady || Vm.DockVisibilityMode != 0) return;
+        var point = e.GetPosition(this);
+        var inBottomZone = point.Y >= Bounds.Height - 54 &&
+            Math.Abs(point.X - Bounds.Width / 2) < Math.Max(280, ActionDock.Bounds.Width / 2 + 32);
+        if (inBottomZone || ActionDock.IsPointerOver)
+        {
+            _dockHideTimer.Stop();
+            SetDockRevealed(true);
+        }
+        else ScheduleDockHide();
+    }
+
+    private void ScheduleDockHide()
+    {
+        if (_stageReady && Vm.DockVisibilityMode == 0 && !_dockHideTimer.IsEnabled)
+            _dockHideTimer.Start();
+    }
+
+    private void UpdateDockMode()
+    {
+        _dockHideTimer.Stop();
+        SetDockRevealed(Vm.DockVisibilityMode == 1);
+    }
+
+    private void SetDockRevealed(bool revealed)
+    {
+        ActionDock.Classes.Set("revealed", revealed);
+        DockHint.Opacity = revealed ? 0 : 1;
+    }
+
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (e.ClickCount == 2)
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        else
+            BeginMoveDrag(e);
+    }
+
+    private void OnRenameCard(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: SessionCardViewModel card }) _ = RenameSessionAsync(card);
+        e.Handled = true;
+    }
+
+    private void OnRenameActive(object? sender, RoutedEventArgs e)
+    {
+        if (Vm.ActiveCard is { } card) _ = RenameSessionAsync(card);
+        e.Handled = true;
+    }
+
+    private async Task RenameSessionAsync(SessionCardViewModel card)
+    {
+        var name = new TextBox { Text = card.Name, Watermark = "终端名称", Name = "SessionNameInput" };
+        var save = new Button { Content = "保存名称", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var dialog = new Window
+        {
+            Title = "重命名终端", Width = 380, Height = 180, CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = ThemeManager.Brush("Surface"),
+            Content = new StackPanel { Margin = new Thickness(22), Spacing = 14,
+                Children = { new TextBlock { Text = "终端名称", Foreground = ThemeManager.Brush("Ink") }, name, save } }
+        };
+        save.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(name.Text)) dialog.Close(name.Text.Trim()); };
+        name.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(name.Text)) dialog.Close(name.Text.Trim());
+            else if (e.Key == Key.Escape) dialog.Close(null);
+        };
+        dialog.Opened += (_, _) => { name.Focus(); name.SelectAll(); };
+        try
+        {
+            if (await dialog.ShowDialog<string?>(this) is { } value && _stageReady)
+                Vm.RenameSession((card, value));
+        }
+        catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Rename dialog closed: {ex.Message}"); }
     }
 
     private void AttachLogsScrollViewer()
@@ -85,10 +224,11 @@ public partial class MainWindow : Window
     /// <summary>Never open larger than the working area — the floating dock must stay on-screen.</summary>
     private void FitToScreen()
     {
-        var wa = Screens.ScreenFromWindow(this)?.WorkingArea ?? Screens.Primary?.WorkingArea;
-        if (wa is not { } s) return;
-        var maxW = s.Width - 24;
-        var maxH = s.Height - 24;
+        var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+        if (screen is null) return;
+        // WorkingArea is physical pixels; window Width/Height are device-independent.
+        var maxW = screen.WorkingArea.Width / screen.Scaling - 24;
+        var maxH = screen.WorkingArea.Height / screen.Scaling - 24;
         if (Width > maxW) Width = maxW;
         if (Height > maxH) Height = maxH;
     }
@@ -223,29 +363,39 @@ public partial class MainWindow : Window
         Vm.SavePublishProfile(dialog.ProfileName, dialog.RepoRoot, dialog.SelectedRid, dialog.NoteText);
     }
 
-    /// <summary>Window-level session shortcuts (tunneling, before TerminalView):
-    /// Ctrl+W closes the active session; Ctrl+Tab / Ctrl+Shift+Tab cycle cards.</summary>
+    /// <summary>Window-level session shortcuts (tunneling, before TerminalView).
+    /// App chords use Ctrl+Shift+letter so bare Ctrl+letter control bytes
+    /// (tmux prefix ^B, readline ^W/^J, next-history ^N, …) still reach the PTY.
+    /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F2 && e.Source is not TextBox) { OnRenameActive(sender, e); return; }
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-        if (e.Key == Key.W && !shift)
-        {
-            Vm.CloseActiveSessionCommand.Execute(null);
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Tab)
+        if (e.Key == Key.Tab)
         {
             Vm.CycleSession(shift ? -1 : +1);
             e.Handled = true;
         }
-    }
-
-    private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
+        else if (!shift) return;   // bare Ctrl+letter → control byte for the shell
+        else if (e.Key == Key.J)
         {
-            Vm.SubmitCommandInputCommand.Execute(null);
+            Vm.ToggleOutputCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.B)
+        {
+            Vm.ToggleInspectorCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.W)
+        {
+            Vm.CloseActiveSessionCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.N)
+        {
+            Vm.NewSessionCommand.Execute(null);
             e.Handled = true;
         }
     }
@@ -314,6 +464,10 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+        _stageReady = false;
+        Vm.PropertyChanged -= OnStageSelectionChanged;
+        ++_selectionGeneration;
+        _dockHideTimer.Stop();
         Vm.Dispose(); // persists settings + kills PTYs
         base.OnClosing(e);
     }

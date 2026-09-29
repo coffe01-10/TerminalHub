@@ -7,7 +7,7 @@ namespace TerminalHub.App.ViewModels;
 
 /// <summary>Popout window VM: a live view onto one detached session's emulator.
 /// Owns nothing — lifetime belongs to whoever detached the session.</summary>
-public partial class SessionWindowViewModel : ViewModelBase
+public partial class SessionWindowViewModel : ViewModelBase, IDisposable
 {
     public TerminalSessionModel Model { get; }
     public TerminalEmulator Emulator => Model.Emulator;
@@ -36,10 +36,16 @@ public partial class SessionWindowViewModel : ViewModelBase
         FontSize = fontSize;
         _title = $"{model.Name} · 独立窗口 — Terminal Hub";
         // OSC title changes (e.g. vim / ssh hosts) flow into the window title.
-        model.Emulator.TitleChanged += t =>
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                Title = string.IsNullOrWhiteSpace(t)
-                    ? $"{model.Name} · 独立窗口 — Terminal Hub"
-                    : $"{model.Name} · {t} — Terminal Hub");
+        // Named handler so Dispose can unsubscribe — the emulator outlives this VM
+        // and would otherwise pin it (plus fire stale UI posts) after every popout.
+        model.Emulator.TitleChanged += OnEmulatorTitleChanged;
     }
+
+    private void OnEmulatorTitleChanged(string title) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            Title = string.IsNullOrWhiteSpace(title)
+                ? $"{Model.Name} · 独立窗口 — Terminal Hub"
+                : $"{Model.Name} · {title} — Terminal Hub");
+
+    public void Dispose() => Model.Emulator.TitleChanged -= OnEmulatorTitleChanged;
 }

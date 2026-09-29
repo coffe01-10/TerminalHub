@@ -101,8 +101,10 @@ public class FilesOpenInTerminalTests
             await Task.Delay(200);
 
             // The mock PTY echoes the typed command straight back into the buffer.
+            // Windows shells quote with "..."; POSIX shells with '...'.
             var emu = vm.ActiveSession!.Emulator;
-            Assert.Contains($"cd '{DirA}'", emu.Buffer.TailText(30));
+            var expectedCd = OperatingSystem.IsWindows() ? $"cd \"{DirA}\"" : $"cd '{DirA}'";
+            Assert.Contains(expectedCd, emu.Buffer.TailText(30));
             // CWD chrome sync: path bar + Files both followed, history pushed (Back armed).
             Assert.Equal(DirA, vm.ActiveSession.WorkingDirectory);
             Assert.Equal(DirA, vm.Files.CurrentPath);

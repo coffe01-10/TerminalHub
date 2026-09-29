@@ -6,8 +6,25 @@ namespace TerminalHub.App.Controls;
 /// <summary>Campbell-style palette + 256-color cube resolution for terminal cells.</summary>
 public static class TerminalPalette
 {
-    public static readonly Color DefaultFg = Color.FromRgb(0xCC, 0xCC, 0xCC);
-    public static readonly Color DefaultBg = Color.FromRgb(0x0C, 0x0C, 0x0C);
+    public static Color DefaultFg = Color.FromRgb(0xCC, 0xCC, 0xCC);
+    public static Color DefaultBg = Color.FromRgb(0x0C, 0x0C, 0x0C);
+
+    public static void SetTheme(string theme)
+    {
+        DefaultFg = Color.Parse(theme is "Paper" ? "#3C352B" : theme is "White" ? "#1E2D41" : "#D8DDE7");
+        DefaultBg = Color.Parse(theme is "Paper" ? "#FCF8EE" : theme is "White" ? "#FAFCFF" : theme is "Black" ? "#050607" : "#0C1018");
+    }
+
+    public static string QueryDefaultColor(bool foreground)
+    {
+        var color = foreground ? DefaultFg : DefaultBg;
+        return $"{color.R * 257:x4}/{color.G * 257:x4}/{color.B * 257:x4}";
+    }
+
+    private static readonly Color[] Light16 = Array.ConvertAll(new[] {
+        "#20242B", "#B12632", "#187344", "#826014", "#255CAE", "#8550A6", "#167485", "#596573",
+        "#707780", "#C03040", "#24763C", "#966200", "#306BC1", "#985AA7", "#157987", "#3E4B5B"
+    }, Color.Parse);
 
     private static readonly Color[] First16 =
     [
@@ -34,7 +51,10 @@ public static class TerminalPalette
 
     private static Color ResolveIndexed(int i)
     {
-        if (i < 16) return First16[i];
+        // Malformed SGR (e.g. "38;5;" with an empty color slot → -1) or
+        // out-of-range values must never index past the tables.
+        i = Math.Clamp(i, 0, 255);
+        if (i < 16) return ThemeManager.IsLight ? Light16[i] : First16[i];
         if (i < 232)
         {
             var v = i - 16;

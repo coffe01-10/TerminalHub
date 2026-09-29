@@ -7,8 +7,8 @@
         Title="{Binding Title}"
         Width="860" Height="540" MinWidth="420" MinHeight="260"
         WindowStartupLocation="Manual"
-        Background="#FF0A0D14"
-        TransparencyLevelHint="AcrylicBlur">
+        Background="{DynamicResource UiCanvas}"
+        >
 
   <Grid RowDefinitions="30,*" Margin="8,6,8,8">
 
@@ -17,27 +17,23 @@
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
         <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                   Foreground="#E2E8F0" VerticalAlignment="Center"/>
-        <Border IsVisible="{Binding HasTag}" CornerRadius="7" Padding="8,2"
-                Background="{Binding TagPillBrush}" VerticalAlignment="Center">
-          <TextBlock Text="{Binding TagText}" FontSize="9" FontWeight="SemiBold"
-                     Foreground="{Binding TagBrush}"/>
-        </Border>
+                   Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding Model.WorkingDirectory}" FontSize="10" Foreground="{DynamicResource UiMuted}"/>
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <TextBlock Text="关闭窗口即收回主窗" FontSize="10" Foreground="#64748B"
+        <TextBlock Text="关闭窗口即收回主窗" FontSize="10" Foreground="{DynamicResource UiFaint}"
                    VerticalAlignment="Center"/>
         <Button Content="↩ 收回" FontSize="10" Padding="10,2" CornerRadius="6"
-                Background="#1A2438" BorderBrush="#3B82F6" BorderThickness="1"
-                Foreground="#E2E8F0" VerticalAlignment="Center"
+                Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"
                 Click="OnReturnClick"
-                ToolTip.Tip="关闭本窗口，会话回到主窗口（快捷键 Esc）"/>
+                ToolTip.Tip="关闭本窗口，会话回到主窗口（焦点不在终端时按 Esc 亦可）"/>
       </StackPanel>
     </Grid>
 
     <!-- Terminal viewport -->
-    <Border Grid.Row="1" CornerRadius="8" Background="#F20A0D14"
-            BorderBrush="#332A3142" BorderThickness="1" ClipToBounds="True">
+    <Border Grid.Row="1" CornerRadius="8" Background="{DynamicResource UiCanvas}"
+            BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Padding="10,8" ClipToBounds="True">
       <ctl:TerminalView x:Name="PopoutTerminal"
                         Emulator="{Binding Emulator}"
                         TerminalFontSize="{Binding FontSize}"/>

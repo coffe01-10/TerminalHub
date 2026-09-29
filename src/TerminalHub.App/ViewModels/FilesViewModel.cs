@@ -6,8 +6,11 @@ using TerminalHub.Core.Files;
 namespace TerminalHub.App.ViewModels;
 
 /// <summary>Right-rail Files tab: browse local dirs, preview small text files.</summary>
-public partial class FilesViewModel : ViewModelBase
+public partial class FilesViewModel : ViewModelBase, IDisposable
 {
+    private FileSystemWatcher? _watcher;
+    private int _refreshPending;
+    private bool _disposed;
     private readonly Func<string?> _sessionCwd;
     private readonly Action<string>? _openTerminalAt;
     private readonly Func<string, Task>? _copyTextAsync;
@@ -83,9 +86,12 @@ public partial class FilesViewModel : ViewModelBase
         try
         {
             var entries = LocalFileBrowser.ListDirectory(path);
+            var selection = SelectedEntry?.FullPath;
             Entries.Clear();
             foreach (var e in entries) Entries.Add(e);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == selection);
             CurrentPath = Path.GetFullPath(path);
+            WatchDirectory();
             RebuildCrumbs();
             StatusText = entries.Count == 0 ? "空目录" : "";
             CanGoUp = Directory.GetParent(CurrentPath) is not null;
@@ -96,18 +102,53 @@ public partial class FilesViewModel : ViewModelBase
         }
     }
 
+    private void WatchDirectory()
+    {
+        if (_watcher?.Path == CurrentPath || _disposed) return;
+        _watcher?.Dispose();
+        _watcher = new FileSystemWatcher(CurrentPath)
+        {
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite
+        };
+        _watcher.Changed += OnDirectoryChanged;
+        _watcher.Created += OnDirectoryChanged;
+        _watcher.Deleted += OnDirectoryChanged;
+        _watcher.Renamed += OnDirectoryChanged;
+        _watcher.EnableRaisingEvents = true;
+    }
+
+    private void OnDirectoryChanged(object sender, FileSystemEventArgs e)
+    {
+        if (Interlocked.Exchange(ref _refreshPending, 1) != 0) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Interlocked.Exchange(ref _refreshPending, 0);
+            if (_disposed) return;
+            NavigateTo(CurrentPath);
+            if (HasPreview && SelectedEntry is { IsDirectory: false } entry) PreviewFile(entry.FullPath);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _watcher?.Dispose();
+    }
+
     private void RebuildCrumbs()
     {
         Breadcrumbs.Clear();
         var path = CurrentPath;
         var sep = Path.DirectorySeparatorChar;
-        var parts = path.Split(sep, StringSplitOptions.RemoveEmptyEntries);
 
-        // Root crumb: "/" on Unix, "C:\" on Windows.
+        // Root crumb: "/" on Unix, "C:\" on Windows, "\\server\share\" for UNC.
         var root = Path.GetPathRoot(path) ?? sep.ToString();
         Breadcrumbs.Add(new Crumb(root.TrimEnd('\\'), root));
+        // Split only the part *below* the root — the raw split would re-yield the
+        // drive ("C:") or server/share segments and produce "C:\C:"-style paths.
+        var rel = path[root.Length..];
         var acc = root;
-        foreach (var part in parts)
+        foreach (var part in rel.Split(sep, StringSplitOptions.RemoveEmptyEntries))
         {
             acc = Path.Combine(acc, part);
             Breadcrumbs.Add(new Crumb(part, acc));

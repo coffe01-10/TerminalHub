@@ -24,7 +24,11 @@ public sealed class VtParser
     private char _privateChar;
     private readonly List<char> _intermediates = new();
 
-    // OSC/DCS string accumulation
+    // OSC/DCS string accumulation — bounded: a runaway program emitting an
+    // unterminated OSC must not grow memory without limit.
+    private const int MaxOscBytes = 64 * 1024;
+    private const int MaxCsiParams = 64;
+    private const int MaxIntermediates = 8;
     private readonly StringBuilder _osc = new();
     private int _oscCommand;
 
@@ -32,6 +36,12 @@ public sealed class VtParser
     private int _utf8Remaining;
     private int _utf8Value;
     private int _utf8Min;
+
+    // Replies (DA / DECRPM / OSC queries / kitty flags) are queued while parsing
+    // under SyncRoot and written back AFTER the lock is released — ConPtySession.Write
+    // blocks on WriteFile and must never stall the render lock.
+    private readonly List<byte[]> _responses = new();
+    public Func<bool, string>? DefaultColorQuery { get; set; }
 
     /// <summary>Raised after a batch of input has been applied (renderer hint).</summary>
     public event Action? BufferChanged;
@@ -46,10 +56,24 @@ public sealed class VtParser
 
     public void Feed(ReadOnlySpan<byte> data)
     {
-        foreach (var b in data)
-            FeedByte(b);
+        byte[][] responses;
+        lock (_buffer.SyncRoot)
+        {
+            foreach (var b in data)
+                FeedByte(b);
+            responses = _responses.ToArray();
+            _responses.Clear();
+        }
+        // Replies (DA, DECRPM, OSC queries, kitty flags) go out AFTER releasing
+        // SyncRoot — ConPtySession.Write blocks on WriteFile and must never stall
+        // the render lock.
+        foreach (var r in responses)
+            _responder?.Invoke(r);
         BufferChanged?.Invoke();
     }
+
+    private void Respond(byte[] bytes) => _responses.Add(bytes);
+    private void Respond(string ascii) => _responses.Add(Encoding.ASCII.GetBytes(ascii));
 
     public void Feed(string text) => Feed(Encoding.UTF8.GetBytes(text));
 
@@ -82,7 +106,11 @@ public sealed class VtParser
     private void Enter(State s)
     {
         _state = s;
-        if (s is State.Csi)
+        if (s is State.Escape)
+        {
+            _intermediates.Clear(); // fresh ESC sequence — no stale intermediates
+        }
+        else if (s is State.Csi)
         {
             _params.Clear();
             _currentParam = 0;
@@ -154,7 +182,6 @@ public sealed class VtParser
             case (byte)'X': case (byte)'^': case (byte)'_': Enter(State.SosPmApc); break;
             case (byte)'(': _charsetTarget = 0; _state = State.CharsetDesignate; break;
             case (byte)')': _charsetTarget = 1; _state = State.CharsetDesignate; break;
-            case (byte)'#': _state = State.EscIntermediate; break;
             case (byte)'7': _buffer.SaveCursor(); Enter(State.Ground); break;
             case (byte)'8': _buffer.RestoreCursor(); Enter(State.Ground); break;
             case (byte)'D': _buffer.Index(); Enter(State.Ground); break;
@@ -174,18 +201,12 @@ public sealed class VtParser
 
     private void EscIntermediateByte(byte b)
     {
-        if (b == (byte)'#')
-        {
-            // already in intermediate via ESC # — shouldn't happen, treat as ground
-            Enter(State.Ground);
-            return;
-        }
         if (b >= 0x20 && b <= 0x2F)
         {
-            _intermediates.Add((char)b);
+            if (_intermediates.Count < MaxIntermediates) _intermediates.Add((char)b);
             return;
         }
-        // Final byte
+        // Final byte — DECALN (ESC # 8) fills the screen with 'E'.
         if (_intermediates.Count > 0 && _intermediates[0] == '#' && b == (byte)'8')
             _buffer.AlignTest();
         Enter(State.Ground);
@@ -204,9 +225,12 @@ public sealed class VtParser
         _buffer.CurrentFg = TerminalColor.Default;
         _buffer.CurrentBg = TerminalColor.Default;
         _buffer.AutoWrap = true;
+        _buffer.BracketedPaste = false;
+        _buffer.SetSynchronizedOutput(false);
         _buffer.InsertMode = false;
         _buffer.SetCursorVisible(true);
         _buffer.SetOriginMode(false);
+        _buffer.ResetKittyKeyboard();
         _buffer.ResetScrollRegion();
         _buffer.EraseInDisplay(2);
         _buffer.CursorPosition(1, 1);
@@ -218,28 +242,32 @@ public sealed class VtParser
     {
         if (b is >= (byte)'0' and <= (byte)'9')
         {
-            _currentParam = _currentParam * 10 + (b - '0');
+            _currentParam = Math.Min(_currentParam * 10 + (b - '0'), 0xFFFFFF);
             _hasParam = true;
             return;
         }
         switch (b)
         {
             case (byte)';':
-                _params.Add(_hasParam ? _currentParam : -1);
+                if (_params.Count < MaxCsiParams)
+                    _params.Add(_hasParam ? _currentParam : -1);
                 _currentParam = 0;
                 _hasParam = false;
                 return;
-            case (byte)'?': case (byte)'>': case (byte)'!': case (byte)'\'': case (byte)'"': case (byte)'$': case (byte)' ':
+            // ECMA-48 private parameter bytes 0x3C–0x3F (? < = >) plus the
+            // intermediates xterm abuses as markers (! ' " $ SP).
+            case (byte)'?': case (byte)'<': case (byte)'=': case (byte)'>':
+            case (byte)'!': case (byte)'\'': case (byte)'"': case (byte)'$': case (byte)' ':
                 if (_params.Count == 0 && !_hasParam && !_privateMarker)
                 {
                     _privateMarker = true;
                     _privateChar = (char)b;
                     return;
                 }
-                _intermediates.Add((char)b);
+                if (_intermediates.Count < MaxIntermediates) _intermediates.Add((char)b);
                 return;
             case >= 0x20 and <= 0x2F:
-                _intermediates.Add((char)b);
+                if (_intermediates.Count < MaxIntermediates) _intermediates.Add((char)b);
                 return;
         }
 
@@ -262,6 +290,28 @@ public sealed class VtParser
         if (_privateMarker && _privateChar == '?')
         {
             HandleDecSet(final);
+            return;
+        }
+        // Keyboard protocol negotiation must not fall through to legacy cursor restore.
+        if (_privateMarker && _privateChar is '>' or '<' or '=')
+        {
+            if (_privateChar == '>' && final == 'c')
+            {
+                Respond("\x1b[>0;1;0c");   // DA2 — secondary device attributes
+                return;
+            }
+            // kitty keyboard protocol: CSI >flags u push, CSI <count u pop,
+            // CSI =flags;mode u set (1 = assign, 2 = set bits, 3 = clear bits).
+            if (final == 'u')
+            {
+                var flags = Param(0, 0);
+                switch (_privateChar)
+                {
+                    case '>': b.KittyPush(flags); break;
+                    case '<': b.KittyPop(flags < 1 ? 1 : flags); break;
+                    case '=': b.KittySet(flags, Param(1, 1)); break;
+                }
+            }
             return;
         }
 
@@ -293,12 +343,12 @@ public sealed class VtParser
             case 'l': HandleSetMode(false); break;
             case 'b': // REP — repeat last char; approximate: noop (needs last-char tracking)
                 break;
-            case 'c': _responder?.Invoke("\x1b[?1;2c"u8.ToArray()); break;  // DA: vt220
+            case 'c': Respond("\x1b[?1;2c"); break;  // DA: vt220
             case 'n':
                 if (Param(0, 0) == 6) // DSR cursor position report
-                    _responder?.Invoke(Encoding.ASCII.GetBytes($"\x1b[{b.CursorY + 1};{b.CursorX + 1}R"));
+                    Respond($"\x1b[{b.CursorY + 1};{b.CursorX + 1}R");
                 else if (Param(0, 0) == 5)
-                    _responder?.Invoke("\x1b[0n"u8.ToArray());
+                    Respond("\x1b[0n");
                 break;
             case 't': break;   // window ops — ignore
             case 'q': break;   // DECSCUSR cursor style — renderer shows default
@@ -321,6 +371,26 @@ public sealed class VtParser
     private void HandleDecSet(char final)
     {
         var b = _buffer;
+        if (final == 'p' && _intermediates.Contains('$'))
+        {
+            var mode = Param(0, 0);
+            var status = mode switch
+            {
+                2026 => b.SynchronizedOutput ? 1 : 2,
+                2004 => b.BracketedPaste ? 1 : 2,
+                25 => b.CursorVisible ? 1 : 2,
+                1049 => b.OnAlternateScreen ? 1 : 2,
+                _ => 0
+            };
+            Respond($"\x1b[?{mode};{status}$y");
+            return;
+        }
+        if (final == 'u')
+        {
+            // kitty keyboard flags query → CSI ?flags u
+            Respond($"\x1b[?{b.KittyKeyboardFlags}u");
+            return;
+        }
         if (final == 'h' || final == 'l')
         {
             var set = final == 'h';
@@ -338,7 +408,8 @@ public sealed class VtParser
                         if (set) { b.SaveCursor(); b.UseAlternateScreen(true); }
                         else { b.UseAlternateScreen(false); b.RestoreCursor(); }
                         break;
-                    case 2004: break; // bracketed paste — pass-through flag (renderer handles)
+                    case 2004: b.BracketedPaste = set; break;
+                    case 2026: b.SetSynchronizedOutput(set); break;
                 }
             }
         }
@@ -418,6 +489,7 @@ public sealed class VtParser
 
         if (_oscCommand < 0)
         {
+            if (_oscCommand == -2) return;      // malformed OSC — swallow until terminator
             if (char.IsDigit((char)b))
             {
                 _osc.Append((char)b);
@@ -429,24 +501,36 @@ public sealed class VtParser
             }
             else
             {
-                Enter(State.Ground); // malformed
+                _oscCommand = -2;                // malformed — swallow until terminator
+                _osc.Clear();                    //   instead of splashing payload to screen
             }
             return;
         }
-        _osc.Append((char)b);
+        if (_osc.Length < MaxOscBytes) _osc.Append((char)b);
     }
 
     private void DispatchOsc()
     {
-        var text = _osc.ToString();
+        var text = Encoding.UTF8.GetString(Encoding.Latin1.GetBytes(_osc.ToString()));
         switch (_oscCommand)
         {
             case 0: case 1: case 2:
                 _buffer.SetTitle(text);
                 break;
             case 8: break;   // hyperlink — ignore payload
-            case 9: case 777: break; // notifications
+            case 777: break; // notifications
             case 4: break;   // palette query/set
+            case 10: case 11:
+                if (text == "?")
+                {
+                    var rgb = DefaultColorQuery?.Invoke(_oscCommand == 10)
+                        ?? (_oscCommand == 10 ? "cccc/cccc/cccc" : "0c0c/0c0c/0c0c");
+                    Respond($"\x1b]{_oscCommand};rgb:{rgb}\x1b\\");
+                }
+                break;
+            case 9 when text.StartsWith("9;"):
+                _buffer.SetCwd(text[2..]);
+                break;
             case 7: // cwd report (OSC 7) — file://host/path or absolute path
                 if (TryParseOsc7(text, out var cwd))
                     _buffer.SetCwd(cwd);
@@ -481,9 +565,12 @@ public sealed class VtParser
                     || candidate.StartsWith("//", StringComparison.Ordinal))
                     candidate = uri.AbsolutePath;
                 cwd = Uri.UnescapeDataString(candidate);
-                // AbsolutePath is always /-separated; normalize to OS separators.
-                if (Path.DirectorySeparatorChar != '/')
-                    cwd = cwd.Replace('/', Path.DirectorySeparatorChar);
+                // "/D:/x" (leading slash before a drive letter) → "D:/x".
+                if (cwd.Length >= 3 && cwd[0] == '/' && char.IsLetter(cwd[1]) && cwd[2] == ':')
+                    cwd = cwd[1..];
+                // '/'-rooted POSIX paths stay verbatim: rewriting them with '\' on
+                // Windows would yield a relative-looking path that is neither a valid
+                // Windows path nor cd-able in the WSL/git-bash session that sent it.
                 return cwd.Length > 0;
             }
         }

@@ -198,6 +198,7 @@ public class LogsPanelTests
             var vm3 = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
             Assert.Equal(3, vm3.Logs.LevelFilterIndex);
             vm3.Dispose();
+            await Task.CompletedTask;
         }
         finally
         {

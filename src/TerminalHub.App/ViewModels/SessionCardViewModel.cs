@@ -16,10 +16,13 @@ public partial class SessionCardViewModel : ViewModelBase
     public TerminalSessionModel Model { get; }
 
     [ObservableProperty] private bool _isActive;
+    [ObservableProperty] private int _stageDistance;
     [ObservableProperty] private string _previewText = "";
     [ObservableProperty] private List<PreviewLineView> _previewLines = [];
 
     public string Name => Model.Name;
+    public string WorkingDirectory => Model.WorkingDirectory;
+    public string DirectoryName => Path.GetFileName(WorkingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name ? name : WorkingDirectory;
     public string TagText => Model.Tag.DisplayName();
     public bool HasTag => Model.Tag != SessionTag.None;
     public IBrush TagBrush => new SolidColorBrush(Color.Parse(Model.Tag.AccentColor()));
@@ -38,15 +41,6 @@ public partial class SessionCardViewModel : ViewModelBase
     public SessionCardViewModel(TerminalSessionModel model)
     {
         Model = model;
-        model.Emulator.Changed += OnBufferChanged;
-    }
-
-    private int _tick;
-    private void OnBufferChanged()
-    {
-        // Throttle preview refresh (mock/idle output is sparse; keep it snappy).
-        if (++_tick % 5 != 0) return;
-        Avalonia.Threading.Dispatcher.UIThread.Post(RefreshPreview);
     }
 
     public void Refresh()
@@ -54,11 +48,14 @@ public partial class SessionCardViewModel : ViewModelBase
         RefreshPreview();
         OnPropertyChanged(nameof(Name));
         OnPropertyChanged(nameof(StatusBrush));
+        OnPropertyChanged(nameof(WorkingDirectory));
+        OnPropertyChanged(nameof(DirectoryName));
     }
 
     private void RefreshPreview()
     {
-        var lines = Model.Emulator.Buffer.TailLines(12);
+        List<ScreenBuffer.PreviewLine> lines;
+        lock (Model.Emulator.Buffer.SyncRoot) lines = Model.Emulator.Buffer.TailLines(12);
         PreviewLines = lines
             .Select(l => new PreviewLineView(l.Text,
                 l.FgHex is null ? DefaultPreviewBrush : new SolidColorBrush(Color.Parse(l.FgHex))))

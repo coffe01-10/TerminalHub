@@ -20,6 +20,9 @@ public partial class SessionWindow : Window
             TransparencyLevelHint = new[] { WindowTransparencyLevel.None };
         DataContext = new SessionWindowViewModel(session, fontSize);
         Opened += (_, _) => PopoutTerminal.Focus();
+        // The emulator outlives the popout — drop the VM's event subscriptions
+        // so each close doesn't leak a dead VM (and its queued UI posts).
+        Closed += (_, _) => (DataContext as IDisposable)?.Dispose();
     }
 
     /// <summary>The session this window is showing (null only for the designer ctor).</summary>

@@ -10,7 +10,6 @@ namespace TerminalHub.Core.Terminal;
 public sealed class TerminalEmulator : IDisposable
 {
     private readonly IPtySession _pty;
-    private bool _ownsPty;
 
     public ScreenBuffer Buffer { get; }
     public VtParser Parser { get; }
@@ -34,7 +33,6 @@ public sealed class TerminalEmulator : IDisposable
         Buffer = new ScreenBuffer(columns, rows);
         Parser = new VtParser(Buffer, bytes => _pty?.Write(bytes));
         _pty = pty ?? new MockPtySession();
-        _ownsPty = true;
         _pty.OutputReceived += OnPtyOutput;
         Parser.BufferChanged += () => Changed?.Invoke();
     }
@@ -47,6 +45,12 @@ public sealed class TerminalEmulator : IDisposable
     /// <summary>Send user text input to the child process.</summary>
     public void SendText(string text) => _pty.Write(Encoding.UTF8.GetBytes(text));
     public void SendBytes(byte[] bytes) => _pty.Write(bytes);
+
+    public void PasteText(string text)
+    {
+        text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        SendText(Buffer.BracketedPaste ? "\x1b[200~" + text + "\x1b[201~" : text.Replace('\n', '\r'));
+    }
 
     /// <summary>Resize the grid and the underlying PTY.</summary>
     public void Resize(int columns, int rows)
@@ -62,6 +66,6 @@ public sealed class TerminalEmulator : IDisposable
     public void Dispose()
     {
         _pty.OutputReceived -= OnPtyOutput;
-        if (_ownsPty) _pty.Dispose();
+        _pty.Dispose();
     }
 }

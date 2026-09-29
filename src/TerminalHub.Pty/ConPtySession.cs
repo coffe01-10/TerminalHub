@@ -15,11 +15,16 @@ public sealed class ConPtySession : IPtySession
     private SafeFileHandle? _ptyIn;      // write end -> conpty input
     private SafeFileHandle? _ptyOut;     // read end  <- conpty output
     private Process? _process;
+    // Cached at exit so ExitCode/IsRunning stay queryable after _process is disposed.
+    private volatile bool _hasExitCode;
+    private int _exitCode;
     private CancellationTokenSource? _readCts;
+    private Task? _readTask;
+    private int _disposed;
 
     public Guid Id { get; } = Guid.NewGuid();
     public bool IsRunning => _process is { HasExited: false };
-    public int? ExitCode => _process is { HasExited: true } p ? p.ExitCode : null;
+    public int? ExitCode => _hasExitCode ? _exitCode : _process is { HasExited: true } p ? p.ExitCode : null;
     public int? ProcessId => _process?.Id;
 
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
@@ -35,59 +40,86 @@ public sealed class ConPtySession : IPtySession
         // Pipe layout: our stdin-write -> conpty-in; conpty-out -> our stdout-read.
         if (!Native.CreatePipe(out var inRead, out var inWrite, IntPtr.Zero, 0))
             throw new InvalidOperationException("CreatePipe failed (in)");
-        if (!Native.CreatePipe(out var outRead, out var outWrite, IntPtr.Zero, 0))
-            throw new InvalidOperationException("CreatePipe failed (out)");
-
+        SafeFileHandle? outRead = null, outWrite = null;
         try
         {
+            if (!Native.CreatePipe(out var r, out var w, IntPtr.Zero, 0))
+                throw new InvalidOperationException("CreatePipe failed (out)");
+            outRead = r; outWrite = w;
             var hr = Native.CreatePseudoConsole(size, inRead, outWrite, 0, out _hpc);
             if (hr != 0)
                 throw new InvalidOperationException($"CreatePseudoConsole failed: 0x{hr:X8}");
         }
+        catch
+        {
+            // Partial init — every handle we still own must be closed.
+            inWrite.Dispose();
+            outRead?.Dispose();
+            throw;
+        }
         finally
         {
-            // Console owns its copies now.
-            inRead.Close();
-            outWrite.Close();
+            // On success the console owns copies of its ends; on failure nothing
+            // took them, so closing ours is still correct.
+            inRead.Dispose();
+            outWrite?.Dispose();
         }
 
         _ptyIn = inWrite;
         _ptyOut = outRead;
 
-        _process = StartShell(options);
+        try
+        {
+            _process = StartShell(options);
+        }
+        catch
+        {
+            Dispose(); // pipes + pseudo console
+            throw;
+        }
         _process.EnableRaisingEvents = true;
         _process.Exited += (_, _) =>
         {
             var code = 0;
-            try { code = _process.ExitCode; } catch { }
+            var p = _process;
+            try { if (p is not null) code = p.ExitCode; } catch { }
+            _exitCode = code;
+            _hasExitCode = true;
             Exited?.Invoke(this, code);
         };
 
         _readCts = new CancellationTokenSource();
         // Dedicated thread: the read blocks in ReadFile until conhost emits data
         // or the pipe breaks. LongRunning keeps it off the thread pool.
-        Task.Factory.StartNew(() => ReadLoop(_readCts.Token),
+        _readTask = Task.Factory.StartNew(() => ReadLoop(_readCts.Token),
             CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         return Task.CompletedTask;
     }
 
     private Process StartShell(PtyOptions options)
     {
+        // Quote a shell given as a path ("C:\Program Files\...\pwsh.exe") —
+        // bare names resolved via PATH must stay unquoted.
+        var shell = options.Shell;
+        if (shell.IndexOfAny(['\\', '/']) >= 0 && !shell.StartsWith('"'))
+            shell = $"\"{shell}\"";
         var cmdline = string.IsNullOrWhiteSpace(options.Arguments)
-            ? options.Shell
-            : $"{options.Shell} {options.Arguments}";
+            ? shell
+            : $"{shell} {options.Arguments}";
 
         var si = new STARTUPINFOEX();
+        var environment = IntPtr.Zero;
         si.StartupInfo.cb = Marshal.SizeOf<STARTUPINFOEX>();
 
         var attrSize = IntPtr.Zero;
         Native.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref attrSize);
         si.lpAttributeList = Marshal.AllocHGlobal(attrSize);
-        if (!Native.InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, ref attrSize))
-            throw new InvalidOperationException("InitializeProcThreadAttributeList failed");
-
         try
         {
+            if (!Native.InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, ref attrSize))
+                throw new InvalidOperationException("InitializeProcThreadAttributeList failed");
+            environment = Marshal.StringToHGlobalUni(string.Join('\0', PtyEnvironment.Build(options)
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase).Select(pair => $"{pair.Key}={pair.Value}")) + "\0\0");
             if (!Native.UpdateProcThreadAttribute(
                     si.lpAttributeList, 0,
                     (IntPtr)Native.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -99,7 +131,7 @@ public sealed class ConPtySession : IPtySession
 
             if (!Native.CreateProcessW(
                     null, cmdline, IntPtr.Zero, IntPtr.Zero, false, flags,
-                    IntPtr.Zero, cwd, ref si, out var pi))
+                    environment, cwd, ref si, out var pi))
             {
                 var err = Marshal.GetLastWin32Error();
                 throw new InvalidOperationException($"CreateProcess failed: {err}");
@@ -111,6 +143,7 @@ public sealed class ConPtySession : IPtySession
         }
         finally
         {
+            Marshal.FreeHGlobal(environment);
             Native.DeleteProcThreadAttributeList(si.lpAttributeList);
             Marshal.FreeHGlobal(si.lpAttributeList);
         }
@@ -141,8 +174,17 @@ public sealed class ConPtySession : IPtySession
     {
         if (_ptyIn is null || !IsRunning) return;
         var tmp = data.ToArray();
-        if (!Native.WriteFile(_ptyIn, tmp, tmp.Length, out _, IntPtr.Zero))
-            Debug.WriteLine("ConPTY WriteFile failed");
+        // Loop on short writes — a large paste can exceed the pipe's kernel buffer.
+        var off = 0;
+        while (off < tmp.Length)
+        {
+            if (!Native.WriteFile(_ptyIn, ref tmp[off], tmp.Length - off, out var written, IntPtr.Zero) || written <= 0)
+            {
+                Debug.WriteLine($"ConPTY WriteFile failed: {Marshal.GetLastWin32Error()}");
+                break;
+            }
+            off += written;
+        }
     }
 
     public void Resize(int columns, int rows)
@@ -159,10 +201,25 @@ public sealed class ConPtySession : IPtySession
 
     public void Dispose()
     {
+        // Process.Exited can re-enter us via the VM's close path — run once only.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Kill();
         _readCts?.Cancel();
+        // Cache the exit code before releasing the Process object — IsRunning
+        // and ExitCode keep answering correctly after the handle is gone.
+        var p = _process;
+        _process = null;
+        if (p is not null)
+        {
+            try { if (!_hasExitCode && p.HasExited) { _exitCode = p.ExitCode; _hasExitCode = true; } }
+            catch { /* handle already gone — exit code stays unknown */ }
+            p.Dispose();
+        }
         _ptyIn?.Dispose();
         _ptyOut?.Dispose();
+        // Closing the pipe ends breaks the blocked ReadFile; give the thread a
+        // moment to unwind so it never outlives the handles it uses.
+        try { _readTask?.Wait(300); } catch { }
         if (_hpc != IntPtr.Zero)
         {
             Native.ClosePseudoConsole(_hpc);
@@ -217,7 +274,7 @@ public sealed class ConPtySession : IPtySession
         public static extern bool CreatePipe(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, IntPtr lpPipeAttributes, int nSize);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool WriteFile(SafeFileHandle hFile, byte[] lpBuffer, int nNumberOfBytesToWrite, out int lpNumberOfBytesWritten, IntPtr lpOverlapped);
+        public static extern bool WriteFile(SafeFileHandle hFile, ref byte lpBuffer, int nNumberOfBytesToWrite, out int lpNumberOfBytesWritten, IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool ReadFile(SafeFileHandle hFile, byte[] lpBuffer, int nNumberOfBytesToRead, out int lpNumberOfBytesRead, IntPtr lpOverlapped);

@@ -37,9 +37,12 @@ public sealed class AppSettings
 
     public ShellKind Shell { get; set; } = ShellKind.PowerShell;
     public string CustomShellPath { get; set; } = "";
-    public string FontFamily { get; set; } = "Cascadia Code, Consolas, Monospace";
     public double FontSize { get; set; } = 13;
     public string Theme { get; set; } = "DarkGlass";
+    public bool InspectorVisible { get; set; }
+    public bool OutputVisible { get; set; }
+    /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
+    public int DockVisibilityMode { get; set; }
     public string WorkspaceName { get; set; } = "MangaFlow";
     /// <summary>When true, session output is also written to a local log file.</summary>
     public bool SessionLogToFile { get; set; }
@@ -116,14 +119,16 @@ public sealed class AppSettings
         new StartupSession { Name = "Terminal 03", Tag = "部署控制" },
     ];
 
-    /// <summary>Resolved shell command line for the current platform.</summary>
-    public string ResolveShellCommand()
+    /// <summary>Resolved shell command line for the current platform.
+    /// <paramref name="shell"/> overrides the configured kind (per-session choice).</summary>
+    public string ResolveShellCommand(ShellKind? shell = null)
     {
-        if (Shell == ShellKind.Custom && !string.IsNullOrWhiteSpace(CustomShellPath))
+        var kind = shell ?? Shell;
+        if (kind == ShellKind.Custom && !string.IsNullOrWhiteSpace(CustomShellPath))
             return CustomShellPath;
 
         var isWindows = OperatingSystem.IsWindows();
-        return Shell switch
+        return kind switch
         {
             ShellKind.PowerShell => isWindows ? "pwsh" : "pwsh",
             ShellKind.Cmd => isWindows ? "cmd.exe" : "bash",

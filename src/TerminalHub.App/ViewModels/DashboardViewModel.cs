@@ -54,7 +54,9 @@ public partial class DashboardViewModel : ViewModelBase
             SearchStatus = "";
             return;
         }
-        foreach (var h in buf.SearchLines(q.Trim())) SearchHits.Add(h);
+        List<TerminalHub.Core.Terminal.ScreenBuffer.SearchHit> hits;
+        lock (buf.SyncRoot) hits = buf.SearchLines(q.Trim());
+        foreach (var h in hits) SearchHits.Add(h);
         SearchStatus = SearchHits.Count == 0 ? "无匹配" : $"{SearchHits.Count} 处匹配";
     }
 

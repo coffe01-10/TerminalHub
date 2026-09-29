@@ -58,6 +58,33 @@ public class SplitPaneTests
         window.Close();
     }
 
+    /// <summary>Regression: exiting split must resize the shared emulator back to
+    /// the main view's dimensions — a view-side "last size" cache once left the
+    /// emulator/PTY stuck at the pane's narrower width.</summary>
+    [AvaloniaFact]
+    public async Task Split_Exit_RestoresEmulatorDimensions()
+    {
+        var (window, vm) = await Boot();
+        var emulator = vm.ActiveSession!.Emulator;
+        var fullCols = emulator.Buffer.Columns;
+        var fullRows = emulator.Buffer.Rows;
+        Assert.True(fullCols > 80);
+
+        vm.ToggleSplitCommand.Execute(null);
+        await Task.Delay(500);
+        Assert.True(vm.IsSplit);
+        Assert.Same(emulator, vm.LeftPane!.Emulator); // left pane reuses the active session
+        Assert.True(emulator.Buffer.Columns < fullCols,
+            $"left pane should have shrunk the grid below {fullCols}, got {emulator.Buffer.Columns}");
+
+        vm.ToggleSplitCommand.Execute(null);
+        await Task.Delay(500);
+        Assert.False(vm.IsSplit);
+        Assert.Equal(fullCols, emulator.Buffer.Columns);
+        Assert.Equal(fullRows, emulator.Buffer.Rows);
+        window.Close();
+    }
+
     [AvaloniaFact]
     public async Task Split_Input_NoCrossTalk()
     {

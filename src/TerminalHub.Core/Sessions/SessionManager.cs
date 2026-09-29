@@ -10,6 +10,11 @@ public sealed class SessionManager
     private int _counter;
 
     public ObservableCollection<TerminalSessionModel> Sessions { get; } = [];
+    private volatile IReadOnlyList<TerminalSessionModel> _snapshot = [];
+    /// <summary>Stable array refreshed on each mutation (mutations always run on the
+    /// caller's thread) — safe for other threads to enumerate, e.g. the monitor's
+    /// cwd-poll, where iterating <see cref="Sessions"/> could throw mid-change.</summary>
+    public IReadOnlyList<TerminalSessionModel> Snapshot => _snapshot;
     public TerminalSessionModel? Active { get; private set; }
 
     public event Action<TerminalSessionModel>? SessionAdded;
@@ -35,7 +40,7 @@ public sealed class SessionManager
 
         var session = new TerminalSessionModel
         {
-            Name = name ?? $"Terminal {++_counter:D2}",
+            Name = name ?? NextAutoName(),
             Tag = tag,
             Emulator = emulator,
             WorkingDirectory = options.WorkingDirectory,
@@ -43,9 +48,21 @@ public sealed class SessionManager
         emulator.Pty.Exited += (_, _) => SessionStateChanged?.Invoke(session);
 
         Sessions.Add(session);
+        _snapshot = Sessions.ToArray();
         SessionAdded?.Invoke(session);
         Activate(session);
         return session;
+    }
+
+    /// <summary>Auto-numbered names must skip names already taken — startup
+    /// sessions carry explicit names that never touched <see cref="_counter"/>,
+    /// and renames can claim any number.</summary>
+    private string NextAutoName()
+    {
+        string candidate;
+        do { candidate = $"Terminal {++_counter:D2}"; }
+        while (Sessions.Any(s => s.Name == candidate));
+        return candidate;
     }
 
     public void Activate(TerminalSessionModel? session)
@@ -59,6 +76,7 @@ public sealed class SessionManager
     {
         session.Pty.Kill();
         Sessions.Remove(session);
+        _snapshot = Sessions.ToArray();
         SessionRemoved?.Invoke(session);
         if (ReferenceEquals(Active, session))
             Activate(Sessions.LastOrDefault());
@@ -73,6 +91,7 @@ public sealed class SessionManager
     public TerminalSessionModel? Detach(TerminalSessionModel session)
     {
         if (!Sessions.Remove(session)) return null;
+        _snapshot = Sessions.ToArray();
         SessionRemoved?.Invoke(session);
         if (ReferenceEquals(Active, session))
             Activate(Sessions.LastOrDefault());
@@ -84,6 +103,7 @@ public sealed class SessionManager
     {
         if (Sessions.Contains(session)) return;
         Sessions.Add(session);
+        _snapshot = Sessions.ToArray();
         SessionAdded?.Invoke(session);
         Activate(session);
     }

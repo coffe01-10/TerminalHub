@@ -38,7 +38,24 @@ public sealed class SystemMonitor : ISystemMonitor
         _timer = null;
     }
 
+    /// <summary>Timer callbacks are not serialized — a slow sample (process list on a
+    /// loaded box) must not let a second Tick run concurrently and corrupt the deltas.</summary>
+    private int _ticking;
+
     private void Tick()
+    {
+        if (Interlocked.Exchange(ref _ticking, 1) != 0) return;
+        try
+        {
+            TickCore();
+        }
+        finally
+        {
+            Volatile.Write(ref _ticking, 0);
+        }
+    }
+
+    private void TickCore()
     {
         var (cpu, memUsed, memTotal) = SampleCpuAndMemory();
         var (rx, tx) = SampleNetwork();
@@ -207,29 +224,39 @@ public sealed class SystemMonitor : ISystemMonitor
         var result = new List<ProcessInfo>();
         var seen = new HashSet<int>();
 
-        foreach (var p in Process.GetProcesses())
+        var procs = Process.GetProcesses();
+        try
         {
-            try
+            foreach (var p in procs)
             {
-                seen.Add(p.Id);
-                var cpuTime = p.TotalProcessorTime;
-                double cpu = 0;
-                if (elapsedMs > 0 && _lastProcCpu.TryGetValue(p.Id, out var prev))
+                try
                 {
-                    // % of one logical core: cpu-time delta / wall-time delta.
-                    var deltaMs = (cpuTime - prev).TotalMilliseconds;
-                    cpu = Math.Clamp(deltaMs / elapsedMs * 100, 0, 100);
+                    seen.Add(p.Id);
+                    var cpuTime = p.TotalProcessorTime;
+                    double cpu = 0;
+                    if (elapsedMs > 0 && _lastProcCpu.TryGetValue(p.Id, out var prev))
+                    {
+                        // % of one logical core: cpu-time delta / wall-time delta.
+                        var deltaMs = (cpuTime - prev).TotalMilliseconds;
+                        cpu = Math.Clamp(deltaMs / elapsedMs * 100, 0, 100);
+                    }
+                    _lastProcCpu[p.Id] = cpuTime;
+                    result.Add(new ProcessInfo
+                    {
+                        Pid = p.Id,
+                        Name = p.ProcessName,
+                        CpuPercent = Math.Round(cpu, 1),
+                        MemoryBytes = p.WorkingSet64,
+                    });
                 }
-                _lastProcCpu[p.Id] = cpuTime;
-                result.Add(new ProcessInfo
-                {
-                    Pid = p.Id,
-                    Name = p.ProcessName,
-                    CpuPercent = Math.Round(cpu, 1),
-                    MemoryBytes = p.WorkingSet64,
-                });
+                catch { }
             }
-            catch { }
+        }
+        finally
+        {
+            // GetProcesses opens a process handle per entry the moment
+            // TotalProcessorTime/WorkingSet64 is touched — release them all.
+            foreach (var p in procs) p.Dispose();
         }
 
         foreach (var stale in _lastProcCpu.Keys.Where(k => !seen.Contains(k)).ToList())

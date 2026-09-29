@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia;
 using Avalonia.Media;
+using TerminalHub.App.Controls;
 using TerminalHub.Core.AI;
 using TerminalHub.Core.Logging;
 
@@ -16,10 +17,10 @@ public sealed class LogLevelConverter : IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => (value as string)?.ToLowerInvariant() switch
         {
-            "warn" or "warning" => new SolidColorBrush(Color.Parse("#FBBF24")),
-            "error" or "err" => new SolidColorBrush(Color.Parse("#F87171")),
-            "debug" => new SolidColorBrush(Color.Parse("#64748B")),
-            _ => new SolidColorBrush(Color.Parse("#38BDF8")),
+            "warn" or "warning" => ThemeManager.Brush("Warm"),
+            "error" or "err" => ThemeManager.Brush("Bad"),
+            "debug" => ThemeManager.Brush("Faint"),
+            _ => ThemeManager.Brush("Accent"),
         };
 
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
@@ -67,8 +68,8 @@ public sealed class DirNameConverter : IValueConverter
     public static readonly DirNameConverter Instance = new();
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is true
-            ? new SolidColorBrush(Color.Parse("#7DD3FC"))
-            : new SolidColorBrush(Color.Parse("#E2E8F0"));
+            ? ThemeManager.Brush("Accent")
+            : ThemeManager.Brush("Ink");
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
@@ -85,10 +86,8 @@ public sealed class StringNotEmptyConverter : IValueConverter
 public sealed class BoolBrushConverter : IValueConverter
 {
     public static readonly BoolBrushConverter Instance = new();
-    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#38BDF8"));
-    private static readonly IBrush Muted = new SolidColorBrush(Color.Parse("#94A3B8"));
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is true ? Accent : Muted;
+        => value is true ? ThemeManager.Brush("Accent") : ThemeManager.Brush("Muted");
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 

@@ -16,8 +16,11 @@ public sealed class TerminalSessionModel : IDisposable
     public IPtySession Pty => Emulator.Pty;
     public bool IsRunning => Pty.IsRunning;
 
-    /// <summary>Preview text for the thumbnail card (last N lines).</summary>
-    public string PreviewText => Emulator.Buffer.TailText(8);
+    /// <summary>True while the session lives in a popout window (off the main
+    /// session list, still owned by the shell VM). Lets SessionAdded/SessionRemoved
+    /// tell a detach/reattach cycle from create/close so PTY wiring and cwd
+    /// history survive the round trip.</summary>
+    public bool Detached { get; set; }
 
     public void Dispose() => Emulator.Dispose();
 }

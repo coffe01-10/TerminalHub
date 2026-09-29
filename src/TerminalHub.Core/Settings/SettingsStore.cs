@@ -49,8 +49,20 @@ public sealed class SettingsStore
 
     public void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        var json = JsonSerializer.Serialize(settings, JsonOptions);
-        File.WriteAllText(_path, json);
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            var json = JsonSerializer.Serialize(settings, JsonOptions);
+            // Write-then-move: a crash mid-write must never leave a truncated
+            // settings.json behind (WriteAllText truncates in place).
+            var tmp = _path + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, _path, overwrite: true);
+        }
+        catch
+        {
+            // Persistence must never break the app — a full/readonly disk or an
+            // antivirus lock is survivable; losing the window on exit is not.
+        }
     }
 }

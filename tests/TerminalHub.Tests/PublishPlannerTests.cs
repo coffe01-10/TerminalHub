@@ -97,13 +97,14 @@ public class PublishPlannerTests
     [Fact]
     public void NameOnPath_FindsBareNameAndWindowsExe()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"th-path-{Guid.NewGuid():N}");
+        // Relative dirs: a unix PATH splits on ':', which would mangle drive letters.
+        var dir = $"th-path-{Guid.NewGuid():N}";
         Directory.CreateDirectory(dir);
         try
         {
             File.WriteAllText(Path.Combine(dir, "pwsh"), "");
             File.WriteAllText(Path.Combine(dir, "powershell.exe"), "");
-            var other = Path.Combine(Path.GetTempPath(), $"th-path-{Guid.NewGuid():N}");
+            var other = $"th-path-{Guid.NewGuid():N}";
             Directory.CreateDirectory(other);
             try
             {

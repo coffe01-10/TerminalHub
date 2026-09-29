@@ -9,6 +9,7 @@ namespace TerminalHub.Core.Logging;
 /// </summary>
 public sealed class SessionLogFile : IDisposable
 {
+    private readonly object _gate = new();
     private StreamWriter? _writer;
 
     public bool IsEnabled => _writer is not null;
@@ -25,24 +26,34 @@ public sealed class SessionLogFile : IDisposable
         var d = dir ?? DefaultDir();
         Directory.CreateDirectory(d);
         var path = Path.Combine(d, $"terminalhub-{DateTime.Now:yyyyMMdd-HHmmss}.log");
-        _writer = new StreamWriter(
-            new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-        { AutoFlush = true };
-        _writer.WriteLine($"# Terminal Hub session log — started {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        CurrentPath = path;
+        lock (_gate)
+        {
+            _writer = new StreamWriter(
+                new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            { AutoFlush = true };
+            _writer.WriteLine($"# Terminal Hub session log — started {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            CurrentPath = path;
+        }
         return path;
     }
 
-    /// <summary>Append one log line; no-op while disabled.</summary>
+    /// <summary>Append one log line; no-op while disabled. Session PTY read
+    /// threads write concurrently — guard the non-thread-safe StreamWriter.</summary>
     public void Write(string source, string level, string message)
-        => _writer?.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [{level}] ({source}) {message}");
+    {
+        lock (_gate)
+            _writer?.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [{level}] ({source}) {message}");
+    }
 
     /// <summary>Close the current log file.</summary>
     public void Disable()
     {
-        _writer?.Dispose();
-        _writer = null;
-        CurrentPath = null;
+        lock (_gate)
+        {
+            _writer?.Dispose();
+            _writer = null;
+            CurrentPath = null;
+        }
     }
 
     public void Dispose() => Disable();

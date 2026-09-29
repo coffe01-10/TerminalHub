@@ -7,7 +7,11 @@ namespace TerminalHub.App;
 
 public partial class App : Application
 {
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        Controls.ThemeManager.Apply("DarkGlass");
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
