@@ -11,6 +11,9 @@
   <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="许可证：MIT"></a>
 </p>
 <p align="center"><strong>多个终端，一个工作空间。</strong></p>
+<p align="center">
+  <img src="docs/readme/typing.svg" width="470" alt="终端窗口中逐字输入还原、构建与启动命令的循环动画">
+</p>
 
 Terminal Hub 是一款 **Windows 优先、支持 Linux 的原生多会话终端**，面向同时使用多个项目、开发服务和命令行工具的开发者。实时缩略图帮你找到会话，分屏让两个任务并排工作，文件、日志和进程工具随时可以展开。
 

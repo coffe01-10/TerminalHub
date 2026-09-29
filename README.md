@@ -11,6 +11,9 @@
   <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="License: MIT"></a>
 </p>
 <p align="center"><strong>Every terminal, one workspace.</strong></p>
+<p align="center">
+  <img src="docs/readme/typing.svg" width="470" alt="A terminal window typing the restore, build, and run commands, one character at a time">
+</p>
 
 Terminal Hub is a Windows-first, Linux-capable native multi-session terminal for developers who keep several projects, dev servers, and command-line tools open at once. Live thumbnails show what each session is doing before you switch, split view puts two sessions side by side, and file, log, process, and SSH panels unfold when you need them.
 
