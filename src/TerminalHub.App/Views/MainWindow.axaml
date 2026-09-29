@@ -10,6 +10,7 @@
         x:Name="Root"
         x:DataType="vm:MainWindowViewModel"
         Title="Terminal Hub · 终端控制中心"
+        Icon="avares://TerminalHub/Assets/terminal-hub-icon.ico"
         Width="1440" Height="900" MinWidth="1100" MinHeight="680"
         Background="{DynamicResource UiCanvas}" FontFamily="Segoe UI, Microsoft YaHei UI, sans-serif"
         ExtendClientAreaToDecorationsHint="True"

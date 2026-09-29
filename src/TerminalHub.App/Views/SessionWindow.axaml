@@ -5,6 +5,7 @@
         x:Class="TerminalHub.App.Views.SessionWindow"
         x:DataType="vm:SessionWindowViewModel"
         Title="{Binding Title}"
+        Icon="avares://TerminalHub/Assets/terminal-hub-icon.ico"
         Width="860" Height="540" MinWidth="420" MinHeight="260"
         WindowStartupLocation="Manual"
         Background="{DynamicResource UiCanvas}"
