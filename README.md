@@ -1,85 +1,83 @@
 <p align="center">
-  <img src="src/TerminalHub.App/Assets/terminal-hub-icon.png" width="112" alt="Terminal Hub：连接多个终端的蓝色应用图标">
+  <img src="docs/readme/logo.svg" width="520" alt="Terminal Hub: three terminal windows joined at one hub, next to a pixel wordmark">
 </p>
-
-<h1 align="center">Terminal Hub</h1>
-
-<p align="center"><strong>多个终端，一个工作空间。</strong></p>
-
 <p align="center">
-  <img src="docs/readme/runtime.svg" height="24" alt=".NET 8">
-  <img src="docs/readme/ui.svg" height="24" alt="Avalonia 11 原生界面">
-  <img src="docs/readme/platform.svg" height="24" alt="Windows 优先，支持 Linux">
-  <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="MIT 许可证"></a>
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
 </p>
-
 <p align="center">
-  <a href="#quick-start">快速开始</a> ·
-  <a href="#workspace">界面与操作</a> ·
-  <a href="#development">参与开发</a>
+  <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt="Runtime: .NET 8"></a>
+  <a href="src/TerminalHub.App"><img src="docs/readme/ui.svg" height="24" alt="UI: native Avalonia 11 interface"></a>
+  <a href="scripts/run-linux.sh"><img src="docs/readme/platform.svg" height="24" alt="Platforms: Windows first, Linux supported"></a>
+  <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="License: MIT"></a>
 </p>
+<p align="center"><strong>Every terminal, one workspace.</strong></p>
 
-Terminal Hub 是一款 **Windows 优先、支持 Linux 的原生多会话终端**，面向同时使用多个项目、开发服务和命令行工具的开发者。实时缩略图帮助你找到会话，分屏让两个任务并排工作，文件、日志和进程工具随时可以展开。
+Terminal Hub is a Windows-first, Linux-capable native multi-session terminal for developers who keep several projects, dev servers, and command-line tools open at once. Live thumbnails show what each session is doing before you switch, split view puts two sessions side by side, and file, log, process, and SSH panels unfold when you need them.
 
-![深蓝玻璃主题的 Terminal Hub：左侧实时会话缩略图、中央终端与底部操作 Dock](docs/readme/workspace.png)
+[Workspace](#the-workspace) · [Quick start](#quick-start) · [Keyboard shortcuts](#keyboard-shortcuts) · [Development](#development-and-checks) · [Documentation](#documentation-and-contributing)
 
-<p align="center"><sub>本页界面图由当前源码通过 Avalonia Headless + Skia 渲染，使用 Mock PTY 与示例终端输出。<a href="docs/readme/README.md">素材来源与更新方式</a></sub></p>
+> [!NOTE]
+> Terminal Hub is in active development and there is no signed release build yet — the supported way to run it is from source below. Windows is the primary platform; Linux runs on a real PTY but sees less daily use, and macOS is not a verified platform. Restoring a workspace starts fresh shell processes: the layout comes back, running programs and their progress do not.
 
-## 让每个会话都有位置
+![Terminal Hub in the dark glass theme: live session thumbnails on the left, the focused terminal in the center, and the action dock at the bottom](docs/readme/workspace.png)
 
-开发服务正在运行，另一边需要查看日志，还要留一个 Shell 执行临时命令。Terminal Hub 把这些会话放在同一工作空间里，让你切换之前就能看到它们的内容。
+<p align="center"><sub>The workspace image is rendered from current source through Avalonia Headless + Skia, using a mock PTY and sample terminal output — it is not a capture of a real CLI session. <a href="docs/readme/README.md">Asset sources and how to regenerate them</a></sub></p>
 
-| 日常操作 | Terminal Hub 的处理方式 |
+## A place for every session
+
+A dev server is running, logs need watching, and a spare shell handles one-off commands. Terminal Hub keeps those sessions in one workspace, so you can see their contents before deciding where to go.
+
+| What you want to do | What the workspace provides |
 | --- | --- |
-| 找到正在运行的任务 | 左侧缩略图展示实时终端内容；点击切换，拖动调整顺序 |
-| 同时操作两个会话 | 左右分屏，各自显示名称；点击窗格立即切换输入焦点 |
-| 临时放大一个任务 | 从缩略图展开到主区域，或将会话弹出为独立窗口 |
-| 查看命令背后的信息 | 按需展开文件、日志、进程、SSH 和输出面板 |
-| 调整自己的工作环境 | 四种主题、等宽字体与字号设置，以及三种 Dock 显示模式 |
-| 回到熟悉的布局 | 保存会话顺序、名称、目录、Shell、分屏与活动会话 |
+| Find the task that is still running | Live terminal thumbnails in the sidebar; click to switch, drag to reorder |
+| Work in two sessions at once | Left/right split, each pane labeled with its session name; click a pane to give it focus |
+| Temporarily enlarge one task | Expand a thumbnail into the main area, or pop a session out into its own window |
+| See what is behind a command | On-demand file, log, process, SSH, and output panels |
+| Adjust the working environment | Four themes, monospace font and size settings, and three dock display modes |
+| Come back to a familiar layout | Saved session order, names, directories, shells, split state, and the active session |
 
-工作区恢复会重新启动 Shell 进程；上次运行的程序及其进度不会随布局一起恢复。
+Workspace restore re-creates shell processes; the programs that were running, and their progress, are not restored with the layout.
 
-<a id="workspace"></a>
+<a id="the-workspace"></a>
 
-## 界面与操作
+## The workspace
 
-### 会话在左，工作在前
+### Sessions on the left, work in front
 
-缩略图拖动时跟随指针，相邻卡片平滑让位，松手后落入新位置。切换会话采用受 macOS Dock 启发的展开过渡；缩略图仅预览内容，动画不会为了自身尺寸调整终端的 PTY 网格。
+Dragged thumbnails follow the pointer while neighboring cards slide aside, then settle into their new slot. Switching sessions uses a macOS Dock-inspired expansion transition. Thumbnails only preview content — they never resize the terminal's PTY grid to fit themselves.
 
-点击工具栏的 **「分屏」**，把两个会话并排放置。先点击要操作的窗格，再点左侧缩略图，可为该窗格换一个会话。左右窗格切换时主区域保持静止，侧栏更新活动状态。
+Click **Split** in the toolbar to place two sessions side by side. Click the pane you want to operate, then a thumbnail, to swap that pane's session. Moving between panes leaves the other side untouched while the sidebar tracks the active session.
 
-![亮白主题的双终端分屏：左右窗格分别显示会话名称，边框标示当前输入焦点](docs/readme/split.png)
+![Split view in the light theme: two panes labeled with their session names, the focused pane marked by a highlighted border](docs/readme/split.png)
 
-### 四种主题，一套工作习惯
+### Four themes, one set of habits
 
-**深蓝玻璃、深黑、亮白、纸张**覆盖主窗口、终端、缩略图、菜单和设置。未展开的卡片使用各自的主题细节：玻璃高光、深黑细描边、亮白柔和阴影和纸张叠页。
+**Dark glass, black, white, and paper** cover the main window, terminal, thumbnails, menus, and settings. Collapsed session cards keep their own theme details: glass highlights, fine black outlines, soft white shadows, and stacked paper edges.
 
-设置采用分组布局，可调整主题、工具栏、输出区、Dock、字体与新终端使用的 Shell。Dock 默认靠近底部时显示，也可改为始终显示或隐藏。
+Settings use a grouped layout for theme, toolbar, output area, dock, fonts, and the shell new terminals start with. The dock appears near the bottom edge by default and can be pinned on or off.
 
-![纸张主题的分组设置面板：配色、工作空间开关、Dock 与终端字体保持一致的暖色](docs/readme/settings.png)
+![Grouped settings in the paper theme: colors, workspace toggles, dock, and terminal font share one warm palette](docs/readme/settings.png)
 
 <details>
-<summary>查看深黑主题</summary>
+<summary>Show the black theme</summary>
 
-![深黑主题：深色终端背景、克制的卡片描边与浅蓝色活动状态](docs/readme/black.png)
+![Black theme: dark terminal background, restrained card outlines, and a light blue active indicator](docs/readme/black.png)
 
 </details>
 
-### 保留终端里的操作习惯
+### Terminal habits that carry over
 
-鼠标拖选后使用 `Ctrl+Shift+C` 复制，`Ctrl+C` 保留给运行中的程序。支持中文输入法定位、历史滚动、文本搜索和多行粘贴。应用启用终端鼠标协议时，按住 `Shift` 可使用终端自身的选择与滚动。
+Select with the mouse and copy with `Ctrl+Shift+C`; `Ctrl+C` stays with the running program. Chinese IME positioning, history scrolling, text search, and multi-line paste are supported. When an application enables the terminal mouse protocol, hold `Shift` to use the terminal's own selection and scrolling.
 
-Claude Code、Codex CLI 等工具可在 Shell 内单独安装和运行。具体键盘协议、鼠标行为及已经验证的范围，见 [CLI 交互适配](docs/cli-compatibility.md)。
+Tools like Claude Code and Codex CLI install and run inside the shell as usual. For verified keyboard protocols, mouse behavior, and the tested scope, see [CLI interaction compatibility](docs/cli-compatibility.md).
 
 <a id="quick-start"></a>
 
-## 快速开始
+## Quick start
 
 ### Windows
 
-需要 **Windows 10 1809 或更高版本 / Windows 11**、Git 和 **.NET 8 SDK**。默认启动 Shell 为 PowerShell 7，请确保 `pwsh` 在 PATH 中。
+Requires **Windows 10 1809 or later / Windows 11**, Git, and the **.NET 8 SDK**. The default shell is PowerShell 7, so make sure `pwsh` is on PATH.
 
 ```powershell
 git clone https://github.com/coffe01-10/TerminalHub.git
@@ -88,11 +86,11 @@ dotnet restore TerminalHub.sln
 dotnet run --project src/TerminalHub.App
 ```
 
-没有安装 `pwsh` 时，可打开设置，把「新终端使用」改为 `cmd.exe`，再点击「新建终端」。WSL、自定义 Shell 和 SSH 连接需要相应程序已在本机安装。
+Without `pwsh`, open Settings, change "New terminals use" to `cmd.exe`, then create a terminal. WSL, custom shells, and SSH connections require the corresponding programs to be installed locally.
 
 ### Linux
 
-需要 **.NET 8 SDK**、Git、可用的 X11 显示环境及字体依赖。Debian / Ubuntu 上的界面依赖可以用以下命令安装：
+Requires the **.NET 8 SDK**, Git, a working X11 display, and font dependencies. On Debian / Ubuntu:
 
 ```bash
 sudo apt-get install libx11-6 libxcb1 libfontconfig1 libice6 libsm6 fonts-noto-cjk
@@ -101,55 +99,57 @@ cd TerminalHub
 bash scripts/run-linux.sh
 ```
 
-默认会话同样使用 `pwsh`；若只安装了 Bash，打开设置选择 `bash`，再新建终端。无实体显示器时，安装 Xvfb 后可运行 `bash scripts/run-linux.sh --headless`。
+New sessions also default to `pwsh`; with only Bash installed, choose `bash` in Settings before creating a terminal. On a machine without a physical display, install Xvfb and run `bash scripts/run-linux.sh --headless`.
 
-### 第一次使用
+### First run
 
-1. 点击一个终端，在提示符后执行 `echo Hello Terminal Hub`，应在当前终端及其缩略图中看到输出。
-2. 使用 `Ctrl+Shift+N` 新建会话，点击缩略图切换；原会话中的进程继续运行。
-3. 点击「分屏」，尝试在两侧分别输入；通过窗格名称与高亮边框确认当前会话。
+1. Click into a terminal and run `echo Hello Terminal Hub`; the output should appear in both the terminal and its thumbnail.
+2. Press `Ctrl+Shift+N` for a new session and click thumbnails to switch; processes in the original session keep running.
+3. Click **Split** and try typing on each side; the pane name and highlighted border show which session receives input.
 
-应用采用单实例运行。重新编译后，请先正常退出旧实例，再启动新版本。
+The app runs as a single instance. After rebuilding, exit the old instance normally before starting the new build.
 
-## 常用快捷键
+<a id="keyboard-shortcuts"></a>
 
-| 操作 | 快捷键 |
+## Keyboard shortcuts
+
+| Action | Shortcut |
 | --- | --- |
-| 新建 / 关闭当前会话 | `Ctrl+Shift+N` / `Ctrl+Shift+W` |
-| 下一个 / 上一个会话 | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| 显示或隐藏工具栏 / 输出区 | `Ctrl+Shift+B` / `Ctrl+Shift+J` |
-| 复制选中文字 | `Ctrl+Shift+C` |
-| 粘贴 | `Ctrl+V`、`Ctrl+Shift+V` 或 `Shift+Insert` |
-| 放大 / 缩小 / 重置字号 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` |
-| 重命名会话 | 会话列表聚焦时按 `F2`，或双击会话标题 |
+| New / close current session | `Ctrl+Shift+N` / `Ctrl+Shift+W` |
+| Next / previous session | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| Toggle toolbar / output area | `Ctrl+Shift+B` / `Ctrl+Shift+J` |
+| Copy selected text | `Ctrl+Shift+C` |
+| Paste | `Ctrl+V`, `Ctrl+Shift+V`, or `Shift+Insert` |
+| Zoom in / out / reset font size | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` |
+| Rename a session | `F2` with the session list focused, or double-click its title |
 
-终端聚焦时，`F2` 交给终端内的程序。关闭会话会结束其进程。
+When the terminal has focus, `F2` goes to the program inside it. Closing a session ends its process.
 
 <details>
-<summary>配置保存在哪里？</summary>
+<summary>Where are settings stored?</summary>
 
-| 平台 | 默认配置文件 |
+| Platform | Default settings file |
 | --- | --- |
 | Windows | `%APPDATA%\TerminalHub\settings.json` |
 | Linux | `${XDG_CONFIG_HOME:-~/.config}/terminalhub/settings.json` |
 
-设置和工作区布局保存在本机。界面中修改 Shell 会影响之后新建的终端；已有会话继续使用原来的进程。
+Settings and workspace layout stay on the local machine. Changing the shell in Settings affects terminals created afterwards; existing sessions keep their original processes.
 
 </details>
 
-<a id="development"></a>
+<a id="development-and-checks"></a>
 
-## 开发与打包
+## Development and checks
 
-项目采用 **Avalonia 11 + .NET 8**。Windows 使用 ConPTY，Linux 使用 `forkpty`；终端解析、屏幕缓冲和会话管理位于独立的 Core 项目。
+The project is **Avalonia 11 + .NET 8**. Windows sessions run on ConPTY, Linux on `forkpty`; VT parsing, the screen buffer, and session management live in a standalone core project.
 
 ```text
 src/
-├── TerminalHub.App     原生界面、终端绘制、输入法与工作区
-├── TerminalHub.Core    VT 解析、屏幕缓冲、会话与设置
-└── TerminalHub.Pty     Windows ConPTY、Linux PTY、Mock PTY
+├── TerminalHub.App     Native UI, terminal rendering, IME, and workspace
+├── TerminalHub.Core    VT parsing, screen buffer, sessions, and settings
+└── TerminalHub.Pty     Windows ConPTY, Linux PTY, and mock PTY
 tests/
-└── TerminalHub.Tests   核心逻辑、原生布局与交互回归
+└── TerminalHub.Tests   Core logic, native layout, and interaction regressions
 ```
 
 ```powershell
@@ -158,37 +158,39 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 ```
 
 <details>
-<summary>生成可分发版本</summary>
+<summary>Build a distributable package</summary>
 
-Windows x64 发布脚本需要 PowerShell 7。先生成包含 .NET 运行时的应用：
+The Windows x64 publish script needs PowerShell 7. Produce the app with the .NET runtime included:
 
 ```powershell
 pwsh -File scripts/publish-windows.ps1 -SkipInstaller
 ```
 
-输出目录为 `artifacts/publish/win-x64/`。安装 Inno Setup 6 后，去掉 `-SkipInstaller` 即可同时生成安装程序，输出到 `artifacts/installer/`。安装程序会结束正在运行的 Terminal Hub，使用前请先保存工作并正常退出。
+Output goes to `artifacts/publish/win-x64/`. With Inno Setup 6 installed, drop `-SkipInstaller` to also build the installer under `artifacts/installer/`. The installer closes a running Terminal Hub — save your work and exit normally first.
 
-Linux x64：
+Linux x64:
 
 ```bash
 bash scripts/publish-linux.sh
 ```
 
-输出目录为 `artifacts/publish/linux-x64/`。自包含发布携带 .NET 运行时，Linux 上仍需要相应的图形系统库。
+Output goes to `artifacts/publish/linux-x64/`. Self-contained builds carry the .NET runtime, but Linux still needs the corresponding graphics system libraries.
 
 </details>
 
-### 文档与贡献
+<a id="documentation-and-contributing"></a>
 
-- [开发指引](AGENTS.md)：代码入口、已知问题背景与验证方式。
-- [CLI 交互适配](docs/cli-compatibility.md)：粘贴、鼠标、快捷键和兼容性验证范围。
-- [Linux 调试记录](docs/local-debugging.md)：X11、Xvfb 与本机调试；历史界面描述以当前源码为准。
-- [产品说明](docs/PRODUCT.md)：设计背景与需求记录。
+## Documentation and contributing
 
-欢迎通过 [Issues](https://github.com/coffe01-10/TerminalHub/issues) 提交问题或改进建议。终端显示与输入问题请附上系统、Shell / CLI 版本、复现步骤和截图；贡献代码时请为修复的具体行为补充或运行相关回归。
+- [Development guide](AGENTS.md): code entry points, background on known issues, and how to verify changes (Chinese).
+- [CLI interaction compatibility](docs/cli-compatibility.md): paste, mouse, shortcuts, and the verified scope.
+- [Linux debugging notes](docs/local-debugging.md): X11, Xvfb, and local debugging; historical UI descriptions defer to current source.
+- [Product notes](docs/PRODUCT.md): design background and requirements history.
 
-当前开发重点包括 Unicode 字素与格宽、光标与输入法定位，以及多会话性能。macOS 尚不作为已验证平台列出。
+Issues and improvement suggestions are welcome at [GitHub Issues](https://github.com/coffe01-10/TerminalHub/issues). For display or input problems, include your OS, shell / CLI version, reproduction steps, and a screenshot; when contributing a fix, add or run the regressions that cover the specific behavior.
 
-## 许可证
+Current focus areas are Unicode graphemes and cell widths, cursor and IME positioning, and multi-session performance.
+
+## License
 
 [MIT](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)

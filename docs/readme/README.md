@@ -4,16 +4,17 @@
 
 ## 来源
 
-- 应用图标直接引用 `src/TerminalHub.App/Assets/terminal-hub-icon.png`，保留项目现有品牌。
+- `logo.svg` 由本目录的 `generate_logo.py` 生成。徽章沿用应用图标的三窗枢纽造型（`src/TerminalHub.App/Assets/terminal-hub-icon.png`），字标为脚本绘制的 5×7 像素字形；墨色通过 `prefers-color-scheme` 随明暗主题变化。
 - `runtime.svg`、`ui.svg`、`platform.svg`、`license.svg` 由本目录的 `generate_badges.py` 生成。采用项目的深蓝与强调色，不依赖外部徽章服务；徽章描述技术栈与许可证，不代表 CI 或兼容性测试结果。
 - `workspace.png`、`split.png`、`settings.png`、`black.png` 于 2026-09-29 从当前应用代码导出。来源是 `ThemeWorkspaceTests.ThemeCoversTerminalAndPreview_WithoutChangingPtyDimensions`，采用 Avalonia Headless + Skia 渲染真实原生控件，PTY 为 Mock，终端文本为示例数据。图片未经合成或重绘，不用于证明真实 CLI 交互或动画帧率。
 - 首页的组织方式参考 `write-visual-readme` 技能；图标、截图和徽章均采用本项目素材，未引用其他项目的品牌图片。
 
 ## 更新
 
-仓库根目录运行以下命令生成徽章：
+仓库根目录运行以下命令重新生成 logo 与徽章：
 
 ```powershell
+python docs/readme/generate_logo.py
 python docs/readme/generate_badges.py
 ```
 
