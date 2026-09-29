@@ -1,82 +1,109 @@
 <p align="center">
-  <img src="docs/readme/logo.svg" width="520" alt="Terminal Hub: three terminal windows joined at one hub, next to a pixel wordmark">
+  <img src="docs/readme/hero-en.svg" width="1200" alt="Terminal Hub — Every terminal. One workspace. Native terminal workspace with live previews, split panes, and four themes.">
 </p>
+
+<p align="center"><strong>English</strong> / <a href="README.zh-CN.md">简体中文</a></p>
+
 <p align="center">
-  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+  <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt=".NET 8"></a>
+  <a href="src/TerminalHub.App"><img src="docs/readme/ui.svg" height="24" alt="Avalonia 11"></a>
+  <a href="scripts/run-linux.sh"><img src="docs/readme/platform.svg" height="24" alt="Windows / Linux"></a>
+  <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="MIT License"></a>
 </p>
+
 <p align="center">
-  <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt="Runtime: .NET 8"></a>
-  <a href="src/TerminalHub.App"><img src="docs/readme/ui.svg" height="24" alt="UI: native Avalonia 11 interface"></a>
-  <a href="scripts/run-linux.sh"><img src="docs/readme/platform.svg" height="24" alt="Platforms: Windows first, Linux supported"></a>
-  <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="License: MIT"></a>
-</p>
-<p align="center"><strong>Every terminal, one workspace.</strong></p>
-<p align="center">
-  <img src="docs/readme/typing.svg" width="470" alt="A terminal window typing the restore, build, and run commands, one character at a time">
+  <a href="#quick-start"><strong>Get started →</strong></a> &nbsp; · &nbsp;
+  <a href="#the-workspace">Explore the workspace</a> &nbsp; · &nbsp;
+  <a href="#themes">Find your theme</a> &nbsp; · &nbsp;
+  <a href="#documentation-and-contributing">Documentation</a>
 </p>
 
-Terminal Hub is a Windows-first, Linux-capable native multi-session terminal for developers who keep several projects, dev servers, and command-line tools open at once. Live thumbnails show what each session is doing before you switch, split view puts two sessions side by side, and file, log, process, and SSH panels unfold when you need them.
+A dev server, a build, a spare shell. **Keep them in view.** Terminal Hub is a Windows-first native terminal that brings live session previews, split panes, and everyday tools into one workspace. Built with Avalonia and .NET, with real PTYs on Windows and Linux.
 
-[Workspace](#the-workspace) · [Quick start](#quick-start) · [Keyboard shortcuts](#keyboard-shortcuts) · [Development](#development-and-checks) · [Documentation](#documentation-and-contributing)
+<a href="docs/readme/workspace.png"><img src="docs/readme/workspace.png" width="1440" alt="Dark glass workspace: live session shelf on the left, focused terminal in the center, and an action dock below"></a>
 
-> [!NOTE]
-> Terminal Hub is in active development and there is no signed release build yet — the supported way to run it is from source below. Windows is the primary platform; Linux runs on a real PTY but sees less daily use, and macOS is not a verified platform. Restoring a workspace starts fresh shell processes: the layout comes back, running programs and their progress do not.
-
-![Terminal Hub in the dark glass theme: live session thumbnails on the left, the focused terminal in the center, and the action dock at the bottom](docs/readme/workspace.png)
-
-<p align="center"><sub>The workspace image is rendered from current source through Avalonia Headless + Skia, using a mock PTY and sample terminal output — it is not a capture of a real CLI session. <a href="docs/readme/README.md">Asset sources and how to regenerate them</a></sub></p>
-
-## A place for every session
-
-A dev server is running, logs need watching, and a spare shell handles one-off commands. Terminal Hub keeps those sessions in one workspace, so you can see their contents before deciding where to go.
-
-| What you want to do | What the workspace provides |
-| --- | --- |
-| Find the task that is still running | Live terminal thumbnails in the sidebar; click to switch, drag to reorder |
-| Work in two sessions at once | Left/right split, each pane labeled with its session name; click a pane to give it focus |
-| Temporarily enlarge one task | Expand a thumbnail into the main area, or pop a session out into its own window |
-| See what is behind a command | On-demand file, log, process, SSH, and output panels |
-| Adjust the working environment | Four themes, monospace font and size settings, and three dock display modes |
-| Come back to a familiar layout | Saved session order, names, directories, shells, split state, and the active session |
-
-Workspace restore re-creates shell processes; the programs that were running, and their progress, are not restored with the layout.
+<p align="center"><sub>THE WORKSPACE · Dark Glass<br>Native Avalonia Headless render with a mock PTY and sample output. <a href="docs/readme/README.md">Image sources</a></sub></p>
 
 <a id="the-workspace"></a>
 
-## The workspace
+## 01 / A place for every session
 
-### Sessions on the left, work in front
+See what is happening before you switch. Bring a task forward when it needs your attention, then return it to the shelf without restarting its process.
 
-Dragged thumbnails follow the pointer while neighboring cards slide aside, then settle into their new slot. Switching sessions uses a macOS Dock-inspired expansion transition. Thumbnails only preview content — they never resize the terminal's PTY grid to fit themselves.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>See it live</h3>
+      <p>Real-time terminal thumbnails keep the whole workspace visible. Drag a card to reorder it; neighboring cards slide into place.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Bring it forward</h3>
+      <p>A Dock-inspired transition opens the selected session. Pop a session into its own window when it needs more room.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Keep tools close</h3>
+      <p>Files, logs, processes, SSH, and output panels are there when needed. The bottom dock can hide, stay visible, or disappear.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Return to your layout</h3>
+      <p>Remember session order, names, directories, shells, and split state. Restore the layout on the next launch with fresh shell processes.</p>
+    </td>
+  </tr>
+</table>
 
-Click **Split** in the toolbar to place two sessions side by side. Click the pane you want to operate, then a thumbnail, to swap that pane's session. Moving between panes leaves the other side untouched while the sidebar tracks the active session.
+### Two sessions. One clear focus.
 
-![Split view in the light theme: two panes labeled with their session names, the focused pane marked by a highlighted border](docs/readme/split.png)
+Click **Split** to work side by side. Each pane has its own name and input target. Click a pane, then a thumbnail, to assign a session to it. Switching focus keeps the main surface still; the shelf follows your selection.
 
-### Four themes, one set of habits
+<a href="docs/readme/split.png"><img src="docs/readme/split.png" width="1440" alt="White theme split view: two named terminal panes with the active pane outlined"></a>
 
-**Dark glass, black, white, and paper** cover the main window, terminal, thumbnails, menus, and settings. Collapsed session cards keep their own theme details: glass highlights, fine black outlines, soft white shadows, and stacked paper edges.
+<p align="center"><sub>SIDE BY SIDE · White<br>Independent sessions, a labeled pane for each, and a visible focus indicator.</sub></p>
 
-Settings use a grouped layout for theme, toolbar, output area, dock, fonts, and the shell new terminals start with. The dock appears near the bottom edge by default and can be pinned on or off.
+<a id="themes"></a>
 
-![Grouped settings in the paper theme: colors, workspace toggles, dock, and terminal font share one warm palette](docs/readme/settings.png)
+## 02 / Make the workspace yours
+
+Four palettes, carried through the terminal, shelf, menus, and settings. Glass gets reflected highlights; black gets fine outlines; white gets soft shadows; paper gets layered edges.
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/readme/workspace.png"><img src="docs/readme/theme-glass.svg" width="580" alt="Dark glass: depth and light"></a><p align="center"><strong>Dark Glass</strong></p></td>
+    <td width="50%"><a href="docs/readme/black.png"><img src="docs/readme/theme-black.svg" width="580" alt="Black: quiet focus"></a><p align="center"><strong>Black</strong></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/readme/split.png"><img src="docs/readme/theme-white.svg" width="580" alt="White: space to breathe"></a><p align="center"><strong>White</strong></p></td>
+    <td width="50%"><a href="docs/readme/settings.png"><img src="docs/readme/theme-paper.svg" width="580" alt="Paper: a warmer workspace"></a><p align="center"><strong>Paper</strong></p></td>
+  </tr>
+</table>
+
+<p align="center"><sub>Palette studies · Click a theme to see its native render.</sub></p>
+
+Choose your monospace font, adjust its size, and decide which panels stay in view. Grouped settings keep appearance and workspace controls together.
 
 <details>
-<summary>Show the black theme</summary>
+<summary><strong>Inside Settings</strong> — open the Paper theme preview</summary>
 
-![Black theme: dark terminal background, restrained card outlines, and a light blue active indicator](docs/readme/black.png)
+![Paper theme settings: grouped appearance, workspace, dock, and font controls](docs/readme/settings.png)
 
 </details>
 
-### Terminal habits that carry over
+### Familiar keys. Real shells.
 
-Select with the mouse and copy with `Ctrl+Shift+C`; `Ctrl+C` stays with the running program. Chinese IME positioning, history scrolling, text search, and multi-line paste are supported. When an application enables the terminal mouse protocol, hold `Shift` to use the terminal's own selection and scrolling.
+Drag to select, `Ctrl+Shift+C` to copy, and `Ctrl+C` to interrupt. Chinese IME positioning, history scrolling, text search, and multi-line paste are supported. Hold `Shift` to use local selection and scrolling when an app enables mouse reporting.
 
-Tools like Claude Code and Codex CLI install and run inside the shell as usual. For verified keyboard protocols, mouse behavior, and the tested scope, see [CLI interaction compatibility](docs/cli-compatibility.md).
+Claude Code, Codex CLI, and other tools install and run inside your shell. See [CLI interaction compatibility](docs/cli-compatibility.md) for the protocols and scenarios already verified.
 
 <a id="quick-start"></a>
 
-## Quick start
+## 03 / From source to your first session
+
+<p align="center">
+  <img src="docs/readme/typing.svg" width="470" alt="Illustrated terminal typing the restore, build, and run commands">
+</p>
+
+> **Development preview.** There is no signed release build yet; start from source below. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target.
 
 ### Windows
 
@@ -110,11 +137,11 @@ New sessions also default to `pwsh`; with only Bash installed, choose `bash` in 
 2. Press `Ctrl+Shift+N` for a new session and click thumbnails to switch; processes in the original session keep running.
 3. Click **Split** and try typing on each side; the pane name and highlighted border show which session receives input.
 
-The app runs as a single instance. After rebuilding, exit the old instance normally before starting the new build.
+Restoring a workspace starts fresh processes; running programs and their progress are not restored. The app runs as a single instance. After rebuilding, exit the old instance normally before starting the new build.
 
 <a id="keyboard-shortcuts"></a>
 
-## Keyboard shortcuts
+## 04 / Keep your hands on the keys
 
 | Action | Shortcut |
 | --- | --- |
@@ -142,7 +169,7 @@ Settings and workspace layout stay on the local machine. Changing the shell in S
 
 <a id="development-and-checks"></a>
 
-## Development and checks
+## 05 / Keep building
 
 The project is **Avalonia 11 + .NET 8**. Windows sessions run on ConPTY, Linux on `forkpty`; VT parsing, the screen buffer, and session management live in a standalone core project.
 
@@ -183,7 +210,7 @@ Output goes to `artifacts/publish/linux-x64/`. Self-contained builds carry the .
 
 <a id="documentation-and-contributing"></a>
 
-## Documentation and contributing
+### Explore the project and contribute
 
 - [Development guide](AGENTS.md): code entry points, background on known issues, and how to verify changes (Chinese).
 - [CLI interaction compatibility](docs/cli-compatibility.md): paste, mouse, shortcuts, and the verified scope.
@@ -194,6 +221,11 @@ Issues and improvement suggestions are welcome at [GitHub Issues](https://github
 
 Current focus areas are Unicode graphemes and cell widths, cursor and IME positioning, and multi-session performance.
 
-## License
+---
 
-[MIT](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
+<p align="center">
+  <img src="docs/readme/logo.svg" width="240" alt="Terminal Hub">
+</p>
+<p align="center"><strong>A place for your terminals. Space for your work.</strong></p>
+<p align="center"><a href="#quick-start">Get started</a> · <a href="https://github.com/coffe01-10/TerminalHub/issues">Report an issue</a> · <a href="LICENSE">MIT License</a></p>
+<p align="center"><sub>Copyright © 2026 Jinhong Chen (coffe01-10)</sub></p>

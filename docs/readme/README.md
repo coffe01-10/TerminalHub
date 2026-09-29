@@ -4,6 +4,7 @@
 
 ## 来源
 
+- `hero-en.svg`、`hero-zh.svg` 是双语品牌横幅；`theme-glass.svg`、`theme-black.svg`、`theme-white.svg`、`theme-paper.svg` 是可点击的主题配色示意图。由 `generate_showcase.py` 生成，沿用既有字标路径和三窗徽章。窗口图形用于品牌与配色说明，不是产品运行截图。所有 SVG 自包含，不依赖图片托管或外部字体。
 - `logo.svg` 由本目录的 `generate_logo.py` 生成。徽章沿用应用图标的三窗枢纽造型（`src/TerminalHub.App/Assets/terminal-hub-icon.png`），字标为脚本绘制的 5×7 像素字形；墨色通过 `prefers-color-scheme` 随明暗主题变化。
 - `typing.svg` 由本目录的 `generate_typing.py` 生成。迷你终端窗口用 SMIL textPath 逐字敲入还原、构建与启动命令，随光标跟踪闪烁、循环清屏重播；机制参考 readme-typing-svg（DenverCoder1），本地生成而非调用外部服务。内容为示意动画，不是终端录屏。
 - `runtime.svg`、`ui.svg`、`platform.svg`、`license.svg` 由本目录的 `generate_badges.py` 生成。采用项目的深蓝与强调色，不依赖外部徽章服务；徽章描述技术栈与许可证，不代表 CI 或兼容性测试结果。
@@ -12,12 +13,13 @@
 
 ## 更新
 
-仓库根目录运行以下命令重新生成 logo、打字动画与徽章：
+仓库根目录运行以下命令重新生成品牌横幅、主题卡片、logo、打字动画与徽章：
 
 ```powershell
 python docs/readme/generate_logo.py
 python docs/readme/generate_typing.py
 python docs/readme/generate_badges.py
+python docs/readme/generate_showcase.py
 ```
 
 需要更新界面图时，将截图输出到一个临时目录，再运行已有的主题渲染用例：

@@ -1,82 +1,109 @@
 <p align="center">
-  <img src="docs/readme/logo.svg" width="520" alt="Terminal Hub：三扇终端窗口汇聚成枢纽的徽章与像素字标">
+  <img src="docs/readme/hero-zh.svg" width="1200" alt="Terminal Hub：多个终端，一个工作空间。支持实时预览、并排分屏和四种主题的原生终端工作空间。">
 </p>
+
+<p align="center"><a href="README.md">English</a> / <strong>简体中文</strong></p>
+
 <p align="center">
-  <a href="README.md">English</a> · <strong>简体中文</strong>
+  <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt=".NET 8"></a>
+  <a href="src/TerminalHub.App"><img src="docs/readme/ui.svg" height="24" alt="Avalonia 11"></a>
+  <a href="scripts/run-linux.sh"><img src="docs/readme/platform.svg" height="24" alt="Windows / Linux"></a>
+  <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="MIT License"></a>
 </p>
+
 <p align="center">
-  <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt="运行环境：.NET 8"></a>
-  <a href="src/TerminalHub.App"><img src="docs/readme/ui.svg" height="24" alt="界面：Avalonia 11 原生界面"></a>
-  <a href="scripts/run-linux.sh"><img src="docs/readme/platform.svg" height="24" alt="平台：Windows 优先，支持 Linux"></a>
-  <a href="LICENSE"><img src="docs/readme/license.svg" height="24" alt="许可证：MIT"></a>
-</p>
-<p align="center"><strong>多个终端，一个工作空间。</strong></p>
-<p align="center">
-  <img src="docs/readme/typing.svg" width="470" alt="终端窗口中逐字输入还原、构建与启动命令的循环动画">
+  <a href="#quick-start"><strong>开始使用 →</strong></a> &nbsp; · &nbsp;
+  <a href="#workspace">探索工作空间</a> &nbsp; · &nbsp;
+  <a href="#themes">选择你的主题</a> &nbsp; · &nbsp;
+  <a href="#docs">开发文档</a>
 </p>
 
-Terminal Hub 是一款 **Windows 优先、支持 Linux 的原生多会话终端**，面向同时使用多个项目、开发服务和命令行工具的开发者。实时缩略图帮你找到会话，分屏让两个任务并排工作，文件、日志和进程工具随时可以展开。
+开发服务、构建任务、随手备用的 Shell，**都在视线之内。** Terminal Hub 是一款 Windows 优先的原生终端，把实时会话预览、分屏与常用工具放进同一个工作空间。基于 Avalonia 与 .NET，Windows 和 Linux 均通过真实 PTY 运行 Shell。
 
-[界面与操作](#workspace) · [快速开始](#quick-start) · [常用快捷键](#shortcuts) · [参与开发](#development) · [文档](#docs)
+<a href="docs/readme/workspace.png"><img src="docs/readme/workspace.png" width="1440" alt="深蓝玻璃主题：左侧实时会话缩略图、中央活动终端和底部操作 Dock"></a>
 
-> [!NOTE]
-> Terminal Hub 正在活跃开发中，目前还没有提供签名的发布版本——从源码构建运行是现阶段的使用方式。Windows 是首要平台；Linux 使用真实 PTY 但日常验证较少，macOS 尚不是已验证平台。恢复工作区会重新启动 Shell 进程：布局会回来，上次运行的程序及其进度不会。
-
-![深蓝玻璃主题的 Terminal Hub：左侧实时会话缩略图、中央终端与底部操作 Dock](docs/readme/workspace.png)
-
-<p align="center"><sub>本页界面图由当前源码通过 Avalonia Headless + Skia 渲染，使用 Mock PTY 与示例终端输出，不是真实 CLI 会话的录屏。<a href="docs/readme/README.md">素材来源与更新方式</a></sub></p>
-
-## 让每个会话都有位置
-
-开发服务正在运行，另一边需要查看日志，还要留一个 Shell 执行临时命令。Terminal Hub 把这些会话放在同一工作空间里，让你切换之前就能看到它们的内容。
-
-| 日常操作 | Terminal Hub 的处理方式 |
-| --- | --- |
-| 找到正在运行的任务 | 左侧缩略图展示实时终端内容；点击切换，拖动调整顺序 |
-| 同时操作两个会话 | 左右分屏，各自显示名称；点击窗格立即切换输入焦点 |
-| 临时放大一个任务 | 从缩略图展开到主区域，或将会话弹出为独立窗口 |
-| 查看命令背后的信息 | 按需展开文件、日志、进程、SSH 和输出面板 |
-| 调整自己的工作环境 | 四种主题、等宽字体与字号设置，以及三种 Dock 显示模式 |
-| 回到熟悉的布局 | 保存会话顺序、名称、目录、Shell、分屏与活动会话 |
-
-工作区恢复会重新启动 Shell 进程；上次运行的程序及其进度不会随布局一起恢复。
+<p align="center"><sub>工作空间 · 深蓝玻璃<br>当前原生界面的 Avalonia Headless 渲染，使用 Mock PTY 与示例输出。<a href="docs/readme/README.md">素材来源</a></sub></p>
 
 <a id="workspace"></a>
 
-## 界面与操作
+## 01 / 每个会话，都有自己的位置
 
-### 会话在左，工作在前
+切换之前，先看到它在做什么。需要操作时让它来到前台，暂时离开时留在侧栏，进程继续运行。
 
-缩略图拖动时跟随指针，相邻卡片平滑让位，松手后落入新位置。切换会话采用受 macOS Dock 启发的展开过渡；缩略图仅预览内容，动画不会为了自身尺寸调整终端的 PTY 网格。
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>看见正在发生的事</h3>
+      <p>缩略图实时呈现终端内容。拖动卡片调整顺序，相邻会话平滑让位，松手后落入新位置。</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>让当前任务来到前台</h3>
+      <p>受 Dock 启发的展开过渡连接缩略图与主区域。需要更多空间时，也可以把会话弹出为独立窗口。</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>工具留在手边</h3>
+      <p>文件、日志、进程、SSH 和输出面板按需展开。底部 Dock 支持自动隐藏、始终显示和完全隐藏。</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>回到熟悉的布局</h3>
+      <p>记住会话顺序、名称、目录、Shell 与分屏状态。下次启动时恢复工作布局，并重新创建 Shell 进程。</p>
+    </td>
+  </tr>
+</table>
 
-点击工具栏的 **「分屏」**，把两个会话并排放置。先点击要操作的窗格，再点左侧缩略图，可为该窗格换一个会话。左右窗格切换时主区域保持静止，侧栏更新活动状态。
+### 两个终端，一个明确的焦点
 
-![亮白主题的双终端分屏：左右窗格分别显示会话名称，边框标示当前输入焦点](docs/readme/split.png)
+点击 **「分屏」**，让两个会话并排工作。每个窗格都有名称和独立的输入目标。先点窗格，再点左侧缩略图，即可为它切换会话。左右切换时主区域保持静止，侧栏跟随焦点更新。
 
-### 四种主题，一套工作习惯
+<a href="docs/readme/split.png"><img src="docs/readme/split.png" width="1440" alt="亮白主题分屏：两个具名终端并排显示，高亮边框标示当前窗格"></a>
 
-**深蓝玻璃、深黑、亮白、纸张**覆盖主窗口、终端、缩略图、菜单和设置。未展开的卡片使用各自的主题细节：玻璃高光、深黑细描边、亮白柔和阴影和纸张叠页。
+<p align="center"><sub>并排工作 · 亮白<br>会话各自独立，名称始终可见，输入焦点一目了然。</sub></p>
 
-设置采用分组布局，可调整主题、工具栏、输出区、Dock、字体与新终端使用的 Shell。Dock 默认靠近底部时显示，也可改为始终显示或隐藏。
+<a id="themes"></a>
 
-![纸张主题的分组设置面板：配色、工作空间开关、Dock 与终端字体保持一致的暖色](docs/readme/settings.png)
+## 02 / 给工作空间，换一种心情
+
+四种配色，从终端延伸到缩略图、菜单和设置。玻璃带着高光，深黑保留细描边，亮白拥有柔和阴影，纸张露出层叠的页边。
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/readme/workspace.png"><img src="docs/readme/theme-glass.svg" width="580" alt="深蓝玻璃：高光与层次"></a><p align="center"><strong>深蓝玻璃</strong></p></td>
+    <td width="50%"><a href="docs/readme/black.png"><img src="docs/readme/theme-black.svg" width="580" alt="深黑：克制与专注"></a><p align="center"><strong>深黑</strong></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/readme/split.png"><img src="docs/readme/theme-white.svg" width="580" alt="亮白：轻盈与留白"></a><p align="center"><strong>亮白</strong></p></td>
+    <td width="50%"><a href="docs/readme/settings.png"><img src="docs/readme/theme-paper.svg" width="580" alt="纸张：暖色与叠页"></a><p align="center"><strong>纸张</strong></p></td>
+  </tr>
+</table>
+
+<p align="center"><sub>主题配色示意 · 点击卡片查看对应的原生界面图。</sub></p>
+
+选择喜欢的等宽字体、调整字号，再决定哪些面板常驻。分组设置把外观与工作空间选项放在一起，随手就能找到。
 
 <details>
-<summary>查看深黑主题</summary>
+<summary><strong>走进设置</strong> — 展开纸张主题预览</summary>
 
-![深黑主题：深色终端背景、克制的卡片描边与浅蓝色活动状态](docs/readme/black.png)
+![纸张主题设置：外观、工作空间、Dock 和字体组成统一的暖色分组面板](docs/readme/settings.png)
 
 </details>
 
-### 保留终端里的操作习惯
+### 熟悉的按键，真实的 Shell
 
-鼠标拖选后使用 `Ctrl+Shift+C` 复制，`Ctrl+C` 保留给运行中的程序。支持中文输入法定位、历史滚动、文本搜索和多行粘贴。应用启用终端鼠标协议时，按住 `Shift` 可使用终端自身的选择与滚动。
+拖选后用 `Ctrl+Shift+C` 复制，`Ctrl+C` 留给程序中断。支持中文输入法定位、历史滚动、文本搜索和多行粘贴。应用启用鼠标协议时，按住 `Shift` 仍可使用终端自身的选择与滚动。
 
-Claude Code、Codex CLI 等工具可在 Shell 内单独安装和运行。具体键盘协议、鼠标行为及已经验证的范围，见 [CLI 交互适配](docs/cli-compatibility.md)。
+Claude Code、Codex CLI 等工具可以在 Shell 内单独安装和运行。已验证的协议与具体交互范围，见 [CLI 交互适配](docs/cli-compatibility.md)。
 
 <a id="quick-start"></a>
 
-## 快速开始
+## 03 / 从源码，到第一个会话
+
+<p align="center">
+  <img src="docs/readme/typing.svg" width="470" alt="逐字输入还原、构建与启动命令的终端示意动画">
+</p>
+
+> **开发预览。** 当前尚未提供签名发布版本，请按下面的步骤从源码运行。Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。
 
 ### Windows
 
@@ -110,11 +137,11 @@ bash scripts/run-linux.sh
 2. 使用 `Ctrl+Shift+N` 新建会话，点击缩略图切换；原会话中的进程继续运行。
 3. 点击「分屏」，尝试在两侧分别输入；通过窗格名称与高亮边框确认当前会话。
 
-应用采用单实例运行。重新编译后，请先正常退出旧实例，再启动新版本。
+工作区恢复会创建新进程，不会恢复上次程序的运行进度。应用采用单实例运行。重新编译后，请先正常退出旧实例，再启动新版本。
 
 <a id="shortcuts"></a>
 
-## 常用快捷键
+## 04 / 让手留在键盘上
 
 | 操作 | 快捷键 |
 | --- | --- |
@@ -142,7 +169,7 @@ bash scripts/run-linux.sh
 
 <a id="development"></a>
 
-## 开发与打包
+## 05 / 继续构建
 
 项目采用 **Avalonia 11 + .NET 8**。Windows 使用 ConPTY，Linux 使用 `forkpty`；终端解析、屏幕缓冲和会话管理位于独立的 Core 项目。
 
@@ -183,7 +210,7 @@ bash scripts/publish-linux.sh
 
 <a id="docs"></a>
 
-## 文档与贡献
+### 深入了解与参与贡献
 
 - [开发指引](AGENTS.md)：代码入口、已知问题背景与验证方式。
 - [CLI 交互适配](docs/cli-compatibility.md)：粘贴、鼠标、快捷键和兼容性验证范围。
@@ -194,6 +221,11 @@ bash scripts/publish-linux.sh
 
 当前开发重点包括 Unicode 字素与格宽、光标与输入法定位，以及多会话性能。
 
-## 许可证
+---
 
-[MIT](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
+<p align="center">
+  <img src="docs/readme/logo.svg" width="240" alt="Terminal Hub">
+</p>
+<p align="center"><strong>把窗口留给任务，把注意力留给工作。</strong></p>
+<p align="center"><a href="#quick-start">开始使用</a> · <a href="https://github.com/coffe01-10/TerminalHub/issues">反馈问题</a> · <a href="LICENSE">MIT 许可证</a></p>
+<p align="center"><sub>Copyright © 2026 Jinhong Chen (coffe01-10)</sub></p>
