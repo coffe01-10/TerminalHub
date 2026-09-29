@@ -52,6 +52,27 @@ public sealed class TerminalEmulator : IDisposable
         SendText(Buffer.BracketedPaste ? "\x1b[200~" + text + "\x1b[201~" : text.Replace('\n', '\r'));
     }
 
+    /// <summary>xterm mouse report; coordinates are zero-based terminal cells.</summary>
+    public void SendMouse(int button, int column, int row, bool released = false,
+        bool motion = false, int modifiers = 0)
+    {
+        var tracking = Buffer.MouseTracking;
+        if (tracking == 0 || (motion && (tracking == 1000 || (tracking == 1002 && button == 3)))) return;
+        var code = button | modifiers | (motion ? 32 : 0);
+        var x = Math.Clamp(column, 0, Buffer.Columns - 1) + 1;
+        var y = Math.Clamp(row, 0, Buffer.Rows - 1) + 1;
+        if (Buffer.SgrMouse)
+            SendText($"\x1b[<{code};{x};{y}{(released ? 'm' : 'M')}");
+        else if (x <= 223 && y <= 223)
+            SendBytes([0x1b, (byte)'[', (byte)'M', (byte)((released ? 3 | modifiers : code) + 32),
+                (byte)(x + 32), (byte)(y + 32)]);
+    }
+
+    public void SendFocus(bool focused)
+    {
+        if (Buffer.FocusReporting) SendText(focused ? "\x1b[I" : "\x1b[O");
+    }
+
     /// <summary>Resize the grid and the underlying PTY.</summary>
     public void Resize(int columns, int rows)
     {

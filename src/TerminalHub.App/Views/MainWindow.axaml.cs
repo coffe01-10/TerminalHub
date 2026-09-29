@@ -113,11 +113,23 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             if (!_stageReady || generation != _selectionGeneration || !IsVisible) return;
+            if (Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
+            // Apply a shelf scroll before reading the card's visible origin.
+            SessionShelf.UpdateLayout();
             var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
                 .FirstOrDefault(c => ReferenceEquals(c.DataContext, Vm.ActiveCard));
-            var origin = card?.TranslatePoint(new Point(0, card.Bounds.Height / 2), StageWindow);
-            StageWindow.ActivateFrom(((origin?.Y ?? StageWindow.Bounds.Height / 2) - StageWindow.Bounds.Height / 2) * .3);
-            if (Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
+            // Measure in the shared parent: StageWindow itself is transformed
+            // during a flight, so translating into it would distort the origin.
+            if (card is not null && Vm.ActiveSession is not null)
+            {
+                var corners = new[] { new Point(), new Point(card.Bounds.Width, 0),
+                    new Point(0, card.Bounds.Height), new Point(card.Bounds.Width, card.Bounds.Height) }
+                    .Select(p => card.TranslatePoint(p, StageLayout)!.Value).ToArray();
+                var left = corners.Min(p => p.X);
+                var top = corners.Min(p => p.Y);
+                StageWindow.ActivateFrom(new Rect(left - StageWindow.Bounds.X, top - StageWindow.Bounds.Y,
+                    corners.Max(p => p.X) - left, corners.Max(p => p.Y) - top));
+            }
             if (IsActive && !Vm.IsSplit && Vm.ActiveSession is not null) MainTerminal.Focus();
         });
     }
@@ -435,7 +447,9 @@ public partial class MainWindow : Window
     /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F2 && e.Source is not TextBox) { OnRenameActive(sender, e); return; }
+        // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
+        if (e.Key == Key.F2 && e.KeyModifiers == KeyModifiers.None
+            && e.Source is not (TextBox or TerminalView)) { OnRenameActive(sender, e); return; }
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         if (e.Key == Key.Tab)
@@ -520,15 +534,6 @@ public partial class MainWindow : Window
             && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             Vm.Logs.CopySelectedCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
-    private void OnAssistantInputKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            Vm.Assistant.SubmitTaskCommand.Execute(null);
             e.Handled = true;
         }
     }

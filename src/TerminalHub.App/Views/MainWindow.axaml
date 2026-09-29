@@ -3,7 +3,6 @@
         xmlns:vm="using:TerminalHub.App.ViewModels"
         xmlns:ctl="using:TerminalHub.App.Controls"
         xmlns:mon="using:TerminalHub.Core.Monitoring"
-        xmlns:ai="using:TerminalHub.Core.AI"
         xmlns:files="using:TerminalHub.Core.Files"
         xmlns:ssh="using:TerminalHub.Core.Ssh"
         xmlns:conv="using:Avalonia.Data.Converters"
@@ -150,7 +149,7 @@
         <!-- ===== CENTER ===== -->
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
-                BoxShadow="{DynamicResource SurfaceShadow}" RenderTransformOrigin="15%,50%">
+                BoxShadow="{DynamicResource SurfaceShadow}">
           <Grid RowDefinitions="46,34,*,Auto" Margin="8">
 
             <!-- The active window has one title; other sessions live on the shelf. -->
@@ -160,7 +159,7 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <TextBlock Text="{Binding ActiveCard.Name}" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                <TextBlock Text="{Binding ActiveCard.Name}" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Background="{DynamicResource UiRaised}" CornerRadius="5" Padding="7,3"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
                   <TextBlock Text="前台" FontSize="9" Foreground="{DynamicResource UiInk}"/>
@@ -479,7 +478,7 @@
           </Grid>
         </ctl:StageSurface>
 
-        <!-- ===== RIGHT: Processes/Files/Logs/SSH/Codex ===== -->
+        <!-- ===== RIGHT: Processes/Files/Logs/SSH ===== -->
         <Border Grid.Column="4" CornerRadius="{DynamicResource SurfaceCorner}" IsVisible="{Binding InspectorVisible}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                 BoxShadow="{DynamicResource SurfaceShadow}">
@@ -510,7 +509,6 @@
               <ListBoxItem>Files</ListBoxItem>
               <ListBoxItem>Logs</ListBoxItem>
               <ListBoxItem>SSH</ListBoxItem>
-              <ListBoxItem>Codex</ListBoxItem>
             </ListBox>
 
             <Panel Grid.Row="1" Margin="0,4,0,0">
@@ -1086,108 +1084,6 @@
                            Text="连接使用本机 ssh 命令:密码 / 密钥确认直接在终端会话中完成;密钥建议用 ssh-agent 或 ~/.ssh/config。"/>
               </Grid>
 
-              <!-- ===== Codex assistant ===== -->
-              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
-                    RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-                <Grid ColumnDefinitions="*,Auto" Margin="2,2">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource UiRaised}">
-                      <TextBlock Text="⌘" FontSize="12" Foreground="{DynamicResource UiAccent}"
-                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <TextBlock Text="Codex 助手" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-                  </StackPanel>
-                  <Button Grid.Column="1" Content="⚙" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource UiFaint}"
-                          ToolTip.Tip="设置" Command="{Binding DockSelectCommand}" CommandParameter="5"/>
-                </Grid>
-
-                <Border Grid.Row="1" CornerRadius="8" Background="{DynamicResource UiSurface}" Padding="8" Margin="0,4">
-                  <TextBlock Text="{Binding Assistant.StatusText}" FontSize="11" Foreground="{DynamicResource UiMuted}"
-                             TextWrapping="Wrap" LineHeight="16"/>
-                </Border>
-
-                <StackPanel Grid.Row="2" Spacing="5" Margin="0,2">
-                  <ItemsControl ItemsSource="{Binding Assistant.Checklist}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="ai:ChecklistItem">
-                        <Button Background="Transparent" BorderThickness="0" Padding="0"
-                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
-                                Command="{Binding $parent[ItemsControl].DataContext.Assistant.ToggleItemCommand}"
-                                CommandParameter="{Binding}">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Ellipse Width="14" Height="14" VerticalAlignment="Center"
-                                     Stroke="{Binding State, Converter={x:Static vm:ChecklistRingConverter.Instance}}"
-                                     StrokeThickness="1.5"
-                                     Fill="{Binding State, Converter={x:Static vm:ChecklistFillConverter.Instance}}"/>
-                            <TextBlock Text="{Binding Text}" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="{Binding State, Converter={x:Static vm:ChecklistTextConverter.Instance}}"/>
-                          </StackPanel>
-                        </Button>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-
-                <ScrollViewer Grid.Row="3" MaxHeight="110" VerticalScrollBarVisibility="Auto" Margin="0,2"
-                              IsVisible="{Binding Assistant.HasMessages}">
-                  <ItemsControl ItemsSource="{Binding Assistant.Messages}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="ai:ChatMessage">
-                        <Grid ColumnDefinitions="42,*" Margin="0,1">
-                          <TextBlock Text="{Binding Sender}" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Top"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="10" Foreground="{DynamicResource UiMuted}"
-                                     TextWrapping="Wrap"/>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
-
-                <DockPanel Grid.Row="4" Margin="0,6,0,0">
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
-                    <TextBlock Text="建议任务" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                    <Border Grid.Column="1" CornerRadius="6" Background="{DynamicResource UiRaised}" Padding="8,2">
-                      <TextBlock Text="点击加入清单" FontSize="10" Foreground="{DynamicResource UiMuted}"/>
-                    </Border>
-                  </Grid>
-                  <ScrollViewer VerticalScrollBarVisibility="Hidden">
-                    <ItemsControl ItemsSource="{Binding Assistant.Suggestions}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="ai:SuggestedTask">
-                          <Button Background="Transparent" BorderThickness="0" Padding="0"
-                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Cursor="Hand"
-                                  Command="{Binding $parent[ItemsControl].DataContext.Assistant.RunSuggestionCommand}"
-                                  CommandParameter="{Binding}">
-                            <Border CornerRadius="8" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}"
-                                    BorderThickness="1" Padding="8" Margin="0,0,0,6">
-                              <Grid ColumnDefinitions="Auto,*">
-                                <Border Width="24" Height="24" CornerRadius="6" Background="{DynamicResource UiRaised}" VerticalAlignment="Top">
-                                  <TextBlock Text="{Binding Icon}" FontSize="11" Foreground="{DynamicResource UiAccent}"
-                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="1">
-                                  <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                                  <TextBlock Text="{Binding Description}" FontSize="9.5" Foreground="{DynamicResource UiFaint}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                              </Grid>
-                            </Border>
-                          </Button>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </ScrollViewer>
-                </DockPanel>
-
-                <Grid Grid.Row="5" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                  <TextBox Text="{Binding Assistant.TaskInput}" Watermark="描述你想做的任务…"
-                           Background="{DynamicResource UiRaised}" CornerRadius="8" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
-                           Foreground="{DynamicResource UiInk}" Padding="10,5" FontSize="11"
-                           KeyDown="OnAssistantInputKeyDown"/>
-                  <Button Grid.Column="1" Content="➤" Margin="6,0,0,0" Width="34" CornerRadius="8"
-                          Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
-                          Command="{Binding Assistant.SubmitTaskCommand}"/>
-                </Grid>
-              </Grid>
             </Panel>
           </Grid>
         </Border>

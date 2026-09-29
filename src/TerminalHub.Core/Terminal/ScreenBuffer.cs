@@ -10,6 +10,9 @@ public sealed class ScreenBuffer
 {
     public object SyncRoot { get; } = new();
     public bool BracketedPaste { get; set; }
+    public int MouseTracking { get; set; } // 0, 1000 (click), 1002 (drag), 1003 (all motion)
+    public bool SgrMouse { get; set; }
+    public bool FocusReporting { get; set; }
     public bool SynchronizedOutput { get; private set; }
     private long _syncStarted;
     private TerminalFrame? _heldFrame;

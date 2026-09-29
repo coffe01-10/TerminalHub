@@ -82,14 +82,14 @@ public class UiSmokeTests
         Assert.NotEmpty(vm.Files.Breadcrumbs);
         window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "files.png"));
 
-        // Codex assistant tab
-        vm.SelectedRightTab = 4;
+        // SSH tab (the former local Codex assistant has been removed).
+        vm.SelectedRightTab = 3;
         await Task.Delay(120);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "assistant.png"));
+        window.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "ssh.png"));
 
         Assert.True(File.Exists(Path.Combine(outDir, "dashboard.png")));
         Assert.True(File.Exists(Path.Combine(outDir, "files.png")));
-        Assert.True(File.Exists(Path.Combine(outDir, "assistant.png")));
+        Assert.True(File.Exists(Path.Combine(outDir, "ssh.png")));
         window.Close();
     }
 
@@ -242,60 +242,4 @@ public class UiSmokeTests
         window.Close();
     }
 
-    /// <summary>Codex: NL submit + suggestion insertion + checklist toggle, all local.</summary>
-    [AvaloniaFact]
-    public async Task Codex_NlSubmit_Suggestion_Toggle()
-    {
-        PtySessionFactory.UseMock = true;
-        var window = new MainWindow { Width = 1200, Height = 800 };
-        window.Show();
-        await Task.Delay(400);
-        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
-
-        // NL submit via the shared query path (right-panel input + "?"-prompt).
-        var itemsBefore = vm.Assistant.Checklist.Count;
-        await vm.Assistant.SubmitQueryAsync("帮我跑一遍测试");
-        await Task.Delay(200);
-        Assert.True(vm.Assistant.Checklist.Count > itemsBefore);
-        Assert.NotEmpty(vm.Assistant.Messages);
-        Assert.Contains(vm.Dashboard.OutputLog, l => l.Message.Contains("Codex:"));
-        Assert.Contains(vm.Dashboard.OutputLog, l => l.Message.Contains("Codex 收到任务"));
-
-        // Suggestion click → checklist item + Output info line.
-        itemsBefore = vm.Assistant.Checklist.Count;
-        await vm.Assistant.RunSuggestionCommand.ExecuteAsync(vm.Assistant.Suggestions[0]);
-        await Task.Delay(200);
-        Assert.Equal(itemsBefore + 1, vm.Assistant.Checklist.Count);
-
-        // Checklist toggle → progress follows real state.
-        var doneBefore = vm.Assistant.Checklist.Count(c => c.State == TerminalHub.Core.AI.ChecklistState.Done);
-        var pending = vm.Assistant.Checklist
-            .First(c => c.State == TerminalHub.Core.AI.ChecklistState.Pending);
-        vm.Assistant.ToggleItemCommand.Execute(pending);
-        await Task.Delay(200);
-        Assert.Equal(doneBefore + 1,
-            vm.Assistant.Checklist.Count(c => c.State == TerminalHub.Core.AI.ChecklistState.Done));
-        Assert.True(vm.Assistant.ProgressPercent is null or >= 0 and <= 100);
-        window.Close();
-    }
-
-    /// <summary>Middle "?" prompt routes to the local assistant, not the shell.</summary>
-    [AvaloniaFact]
-    public async Task CommandInput_QuestionPrefix_RoutesToCodex()
-    {
-        PtySessionFactory.UseMock = true;
-        var window = new MainWindow { Width = 1200, Height = 800 };
-        window.Show();
-        await Task.Delay(400);
-        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
-
-        var itemsBefore = vm.Assistant.Checklist.Count;
-        vm.CommandInput = "? 帮我看看日志";
-        vm.SubmitCommandInputCommand.Execute(null);
-        await Task.Delay(300);
-
-        Assert.True(vm.Assistant.Checklist.Count > itemsBefore);
-        Assert.Contains(vm.Dashboard.OutputLog, l => l.Message.Contains("Codex 收到任务: 帮我看看日志"));
-        window.Close();
-    }
 }

@@ -184,6 +184,38 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
+    public async Task Activation_ExpandsFromThumbnailBounds_WithoutResizingPty()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(700);
+        var surface = fixture.Window.FindControl<StageSurface>("StageWindow")!;
+        var emulator = fixture.Vm.ActiveSession!.Emulator;
+        var gridSize = (emulator.Buffer.Columns, emulator.Buffer.Rows);
+        var source = new Rect(-260, 70, 220, 180);
+        surface.ActivateFrom(source);
+        surface.Transitions = null;
+        surface.Reveal = 0;
+        var initial = surface.RenderTransform!.Value;
+        Assert.Equal(new Point(source.X, source.Y), new Point().Transform(initial));
+        Assert.Equal(source.Width, surface.Bounds.Width * initial.M11, 5);
+        Assert.Equal(source.Height, surface.Bounds.Height * initial.M22, 5);
+        surface.Reveal = .45;
+        var middle = surface.RenderTransform.Value;
+        if (Environment.GetEnvironmentVariable("TERMINALHUB_STAGE_CAPTURES") is { } output)
+        {
+            Directory.CreateDirectory(output);
+            fixture.Window.CaptureRenderedFrame()!.Save(Path.Combine(output, "stage-expanding.png"));
+        }
+        surface.ActivateFrom(new Rect(-260, 400, 220, 180));
+        surface.Transitions = null;
+        surface.Reveal = 0;
+        Assert.Equal(middle, surface.RenderTransform.Value);
+        surface.Reveal = 1;
+        Assert.True(surface.RenderTransform.Value.IsIdentity);
+        Assert.Equal(gridSize, (emulator.Buffer.Columns, emulator.Buffer.Rows));
+    }
+
+    [AvaloniaFact]
     public async Task SwitchAndClose_DuringSpringAndQueuedSelection_DoesNotLeaveCallbacks()
     {
         using var fixture = new StageFixture();

@@ -7,7 +7,7 @@ namespace TerminalHub.Core.Sessions;
 /// <summary>Tracks live terminal sessions: create / switch / close.</summary>
 public sealed class SessionManager
 {
-    private int _counter;
+    private readonly HashSet<TerminalSessionModel> _detached = [];
 
     public ObservableCollection<TerminalSessionModel> Sessions { get; } = [];
     private volatile IReadOnlyList<TerminalSessionModel> _snapshot = [];
@@ -56,14 +56,13 @@ public sealed class SessionManager
         return session;
     }
 
-    /// <summary>Auto-numbered names must skip names already taken — startup
-    /// sessions carry explicit names that never touched <see cref="_counter"/>,
-    /// and renames can claim any number.</summary>
+    /// <summary>Reuse the lowest free number, including names held by popouts.</summary>
     private string NextAutoName()
     {
         string candidate;
-        do { candidate = $"Terminal {++_counter:D2}"; }
-        while (Sessions.Any(s => s.Name == candidate));
+        var number = 0;
+        do { candidate = $"Terminal {++number:D2}"; }
+        while (Sessions.Concat(_detached).Any(s => s.Name == candidate));
         return candidate;
     }
 
@@ -78,6 +77,7 @@ public sealed class SessionManager
     {
         session.Pty.Kill();
         Sessions.Remove(session);
+        _detached.Remove(session);
         _snapshot = Sessions.ToArray();
         SessionRemoved?.Invoke(session);
         if (ReferenceEquals(Active, session))
@@ -93,6 +93,7 @@ public sealed class SessionManager
     public TerminalSessionModel? Detach(TerminalSessionModel session)
     {
         if (!Sessions.Remove(session)) return null;
+        _detached.Add(session);
         _snapshot = Sessions.ToArray();
         SessionRemoved?.Invoke(session);
         if (ReferenceEquals(Active, session))
@@ -104,6 +105,7 @@ public sealed class SessionManager
     public void Reattach(TerminalSessionModel session)
     {
         if (Sessions.Contains(session)) return;
+        _detached.Remove(session);
         Sessions.Add(session);
         _snapshot = Sessions.ToArray();
         SessionAdded?.Invoke(session);

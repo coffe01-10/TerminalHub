@@ -41,7 +41,7 @@ public class UiBugHuntTests
         window.KeyPressQwerty(PhysicalKey.J, RawInputModifiers.Control | RawInputModifiers.Shift);
         await Snap(window, "output-open");
 
-        // Inspector tabs: 0 Monitor, 1 Files, 2 Logs, 3 Ssh, 4 Codex
+        // Inspector tabs: 0 Monitor, 1 Files, 2 Logs, 3 Ssh
         window.KeyPressQwerty(PhysicalKey.B, RawInputModifiers.Control | RawInputModifiers.Shift);
         await Snap(window, "inspector-monitor");
 
@@ -51,8 +51,6 @@ public class UiBugHuntTests
         vm.SelectedRightTab = 3;
         await Snap(window, "inspector-ssh");
 
-        vm.SelectedRightTab = 4;
-        await Snap(window, "inspector-codex");
         vm.SelectedRightTab = 0;
 
         // Settings overlay

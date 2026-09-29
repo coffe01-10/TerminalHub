@@ -24,7 +24,7 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Search hits over the active session's scrollback+screen.</summary>
     public ObservableCollection<TerminalHub.Core.Terminal.ScreenBuffer.SearchHit> SearchHits { get; } = [];
 
-    [ObservableProperty] private int _selectedRightTab;       // 0 Proc 1 Files 2 Logs 3 Ssh 4 Codex
+    [ObservableProperty] private int _selectedRightTab;       // 0 Proc 1 Files 2 Logs 3 Ssh
     [ObservableProperty] private int _selectedBottomTab;      // 0 Output 1 Debug 2 Problems 3 Search
     [ObservableProperty] private int _problemCount;
     [ObservableProperty] private string _searchQuery = "";

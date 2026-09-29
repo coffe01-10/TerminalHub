@@ -149,6 +149,20 @@ public class SessionShortcutTests
     }
 
     [AvaloniaFact]
+    public async Task F2_InTerminal_ReachesCliInsteadOfOpeningRenameDialog()
+    {
+        using var fixture = new StageLayoutTests.StageFixture();
+        await Task.Delay(700);
+        var terminal = fixture.Window.FindControl<TerminalHub.App.Controls.TerminalView>("MainTerminal")!;
+        terminal.Focus();
+        var mock = (TerminalHub.Core.Pty.MockPtySession)fixture.Vm.ActiveSession!.Pty;
+        mock.RawInput.Clear();
+        fixture.Window.KeyPressQwerty(Avalonia.Input.PhysicalKey.F2, Avalonia.Input.RawInputModifiers.None);
+        Assert.Equal("\x1bOQ", mock.RawInput.ToString());
+        Assert.True(terminal.IsFocused);
+    }
+
+    [AvaloniaFact]
     public async Task ToolbarMenu_HasShortcutItems()
     {
         var (window, vm) = await Boot();

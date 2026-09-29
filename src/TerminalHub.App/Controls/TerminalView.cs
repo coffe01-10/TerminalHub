@@ -65,6 +65,9 @@ public class TerminalView : Control
     private (int line, int col)? _selAnchor, _selEnd;
     private bool _selecting;
     private Point _lastPointer;
+    private int _applicationMouseButton = -1;
+    private (int column, int row)? _lastMouseCell;
+    private IPointer? _applicationPointer;
 
     // Search state — hits are recomputed lazily against buffer version.
     private int _hitLine = -1, _hitCol = -1, _hitLen;  // current match marker
@@ -158,7 +161,14 @@ public class TerminalView : Control
             old.Changed -= OnBufferChanged;
             old.Buffer.ScrollbackChanged -= OnScrollbackChanged;
         }
+        _applicationPointer?.Capture(null);
+        if (!IsPreview && IsFocused) old?.SendFocus(false);
         _emulator = next;
+        if (!IsPreview && IsFocused) next?.SendFocus(true);
+        _applicationPointer = null;
+        _applicationMouseButton = -1;
+        _lastMouseCell = null;
+        _selecting = false;
         _typedTail = "";
         _imeAnchorValid = false;
         _selAnchor = _selEnd = null;
@@ -760,9 +770,16 @@ public class TerminalView : Control
         e.Handled = true;
     }
 
+    protected override void OnGotFocus(GotFocusEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (!IsPreview) _emulator?.SendFocus(true);
+    }
+
     protected override void OnLostFocus(RoutedEventArgs e)
     {
         base.OnLostFocus(e);
+        if (!IsPreview) _emulator?.SendFocus(false);
         if (_preedit is not null) { _preedit = null; InvalidateVisual(); }
     }
 
@@ -771,6 +788,16 @@ public class TerminalView : Control
         base.OnKeyDown(e);
         if (_emulator is null) return;
         if (IsPreview) return;
+        // Windows paste shortcuts must read the clipboard, not send Ctrl+V (SYN)
+        // or Insert to the CLI. Keep Alt combinations available to applications.
+        if ((e.Key == Key.V && e.KeyModifiers is KeyModifiers.Control
+                or (KeyModifiers.Control | KeyModifiers.Shift))
+            || (e.Key == Key.Insert && e.KeyModifiers == KeyModifiers.Shift))
+        {
+            _ = PasteClipboardAsync();
+            e.Handled = true;
+            return;
+        }
         // Keys consumed by an IME composition (VK_PROCESSKEY etc.) must not reach
         // the shell — e.g. Enter that picks a candidate would double-submit.
         if (e.Key is Key.ImeProcessed or Key.ImeAccept or Key.ImeConvert
@@ -799,13 +826,25 @@ public class TerminalView : Control
                 break;
         }
         var app = _emulator.Buffer.ApplicationCursorKeys;
+        var modifiers = 1 + (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 1 : 0)
+            + (e.KeyModifiers.HasFlag(KeyModifiers.Alt) ? 2 : 0)
+            + (e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 4 : 0);
+        if (e.Key == Key.Enter && modifiers > 1 && (_emulator.Buffer.KittyKeyboardFlags & 1) != 0)
+        {
+            _emulator.SendText($"\x1b[13;{modifiers}u");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Alt)
+        {
+            _emulator.SendText("\x1b\r"); // Grok/Codex multiline fallback without Kitty.
+            e.Handled = true;
+            return;
+        }
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.Enter)
         {
-            // CSI-u is only valid once the app negotiated the kitty keyboard
-            // protocol (disambiguate flag). Outside it, plain \r keeps readline
-            // from eating a stray escape sequence.
-            var kitty = (_emulator.Buffer.KittyKeyboardFlags & 0b1) != 0;
-            _emulator.SendText(kitty ? "\x1b[13;2u" : "\r");
+            // Outside negotiated Kitty mode keep readline's legacy Enter.
+            _emulator.SendText("\r");
             e.Handled = true;
             return;
         }
@@ -815,20 +854,27 @@ public class TerminalView : Control
             e.Handled = true;
             return;
         }
+        string CursorKey(char final) => modifiers > 1 ? $"\x1b[1;{modifiers}{final}"
+            : app ? $"\x1bO{final}" : $"\x1b[{final}";
+        string TildeKey(int code) => modifiers > 1 ? $"\x1b[{code};{modifiers}~" : $"\x1b[{code}~";
         var send = e.Key switch
         {
             Key.Enter or Key.Return => "\r",
-            Key.Back => "\x7f",
+            Key.Back => e.KeyModifiers == KeyModifiers.Control ? "\x17" :
+                e.KeyModifiers == KeyModifiers.Alt ? "\x1b\x7f" : "\x7f",
             Key.Tab => "\t",
             Key.Escape => "\x1b",
-            Key.Up => app ? "\x1bOA" : "\x1b[A",
-            Key.Down => app ? "\x1bOB" : "\x1b[B",
-            Key.Right => app ? "\x1bOC" : "\x1b[C",
-            Key.Left => app ? "\x1bOD" : "\x1b[D",
-            Key.Home => "\x1b[H",
-            Key.End => "\x1b[F",
-            Key.Delete => "\x1b[3~",
-            Key.Insert => "\x1b[2~",
+            Key.Up => CursorKey('A'),
+            Key.Down => CursorKey('B'),
+            Key.Right => CursorKey('C'),
+            Key.Left => CursorKey('D'),
+            Key.Home => CursorKey('H'),
+            Key.End => CursorKey('F'),
+            Key.Delete => TildeKey(3),
+            Key.Insert => TildeKey(2),
+            >= Key.F1 and <= Key.F4 => modifiers > 1 ? $"\x1b[1;{modifiers}{(char)('P' + e.Key - Key.F1)}"
+                : $"\x1bO{(char)('P' + e.Key - Key.F1)}",
+            >= Key.F5 and <= Key.F12 => TildeKey(new[] { 15, 17, 18, 19, 20, 21, 23, 24 }[e.Key - Key.F5]),
             _ => null,
         };
 
@@ -836,14 +882,14 @@ public class TerminalView : Control
         {
             // Alt-screen apps (less, vim, htop) own the scrollback — the key
             // belongs to them; local scrollback scroll applies to the main screen.
-            if (_emulator.Buffer.OnAlternateScreen) _emulator.SendText("\x1b[5~");
+            if (_emulator.Buffer.OnAlternateScreen) _emulator.SendText(TildeKey(5));
             else ScrollBy(_emulator.Buffer.Rows - 2);
             e.Handled = true;
             return;
         }
         if (e.Key == Key.PageDown)
         {
-            if (_emulator.Buffer.OnAlternateScreen) _emulator.SendText("\x1b[6~");
+            if (_emulator.Buffer.OnAlternateScreen) _emulator.SendText(TildeKey(6));
             else ScrollBy(-(_emulator.Buffer.Rows - 2));
             e.Handled = true;
             return;
@@ -851,6 +897,18 @@ public class TerminalView : Control
 
         if (send is null)
         {
+            if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z)
+            {
+                _emulator.SendText("\x1b" + (char)('a' + e.Key - Key.A));
+                e.Handled = true;
+                return;
+            }
+            if (e.KeyModifiers == KeyModifiers.Control && e.Key is Key.Oem5 or Key.Oem4 or Key.Oem6 or Key.Space)
+            {
+                _emulator.SendBytes([(byte)(e.Key switch { Key.Oem4 => 27, Key.Oem5 => 28, Key.Oem6 => 29, _ => 0 })]);
+                e.Handled = true;
+                return;
+            }
             // Ctrl+Shift+C copy / Ctrl+Shift+V paste, plain Ctrl+key → control byte.
             // Bare Ctrl+C keeps sending ETX — the terminal interrupt stays intact.
             if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
@@ -858,12 +916,6 @@ public class TerminalView : Control
                 if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {
                     _ = CopySelectionAsync();
-                    e.Handled = true;
-                    return;
-                }
-                if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-                {
-                    PasteClipboard();
                     e.Handled = true;
                     return;
                 }
@@ -884,8 +936,9 @@ public class TerminalView : Control
         e.Handled = true;
     }
 
-    private async void PasteClipboard()
+    private async Task PasteClipboardAsync()
     {
+        var emulator = _emulator;
         try
         {
             var clip = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -893,15 +946,26 @@ public class TerminalView : Control
             if (!string.IsNullOrEmpty(text))
             {
                 ResetScroll();
-                _emulator?.PasteText(text);
+                _typedTail = "";
+                emulator?.PasteText(text);
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Clipboard paste failed: {ex.Message}"); }
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+        if (IsPreview || _emulator is null) return;
+        if (ApplicationOwnsMouse(e.KeyModifiers))
+        {
+            var delta = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
+            var button = e.Delta.Y != 0 ? (delta > 0 ? 64 : 65) : (delta > 0 ? 66 : 67);
+            for (var i = 0; i < Math.Ceiling(Math.Abs(delta)); i++)
+                ReportMouse(e, button);
+            e.Handled = true;
+            return;
+        }
         ScrollBy((int)(-e.Delta.Y * 3));
         e.Handled = true;
     }
@@ -931,6 +995,23 @@ public class TerminalView : Control
 
     // ---------- selection ----------
 
+    // Shift retains terminal text selection/history while a TUI owns the mouse.
+    private bool ApplicationOwnsMouse(KeyModifiers modifiers) =>
+        !IsPreview && _emulator?.Buffer.MouseTracking > 0 && !modifiers.HasFlag(KeyModifiers.Shift);
+
+    private void ReportMouse(PointerEventArgs e, int button, bool released = false, bool motion = false)
+    {
+        if (_emulator is null) return;
+        var p = e.GetPosition(this);
+        var cell = (Math.Clamp((int)(p.X / _cellW), 0, _emulator.Buffer.Columns - 1),
+            Math.Clamp((int)(p.Y / _cellH), 0, _emulator.Buffer.Rows - 1));
+        if (motion && _lastMouseCell == cell) return;
+        _lastMouseCell = cell;
+        var modifiers = (e.KeyModifiers.HasFlag(KeyModifiers.Alt) ? 8 : 0)
+            | (e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 16 : 0);
+        _emulator.SendMouse(button, cell.Item1, cell.Item2, released, motion, modifiers);
+    }
+
     /// <summary>Map a point to (absolute buffer line, column) of the cell under it.</summary>
     private (int line, int col) PointToCell(Point p)
     {
@@ -953,6 +1034,32 @@ public class TerminalView : Control
         Focus();
         if (_emulator is null) return;
         var point = e.GetCurrentPoint(this);
+        if (ApplicationOwnsMouse(e.KeyModifiers))
+        {
+            var button = point.Properties.PointerUpdateKind switch
+            {
+                PointerUpdateKind.LeftButtonPressed => 0,
+                PointerUpdateKind.MiddleButtonPressed => 1,
+                PointerUpdateKind.RightButtonPressed => 2,
+                _ => -1
+            };
+            if (button < 0) return;
+            ResetScroll();
+            _selAnchor = _selEnd = null;
+            _applicationMouseButton = button;
+            _applicationPointer = e.Pointer;
+            e.Pointer.Capture(this);
+            ReportMouse(e, button);
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+        if (point.Properties.IsRightButtonPressed)
+        {
+            _ = PasteClipboardAsync();
+            e.Handled = true;
+            return;
+        }
         if (!point.Properties.IsLeftButtonPressed) return;
         var pos = e.GetPosition(this);
         var (line, col) = PointToCell(pos);
@@ -1017,6 +1124,12 @@ public class TerminalView : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        if (!_selecting && ApplicationOwnsMouse(e.KeyModifiers))
+        {
+            ReportMouse(e, _applicationMouseButton < 0 ? 3 : _applicationMouseButton, motion: true);
+            e.Handled = true;
+            return;
+        }
         if (!_selecting || _emulator is null) return;
         var pos = e.GetPosition(this);
         _lastPointer = pos;
@@ -1043,12 +1156,31 @@ public class TerminalView : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (_applicationMouseButton >= 0)
+        {
+            ReportMouse(e, _applicationMouseButton, released: true);
+            _applicationMouseButton = -1;
+            _applicationPointer = null;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
         if (_selecting)
         {
             _selecting = false;
             if (_selAnchor == _selEnd) { _selAnchor = _selEnd = null; InvalidateVisual(); }
             e.Pointer.Capture(null);
         }
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        if (_applicationMouseButton >= 0 && _lastMouseCell is { } cell)
+            _emulator?.SendMouse(_applicationMouseButton, cell.column, cell.row, released: true);
+        _applicationMouseButton = -1;
+        _applicationPointer = null;
+        _selecting = false;
     }
 
     /// <summary>Selected text (normalized, soft-wrapped lines joined), or null.</summary>

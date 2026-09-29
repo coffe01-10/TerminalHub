@@ -34,7 +34,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _breadcrumb = "";
     [ObservableProperty] private bool _canCwdBack;
     [ObservableProperty] private bool _canCwdForward;
-    [ObservableProperty] private bool _assistantMode;
     [ObservableProperty] private int _terminalCount;
     [ObservableProperty] private int _runningCount;
     [ObservableProperty] private string _cpuText = "";
@@ -202,13 +201,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         : OperatingSystem.IsMacOS() ? "macOS System"
         : "本机";
 
-    /// <summary>AssistantMode mirrors the Codex right-rail tab; Files lazy-inits on first visit.</summary>
+    /// <summary>Files lazy-inits on first visit.</summary>
     partial void OnSelectedRightTabChanged(int value)
     {
-        AssistantMode = value == 4;
         if (value == 1) Files.EnsureSessionDir();
         if (value == 2) Logs.RefreshSessions();
-        // Dock: 1 Monitor→tab0, 2 SSH→tab3, 3 Logs→tab2; Files/Codex have no dock item.
+        // Dock: 1 Monitor→tab0, 2 SSH→tab3, 3 Logs→tab2; Files has no dock item.
         DockHighlight = value switch { 0 => 1, 2 => 3, 3 => 2, _ => SettingsOpen ? 5 : -1 };
     }
 
@@ -299,7 +297,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<RecentArtifact> RecentArtifacts { get; private set; } = [];
 
     public DashboardViewModel Dashboard { get; }
-    public AiPanelViewModel Assistant { get; }
     public FilesViewModel Files { get; }
     public LogsViewModel Logs { get; }
     public SshViewModel Ssh { get; }
@@ -322,8 +319,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Dashboard = new DashboardViewModel(_monitor);
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
-        Assistant = new AiPanelViewModel(new TerminalHub.Core.AI.LocalAiAssistant(),
-            msg => Dashboard.AppendOutput("info", msg, "codex"));
         Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory,
             openTerminalAt: CdActiveSessionTo,
             copyTextAsync: CopyTextToClipboardAsync,
@@ -743,7 +738,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return Logs.DefaultExportPath();
     }
 
-    [RelayCommand] private void ToggleAssistant() => AssistantMode = !AssistantMode;
 
     /// <summary>Bottom dock: 0 New 1 Monitor 2 SSH 3 Logs 4 Deploy 5 Settings.
     /// Parameter arrives as a string from XAML — parse it (int also accepted).</summary>
@@ -1599,15 +1593,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrEmpty(CommandInput)) return;
         var text = CommandInput;
         CommandInput = "";
-        if (text.StartsWith('?') || text.StartsWith("ai:", StringComparison.OrdinalIgnoreCase))
-        {
-            var query = text.TrimStart('?').Trim();
-            if (query.StartsWith("ai:", StringComparison.OrdinalIgnoreCase))
-                query = query[3..].TrimStart();
-            if (query.Length == 0) return;
-            _ = Assistant.SubmitQueryAsync(query);
-            return;
-        }
         if (ActiveSession is null) return;
         ActiveSession.Emulator.SendText(text + "\r");
     }

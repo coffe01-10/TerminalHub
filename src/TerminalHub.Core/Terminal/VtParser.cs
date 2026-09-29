@@ -243,6 +243,9 @@ public sealed class VtParser
         _buffer.CurrentBg = TerminalColor.Default;
         _buffer.AutoWrap = true;
         _buffer.BracketedPaste = false;
+        _buffer.MouseTracking = 0;
+        _buffer.SgrMouse = false;
+        _buffer.FocusReporting = false;
         _buffer.SetSynchronizedOutput(false);
         _buffer.InsertMode = false;
         _buffer.SetCursorVisible(true);
@@ -395,6 +398,9 @@ public sealed class VtParser
             {
                 2026 => b.SynchronizedOutput ? 1 : 2,
                 2004 => b.BracketedPaste ? 1 : 2,
+                1000 or 1002 or 1003 => b.MouseTracking == mode ? 1 : 2,
+                1004 => b.FocusReporting ? 1 : 2,
+                1006 => b.SgrMouse ? 1 : 2,
                 25 => b.CursorVisible ? 1 : 2,
                 1049 => b.OnAlternateScreen ? 1 : 2,
                 _ => 0
@@ -419,6 +425,12 @@ public sealed class VtParser
                     case 6: b.SetOriginMode(set); break;
                     case 7: b.AutoWrap = set; break;
                     case 25: b.SetCursorVisible(set); break;
+                    case 1000: case 1002: case 1003:
+                        if (set) b.MouseTracking = p;
+                        else if (b.MouseTracking == p) b.MouseTracking = 0;
+                        break;
+                    case 1004: b.FocusReporting = set; break;
+                    case 1006: b.SgrMouse = set; break;
                     case 47: case 1047: b.UseAlternateScreen(set); break;
                     case 1048: if (set) b.SaveCursor(); else b.RestoreCursor(); break;
                     case 1049:

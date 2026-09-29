@@ -77,17 +77,36 @@ public class PopoutWindowTests
             new PtyOptions { Shell = "mock" });
         Assert.Equal("Terminal 04", auto.Name);
 
-        // …and a rename that claims a future number is skipped too.
+        // A rename frees the old number; the future number stays reserved.
         mgr.Rename(auto, "Terminal 05");
         var next = await mgr.CreateAsync(() => new MockPtySession(),
             new PtyOptions { Shell = "mock" });
-        Assert.Equal("Terminal 06", next.Name);
+        Assert.Equal("Terminal 04", next.Name);
         Assert.Equal(5, mgr.Sessions.Select(s => s.Name).Distinct().Count());
 
         foreach (var s in mgr.Sessions.ToArray()) mgr.Close(s);
     }
 
     // ---------- UI: popout window lifecycle ----------
+
+    [Fact]
+    public async Task AutoName_ReusesClosedGap_ButReservesDetachedSession()
+    {
+        var mgr = new SessionManager();
+        Task<TerminalSessionModel> Create() => mgr.CreateAsync(() => new MockPtySession(), new PtyOptions { Shell = "mock" });
+        var first = await Create();
+        var middle = await Create();
+        var last = await Create();
+        mgr.Close(middle);
+        Assert.Equal("Terminal 02", (await Create()).Name);
+        mgr.Detach(first);
+        Assert.Equal("Terminal 04", (await Create()).Name);
+        mgr.Reattach(first);
+        Assert.Equal(mgr.Sessions.Count, mgr.Sessions.Select(s => s.Name).Distinct().Count());
+        foreach (var s in mgr.Sessions.ToArray()) mgr.Close(s);
+        Assert.Equal("Terminal 01", (await Create()).Name);
+        mgr.Close(mgr.Active!);
+    }
 
     private static async Task<TerminalHub.App.ViewModels.MainWindowViewModel> ShowMain()
     {
