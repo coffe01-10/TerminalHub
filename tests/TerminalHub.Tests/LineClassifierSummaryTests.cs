@@ -26,3 +26,27 @@ public class LineClassifierSummaryTests
     public void RealErrors_AreError(string line)
         => Assert.Equal("error", LineClassifier.Classify(line));
 }
+
+/// <summary>Heuristic classify cases — moved from the deleted AiAssistantTests.cs
+/// (the AI assistant it tested is gone; the classifier coverage stays).</summary>
+public class LineClassifierTests
+{
+    [Theory]
+    [InlineData("ls: cannot access 'x': No such file or directory", "error")]
+    [InlineData("Unhandled exception: boom", "error")]
+    [InlineData("FAIL: build failed", "error")]
+    [InlineData("exit code 2", "error")]
+    [InlineData("exit status 127", "error")]
+    [InlineData("exit_code_1", "error")]
+    [InlineData("process exited with code 3", "error")]
+    [InlineData("bash: foo: command not found", "error")]
+    [InlineData("Permission denied", "error")]
+    [InlineData("执行失败", "error")]
+    [InlineData("npm warn deprecated something", "warn")]
+    [InlineData("警告: 配置缺失", "warn")]
+    [InlineData("hello world", "info")]
+    [InlineData("exit code 0", "info")]
+    [InlineData("all tests passed", "info")]
+    public void Classify_Heuristics(string line, string expected)
+        => Assert.Equal(expected, LineClassifier.Classify(line));
+}

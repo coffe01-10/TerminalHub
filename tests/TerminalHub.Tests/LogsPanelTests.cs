@@ -2236,4 +2236,78 @@ public class LogsPanelTests
         }
     }
 
+    /// <summary>Regression: a closed session's filter combo must not survive in the
+    /// name-keyed map — the next auto-named session reuses "Terminal 01" and would
+    /// silently inherit the dead session's filters.</summary>
+    [AvaloniaFact]
+    public async Task SessionFilter_DiesWithSession_RecycledNameStartsClean()
+    {
+        PtySessionFactory.UseMock = true;
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-recycle-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        MainWindowViewModel? vm = null;
+        try
+        {
+            vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            await vm.SpawnStartupSessionsAsync();
+            await Until(() => vm.Logs.SessionNames.Count == 4);
+
+            vm.Logs.SessionFilterIndex = 1;      // Terminal 01
+            vm.Logs.FilterText = "t01-only";
+            Assert.Equal("t01-only", vm.Logs.SnapshotSessionFilters()["Terminal 01"].FilterText);
+
+            var t01 = vm.SessionCards.First(c => c.Name == "Terminal 01");
+            vm.CloseSessionCommand.Execute(t01);
+            await Until(() => vm.SessionCards.All(c => c.Name != "Terminal 01"));
+
+            vm.NewSessionCommand.Execute(null);  // auto-name reuses "Terminal 01"
+            await Until(() => vm.SessionCards.Any(c => c.Name == "Terminal 01"));
+            await Until(() => vm.Logs.SessionNames.Contains("Terminal 01"));
+
+            vm.Logs.SessionFilterIndex = vm.Logs.SessionNames.IndexOf("Terminal 01");
+            Assert.Equal("", vm.Logs.FilterText); // the dead session's combo is gone
+        }
+        finally
+        {
+            vm?.Dispose();
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    /// <summary>Regression: renaming a session moves its remembered filter combo —
+    /// the freed name must not keep it (it recycles to the next auto-named session).</summary>
+    [AvaloniaFact]
+    public async Task SessionFilter_FollowsRename_OldNameFreed()
+    {
+        PtySessionFactory.UseMock = true;
+        var dir = Path.Combine(Path.GetTempPath(), "th-logs-rename-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        MainWindowViewModel? vm = null;
+        try
+        {
+            vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            await vm.SpawnStartupSessionsAsync();
+            await Until(() => vm.Logs.SessionNames.Count == 4);
+
+            vm.Logs.SessionFilterIndex = 1;      // Terminal 01
+            vm.Logs.FilterText = "t01-combo";
+
+            var card = vm.SessionCards.First(c => c.Name == "Terminal 01");
+            vm.RenameSessionCommand.Execute((card, "build box"));
+            await Until(() => vm.Logs.SessionNames.Contains("build box"));
+
+            var map = vm.Logs.SnapshotSessionFilters();
+            Assert.DoesNotContain("Terminal 01", map.Keys);   // freed
+            Assert.Equal("t01-combo", map["build box"].FilterText); // moved
+
+            vm.Logs.SessionFilterIndex = vm.Logs.SessionNames.IndexOf("build box");
+            Assert.Equal("t01-combo", vm.Logs.FilterText);    // combo follows the session
+        }
+        finally
+        {
+            vm?.Dispose();
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
 }

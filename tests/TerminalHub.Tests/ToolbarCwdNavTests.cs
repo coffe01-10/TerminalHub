@@ -4,6 +4,7 @@ using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
 using TerminalHub.App.Views;
 using TerminalHub.Core.Monitoring;
+using TerminalHub.Core.Settings;
 using TerminalHub.Pty;
 using Xunit;
 
@@ -132,6 +133,57 @@ public class ToolbarCwdNavTests
         finally
         {
             vm.Dispose();
+        }
+    }
+
+    /// <summary>Regression: an ssh session's OSC 7 cwd is a REMOTE path — it must
+    /// stay verbatim (no local GetFullPath mangling), must not navigate the local
+    /// Files panel, and must not be persisted as a local spawn dir.</summary>
+    [AvaloniaFact]
+    public async Task Ssh_RemoteCwd_StaysVerbatim_FilesAndSnapshotUnaffected()
+    {
+        PtySessionFactory.UseMock = true;
+        var dir = Path.Combine(Path.GetTempPath(), "th-ssh-cwd-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(dir, "settings.json");
+        Directory.CreateDirectory(dir);
+        MainWindowViewModel? vm = null;
+        try
+        {
+            vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            await vm.SpawnStartupSessionsAsync();
+            await Until(() => vm.SessionCards.Count > 0);
+
+            // The real SSH panel path → spawns a session tagged SessionTag.Ssh.
+            vm.Ssh.EditHost = "box.example";
+            vm.Ssh.AddOrUpdateCommand.Execute(null);
+            vm.Ssh.ConnectCommand.Execute(vm.Ssh.Hosts[0]);
+            await Until(() => vm.SessionCards.Any(c => c.Model.Tag == TerminalHub.Core.Sessions.SessionTag.Ssh));
+            var ssh = vm.SessionCards.First(c => c.Model.Tag == TerminalHub.Core.Sessions.SessionTag.Ssh).Model;
+            await Until(() => ReferenceEquals(vm.ActiveSession, ssh));
+
+            var localDir = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
+            vm.Files.NavigateTo(localDir);
+
+            ssh.Emulator.Parser.Feed("\u001b]7;file:///srv/app\u0007");
+            await Until(() => ssh.WorkingDirectory == "/srv/app");
+            Assert.Equal("/srv/app", ssh.WorkingDirectory);    // verbatim — not "C:\srv\app"
+            Assert.Equal(Path.GetFullPath(localDir), vm.Files.CurrentPath); // Files stays local
+
+            // Remote cwd history is verbatim too — back sends a remote-valid cd.
+            ssh.Emulator.Parser.Feed("\u001b]7;file:///var/log\u0007");
+            await Until(() => ssh.WorkingDirectory == "/var/log" && vm.CanCwdBack);
+            vm.CwdBackCommand.Execute(null);
+            Assert.Equal("/srv/app", ssh.WorkingDirectory);
+
+            vm.PersistSettings();
+            var saved = new SettingsStore(settingsPath).Load();
+            var sshEntry = saved.Workspace.Sessions.Single(s => s.Shell == "ssh");
+            Assert.Equal("", sshEntry.WorkingDirectory);       // remote path never becomes a local spawn dir
+        }
+        finally
+        {
+            vm?.Dispose();
+            try { Directory.Delete(dir, recursive: true); } catch { /* ignore */ }
         }
     }
 

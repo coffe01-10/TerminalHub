@@ -68,6 +68,9 @@ public class TerminalView : Control
     private int _applicationMouseButton = -1;
     private (int column, int row)? _lastMouseCell;
     private IPointer? _applicationPointer;
+    // The pointer holding the local-selection capture — a second pointer (pen,
+    // touch, another mouse) must not move or release someone else's selection.
+    private IPointer? _selectionPointer;
 
     // Search state — hits are recomputed lazily against buffer version.
     private int _hitLine = -1, _hitCol = -1, _hitLen;  // current match marker
@@ -162,10 +165,12 @@ public class TerminalView : Control
             old.Buffer.ScrollbackChanged -= OnScrollbackChanged;
         }
         _applicationPointer?.Capture(null);
+        _selectionPointer?.Capture(null);
         if (!IsPreview && IsFocused) old?.SendFocus(false);
         _emulator = next;
         if (!IsPreview && IsFocused) next?.SendFocus(true);
         _applicationPointer = null;
+        _selectionPointer = null;
         _applicationMouseButton = -1;
         _lastMouseCell = null;
         _selecting = false;
@@ -842,9 +847,12 @@ public class TerminalView : Control
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Alt)
+        // Alt+Enter / Alt+Shift+Enter: ESC CR — the Grok/Codex multiline fallback
+        // when no Kitty keyboard was negotiated (that case is handled above).
+        // Shift must not drop the Alt and fall through to plain "\r".
+        if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
-            _emulator.SendText("\x1b\r"); // Grok/Codex multiline fallback without Kitty.
+            _emulator.SendText("\x1b\r");
             e.Handled = true;
             return;
         }
@@ -910,7 +918,11 @@ public class TerminalView : Control
                 e.Handled = true;
                 return;
             }
-            if (e.KeyModifiers == KeyModifiers.Control && e.Key is Key.Oem5 or Key.Oem4 or Key.Oem6 or Key.Space)
+            // Shift doesn't change these control bytes (Ctrl+Shift+[ is still
+            // ESC). Alt is excluded — Ctrl+Alt is AltGr on many layouts and
+            // produces real text that must reach TextInput.
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt)
+                && e.Key is Key.Oem5 or Key.Oem4 or Key.Oem6 or Key.Space)
             {
                 _emulator.SendBytes([(byte)(e.Key switch { Key.Oem4 => 27, Key.Oem5 => 28, Key.Oem6 => 29, _ => 0 })]);
                 e.Handled = true;
@@ -945,16 +957,17 @@ public class TerminalView : Control
 
     private async Task PasteClipboardAsync()
     {
-        var emulator = _emulator;
         try
         {
             var clip = TopLevel.GetTopLevel(this)?.Clipboard;
             var text = clip is null ? null : await clip.GetTextAsync();
             if (!string.IsNullOrEmpty(text))
             {
+                // Resolve the emulator after the await — a session switch during
+                // the clipboard read must not paste into the previous session.
                 ResetScroll();
                 _typedTail = "";
-                emulator?.PasteText(text);
+                _emulator?.PasteText(text);
             }
         }
         catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Clipboard paste failed: {ex.Message}"); }
@@ -972,6 +985,19 @@ public class TerminalView : Control
             // pipe and the CLI's input loop on high-resolution trackpads.
             var steps = Math.Min((int)Math.Ceiling(Math.Abs(delta)), 200);
             if (steps > 0) ReportMouse(e, button, count: steps);
+            e.Handled = true;
+            return;
+        }
+        if (_emulator.Buffer.OnAlternateScreen)
+        {
+            // The alternate screen has no scrollback — the wheel belongs to the
+            // app as cursor keys (xterm alternateScroll: less/vim scroll it).
+            var up = e.Delta.Y > 0;
+            var seq = _emulator.Buffer.ApplicationCursorKeys
+                ? (up ? "\x1bOA" : "\x1bOB")
+                : (up ? "\x1b[A" : "\x1b[B");
+            var steps = Math.Clamp((int)Math.Ceiling(Math.Abs(e.Delta.Y) * 3), 1, 64);
+            _emulator.SendText(string.Concat(Enumerable.Repeat(seq, steps)));
             e.Handled = true;
             return;
         }
@@ -1105,12 +1131,19 @@ public class TerminalView : Control
             }
             else
             {
-                _selAnchor = (line, col);
-                _selEnd = (line, col);
+                var cell = SnapToCluster((line, col));
+                _selAnchor = cell;
+                _selEnd = cell;
                 _selecting = true;
             }
         }
-        e.Pointer.Capture(this);
+        // Only capture while actually selecting — a double-click miss leaves
+        // _selecting false, and the release path would never release the capture.
+        if (_selecting)
+        {
+            _selectionPointer = e.Pointer;
+            e.Pointer.Capture(this);
+        }
         InvalidateVisual();
         e.Handled = true;
     }
@@ -1136,14 +1169,20 @@ public class TerminalView : Control
         base.OnPointerMoved(e);
         if (!_selecting && ApplicationOwnsMouse(e.KeyModifiers))
         {
+            // During a captured app-drag only the owning pointer reports motion —
+            // a second pointer's move would inject phantom drag events.
+            if (_applicationPointer is not null && !ReferenceEquals(e.Pointer, _applicationPointer))
+                return;
             ReportMouse(e, _applicationMouseButton < 0 ? 3 : _applicationMouseButton, motion: true);
             e.Handled = true;
             return;
         }
         if (!_selecting || _emulator is null) return;
+        if (_selectionPointer is not null && !ReferenceEquals(e.Pointer, _selectionPointer))
+            return;
         var pos = e.GetPosition(this);
         _lastPointer = pos;
-        _selEnd = PointToCell(pos);
+        _selEnd = SnapToCluster(PointToCell(pos));
         InvalidateVisual();
     }
 
@@ -1158,8 +1197,8 @@ public class TerminalView : Control
         var distance = overTop ? -_lastPointer.Y : _lastPointer.Y - Bounds.Height;
         var lines = Math.Clamp((int)(distance / (_cellH * 2)) + 1, 1, 8);
         ScrollBy(overTop ? lines : -lines);
-        _selEnd = PointToCell(new Point(_lastPointer.X,
-            Math.Clamp(_lastPointer.Y, 0, Bounds.Height - 1)));
+        _selEnd = SnapToCluster(PointToCell(new Point(_lastPointer.X,
+            Math.Clamp(_lastPointer.Y, 0, Bounds.Height - 1))));
         InvalidateVisual();
     }
 
@@ -1168,6 +1207,8 @@ public class TerminalView : Control
         base.OnPointerReleased(e);
         if (_applicationMouseButton >= 0)
         {
+            // A different pointer's release must not end the captured app-drag.
+            if (!ReferenceEquals(e.Pointer, _applicationPointer)) return;
             ReportMouse(e, _applicationMouseButton, released: true);
             _applicationMouseButton = -1;
             _applicationPointer = null;
@@ -1177,7 +1218,10 @@ public class TerminalView : Control
         }
         if (_selecting)
         {
+            if (_selectionPointer is not null && !ReferenceEquals(e.Pointer, _selectionPointer))
+                return;
             _selecting = false;
+            _selectionPointer = null;
             if (_selAnchor == _selEnd) { _selAnchor = _selEnd = null; InvalidateVisual(); }
             e.Pointer.Capture(null);
         }
@@ -1186,11 +1230,35 @@ public class TerminalView : Control
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
-        if (_applicationMouseButton >= 0 && _lastMouseCell is { } cell)
-            _emulator?.SendMouse(_applicationMouseButton, cell.column, cell.row, released: true);
-        _applicationMouseButton = -1;
-        _applicationPointer = null;
-        _selecting = false;
+        if (ReferenceEquals(e.Pointer, _applicationPointer))
+        {
+            if (_applicationMouseButton >= 0 && _lastMouseCell is { } cell)
+                _emulator?.SendMouse(_applicationMouseButton, cell.column, cell.row, released: true);
+            _applicationMouseButton = -1;
+            _applicationPointer = null;
+        }
+        if (ReferenceEquals(e.Pointer, _selectionPointer))
+        {
+            _selectionPointer = null;
+            _selecting = false;
+        }
+    }
+
+    /// <summary>Snap a pointer-derived cell onto a grapheme boundary: a point on
+    /// a wide glyph's continuation cell belongs to the lead cell — otherwise the
+    /// render expands the highlight over the glyph while the copy drops it.</summary>
+    private (int line, int col) SnapToCluster((int line, int col) cell)
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return cell;
+        lock (buf.SyncRoot)
+        {
+            if (cell.line < 0 || cell.line >= buf.TotalLines) return cell;
+            var row = buf.GetLine(cell.line);
+            if (cell.col > 0 && cell.col < row.Length && row[cell.col].IsWideContinuation)
+                return (cell.line, cell.col - 1);
+            return cell;
+        }
     }
 
     /// <summary>Selected text (normalized, soft-wrapped lines joined), or null.</summary>

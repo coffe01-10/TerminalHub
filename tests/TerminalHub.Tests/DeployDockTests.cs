@@ -981,6 +981,37 @@ public class DeployDockTests
         Assert.Equal("host", dialog.ProfileName);
     }
 
+    /// <summary>Regression: the "Publish" session is a one-shot task — the workspace
+    /// snapshot must skip it or every restart re-runs the publish script.</summary>
+    [AvaloniaFact]
+    public async Task PublishSession_ExcludedFromWorkspaceSnapshot()
+    {
+        PtySessionFactory.UseMock = true;
+        var root = TempRepo(withScript: true, withArtifact: false);
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
+        var vm = new MainWindowViewModel(settingsStore: new SettingsStore(settingsPath));
+        try
+        {
+            await vm.SpawnStartupSessionsAsync();
+            await WaitFor(() => vm.SessionCards.Count > 0);
+            vm.DeployFromDock(false, root);
+            await WaitFor(() => vm.SessionCards.Any(c => c.Name == "Publish"));
+            vm.PersistSettings();
+
+            var saved = new SettingsStore(settingsPath).Load();
+            Assert.NotEmpty(saved.Workspace.Sessions);          // normal sessions still snapshot
+            Assert.DoesNotContain(saved.Workspace.Sessions, s => s.Name == "Publish");
+            Assert.DoesNotContain(saved.Workspace.Sessions,
+                s => s.Arguments.Contains("publish", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            vm.Dispose();
+            Directory.Delete(root, true);
+            if (File.Exists(settingsPath)) File.Delete(settingsPath);
+        }
+    }
+
     private static MenuItem MenuByHeader(MenuFlyout flyout, string startsWith) =>
         flyout.Items.OfType<MenuItem>().Single(i =>
             i.Header is string header && header.StartsWith(startsWith, StringComparison.Ordinal));

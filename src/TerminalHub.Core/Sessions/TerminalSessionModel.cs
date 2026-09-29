@@ -26,5 +26,9 @@ public sealed class TerminalSessionModel : IDisposable
     /// history survive the round trip.</summary>
     public bool Detached { get; set; }
 
+    /// <summary>One-shot task sessions (a publish run) are left out of the saved
+    /// workspace — restoring them would re-run the script on every launch.</summary>
+    public bool ExcludeFromWorkspace { get; set; }
+
     public void Dispose() => Emulator.Dispose();
 }

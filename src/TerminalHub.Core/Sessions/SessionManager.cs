@@ -36,7 +36,17 @@ public sealed class SessionManager
         CancellationToken cancellationToken = default)
     {
         var emulator = new TerminalEmulator(ptyFactory(), columns, rows);
-        await emulator.StartAsync(options, cancellationToken);
+        try
+        {
+            await emulator.StartAsync(options, cancellationToken);
+        }
+        catch
+        {
+            // A half-started PTY owns a live process/handles — dispose it here
+            // or every failed spawn leaks one.
+            emulator.Dispose();
+            throw;
+        }
 
         var session = new TerminalSessionModel
         {

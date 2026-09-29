@@ -39,7 +39,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _cpuText = "";
     [ObservableProperty] private string _memText = "";
     [ObservableProperty] private double[] _statusSpark = [];
-    [ObservableProperty] private string _commandInput = "";
     [ObservableProperty] private int _selectedRightTab;
     [ObservableProperty] private bool _settingsOpen;
     [ObservableProperty] private bool _inspectorVisible;
@@ -66,7 +65,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         InspectorVisible = true;
         SelectedRightTab = 1;
-        Files.NavigateTo(ActiveWorkingDirectory);
+        // For ssh sessions the cwd is remote — Files only browses local dirs.
+        if (ActiveSession?.Tag != SessionTag.Ssh)
+            Files.NavigateTo(ActiveWorkingDirectory);
     }
 
     partial void OnInspectorVisibleChanged(bool value) => _settings.InspectorVisible = value;
@@ -319,10 +320,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Dashboard = new DashboardViewModel(_monitor);
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
-        Files = new FilesViewModel(() => ActiveSession?.WorkingDirectory,
+        Files = new FilesViewModel(
+            // Files browses the LOCAL filesystem — an ssh session's remote cwd
+            // must never reach it, and "open terminal here" on a local dir is
+            // meaningless for a remote shell.
+            () => ActiveSession is { Tag: not SessionTag.Ssh } ? ActiveSession.WorkingDirectory : null,
             openTerminalAt: CdActiveSessionTo,
             copyTextAsync: CopyTextToClipboardAsync,
-            hasActiveSession: () => ActiveSession is not null);
+            hasActiveSession: () => ActiveSession is { Tag: not SessionTag.Ssh });
         Logs = new LogsViewModel(Dashboard, _sessionLog,
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
@@ -515,20 +520,25 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // UI-thread post behind Activate() and would give us the stale session.
         var left = _sessions.Active ?? _sessions.Sessions.FirstOrDefault();
         var other = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, left));
-        if (left is null && other is null)
+        if (left is null)
         {
             await NewSession();
-            left = _sessions.Active;
+            left = _sessions.Active ?? _sessions.Sessions.FirstOrDefault();
         }
-        if (other is null)
+        if (other is null && left is not null)
         {
             Dashboard.AppendOutput("info", "分屏: 只有一个会话,为右栏新建一个…", "split");
-            var prev = left;
             await NewSession();                       // activates the new session
-            other = _sessions.Active;
-            if (prev is not null) _sessions.Activate(prev); // keep focus on the left pane
+            // Re-pick from the list instead of trusting _sessions.Active: during
+            // the await the user can activate/close sessions, so Active may still
+            // be `left` (→ both panes one session) or a dead session.
+            other = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, left));
+            if (_sessions.Sessions.Contains(left)) _sessions.Activate(left); // keep focus on the left pane
         }
-        if (other is null)
+        // Both panes must be live, distinct sessions — captured values can be
+        // closed mid-await, and a null left would leave a dead pane behind.
+        if (left is null || other is null
+            || !_sessions.Sessions.Contains(left) || !_sessions.Sessions.Contains(other))
         {
             Dashboard.AppendOutput("warn", "分屏: 无法创建第二个会话", "split");
             return;
@@ -538,7 +548,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         FocusedPane = 0;
         IsSplit = true;
         Dashboard.AppendOutput("info",
-            $"分屏: 左 {left?.Name ?? "—"} ｜ 右 {other.Name} · 点击窗格聚焦,点会话卡分配到该窗格", "split");
+            $"分屏: 左 {left.Name} ｜ 右 {other.Name} · 点击窗格聚焦,点会话卡分配到该窗格", "split");
     }
 
     private void ExitSplit()
@@ -676,8 +686,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         name = name.Trim();
         var startup = _settings.StartupSessions.FindIndex(s => s.Name == card.Name);
         if (startup >= 0) _settings.StartupSessions[startup] = _settings.StartupSessions[startup] with { Name = name };
+        var oldName = card.Name;
         _sessions.Rename(card.Model, name);
         _sessionNames[card.Model.Id] = name; // future output lines carry the new name
+        // The filter combo belongs to the session — move it so the freed
+        // auto-name doesn't hand it to a later recycled session.
+        Logs.RenameSessionFilter(oldName, name);
         card.Refresh();
         Logs.RefreshSessions();
     }
@@ -1083,6 +1097,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 },
                 "Publish",
                 SessionTag.Deploy);
+            // One-shot task session: the workspace snapshot must skip it or the
+            // publish script re-runs on every restart.
+            session.ExcludeFromWorkspace = true;
             session.Pty.Exited += (_, code) => RunOnUi(() => ReportPublishExit(session.Id, code));
             if (!session.IsRunning)
                 ReportPublishExit(session.Id, session.Pty.ExitCode ?? -1);
@@ -1427,13 +1444,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var ordered = SessionCards.Select(c => c.Model)
             .Concat(DetachedSessions)
+            .Where(m => !m.ExcludeFromWorkspace)
             .ToList();
         var ws = _settings.Workspace;
         ws.Sessions = ordered.Select(m => new WorkspaceSession
         {
             Name = m.Name,
             Tag = m.Tag.DisplayName(),
-            WorkingDirectory = m.WorkingDirectory,
+            // An ssh session's cwd is a REMOTE path — saving it would make the
+            // respawned ssh try to start in a nonexistent local directory.
+            WorkingDirectory = m.Tag == SessionTag.Ssh ? "" : m.WorkingDirectory,
             Shell = m.Shell,
             Arguments = m.ShellArguments,
         }).ToList();
@@ -1502,15 +1522,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Session-cwd normalize: a remote (ssh) path stays verbatim — the
+    /// local <see cref="CwdHistory.Normalize"/> would anchor "/home/u" at
+    /// "C:\home\u", which is neither a real local dir nor a valid remote cd.</summary>
+    private static string NormalizeSessionPath(TerminalSessionModel s, string path)
+    {
+        if (s.Tag != SessionTag.Ssh) return CwdHistory.Normalize(path);
+        var t = path.Trim();
+        return t.Length > 1 ? t.TrimEnd('/') : t;
+    }
+
     private void OnSessionCwdReported(TerminalSessionModel s, string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
-        path = CwdHistory.Normalize(path);
+        path = NormalizeSessionPath(s, path);
         if (path.Length == 0) return;
         lock (_cwdLock)
         {
             s.WorkingDirectory = path;
-            HistoryFor(s).Push(path);
+            if (s.Tag == SessionTag.Ssh) HistoryFor(s).PushRaw(path);
+            else HistoryFor(s).Push(path);
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
@@ -1518,7 +1549,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (!ReferenceEquals(ActiveSession, s)) return;
             UpdateBreadcrumbFrom(path);
             UpdateCwdNavFlags();
-            if (InspectorVisible && SelectedRightTab == 1) Files.NavigateTo(path);
+            // Files browses the LOCAL filesystem — never navigate it to a remote path.
+            if (s.Tag != SessionTag.Ssh && InspectorVisible && SelectedRightTab == 1)
+                Files.NavigateTo(path);
         });
     }
 
@@ -1527,7 +1560,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void RefreshCwd()
     {
         if (ActiveSession is null) return;
-        var probed = ProcessCwd.TryRead(ActiveSession.Pty);
+        // /proc probing reads the LOCAL ssh client's cwd, not the remote shell's.
+        var probed = ActiveSession.Tag == SessionTag.Ssh ? null : ProcessCwd.TryRead(ActiveSession.Pty);
         var path = !string.IsNullOrEmpty(probed) ? probed! : ActiveSession.WorkingDirectory;
         if (string.IsNullOrEmpty(path)) return;
         ApplyDisplayedCwd(path, sendCd: false, recordHistory: true);
@@ -1556,16 +1590,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ApplyDisplayedCwd(string path, bool sendCd, bool recordHistory)
     {
         if (ActiveSession is null) return;
-        path = CwdHistory.Normalize(path);
+        var ssh = ActiveSession.Tag == SessionTag.Ssh;
+        path = NormalizeSessionPath(ActiveSession, path);
         if (path.Length == 0) return;
         lock (_cwdLock)
         {
             ActiveSession.WorkingDirectory = path;
             if (recordHistory)
-                HistoryFor(ActiveSession).Push(path);
+            {
+                if (ssh) HistoryFor(ActiveSession).PushRaw(path);
+                else HistoryFor(ActiveSession).Push(path);
+            }
         }
         UpdateBreadcrumbFrom(path);
-        Files.NavigateTo(path);
+        if (!ssh) Files.NavigateTo(path);
         UpdateCwdNavFlags();
         if (sendCd && ActiveSession.IsRunning)
             ActiveSession.Emulator.SendText($"cd {QuoteForShell(path)}\r");
@@ -1585,16 +1623,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (OperatingSystem.IsWindows())
             return "\"" + path.Replace("\"", "\"\"") + "\"";
         return "'" + path.Replace("'", "'\\''") + "'";
-    }
-
-    [RelayCommand]
-    private void SubmitCommandInput()
-    {
-        if (string.IsNullOrEmpty(CommandInput)) return;
-        var text = CommandInput;
-        CommandInput = "";
-        if (ActiveSession is null) return;
-        ActiveSession.Emulator.SendText(text + "\r");
     }
 
     /// <summary>Per-session UTF-8 line decoders feeding the real Output log.
@@ -1647,7 +1675,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!reattach)
         {
             s.Pty.OutputReceived += OnPtyOutput;
-            if (!string.IsNullOrEmpty(s.WorkingDirectory))
+            // For ssh the spawn dir is the local client's cwd, not the remote
+            // shell's — pushing it would seed the history with a path that
+            // `cd` back fails on remotely.
+            if (s.Tag != SessionTag.Ssh && !string.IsNullOrEmpty(s.WorkingDirectory))
                 lock (_cwdLock) HistoryFor(s).Push(s.WorkingDirectory);
             s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
         }
@@ -1666,7 +1697,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // Detach (popout) keeps the session alive off-list: PTY output keeps
         // feeding Output/Logs, cwd history survives, and CwdChanged stays wired —
         // everything resumes seamlessly on Reattach. A real close tears it down.
-        if (!s.Detached)
+        // Capture now — Reattach can reset Detached before the posted lambda runs.
+        var detached = s.Detached;
+        if (!detached)
         {
             s.Pty.OutputReceived -= OnPtyOutput;
             _lineDecoders.TryRemove(s.Id, out _);
@@ -1678,9 +1711,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (IsSplit)
             {
                 if (ReferenceEquals(RightPane, s))
-                    RightPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, LeftPane));
+                    RightPane = PaneFallbackFor(s, LeftPane);
                 if (ReferenceEquals(LeftPane, s))
-                    LeftPane = _sessions.Sessions.FirstOrDefault();
+                    LeftPane = PaneFallbackFor(s, RightPane);
                 if (LeftPane is null && RightPane is null)
                 {
                     IsSplit = false;
@@ -1689,8 +1722,32 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
             if (vm is not null) SessionCards.Remove(vm);
+            if (!detached)
+            {
+                // Session names recycle ("Terminal 01" → the next auto-named
+                // session). The Logs filter map is keyed by name — drop the dead
+                // session's combo so a recycled name doesn't inherit it.
+                Logs.ForgetSessionFilter(s.Name);
+                _settings.LogsSessionFilters.Remove(s.Name);
+            }
             RefreshCounts();
         });
+    }
+
+    /// <summary>Pane fallback after a session closes: prefer the removed card's
+    /// shelf neighbor; never hand both panes the same session.</summary>
+    private TerminalSessionModel? PaneFallbackFor(TerminalSessionModel removed, TerminalSessionModel? otherPane)
+    {
+        var card = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, removed));
+        var idx = card is null ? -1 : SessionCards.IndexOf(card);
+        for (var i = idx + 1; i < SessionCards.Count; i++)
+            if (!ReferenceEquals(SessionCards[i].Model, otherPane))
+                return SessionCards[i].Model;
+        for (var i = idx - 1; i >= 0; i--)
+            if (!ReferenceEquals(SessionCards[i].Model, otherPane))
+                return SessionCards[i].Model;
+        return _sessions.Sessions.FirstOrDefault(o =>
+            !ReferenceEquals(o, removed) && !ReferenceEquals(o, otherPane));
     }
 
     private void SyncActive()
@@ -1707,7 +1764,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ActiveCard = target;
         Dashboard.RefreshSearch();
         UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
-        if (InspectorVisible && SelectedRightTab == 1) Files.NavigateTo(ActiveWorkingDirectory);
+        if (InspectorVisible && SelectedRightTab == 1
+            && ActiveSession?.Tag != SessionTag.Ssh)
+            Files.NavigateTo(ActiveWorkingDirectory);
         UpdateCwdNavFlags();
     }
 
@@ -1739,6 +1798,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         foreach (var s in _sessions.Snapshot)
         {
+            // The probe reads the local process's cwd — for ssh that is the ssh
+            // client's dir and would stomp the remote path reported via OSC 7.
+            if (s.Tag == SessionTag.Ssh) continue;
             var probed = ProcessCwd.TryRead(s.Pty);
             if (string.IsNullOrEmpty(probed)) continue;
             var norm = CwdHistory.Normalize(probed);

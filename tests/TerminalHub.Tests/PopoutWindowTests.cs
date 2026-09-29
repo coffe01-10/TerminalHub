@@ -108,6 +108,36 @@ public class PopoutWindowTests
         mgr.Close(mgr.Active!);
     }
 
+    /// <summary>Regression: a PTY whose StartAsync throws already owns process
+    /// handles — CreateAsync must dispose the emulator or every failed spawn leaks.</summary>
+    [Fact]
+    public async Task CreateAsync_StartFailure_DisposesHalfStartedPty()
+    {
+        var mgr = new SessionManager();
+        var pty = new FailingStartPty();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            mgr.CreateAsync(() => pty, new PtyOptions { Shell = "mock" }));
+        Assert.True(pty.Disposed);
+        Assert.Empty(mgr.Sessions);
+    }
+
+    private sealed class FailingStartPty : IPtySession
+    {
+        public bool Disposed { get; private set; }
+        public Guid Id { get; } = Guid.NewGuid();
+        public bool IsRunning => false;
+        public int? ExitCode => null;
+        public int? ProcessId => null;
+        public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived { add { } remove { } }
+        public event Action<IPtySession, int>? Exited { add { } remove { } }
+        public Task StartAsync(PtyOptions options, CancellationToken cancellationToken = default)
+            => Task.FromException(new InvalidOperationException("spawn failed"));
+        public void Write(ReadOnlySpan<byte> data) { }
+        public void Resize(int columns, int rows) { }
+        public void Kill() { }
+        public void Dispose() => Disposed = true;
+    }
+
     private static async Task<TerminalHub.App.ViewModels.MainWindowViewModel> ShowMain()
     {
         PtySessionFactory.UseMock = true;

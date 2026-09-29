@@ -408,6 +408,21 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     public Dictionary<string, LogsSessionFilterState> SnapshotSessionFilters()
         => _sessionFilters.ToDictionary(kv => kv.Key, kv => Clone(kv.Value));
 
+    /// <summary>Drop a closed session's remembered filter combo. Auto-names recycle
+    /// ("Terminal 01" → the next auto-named session), and a recycled name must not
+    /// inherit the dead session's filters — the map is keyed by name.</summary>
+    public void ForgetSessionFilter(string name) => _sessionFilters.Remove(name);
+
+    /// <summary>Rename moves a session's remembered combo to the new name — the old
+    /// name (often an auto-name) frees up without handing its filters to whatever
+    /// session recycles it later.</summary>
+    public void RenameSessionFilter(string oldName, string newName)
+    {
+        if (string.Equals(oldName, newName, StringComparison.Ordinal)) return;
+        if (_sessionFilters.Remove(oldName, out var state))
+            _sessionFilters[newName] = state;
+    }
+
     /// <summary>Copy of「全部会话」's remembered combo — the global-slot values
     /// <c>AppSettings.LogsFilterText</c> &amp; co. persist.</summary>
     public LogsSessionFilterState SnapshotGlobalFilters() => Clone(_globalFilters);

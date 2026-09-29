@@ -1,4 +1,3 @@
-using TerminalHub.Core.AI;
 using TerminalHub.Core.Monitoring;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Settings;
@@ -92,14 +91,5 @@ public class CoreSmokeTests
         monitor.Start(TimeSpan.FromMilliseconds(50));
         await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.InRange(monitor.Current.CpuPercent, 0, 100);
-    }
-
-    [Fact]
-    public void LocalAiAssistant_HasChecklistAndSuggestions()
-    {
-        var ai = new LocalAiAssistant();
-        Assert.NotEmpty(ai.Checklist);
-        Assert.NotEmpty(ai.Suggestions);
-        Assert.Contains(ai.Checklist, c => c.State == ChecklistState.Active);
     }
 }

@@ -46,6 +46,19 @@ public sealed class CwdHistory
         _index = _stack.Count - 1;
     }
 
+    /// <summary>Record a path that is not local (a remote shell's cwd over ssh).
+    /// Stored verbatim — <see cref="Normalize"/> would anchor "/home/u" at the
+    /// current drive, and only verbatim remote paths are cd-able on the remote.</summary>
+    public void PushRaw(string path)
+    {
+        if (path.Length == 0) return;
+        if (Current is { } cur && PathsEqual(cur, path)) return;
+        if (_index >= 0 && _index < _stack.Count - 1)
+            _stack.RemoveRange(_index + 1, _stack.Count - _index - 1);
+        _stack.Add(path);
+        _index = _stack.Count - 1;
+    }
+
     public string? Back()
     {
         if (!CanGoBack) return null;

@@ -134,18 +134,60 @@ public class CliInteractionTests
 
     [AvaloniaTheory]
     [InlineData(Key.Enter, KeyModifiers.Alt, "\x1b\r")]
+    // Alt+Shift+Enter keeps the Alt: without kitty it is still ESC CR, not a bare CR.
+    [InlineData(Key.Enter, KeyModifiers.Alt | KeyModifiers.Shift, "\x1b\r")]
     [InlineData(Key.F2, KeyModifiers.None, "\x1bOQ")]
     [InlineData(Key.Left, KeyModifiers.Control, "\x1b[1;5D")]
     [InlineData(Key.Right, KeyModifiers.Shift, "\x1b[1;2C")]
     [InlineData(Key.Back, KeyModifiers.Control, "\x17")]
     [InlineData(Key.C, KeyModifiers.Control, "\x03")]
     [InlineData(Key.Oem5, KeyModifiers.Control, "\x1c")]
+    // Shift does not change these control bytes: Ctrl+Shift+[ is still ESC, etc.
+    [InlineData(Key.Oem4, KeyModifiers.Control | KeyModifiers.Shift, "\x1b")]
+    [InlineData(Key.Oem5, KeyModifiers.Control | KeyModifiers.Shift, "\x1c")]
+    [InlineData(Key.Oem6, KeyModifiers.Control | KeyModifiers.Shift, "\x1d")]
+    [InlineData(Key.Space, KeyModifiers.Control | KeyModifiers.Shift, "\x00")]
     [InlineData(Key.B, KeyModifiers.Alt, "\x1b" + "b")]
     public void CliEditingKeys_KeepModifiers_AndCtrlCRemainsInterrupt(Key key, KeyModifiers modifiers, string expected)
     {
         using var f = new Fixture();
         f.View.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = key, KeyModifiers = modifiers });
         Assert.Equal(expected, f.Pty.Text);
+    }
+
+    /// <summary>Alt-screen has no local scrollback — the wheel belongs to the app
+    /// as cursor keys (xterm alternateScroll), batched per notch.</summary>
+    [AvaloniaFact]
+    public void AltScreen_WheelGoesToApp_AsCursorKeys()
+    {
+        using var f = new Fixture();
+        f.Emulator.Parser.Feed("\x1b[?1049h");           // alternate screen
+        f.Window.MouseWheel(new Point(40, 8), new Vector(0, -1));
+        Assert.Equal("\x1b[B\x1b[B\x1b[B", f.Pty.Text); // one notch → 3 cursor-downs
+        f.Pty.Writes.Clear();
+        f.Emulator.Parser.Feed("\x1b[?1h");             // application cursor keys → SS3 form
+        f.Window.MouseWheel(new Point(40, 8), new Vector(0, 1));
+        Assert.Equal("\x1bOA\x1bOA\x1bOA", f.Pty.Text);
+    }
+
+    /// <summary>Dragging onto a wide glyph's padding cell selects the whole glyph —
+    /// the highlight already covers it; the copied text must not silently drop it.</summary>
+    [AvaloniaFact]
+    public void Selection_DragOntoWideGlyphPadding_IncludesWholeGlyph()
+    {
+        using var f = new Fixture();
+        f.Emulator.Parser.Feed("中Xtail");                 // 中 = cells 0-1 (cell 1 padding), X = cell 2
+        var cellW = (double)typeof(TerminalView).GetField("_cellW",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(f.View)!;
+        var cellH = (double)typeof(TerminalView).GetField("_cellH",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(f.View)!;
+        var y = cellH / 2;                                 // row 0
+        f.Window.MouseDown(new Point(2.5 * cellW, y), MouseButton.Left);
+        f.Window.MouseMove(new Point(1.5 * cellW, y), RawInputModifiers.LeftMouseButton);
+        f.Window.MouseUp(new Point(1.5 * cellW, y), MouseButton.Left);
+        Assert.Equal("中X", f.View.GetSelectedText());
     }
 
     [AvaloniaFact]

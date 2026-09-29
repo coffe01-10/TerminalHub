@@ -4,7 +4,6 @@ using Avalonia.Data.Converters;
 using Avalonia;
 using Avalonia.Media;
 using TerminalHub.App.Controls;
-using TerminalHub.Core.AI;
 using TerminalHub.Core.Logging;
 
 namespace TerminalHub.App.ViewModels;
@@ -88,54 +87,6 @@ public sealed class BoolBrushConverter : IValueConverter
     public static readonly BoolBrushConverter Instance = new();
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is true ? ThemeManager.Brush("Accent") : ThemeManager.Brush("Muted");
-    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
-}
-
-/// <summary>Checklist state → ring stroke color.</summary>
-public sealed class ChecklistRingConverter : IValueConverter
-{
-    public static readonly ChecklistRingConverter Instance = new();
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is ChecklistState s
-            ? new SolidColorBrush(Color.Parse(s switch
-            {
-                ChecklistState.Done => "#34D399",
-                ChecklistState.Active => "#38BDF8",
-                _ => "#64748B",
-            }))
-            : Brushes.Gray;
-    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
-}
-
-/// <summary>Checklist state → fill (done=solid green, active=translucent, pending=empty).</summary>
-public sealed class ChecklistFillConverter : IValueConverter
-{
-    public static readonly ChecklistFillConverter Instance = new();
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is ChecklistState s
-            ? new SolidColorBrush(Color.Parse(s switch
-            {
-                ChecklistState.Done => "#34D399",
-                ChecklistState.Active => "#3338BDF8",
-                _ => "#00000000",
-            }))
-            : Brushes.Transparent;
-    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
-}
-
-/// <summary>Checklist state → text color (done=dimmed green, active=bright, pending=gray).</summary>
-public sealed class ChecklistTextConverter : IValueConverter
-{
-    public static readonly ChecklistTextConverter Instance = new();
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is ChecklistState s
-            ? new SolidColorBrush(Color.Parse(s switch
-            {
-                ChecklistState.Done => "#34D399",
-                ChecklistState.Active => "#E2E8F0",
-                _ => "#64748B",
-            }))
-            : Brushes.Gray;
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 

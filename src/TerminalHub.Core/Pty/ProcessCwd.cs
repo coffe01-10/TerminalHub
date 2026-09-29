@@ -26,7 +26,8 @@ public static class ProcessCwd
                 return Path.GetFullPath(info.LinkTarget);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-                                       or ArgumentException or NotSupportedException)
+                                       or ArgumentException or NotSupportedException
+                                       or PathTooLongException)
         {
             // process gone / permission / bad pid
         }

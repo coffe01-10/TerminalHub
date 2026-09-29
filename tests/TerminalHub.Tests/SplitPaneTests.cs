@@ -214,4 +214,27 @@ public class SplitPaneTests
             Assert.NotSame(right, vm.RightPane);
         window.Close();
     }
+
+    /// <summary>Regression: closing the LEFT pane's session must fall back to a
+    /// different session — never the one the right pane is already showing.</summary>
+    [AvaloniaFact]
+    public async Task Split_LeftSessionClosed_FallsToNeighbor_NotRightPaneSession()
+    {
+        var (window, vm) = await Boot();
+        vm.ToggleSplitCommand.Execute(null);
+        await Task.Delay(300);
+        Assert.True(vm.SessionCards.Count >= 3); // needs a session besides both panes
+
+        var left = vm.LeftPane!;
+        var right = vm.RightPane!;
+        var leftCard = vm.SessionCards.First(c => ReferenceEquals(c.Model, left));
+        vm.CloseSessionCommand.Execute(leftCard);
+        await Task.Delay(400);
+
+        Assert.True(vm.IsSplit);
+        Assert.NotNull(vm.LeftPane);
+        Assert.NotSame(left, vm.LeftPane);
+        Assert.NotSame(right, vm.LeftPane); // panes must not collapse onto one session
+        window.Close();
+    }
 }
