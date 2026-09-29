@@ -78,7 +78,12 @@ public sealed class SessionLogFile : IDisposable
     private string OpenNewLocked(string dir)
     {
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"terminalhub-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        // Millisecond precision + a collision counter: a same-second re-Enable
+        // or rotation must not append a second header into the previous file.
+        var stamp = DateTime.Now;
+        var path = Path.Combine(dir, $"terminalhub-{stamp:yyyyMMdd-HHmmss-fff}.log");
+        for (var i = 2; File.Exists(path); i++)
+            path = Path.Combine(dir, $"terminalhub-{stamp:yyyyMMdd-HHmmss-fff}-{i}.log");
         _writer = new StreamWriter(
             new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
         { AutoFlush = true };

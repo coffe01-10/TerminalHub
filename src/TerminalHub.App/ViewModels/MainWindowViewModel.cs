@@ -302,9 +302,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public LogsViewModel Logs { get; }
     public SshViewModel Ssh { get; }
     private readonly SessionLogFile _sessionLog = new();
+    /// <summary>"Open in file manager" seam — tests stub it so no real Explorer
+    /// window pops on a temp artifacts dir the test then deletes (位置不可用).</summary>
+    private readonly Action<string> _openFolder;
 
-    public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null)
+    public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null,
+        Action<string>? openFolder = null)
     {
+        _openFolder = openFolder ?? OpenFolderInFileManager;
         _settingsStore = settingsStore ?? new SettingsStore();
         _settings = _settingsStore.Load();
         ThemeManager.Apply(_settings.Theme);
@@ -684,8 +689,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var (card, name) = args;
         if (card is null || string.IsNullOrWhiteSpace(name)) return;
         name = name.Trim();
-        var startup = _settings.StartupSessions.FindIndex(s => s.Name == card.Name);
-        if (startup >= 0) _settings.StartupSessions[startup] = _settings.StartupSessions[startup] with { Name = name };
+        // Startup entries have no session identity — rename every match instead
+        // of the first, so duplicate names can't rewrite the wrong slot.
+        for (var i = 0; i < _settings.StartupSessions.Count; i++)
+            if (_settings.StartupSessions[i].Name == card.Name)
+                _settings.StartupSessions[i] = _settings.StartupSessions[i] with { Name = name };
         var oldName = card.Name;
         _sessions.Rename(card.Model, name);
         _sessionNames[card.Model.Id] = name; // future output lines carry the new name
@@ -1023,8 +1031,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found[0].Path)
-                { UseShellExecute = true });
+            _openFolder(found[0].Path);
             Dashboard.AppendOutput("info", "Deploy: 已在文件管理器中打开产物目录", "deploy");
         }
         catch
@@ -1034,6 +1041,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dashboard.AppendOutput("info",
             "Deploy: 重新发布请按住 Ctrl 再点 Deploy，或右键菜单「重新打包」。", "deploy");
     }
+
+    private static void OpenFolderInFileManager(string path)
+        => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path)
+            { UseShellExecute = true });
 
     private void StartPublish(string startDir, PublishPlatform platform)
     {
@@ -1684,6 +1695,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            // The window can close between SessionAdded and this post — no card
+            // would ever be created and the spawned PTY would leak.
+            if (_disposed) { s.Dispose(); return; }
             var card = new SessionCardViewModel(s);
             card.Refresh();
             SessionCards.Add(card);
@@ -1852,7 +1866,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Files.Dispose();
         _sessionLog.Dispose();
         _monitor.Dispose();
-        foreach (var c in SessionCards) c.Model.Dispose();
+        // SessionCards lags _sessions.Sessions for a session whose posted
+        // card-add hasn't run yet — dispose the union so no PTY leaks.
+        var live = new HashSet<TerminalSessionModel>(SessionCards.Select(c => c.Model));
+        live.UnionWith(_sessions.Sessions);
         SessionCards.Clear();
+        foreach (var s in live) s.Dispose();
     }
 }

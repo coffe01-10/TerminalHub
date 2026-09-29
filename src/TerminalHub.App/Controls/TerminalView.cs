@@ -123,7 +123,11 @@ public class TerminalView : Control
                 SetScrolledUp(_viewOffset > 0);
                 Interlocked.Exchange(ref _dirty, 1);
             }
-            var blink = !IsPreview && Environment.TickCount64 - _lastBlink >= 530;
+            // Blink only repaints the focused view — the cursor and carets are
+            // drawn for IsFocused (or previews, which don't blink) anyway, so
+            // ticking unfocused panes was a wasted InvalidateVisual every 530ms.
+            var blink = !IsPreview && IsFocused
+                && Environment.TickCount64 - _lastBlink >= 530;
             if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
             if (!IsPreview && IsFocused)
             {
@@ -930,7 +934,11 @@ public class TerminalView : Control
             }
             // Ctrl+Shift+C copy / Ctrl+Shift+V paste, plain Ctrl+key → control byte.
             // Bare Ctrl+C keeps sending ETX — the terminal interrupt stays intact.
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            // Alt is excluded here too: Ctrl+Alt is AltGr on many layouts and the
+            // key must reach TextInput to produce its real character instead of
+            // a spurious control byte.
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control)
+                && !e.KeyModifiers.HasFlag(KeyModifiers.Alt))
             {
                 if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {

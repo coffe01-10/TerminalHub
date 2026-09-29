@@ -208,7 +208,10 @@ public sealed class SystemMonitor : ISystemMonitor
     {
         try
         {
-            var root = OperatingSystem.IsWindows() ? "C:\\" : "/";
+            // The OS drive, not a hardcoded C:\ — some machines install Windows elsewhere.
+            var root = OperatingSystem.IsWindows()
+                ? Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\"
+                : "/";
             var drive = DriveInfo.GetDrives()
                 .FirstOrDefault(d => d.IsReady && root.StartsWith(d.Name, StringComparison.OrdinalIgnoreCase));
             if (drive is null) return (0, 0);

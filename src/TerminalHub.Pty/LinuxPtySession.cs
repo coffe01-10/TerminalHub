@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 using TerminalHub.Core.Pty;
 
 namespace TerminalHub.Pty;
@@ -13,7 +14,7 @@ namespace TerminalHub.Pty;
 /// </summary>
 public sealed class LinuxPtySession : IPtySession
 {
-    private int _masterFd = -1;
+    private SafeFileHandle? _master;
     private int _childPid;
     private CancellationTokenSource? _readLoopCts;
     private Task? _readLoop;
@@ -56,7 +57,7 @@ public sealed class LinuxPtySession : IPtySession
             pid = Native.forkpty(out var masterFd, IntPtr.Zero, IntPtr.Zero, ref win);
             if (pid < 0)
                 throw new InvalidOperationException($"forkpty failed: errno={Marshal.GetLastWin32Error()}");
-            _masterFd = masterFd;
+            _master = new SafeFileHandle(masterFd, ownsHandle: true);
         }
         catch
         {
@@ -181,7 +182,10 @@ public sealed class LinuxPtySession : IPtySession
         // poll() drives the loop: cancellation is observed within 100ms, and a
         // blocked read() can never outlive Dispose (close() does not reliably
         // wake a read() already in progress on Linux).
-        var fds = new PollFd { Fd = _masterFd, Events = Native.POLLIN };
+        // The fd is captured once: Dispose waits for this loop before closing
+        // the handle, so the number stays valid for the loop's lifetime.
+        var fd = _master is { } m ? (int)m.DangerousGetHandle() : -1;
+        var fds = new PollFd { Fd = fd, Events = Native.POLLIN };
         try
         {
             while (!ct.IsCancellationRequested)
@@ -192,7 +196,7 @@ public sealed class LinuxPtySession : IPtySession
                 if (ready <= 0) continue;           // timeout → re-check ct; EINTR → retry
 
                 int n;
-                try { n = Native.read(_masterFd, buffer, buffer.Length); }
+                try { n = Native.read(fd, buffer, buffer.Length); }
                 catch { break; }
                 // After POLLHUP, read() still returns the kernel-buffered tail
                 // before reporting EIO/EOF — so the child's final output survives
@@ -235,29 +239,56 @@ public sealed class LinuxPtySession : IPtySession
 
     public void Write(ReadOnlySpan<byte> data)
     {
-        if (_masterFd < 0 || !IsRunning) return;
+        var master = _master;
+        if (master is null || !IsRunning) return;
         var tmp = data.ToArray();
-        // Loop on short writes — a large paste can exceed the PTY kernel buffer
-        // (on Linux, 4096 bytes in canonical-echo terms); EINTR → retry.
-        var off = 0;
-        while (off < tmp.Length)
+        // Pin the fd for the whole write: VT query responses come in on the
+        // PTY read thread while Dispose can close the handle from the UI
+        // thread — without AddRef the OS could recycle the descriptor and the
+        // write would hit an unrelated fd.
+        var release = false;
+        try
         {
-            var n = Native.write(_masterFd, ref tmp[off], tmp.Length - off);
-            if (n < 0)
+            master.DangerousAddRef(ref release);
+            var fd = (int)master.DangerousGetHandle();
+            // Loop on short writes — a large paste can exceed the PTY kernel
+            // buffer (on Linux, 4096 bytes in canonical-echo terms); EINTR → retry.
+            var off = 0;
+            while (off < tmp.Length)
             {
-                if (Marshal.GetLastWin32Error() == Native.EINTR) continue;
-                break;
+                var n = Native.write(fd, ref tmp[off], tmp.Length - off);
+                if (n < 0)
+                {
+                    if (Marshal.GetLastWin32Error() == Native.EINTR) continue;
+                    break;
+                }
+                if (n == 0) break;
+                off += n;
             }
-            if (n == 0) break;
-            off += n;
+        }
+        catch (ObjectDisposedException) { /* handle closed concurrently */ }
+        finally
+        {
+            if (release) master.DangerousRelease();
         }
     }
 
     public void Resize(int columns, int rows)
     {
-        if (_masterFd < 0) return;
-        var win = new Winsize { ws_row = (ushort)rows, ws_col = (ushort)columns };
-        Native.ioctl(_masterFd, Native.TIOCSWINSZ, ref win);
+        var master = _master;
+        if (master is null) return;
+        var release = false;
+        try
+        {
+            master.DangerousAddRef(ref release);
+            var win = new Winsize { ws_row = (ushort)rows, ws_col = (ushort)columns };
+            Native.ioctl((int)master.DangerousGetHandle(), Native.TIOCSWINSZ, ref win);
+        }
+        catch (ObjectDisposedException) { /* handle closed concurrently */ }
+        finally
+        {
+            if (release) master.DangerousRelease();
+        }
     }
 
     public void Kill()
@@ -294,11 +325,9 @@ public sealed class LinuxPtySession : IPtySession
         // Wait for the read loop BEFORE closing the fd — otherwise the loop could
         // read() a stale descriptor number that the OS may have already recycled.
         try { _readLoop?.Wait(300); } catch { }
-        if (_masterFd >= 0)
-        {
-            try { Native.close(_masterFd); } catch { }
-            _masterFd = -1;
-        }
+        // SafeFileHandle.Dispose defers the real close() until any in-flight
+        // DangerousAddRef (Write/Resize on another thread) has released.
+        _master?.Dispose();
         FreeNativeAllocations();
     }
 
@@ -325,7 +354,9 @@ public sealed class LinuxPtySession : IPtySession
         public const int SIGHUP = 1;
         public const int SIGKILL = 9;
         public const int EINTR = 4; // same value on Linux and macOS
-        public const uint TIOCSWINSZ = 0x5414;
+        // 0x5414 is the Linux value; macOS needs 0x80087467 — this class serves both.
+        public static readonly uint TIOCSWINSZ =
+            OperatingSystem.IsMacOS() ? 0x80087467u : 0x5414u;
         public const short POLLIN = 0x0001;
 
         [DllImport("libc", SetLastError = true)]
@@ -334,7 +365,6 @@ public sealed class LinuxPtySession : IPtySession
         [DllImport("libc")] public static extern int read(int fd, byte[] buf, int count);
         [DllImport("libc", SetLastError = true)] public static extern int write(int fd, ref byte buf, int count);
         [DllImport("libc", SetLastError = true)] public static extern int poll(ref PollFd fds, nint nfds, int timeoutMs);
-        [DllImport("libc")] public static extern int close(int fd);
         [DllImport("libc")] public static extern int ioctl(int fd, uint request, ref Winsize winp);
         [DllImport("libc")] public static extern int kill(int pid, int sig);
         [DllImport("libc")] public static extern int getpgid(int pid);

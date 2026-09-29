@@ -123,4 +123,22 @@ public class SessionOutputTests
         d.Feed(bytes.AsSpan(3));
         Assert.Equal(new[] { "目录列表" }, lines);
     }
+
+    [Fact]
+    public void Decoder_OversizedLine_ForceEmits()
+    {
+        // A stream with no \r or \n (cat of a huge binary) must not accumulate
+        // in _line forever — the pending line is force-emitted at the cap.
+        var d = new Utf8LineDecoder();
+        var lines = new List<string>();
+        d.LineReceived += lines.Add;
+        var chunk = Encoding.UTF8.GetBytes(new string('a', 256 * 1024));
+        for (var i = 0; i < 5; i++) d.Feed(chunk); // 1.25M chars > 1Mi cap
+        Assert.Single(lines);
+        Assert.Equal(1 << 20, lines[0].Length);
+        d.Feed(Encoding.UTF8.GetBytes("\n"));
+        Assert.Equal(2, lines.Count);
+        // The char that tipped the cap is appended to the fresh pending line.
+        Assert.Equal(256 * 1024, lines[1].Length);
+    }
 }

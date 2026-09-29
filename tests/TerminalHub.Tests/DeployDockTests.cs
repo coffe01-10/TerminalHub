@@ -129,12 +129,15 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: true);
-        var vm = new MainWindowViewModel();
+        var opened = new List<string>();
+        var vm = new MainWindowViewModel(openFolder: opened.Add);
         try
         {
             vm.DeployFromDock(false, root);
             await FlushUi();
             Assert.DoesNotContain(vm.SessionCards, c => c.Name == "Publish");
+            Assert.Single(opened);
+            Assert.Contains("linux-x64", opened[0]);
             Assert.Contains(vm.Dashboard.OutputLog, l =>
                 l.Source == "deploy" && l.Message.Contains("产物目录") && l.Message.Contains("linux-x64"));
             Assert.Contains(vm.Dashboard.OutputLog, l =>
@@ -184,7 +187,7 @@ public class DeployDockTests
     {
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: true);
-        var vm = new MainWindowViewModel();
+        var vm = new MainWindowViewModel(openFolder: _ => { });
         var previous = Directory.GetCurrentDirectory();
         try
         {
@@ -218,7 +221,7 @@ public class DeployDockTests
         PtySessionFactory.UseMock = true;
         var root = TempRepo(withScript: true, withArtifact: true);
         var previous = Directory.GetCurrentDirectory();
-        var window = new MainWindow { Width = 1200, Height = 800 };
+        var window = new MainWindow(openFolder: _ => { }) { Width = 1200, Height = 800 };
         try
         {
             Directory.SetCurrentDirectory(root);
@@ -454,7 +457,7 @@ public class DeployDockTests
         var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
         var empty = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"th-empty-{Guid.NewGuid():N}"));
         var previous = Directory.GetCurrentDirectory();
-        var window = new MainWindow(new SettingsStore(settingsPath)) { Width = 1200, Height = 800 };
+        var window = new MainWindow(new SettingsStore(settingsPath), _ => { }) { Width = 1200, Height = 800 };
         try
         {
             Directory.SetCurrentDirectory(empty.FullName);
@@ -683,7 +686,7 @@ public class DeployDockTests
         var root = TempRepo(withScript: true, withArtifact: true);
         var settingsPath = Path.Combine(Path.GetTempPath(), $"th-dock-set-{Guid.NewGuid():N}.json");
         var previous = Directory.GetCurrentDirectory();
-        var window = new MainWindow(new SettingsStore(settingsPath)) { Width = 1200, Height = 800 };
+        var window = new MainWindow(new SettingsStore(settingsPath), _ => { }) { Width = 1200, Height = 800 };
         MainWindowViewModel? vm = null;
         MainWindowViewModel? reloaded = null;
         try

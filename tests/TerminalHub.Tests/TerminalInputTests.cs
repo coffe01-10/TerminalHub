@@ -44,4 +44,46 @@ public class TerminalInputTests
         Assert.Contains("mock: dir", text);
         window.Close();
     }
+
+    /// <summary>AltGr = Ctrl+Alt on many layouts: the key must NOT turn into a
+    /// control byte. Before the fix, AltGr+E wrote \x05 (ENQ) to the PTY and
+    /// swallowed the character the user's IME would have produced.</summary>
+    [AvaloniaFact]
+    public async Task CtrlAltLetter_DoesNotSendControlByte()
+    {
+        var (window, vm) = await Boot();
+        var view = window.GetVisualDescendants().OfType<TerminalView>().First(v => !v.IsPreview && v.IsEffectivelyVisible);
+        view.Focus();
+        await Task.Delay(100);
+        Assert.True(view.IsFocused);
+
+        var pty = (TerminalHub.Core.Pty.MockPtySession)vm.ActiveSession!.Emulator.Pty;
+        var before = pty.RawInput.Length;
+
+        window.KeyPressQwerty(PhysicalKey.E, RawInputModifiers.Control | RawInputModifiers.Alt);
+        await Task.Delay(150);
+
+        Assert.Equal(before, pty.RawInput.Length); // AltGr+E produced nothing at the PTY
+        window.Close();
+    }
+
+    /// <summary>Plain Ctrl+letter still sends its control byte — AltGr exclusion
+    /// must not break normal control keys.</summary>
+    [AvaloniaFact]
+    public async Task CtrlLetter_StillSendsControlByte()
+    {
+        var (window, vm) = await Boot();
+        var view = window.GetVisualDescendants().OfType<TerminalView>().First(v => !v.IsPreview && v.IsEffectivelyVisible);
+        view.Focus();
+        await Task.Delay(100);
+        Assert.True(view.IsFocused);
+
+        var pty = (TerminalHub.Core.Pty.MockPtySession)vm.ActiveSession!.Emulator.Pty;
+
+        window.KeyPressQwerty(PhysicalKey.E, RawInputModifiers.Control);
+        await Task.Delay(150);
+
+        Assert.Contains("\x05", pty.RawInput.ToString());
+        window.Close();
+    }
 }

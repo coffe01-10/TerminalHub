@@ -97,7 +97,7 @@ public class UiSmokeTests
     public async Task DockSelect_Deploy_ReportsArtifactsOrInstructions()
     {
         PtySessionFactory.UseMock = true;
-        var window = new MainWindow { Width = 1200, Height = 800 };
+        var window = new MainWindow(openFolder: _ => { }) { Width = 1200, Height = 800 };
         window.Show();
         await Task.Delay(400);
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;

@@ -527,6 +527,21 @@ public class TerminalCoreTests
     }
 
     [Fact]
+    public void Scrollback_BatchTrim_NotifiesNegative_KeepsNetDriftConsistent()
+    {
+        // Trimming must fire a negative delta so a scrolled-up view can stay
+        // anchored (and net drift must equal the final count).
+        var (p, b) = Make(5, 2);
+        var drift = 0;
+        b.ScrollbackChanged += d => drift += d;
+        // 2200 newlines on a 2-row buffer ≈ 2199 scrollback pushes — past the
+        // 2000 limit + 128 slack, so at least one batch trim runs.
+        for (var i = 0; i < 2200; i++) p.Feed("x\n");
+        Assert.InRange(b.ScrollbackCount, 2000, 2128);
+        Assert.Equal(b.ScrollbackCount, drift);
+    }
+
+    [Fact]
     public void WideChar_LastColumn_NoAutoWrap_StaysOnLine()
     {
         var (p, b) = Make(5, 4);

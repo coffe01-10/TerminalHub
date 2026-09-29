@@ -10,7 +10,9 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-        Controls.ThemeManager.Apply("DarkGlass");
+        // Apply the persisted theme now — the VM re-applies it later, but doing
+        // it here first prevents a DarkGlass flash for users on another theme.
+        Controls.ThemeManager.Apply(new TerminalHub.Core.Settings.SettingsStore().Load().Theme);
     }
 
     public override void OnFrameworkInitializationCompleted()

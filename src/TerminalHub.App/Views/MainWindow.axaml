@@ -293,7 +293,7 @@
                     IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
               <Grid RowDefinitions="30,*">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="4,0">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="4,0">
                   <ListBox SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                            ScrollViewer.VerticalScrollBarVisibility="Disabled"
@@ -332,14 +332,6 @@
                           Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                           Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"
                           Command="{Binding Dashboard.ClearOutputCommand}"/>
-                  <ComboBox Grid.Column="2" SelectedIndex="0" Margin="6,0,0,0" VerticalAlignment="Center"
-                            Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" FontSize="10" MinWidth="90"
-                            CornerRadius="6" Padding="6,2">
-                    <ComboBoxItem>All Levels</ComboBoxItem>
-                    <ComboBoxItem>Info</ComboBoxItem>
-                    <ComboBoxItem>Warn</ComboBoxItem>
-                    <ComboBoxItem>Error</ComboBoxItem>
-                  </ComboBox>
                 </Grid>
 
                 <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource UiBorder}">

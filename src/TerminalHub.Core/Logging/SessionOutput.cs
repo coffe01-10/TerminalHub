@@ -11,6 +11,11 @@ namespace TerminalHub.Core.Logging;
 /// </summary>
 public sealed class Utf8LineDecoder
 {
+    /// <summary>Force-emit the pending line once it passes this many chars: a
+    /// stream with no \r or \n at all (e.g. cat of a huge binary) would
+    /// otherwise grow this buffer without bound.</summary>
+    private const int MaxPendingLineChars = 1 << 20;
+
     private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
     private readonly StringBuilder _line = new();
     private bool _pendingCR;
@@ -56,6 +61,7 @@ public sealed class Utf8LineDecoder
             }
             else
             {
+                if (_line.Length >= MaxPendingLineChars) Emit();
                 _line.Append(ch);
             }
         }

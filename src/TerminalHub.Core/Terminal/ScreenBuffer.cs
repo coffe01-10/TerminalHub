@@ -74,6 +74,21 @@ public sealed class ScreenBuffer
     /// <summary>Cell that a following zero-width rune joins (set by the last PutCluster).</summary>
     private int _lastGlyphRow = -1, _lastGlyphCol;
     private int _scrollbackLimit = 2000;
+    /// <summary>Overshoot allowed before a trim runs: lets removal batch instead
+    /// of memmoving the whole list once per scrolled line.</summary>
+    private const int ScrollbackSlack = 128;
+
+    /// <summary>Drop oldest scrollback lines down to the limit, in batches.
+    /// The negative delta keeps scrolled-up views anchored to the same content
+    /// (previously trims never notified, so the viewport silently drifted).</summary>
+    private void TrimScrollbackIfNeeded()
+    {
+        if (_scrollback.Count <= _scrollbackLimit + ScrollbackSlack) return;
+        var drop = _scrollback.Count - _scrollbackLimit;
+        _scrollback.RemoveRange(0, drop);
+        _scrollWrapped.RemoveRange(0, drop);
+        ScrollbackChanged?.Invoke(-drop);
+    }
 
     // Cursor + saved state
     public int CursorX { get; private set; }
@@ -457,11 +472,7 @@ public sealed class ScreenBuffer
             {
                 _scrollback.Add(rowArr);
                 _scrollWrapped.Add(leavingWrapped);
-                if (_scrollback.Count > _scrollbackLimit)
-                {
-                    _scrollback.RemoveAt(0);
-                    _scrollWrapped.RemoveAt(0);
-                }
+                TrimScrollbackIfNeeded();
                 ScrollbackChanged?.Invoke(1);
             }
         }
@@ -699,11 +710,7 @@ public sealed class ScreenBuffer
                 Array.Copy(_screen, r * Columns, rowArr, 0, Columns);
                 _scrollback.Add(rowArr);
                 _scrollWrapped.Add(_wrapped[r]);
-                if (_scrollback.Count > _scrollbackLimit)
-                {
-                    _scrollback.RemoveAt(0);
-                    _scrollWrapped.RemoveAt(0);
-                }
+                TrimScrollbackIfNeeded();
             }
             ScrollbackChanged?.Invoke(lostRows);
             CursorY = Math.Max(0, CursorY - lostRows);

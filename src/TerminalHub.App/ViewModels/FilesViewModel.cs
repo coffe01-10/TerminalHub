@@ -127,7 +127,11 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             if (_disposed) return;
             _watcher?.Dispose();
             _watcher = null;
-            WatchDirectory();          // _watcher is null → guard passes, watcher rebuilt
+            // WatchDirectory() → new FileSystemWatcher(CurrentPath) throws if the
+            // watched dir was deleted between the error and this rebuild — that
+            // would be an unhandled exception on the dispatcher. NavigateTo has
+            // its own guard; only rebuild the watcher when the dir still exists.
+            if (Directory.Exists(CurrentPath)) WatchDirectory();
             NavigateTo(CurrentPath);
         });
     }

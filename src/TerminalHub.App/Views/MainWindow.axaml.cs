@@ -30,10 +30,10 @@ public partial class MainWindow : Window
     {
     }
 
-    public MainWindow(SettingsStore? settingsStore)
+    public MainWindow(SettingsStore? settingsStore = null, Action<string>? openFolder = null)
     {
         InitializeComponent();
-        DataContext = new MainWindowViewModel(settingsStore: settingsStore);
+        DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder);
         Vm.PropertyChanged += OnStageSelectionChanged;
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
         Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
