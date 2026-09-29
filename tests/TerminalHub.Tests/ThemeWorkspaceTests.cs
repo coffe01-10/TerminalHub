@@ -36,6 +36,15 @@ public class ThemeWorkspaceTests
         Assert.Equal(5, fixture.Window.GetVisualDescendants().OfType<StagePreview>().Count());
         Assert.Equal(ThemeManager.Names[theme], vm.Settings.Theme);
         Assert.Equal(ThemeManager.IsLight, theme is 2 or 3);
+        // The session menu used to keep Fluent's grey background in Paper.
+        var menuButton = fixture.Window.FindControl<Button>("SessionMenuButton")!;
+        var menu = (MenuFlyout)menuButton.Flyout!;
+        menu.ShowAt(menuButton);
+        await Task.Delay(80);
+        var presenter = ((MenuItem)menu.Items[0]!).FindAncestorOfType<MenuFlyoutPresenter>()!;
+        Assert.NotNull(presenter);
+        Assert.Same(ThemeManager.Brush("Surface"), presenter.Background);
+        menu.Hide();
         var output = Environment.GetEnvironmentVariable("TERMINALHUB_STAGE_CAPTURES");
         if (output is not null)
         {
@@ -44,6 +53,14 @@ public class ThemeWorkspaceTests
             vm.ShowWorkspaceCommand.Execute(null);
             await Task.Delay(200);
             fixture.Window.CaptureRenderedFrame()!.Save(Path.Combine(output, $"workspace-{ThemeManager.Current}.png"));
+            vm.InspectorVisible = false;
+            vm.SettingsOpen = true;
+            await Task.Delay(150);
+            fixture.Window.CaptureRenderedFrame()!.Save(Path.Combine(output, $"settings-{ThemeManager.Current}.png"));
+            vm.SettingsOpen = false;
+            vm.ToggleSplitCommand.Execute(null);
+            await Task.Delay(150);
+            fixture.Window.CaptureRenderedFrame()!.Save(Path.Combine(output, $"split-{ThemeManager.Current}.png"));
         }
     }
 

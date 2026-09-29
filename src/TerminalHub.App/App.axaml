@@ -4,6 +4,22 @@
              RequestedThemeVariant="Dark">
   <Application.Styles>
     <FluentTheme />
+    <Style Selector="TextBox, ComboBox">
+      <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
+      <Setter Property="Background" Value="{DynamicResource UiInset}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
+    </Style>
+    <Style Selector="MenuFlyoutPresenter">
+      <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Padding" Value="6"/>
+    </Style>
+    <Style Selector="MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Padding" Value="10,8"/>
+    </Style>
   </Application.Styles>
 
   <Application.Resources>

@@ -16,6 +16,29 @@
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="64">
 
+  <Window.Styles>
+    <Style Selector="Border.settings-group">
+      <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Padding" Value="16"/>
+    </Style>
+    <Style Selector="TextBlock.settings-heading">
+      <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="5,6,0,0"/>
+    </Style>
+    <Style Selector="Border#SettingsPanel TextBox, Border#SettingsPanel ComboBox">
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="Padding" Value="10,7"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+  </Window.Styles>
+
   <Window.KeyBindings>
     <!-- Session shortcuts live in OnSessionShortcutKeyDown (tunnel handler) so bare
          Ctrl+letter control bytes keep reaching the PTY: app chords are Ctrl+Shift+*. -->
@@ -48,7 +71,7 @@
                     Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0" FontSize="12"/>
             <Button Content="◫ 工具" Command="{Binding ToggleInspectorCommand}" ToolTip.Tip="显示 / 隐藏右栏 · Ctrl+Shift+B"
                     Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0" FontSize="12"/>
-            <Button Content="⚙" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
+            <Button Content="⚙" FontFamily="Segoe UI Symbol" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
                     Command="{Binding DockSelectCommand}" CommandParameter="5"/>
             <Button Content="—" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
                     Click="OnMinimizeClick"/>
@@ -111,7 +134,7 @@
                     <Style Selector="ctl|StageCard.active">
                       <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
                       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
-                      <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}"/>
+                      <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
                     </Style>
                   </ctl:StageCard.Styles>
                   <Grid RowDefinitions="24,*,Auto">
@@ -130,6 +153,7 @@
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding WorkingDirectory}"/>
                       <TextBlock Grid.Column="1" Text="当前终端" IsVisible="{Binding IsActive}" FontSize="9" Foreground="{DynamicResource UiAccent}"/>
                     </Grid>
+                    <ctl:StageCardFinish Grid.RowSpan="3" Margin="-9" IsVisible="{Binding !IsActive}" IsHitTestVisible="False"/>
                   </Grid>
                 </ctl:StageCard>
               </DataTemplate>
@@ -194,7 +218,7 @@
                       Foreground="{DynamicResource UiMuted}" FontSize="11" Padding="6,0"
                       Command="{Binding OpenInNewWindowCommand}"
                       ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）"/>
-              <Button Grid.Column="6" Content="•••" Background="Transparent" BorderThickness="0"
+              <Button x:Name="SessionMenuButton" Grid.Column="6" Content="•••" Background="Transparent" BorderThickness="0"
                       Foreground="{DynamicResource UiMuted}" Padding="6,0" ToolTip.Tip="会话操作">
                 <Button.Flyout>
                   <MenuFlyout>
@@ -245,7 +269,16 @@
                       <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
                       <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
                     </Border.Styles>
-                    <Panel>
+                    <Grid RowDefinitions="32,*">
+                      <Border Background="{DynamicResource UiRaised}" CornerRadius="5,5,0,0" Padding="10,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock x:Name="LeftPaneTitle" Text="{Binding LeftPaneName}" FontSize="11" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                                     IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                        </Grid>
+                      </Border>
+                      <Panel Grid.Row="1" Margin="6,7,6,4">
                       <ctl:TerminalView x:Name="LeftTerminal" Emulator="{Binding LeftPane.Emulator}"
                                         TerminalFontSize="{Binding FontSize}"
                                         TerminalFontFamily="{Binding TerminalFont}"
@@ -257,6 +290,7 @@
                               IsVisible="{Binding #LeftTerminal.IsScrolledUp}"
                               ToolTip.Tip="回到实时输出底部"/>
                     </Panel>
+                    </Grid>
                   </Border>
                   <GridSplitter Grid.Column="1" Width="5" Background="{DynamicResource UiRaised}"
                                 ResizeBehavior="BasedOnAlignment"/>
@@ -266,7 +300,16 @@
                       <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
                       <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
                     </Border.Styles>
-                    <Panel Background="Transparent">
+                    <Grid RowDefinitions="32,*">
+                      <Border Background="{DynamicResource UiRaised}" CornerRadius="5,5,0,0" Padding="10,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock x:Name="RightPaneTitle" Text="{Binding RightPaneName}" FontSize="11" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                                     IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"/>
+                        </Grid>
+                      </Border>
+                      <Panel Grid.Row="1" Margin="6,7,6,4" Background="Transparent">
                       <ctl:TerminalView x:Name="RightTerminal" Emulator="{Binding RightPane.Emulator}"
                                         TerminalFontSize="{Binding FontSize}"
                                         TerminalFontFamily="{Binding TerminalFont}"
@@ -283,6 +326,7 @@
                               IsVisible="{Binding #RightTerminal.IsScrolledUp}"
                               ToolTip.Tip="回到实时输出底部"/>
                     </Panel>
+                    </Grid>
                   </Border>
                 </Grid>
               </Panel>
@@ -1241,81 +1285,108 @@
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"
                 Command="{Binding DockSelectCommand}" CommandParameter="5">
           <StackPanel>
-            <TextBlock Text="⚙" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="⚙" FontFamily="Segoe UI Symbol" FontSize="20" HorizontalAlignment="Center"/>
             <TextBlock Text="Settings" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
       </StackPanel>
     </Border>
 
-    <!-- ============ Settings overlay ============ -->
-    <Border IsVisible="{Binding SettingsOpen}" ZIndex="200"
-            HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="320"
-            Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1,0,0,0"
-            Padding="16" CornerRadius="14,0,0,0">
-      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Spacing="12">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Text="设置 Settings" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-          <Button Grid.Column="1" Content="✕" Background="Transparent" BorderThickness="0"
-                  Foreground="{DynamicResource UiMuted}" Command="{Binding DockSelectCommand}" CommandParameter="5"/>
+    <!-- Floating, grouped preferences; header and actions stay visible when scrolling. -->
+    <Border x:Name="SettingsPanel" IsVisible="{Binding SettingsOpen}" ZIndex="200"
+            HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="440" Margin="16"
+            Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
+            BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="18" ClipToBounds="True">
+      <Grid RowDefinitions="76,*,66">
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="22,16">
+          <Border Width="38" Height="38" Background="{DynamicResource UiAccentSoft}" CornerRadius="10">
+            <TextBlock Text="⚙" FontFamily="Segoe UI Symbol" FontSize="23" Foreground="{DynamicResource UiAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel Grid.Column="1" Spacing="3" Margin="12,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="设置" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+            <TextBlock Text="让工作空间更合你的习惯" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+          </StackPanel>
+          <Button Grid.Column="2" Content="×" Width="28" Height="28" Padding="0" CornerRadius="14"
+                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
+                  Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="关闭设置"/>
         </Grid>
-
-        <TextBlock Text="工作区" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <CheckBox Content="显示右侧工具栏" IsChecked="{Binding InspectorVisible}"/>
-        <CheckBox Content="显示下方输出区" IsChecked="{Binding OutputVisible}"/>
-        <TextBlock Text="Dock" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <ComboBox SelectedIndex="{Binding DockVisibilityMode}" HorizontalAlignment="Stretch"
-                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" CornerRadius="6" Padding="8,4">
-          <ComboBoxItem>自动隐藏 · 靠近底部显示</ComboBoxItem>
-          <ComboBoxItem>始终显示</ComboBoxItem>
-          <ComboBoxItem>隐藏</ComboBoxItem>
-        </ComboBox>
-
-        <TextBlock Text="Shell" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <ComboBox SelectedIndex="{Binding ShellIndex}" HorizontalAlignment="Stretch"
-                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" CornerRadius="6" Padding="8,4">
-          <ComboBoxItem>PowerShell (pwsh)</ComboBoxItem>
-          <ComboBoxItem>cmd.exe</ComboBoxItem>
-          <ComboBoxItem>WSL / bash</ComboBoxItem>
-          <ComboBoxItem>bash</ComboBoxItem>
-          <ComboBoxItem>自定义 Custom</ComboBoxItem>
-        </ComboBox>
-
-        <TextBlock Text="自定义 Shell 路径" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="C:\\…\\pwsh.exe"
-                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
-                 CornerRadius="6" Padding="8,4" FontSize="11"/>
-
-        <TextBlock Text="字体大小 Font size（Ctrl+= / Ctrl+- 缩放，Ctrl+0 复位）" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <TextBox Text="{Binding FontSize, Mode=TwoWay}"
-                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
-                 CornerRadius="6" Padding="8,4" FontSize="11"/>
-
-        <TextBlock Text="终端字体 Font family" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <TextBox Text="{Binding TerminalFontName}" Watermark="留空用内置 Cascadia/Consolas 等宽栈"
-                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
-                 CornerRadius="6" Padding="8,4" FontSize="11"/>
-
-        <TextBlock Text="工作空间 Workspace" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <TextBox Text="{Binding WorkspaceNameLive}"
-                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
-                 CornerRadius="6" Padding="8,4" FontSize="11"/>
-
-        <TextBlock Text="主题 Theme" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-        <ComboBox SelectedIndex="{Binding ThemeIndex}" HorizontalAlignment="Stretch"
-                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" CornerRadius="6" Padding="8,4">
-          <ComboBoxItem>深蓝玻璃 · 悬浮层次</ComboBoxItem>
-          <ComboBoxItem>深黑 · 克制高对比</ComboBoxItem>
-          <ComboBoxItem>亮白 · 轻盈清晰</ComboBoxItem>
-          <ComboBoxItem>纸张 · 暖色阅读</ComboBoxItem>
-        </ComboBox>
-
-        <Button Content="保存 Save" Background="{DynamicResource UiAccent}" Foreground="{DynamicResource UiOnAccent}" CornerRadius="8"
-                Padding="10,7" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                Command="{Binding SaveSettingsCommand}"/>
-      </StackPanel>
-      </ScrollViewer>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="10" Margin="20,0,20,16">
+            <TextBlock Classes="settings-heading" Text="外观"/>
+            <Border Classes="settings-group">
+              <StackPanel Spacing="10">
+                <TextBlock Text="配色主题" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <ComboBox x:Name="ThemePicker" SelectedIndex="{Binding ThemeIndex}">
+                  <ComboBoxItem>深蓝玻璃 · 悬浮层次</ComboBoxItem>
+                  <ComboBoxItem>深黑 · 克制高对比</ComboBoxItem>
+                  <ComboBoxItem>亮白 · 轻盈清晰</ComboBoxItem>
+                  <ComboBoxItem>纸张 · 暖色阅读</ComboBoxItem>
+                </ComboBox>
+                <TextBlock Text="窗口、缩略图与终端同步呈现主题。" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="settings-heading" Text="工作空间"/>
+            <Border Classes="settings-group">
+              <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="右侧工具栏" FontSize="12" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding InspectorVisible}" OnContent="" OffContent="" MinWidth="0"/>
+                </Grid>
+                <Border Height="1" Background="{DynamicResource UiBorder}" Opacity="0.5"/>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="下方输出区" FontSize="12" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding OutputVisible}" OnContent="" OffContent="" MinWidth="0"/>
+                </Grid>
+                <Border Height="1" Background="{DynamicResource UiBorder}" Opacity="0.5"/>
+                <TextBlock Text="Dock 显示方式" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <ComboBox SelectedIndex="{Binding DockVisibilityMode}">
+                  <ComboBoxItem>自动隐藏 · 靠近底部显示</ComboBoxItem>
+                  <ComboBoxItem>始终显示</ComboBoxItem>
+                  <ComboBoxItem>隐藏</ComboBoxItem>
+                </ComboBox>
+                <TextBlock Text="工作空间名称" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <TextBox Text="{Binding WorkspaceNameLive}"/>
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="settings-heading" Text="终端文字"/>
+            <Border Classes="settings-group">
+              <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,90">
+                  <TextBlock Text="字体大小" FontSize="12" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                  <TextBox Grid.Column="1" Text="{Binding FontSize, Mode=TwoWay}"/>
+                </Grid>
+                <TextBlock Text="Ctrl + = / − 调整大小 · Ctrl + 0 复位" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+                <Border Height="1" Background="{DynamicResource UiBorder}" Opacity="0.5"/>
+                <TextBlock Text="等宽字体" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <TextBox Text="{Binding TerminalFontName}" Watermark="默认 Cascadia / Consolas"/>
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="settings-heading" Text="启动与 SHELL"/>
+            <Border Classes="settings-group">
+              <StackPanel Spacing="10">
+                <TextBlock Text="新终端使用" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <ComboBox SelectedIndex="{Binding ShellIndex}">
+                  <ComboBoxItem>PowerShell (pwsh)</ComboBoxItem>
+                  <ComboBoxItem>cmd.exe</ComboBoxItem>
+                  <ComboBoxItem>WSL / bash</ComboBoxItem>
+                  <ComboBoxItem>bash</ComboBoxItem>
+                  <ComboBoxItem>自定义</ComboBoxItem>
+                </ComboBox>
+                <TextBlock Text="自定义 Shell 路径" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="C:\…\pwsh.exe"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,1,0,0" Padding="20,12">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="你的终端，你的工作空间" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="完成" MinWidth="86" Background="{DynamicResource UiAccent}" Foreground="{DynamicResource UiOnAccent}" CornerRadius="8"
+                    Padding="18,8" HorizontalContentAlignment="Center" Command="{Binding SaveSettingsCommand}"/>
+          </Grid>
+        </Border>
+      </Grid>
     </Border>
   </Panel>
 </Window>

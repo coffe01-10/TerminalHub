@@ -1,0 +1,17 @@
+fix: 代码审查修复 — VT 解析边界、PTY 退出码、事件泄漏与服务层缺陷
+
+- VtParser: OSC/DCS 中 CJK 尾字节 0x9C 不再误判为 ST 终结符；OSC 命令号位数上限；CSI S/T 尊重 DECSTBM 并 clamp 滚动行数
+- ScreenBuffer: 缩行 resize 保留底部内容、顶部行入 scrollback；DECAWM 关闭时宽字符不再强制换行
+- GraphemeWidth: U+00AD 软连字符占 1 格；补全 BMP EAW=W emoji 段（⌚⏩⏰✅⭐ 等）
+- ConPtySession: Exited 竞态报 -1 而非假 0；句柄保持到 GetProcessById 之后；Dispose 先关伪控制台再等读线程；Write 防 ODE
+- LinuxPtySession: exec 失败按 shell 惯例报 127；Dispose 后不再触发迟到 Exited
+- TerminalView: 修复 ScrollbackChanged 事件泄漏（StagePreview 弹出后死树滞留委托链）；滚轮手势合并为一次 PTY 写
+- LineClassifier: "0 个错误/警告" 等成功摘要不再误报 Problems 面板
+- SystemMonitor: 单网卡统计异常（隧道适配器）不再清零整体采样
+- DashboardViewModel: 输出行合并批处理，PTY 高输出不再逐行 Post 冻结 UI
+- FilesViewModel: FileSystemWatcher 缓冲溢出后自动重建并刷新
+- SshHost: 含空格目标加引号，作为单参数传给 ssh
+- SessionLogFile: 16MB 轮转，长会话不再无限增长
+- 新增 25 项回归测试；全套 331 通过 / 0 失败
+
+Co-Authored-By: Claude Code <noreply@anthropic.com>

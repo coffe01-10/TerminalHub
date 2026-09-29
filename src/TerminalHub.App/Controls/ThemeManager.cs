@@ -34,6 +34,44 @@ public static class ThemeManager
             brush.Color = Color.Parse(colors[i]);
             app.Resources["Ui" + roles[i]] = brush;
         }
+        // Fluent popup/hover templates use their own resource keys. Map those
+        // keys too, otherwise a Paper menu reverts to a cold grey Windows panel.
+        void Map(string role, params string[] keys)
+        {
+            foreach (var key in keys) app.Resources[key] = Brushes[role];
+        }
+        Map("Surface", "MenuFlyoutPresenterBackground", "ComboBoxDropDownBackground");
+        Map("Border", "MenuFlyoutPresenterBorderBrush", "ComboBoxDropDownBorderBrush");
+        Map("Ink", "MenuFlyoutItemForeground", "MenuFlyoutItemForegroundPointerOver", "MenuFlyoutItemForegroundPressed",
+            "ComboBoxItemForeground", "ComboBoxItemForegroundSelected", "ComboBoxItemForegroundSelectedPointerOver",
+            "ComboBoxItemForegroundPointerOver", "ComboBoxItemForegroundPressed", "ToggleSwitchContentForeground");
+        Map("AccentSoft", "MenuFlyoutItemBackgroundPointerOver", "MenuFlyoutItemBackgroundPressed",
+            "ComboBoxItemBackgroundSelected", "ComboBoxItemBackgroundSelectedPointerOver", "ComboBoxItemBackgroundPointerOver");
+        foreach (var state in new[] { "", "PointerOver", "Pressed" })
+        {
+            Map("Accent", "ToggleSwitchFillOn" + state, "ToggleSwitchStrokeOn" + state);
+            Map("OnAccent", "ToggleSwitchKnobFillOn" + state);
+            Map("Raised", "ToggleSwitchFillOff" + state);
+            Map("Border", "ToggleSwitchStrokeOff" + state);
+            Map("Muted", "ToggleSwitchKnobFillOff" + state);
+            Map("Ink", "ButtonForeground" + state);
+            Map(state == "" ? "Raised" : "AccentSoft", "ButtonBackground" + state, "ComboBoxBackground" + state);
+            Map("Border", "ButtonBorderBrush" + state, "ComboBoxBorderBrush" + state);
+            if (state != "Pressed")
+            {
+                Map("Ink", "TextControlForeground" + state);
+                Map("Border", "TextControlBorderBrush" + state);
+                Map("Inset", "TextControlBackground" + state);
+            }
+        }
+        Map("Ink", "TextControlForegroundFocused", "ComboBoxForeground", "ComboBoxForegroundFocused", "ComboBoxForegroundFocusedPressed");
+        Map("Raised", "ButtonBackgroundDisabled");
+        Map("Border", "ButtonBorderBrushDisabled");
+        Map("Faint", "ButtonForegroundDisabled");
+        Map("Inset", "TextControlBackgroundFocused");
+        Map("Accent", "TextControlBorderBrushFocused");
+        Map("Muted", "TextControlPlaceholderForeground", "TextControlPlaceholderForegroundFocused",
+            "ComboBoxDropDownGlyphForeground", "ComboBoxPlaceHolderForeground");
         app.Resources["SurfaceCorner"] = new CornerRadius(Current == "Paper" ? 4 : Current == "Black" ? 10 : 18);
         app.Resources["CardCorner"] = new CornerRadius(Current == "Paper" ? 3 : Current == "Black" ? 7 : 13);
         app.Resources["DockCorner"] = new CornerRadius(Current == "Paper" ? 8 : 20);
@@ -45,7 +83,20 @@ public static class ThemeManager
             "Black" => "0 8 24 0 #80000000",
             _ => "0 18 42 0 #60000000"
         });
-        app.Resources["CardShadow"] = BoxShadows.Parse(IsLight ? "0 4 10 0 #20524736" : "-5 9 18 0 #40000000");
+        app.Resources["CardShadow"] = BoxShadows.Parse(Current switch
+        {
+            "Paper" => "1 4 5 0 #24816D50",
+            "White" => "0 8 18 -3 #30314766, 0 1 3 0 #18314766",
+            "Black" => "0 5 10 0 #90000000",
+            _ => "0 10 20 -3 #80000000, 0 1 0 0 #305EB6FF"
+        });
+        app.Resources["ActiveCardShadow"] = BoxShadows.Parse(Current switch
+        {
+            "Paper" => "0 2 3 0 #28816D50",
+            "White" => "0 3 8 0 #20314766",
+            "Black" => "0 1 4 0 #60000000",
+            _ => "0 3 12 0 #40258ED6"
+        });
         app.Resources["HeadingFont"] = new FontFamily(Current == "Paper" ? "Georgia, Noto Serif, Microsoft YaHei UI, serif" : "Segoe UI, Noto Sans, sans-serif");
         TerminalPalette.SetTheme(Current);
         Changed?.Invoke();

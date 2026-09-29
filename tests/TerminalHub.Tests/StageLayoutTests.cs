@@ -106,6 +106,75 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
+    public async Task ShelfDrag_BoundaryJitterDoesNotReorderUntilDrop_OrActivateBackgroundSession()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(700);
+        var window = fixture.Window;
+        var vm = fixture.Vm;
+        var order = vm.SessionCards.ToArray();
+        var active = vm.ActiveSession;
+        var shelf = window.FindControl<ListBox>("SessionShelf")!;
+        shelf.ScrollIntoView(order[0]);
+        await Task.Delay(100);
+        var cards = shelf.GetVisualDescendants().OfType<StageCard>().ToArray();
+        var first = cards.Single(c => ReferenceEquals(c.DataContext, order[0]));
+        var second = cards.Single(c => ReferenceEquals(c.DataContext, order[1]));
+        var firstContainer = first.FindAncestorOfType<ListBoxItem>()!;
+        var secondContainer = second.FindAncestorOfType<ListBoxItem>()!;
+        var origin = firstContainer.TranslatePoint(new Point(90, window.ThumbnailHeight / 2), window)!.Value;
+        var stride = secondContainer.Bounds.Y - firstContainer.Bounds.Y;
+        window.MouseDown(origin, MouseButton.Left);
+        window.MouseMove(origin + new Vector(0, stride / 2 + 14));
+        for (var i = 0; i < 8; i++)
+        {
+            window.MouseMove(origin + new Vector(0, stride / 2 + (i % 2 == 0 ? 2 : -2)));
+            await Task.Delay(25);
+        }
+        await Task.Delay(280);
+        Assert.Equal(order, vm.SessionCards);
+        Assert.Same(active, vm.ActiveSession);
+        Assert.InRange(second.SlotOffset, -stride - 1, -stride + 1);
+        window.MouseUp(origin + new Vector(0, stride / 2), MouseButton.Left);
+        await Task.Delay(600);
+        Assert.Same(order[1], vm.SessionCards[0]);
+        Assert.Same(order[0], vm.SessionCards[1]);
+        Assert.Same(active, vm.ActiveSession);
+        Assert.All(shelf.GetVisualDescendants().OfType<StageCard>(), c => Assert.Equal(0, c.SlotOffset));
+    }
+
+    [AvaloniaFact]
+    public async Task SplitFocus_LeavesSurfaceStill_AndTitlesFollowRenameAndAssignment()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(700);
+        var window = fixture.Window;
+        var vm = fixture.Vm;
+        var surface = window.FindControl<StageSurface>("StageWindow")!;
+        vm.ToggleSplitCommand.Execute(null);
+        await Task.Delay(100);
+        foreach (var side in new[] { "Right", "Left", "Right" })
+        {
+            var pane = window.FindControl<Border>(side + "PaneBox")!;
+            var point = pane.TranslatePoint(new Point(60, 65), window)!.Value;
+            window.MouseDown(point, MouseButton.Left);
+            window.MouseUp(point, MouseButton.Left);
+            await Task.Delay(60);
+            Assert.Same(side == "Left" ? vm.LeftPane : vm.RightPane, vm.ActiveSession);
+            Assert.True(surface.RenderTransform!.Value.IsIdentity);
+            Assert.Equal(1, surface.Reveal);
+        }
+        var right = vm.SessionCards.Single(c => ReferenceEquals(c.Model, vm.RightPane));
+        vm.RenameSession((right, "右侧 · 构建日志"));
+        Assert.Equal("右侧 · 构建日志", window.FindControl<TextBlock>("RightPaneTitle")!.Text);
+        Assert.Equal(vm.LeftPane!.Name, window.FindControl<TextBlock>("LeftPaneTitle")!.Text);
+        vm.ActiveCard = vm.SessionCards.First(c => c.Model != vm.LeftPane && c.Model != vm.RightPane);
+        await Task.Delay(60);
+        Assert.Equal(vm.RightPane!.Name, window.FindControl<TextBlock>("RightPaneTitle")!.Text);
+        Assert.True(surface.RenderTransform!.Value.IsIdentity);
+    }
+
+    [AvaloniaFact]
     public async Task TiltedCard_ClickAndRapidSwitch_PreserveSessionAndInput()
     {
         using var fixture = new StageFixture();

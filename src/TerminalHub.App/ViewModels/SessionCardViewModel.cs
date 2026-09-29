@@ -35,8 +35,7 @@ public partial class SessionCardViewModel : ViewModelBase
             return new SolidColorBrush(new Color(0x3A, c.R, c.G, c.B));
         }
     }
-    public IBrush StatusBrush => new SolidColorBrush(
-        Color.Parse(Model.IsRunning ? "#34D399" : "#F87171"));
+    public IBrush StatusBrush => Controls.ThemeManager.Brush(Model.IsRunning ? "Good" : "Bad");
 
     public SessionCardViewModel(TerminalSessionModel model)
     {

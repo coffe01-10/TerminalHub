@@ -511,6 +511,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private TerminalSessionModel? _rightPane;
     /// <summary>0 = left pane focused, 1 = right.</summary>
     [ObservableProperty] private int _focusedPane;
+    public string LeftPaneName => LeftPane?.Name ?? "未分配会话";
+    public string RightPaneName => RightPane?.Name ?? "未分配会话";
+    partial void OnLeftPaneChanged(TerminalSessionModel? value) => OnPropertyChanged(nameof(LeftPaneName));
+    partial void OnRightPaneChanged(TerminalSessionModel? value) => OnPropertyChanged(nameof(RightPaneName));
 
     [RelayCommand]
     private void ToggleSplit()
@@ -702,6 +706,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.RenameSessionFilter(oldName, name);
         card.Refresh();
         Logs.RefreshSessions();
+        OnPropertyChanged(nameof(LeftPaneName));
+        OnPropertyChanged(nameof(RightPaneName));
     }
 
     private void OnSessionCardsChanged(object? sender, NotifyCollectionChangedEventArgs e)

@@ -64,11 +64,13 @@ public partial class MainWindow : Window
             (_, _) => Vm.FocusPane(1), RoutingStrategies.Bubble, handledEventsToo: true);
         // Shelf drag reorder — threshold-gated so plain clicks still just select.
         SessionShelf.AddHandler(InputElement.PointerPressedEvent, OnShelfPointerPressed,
-            RoutingStrategies.Bubble, handledEventsToo: true);
+            RoutingStrategies.Tunnel, handledEventsToo: true);
         SessionShelf.AddHandler(InputElement.PointerMovedEvent, OnShelfPointerMoved,
             RoutingStrategies.Bubble, handledEventsToo: true);
         SessionShelf.AddHandler(InputElement.PointerReleasedEvent, OnShelfPointerReleased,
-            RoutingStrategies.Bubble, handledEventsToo: true);
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+        SessionShelf.PointerCaptureLost += (_, _) => EndShelfDrag(commit: false);
+        _shelfDragTimer.Tick += (_, _) => UpdateShelfDrag(autoScroll: true);
         Opened += (_, _) =>
         {
             FitToScreen();
@@ -91,6 +93,7 @@ public partial class MainWindow : Window
 
     private void UpdateStageLayout()
     {
+        if (_dragCard is not null) return;
         // Keep enough height for the full terminal grid; overflow remains scrollable.
         var visibleCards = Math.Clamp(Vm.SessionCards.Count, 1, 5);
         ThumbnailHeight = Math.Clamp((SessionShelf.Bounds.Height - 34 - (visibleCards - 1) * 16) / visibleCards, 208, 268);
@@ -107,12 +110,17 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainWindowViewModel.InspectorVisible)) UpdateStageLayout();
         if (e.PropertyName == nameof(MainWindowViewModel.DockVisibilityMode)) UpdateDockMode();
+        if (e.PropertyName == nameof(MainWindowViewModel.IsSplit) && Vm.IsSplit)
+        {
+            ++_selectionGeneration;
+            StageWindow.FinishActivation();
+        }
         if (!_stageReady || e.PropertyName != nameof(MainWindowViewModel.ActiveSession)) return;
         var generation = ++_selectionGeneration;
         // SyncActive finishes binding the new card before we locate its visual.
         Dispatcher.UIThread.Post(() =>
         {
-            if (!_stageReady || generation != _selectionGeneration || !IsVisible) return;
+            if (!_stageReady || generation != _selectionGeneration || !IsVisible || _dragCard is not null) return;
             if (Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
             // Apply a shelf scroll before reading the card's visible origin.
             SessionShelf.UpdateLayout();
@@ -120,7 +128,7 @@ public partial class MainWindow : Window
                 .FirstOrDefault(c => ReferenceEquals(c.DataContext, Vm.ActiveCard));
             // Measure in the shared parent: StageWindow itself is transformed
             // during a flight, so translating into it would distort the origin.
-            if (card is not null && Vm.ActiveSession is not null)
+            if (!Vm.IsSplit && card is not null && Vm.ActiveSession is not null)
             {
                 var corners = new[] { new Point(), new Point(card.Bounds.Width, 0),
                     new Point(0, card.Bounds.Height), new Point(card.Bounds.Width, card.Bounds.Height) }
@@ -308,39 +316,114 @@ public partial class MainWindow : Window
             ActiveTerminal()?.RevealLine(hit.Line);
     }
 
-    // Session-card drag reorder — a small threshold keeps click→activate intact;
-    // the move fires when the pointer actually travels onto another card.
+    // Preview slot changes during the drag; commit collection order on release.
     private SessionCardViewModel? _dragCard;
     private Point _dragOrigin;
+    private Point _dragPosition;
     private bool _cardDragging;
+    private int _dragFrom, _dragTo;
+    private double _dragScrollStart;
+    private ScrollViewer? _shelfScroll;
+    private readonly DispatcherTimer _shelfDragTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private (SessionCardViewModel Model, StageCard Card, double Top)[] _dragSlots = [];
 
     private void OnShelfPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        _dragCard = null;
-        _cardDragging = false;
         if (!e.GetCurrentPoint(SessionShelf).Properties.IsLeftButtonPressed) return;
         _dragCard = (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
             ?.DataContext as SessionCardViewModel;
+        if (_dragCard is null) return;
         _dragOrigin = e.GetPosition(SessionShelf);
+        _dragPosition = _dragOrigin;
+        _shelfScroll = SessionShelf.GetVisualDescendants().OfType<ScrollViewer>().First();
+        _dragScrollStart = _shelfScroll.Offset.Y;
+        _dragSlots = SessionShelf.GetVisualDescendants().OfType<StageCard>()
+            .Select(c => ((SessionCardViewModel)c.DataContext!, c,
+                c.FindAncestorOfType<ListBoxItem>()!.TranslatePoint(default, SessionShelf)!.Value.Y))
+            .OrderBy(slot => slot.Item3).ToArray();
+        _dragFrom = Array.FindIndex(_dragSlots, slot => ReferenceEquals(slot.Model, _dragCard));
+        _dragTo = _dragFrom;
+        e.Pointer.Capture(SessionShelf);
+        // Defer selection until release so dragging a background terminal does
+        // not launch its foreground animation or scroll the shelf underneath us.
+        e.Handled = true;
     }
 
     private void OnShelfPointerMoved(object? sender, PointerEventArgs e)
     {
         if (_dragCard is null) return;
-        var pos = e.GetPosition(SessionShelf);
-        if (!_cardDragging && Math.Abs(pos.Y - _dragOrigin.Y) + Math.Abs(pos.X - _dragOrigin.X) < 12)
+        _dragPosition = e.GetPosition(SessionShelf);
+        if (!_cardDragging && Math.Abs(_dragPosition.Y - _dragOrigin.Y) + Math.Abs(_dragPosition.X - _dragOrigin.X) < 8)
             return;
-        _cardDragging = true;
-        var target = (SessionShelf.InputHitTest(pos) as Visual)
-            ?.FindAncestorOfType<StageCard>(includeSelf: true)
-            ?.DataContext as SessionCardViewModel;
-        Vm.MoveSessionCard(_dragCard, target);
+        if (!_cardDragging)
+        {
+            _cardDragging = true;
+            _dragSlots[_dragFrom].Card.SetDragging(true);
+            _shelfDragTimer.Start();
+        }
+        UpdateShelfDrag(autoScroll: false);
+        e.Handled = true;
+    }
+
+    private void UpdateShelfDrag(bool autoScroll)
+    {
+        if (!_cardDragging || _shelfScroll is null) return;
+        if (autoScroll)
+        {
+            var speed = _dragPosition.Y < 36 ? -8 : _dragPosition.Y > SessionShelf.Bounds.Height - 36 ? 8 : 0;
+            _shelfScroll.Offset = new Vector(0, Math.Clamp(_shelfScroll.Offset.Y + speed, 0,
+                Math.Max(0, _shelfScroll.Extent.Height - _shelfScroll.Viewport.Height)));
+        }
+        var delta = _dragPosition.Y - _dragOrigin.Y + _shelfScroll.Offset.Y - _dragScrollStart;
+        var center = _dragSlots[_dragFrom].Top + ThumbnailHeight / 2 + delta;
+        // Compare against fixed slot centers, with a small hysteresis for hand
+        // jitter. Never hit-test the animated cards to decide the next order.
+        while (_dragTo < _dragSlots.Length - 1 && center > (_dragSlots[_dragTo].Top + _dragSlots[_dragTo + 1].Top + ThumbnailHeight) / 2 + 8) _dragTo++;
+        while (_dragTo > 0 && center < (_dragSlots[_dragTo].Top + _dragSlots[_dragTo - 1].Top + ThumbnailHeight) / 2 - 8) _dragTo--;
+        for (var i = 0; i < _dragSlots.Length; i++)
+        {
+            var slot = _dragSlots[i];
+            if (i == _dragFrom) slot.Card.SetSlotOffset(delta, immediate: true);
+            else
+            {
+                var destination = i;
+                if (_dragFrom < i && i <= _dragTo) destination--;
+                if (_dragTo <= i && i < _dragFrom) destination++;
+                slot.Card.SetSlotOffset(_dragSlots[destination].Top - slot.Top);
+            }
+        }
     }
 
     private void OnShelfPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_dragCard is null) return;
+        var clicked = _cardDragging ? null : _dragCard;
+        EndShelfDrag(commit: true);
+        e.Pointer.Capture(null);
+        if (clicked is not null) Vm.ActiveCard = clicked;
+        e.Handled = true;
+    }
+
+    private void EndShelfDrag(bool commit)
+    {
+        _shelfDragTimer.Stop();
+        if (_dragCard is null) return;
+        var painted = _dragSlots.ToDictionary(s => s.Model, s => s.Top + s.Card.SlotOffset);
+        if (commit && _cardDragging) Vm.MoveSessionCard(_dragCard, _dragSlots[_dragTo].Model);
+        SessionShelf.UpdateLayout();
+        foreach (var card in SessionShelf.GetVisualDescendants().OfType<StageCard>())
+        {
+            card.SetDragging(false);
+            if (card.DataContext is SessionCardViewModel model && painted.TryGetValue(model, out var top))
+            {
+                var newTop = card.FindAncestorOfType<ListBoxItem>()!.TranslatePoint(default, SessionShelf)!.Value.Y;
+                card.SetSlotOffset(top - newTop - ((_shelfScroll?.Offset.Y ?? 0) - _dragScrollStart), immediate: true);
+            }
+            card.SetSlotOffset(0);
+        }
         _dragCard = null;
         _cardDragging = false;
+        _dragSlots = [];
     }
 
     private void OnDeployMenuOpening(object? sender, EventArgs e) => RefreshDeployContextMenu();
@@ -544,6 +627,7 @@ public partial class MainWindow : Window
         Vm.PropertyChanged -= OnStageSelectionChanged;
         ++_selectionGeneration;
         _dockHideTimer.Stop();
+        EndShelfDrag(commit: false);
         Vm.Dispose(); // persists settings + kills PTYs
         base.OnClosing(e);
     }
