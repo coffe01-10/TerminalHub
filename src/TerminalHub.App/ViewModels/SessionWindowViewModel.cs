@@ -12,6 +12,7 @@ public partial class SessionWindowViewModel : ViewModelBase, IDisposable
     public TerminalSessionModel Model { get; }
     public TerminalEmulator Emulator => Model.Emulator;
     public double FontSize { get; }
+    public FontFamily FontFamily { get; }
 
     [ObservableProperty] private string _title;
 
@@ -30,10 +31,12 @@ public partial class SessionWindowViewModel : ViewModelBase, IDisposable
     public IBrush StatusBrush => new SolidColorBrush(
         Color.Parse(Model.IsRunning ? "#34D399" : "#F87171"));
 
-    public SessionWindowViewModel(TerminalSessionModel model, double fontSize)
+    public SessionWindowViewModel(TerminalSessionModel model, double fontSize, FontFamily? fontFamily = null)
     {
         Model = model;
         FontSize = fontSize;
+        FontFamily = fontFamily
+            ?? new FontFamily("Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace");
         _title = $"{model.Name} · 独立窗口 — Terminal Hub";
         // OSC title changes (e.g. vim / ssh hosts) flow into the window title.
         // Named handler so Dispose can unsubscribe — the emulator outlives this VM

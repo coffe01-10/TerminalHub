@@ -29,6 +29,19 @@ public class TerminalView : Control
     public static readonly StyledProperty<bool> IsPreviewProperty =
         AvaloniaProperty.Register<TerminalView, bool>(nameof(IsPreview));
     public bool IsPreview { get => GetValue(IsPreviewProperty); set => SetValue(IsPreviewProperty, value); }
+
+    /// <summary>Text highlighted inside the viewport (search, find). Null/empty = off.</summary>
+    public static readonly StyledProperty<string?> SearchQueryProperty =
+        AvaloniaProperty.Register<TerminalView, string?>(nameof(SearchQuery));
+    public string? SearchQuery { get => GetValue(SearchQueryProperty); set => SetValue(SearchQueryProperty, value); }
+
+    /// <summary>True while the viewport is scrolled above the bottom — drives the
+    /// "back to bottom" affordance. Read-only, updated as the view scrolls.</summary>
+    public static readonly DirectProperty<TerminalView, bool> IsScrolledUpProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, bool>(nameof(IsScrolledUp), v => v.IsScrolledUp);
+    private bool _isScrolledUp;
+    public bool IsScrolledUp => _isScrolledUp;
+
     private TerminalEmulator? _emulator;
     private int _dirty = 1;
     private long _lastBlink;
@@ -37,6 +50,7 @@ public class TerminalView : Control
     private Typeface _boldTypeface;
     private double _cellW = 8, _cellH = 16;
     private int _viewOffset;          // lines scrolled up into scrollback
+    private int _scrollDrift;         // scrollback lines appended while scrolled up
     private bool _cursorOn = true;
     private readonly DispatcherTimer _blink;
     private readonly TerminalImeClient _imeClient;
@@ -46,6 +60,21 @@ public class TerminalView : Control
     private string _typedTail = "";   // fallback for hidden-cursor TUIs without a bordered prompt
     private int _imeAnchorCol, _imeAnchorRow;
     private bool _imeAnchorValid;     // _imeAnchorCol/Row resolved against the latest frame
+
+    // Mouse selection — absolute buffer lines (scrollback indexes stay stable).
+    private (int line, int col)? _selAnchor, _selEnd;
+    private bool _selecting;
+    private Point _lastPointer;
+
+    // Search state — hits are recomputed lazily against buffer version.
+    private int _hitLine = -1, _hitCol = -1, _hitLen;  // current match marker
+    private int _hitsVersion = -1;
+    private string? _hitsQuery;
+    private List<(int line, int col, int len)>? _hits;
+
+    // Text-layout caches (FormattedText is costly; terminal rows repeat heavily).
+    private readonly Dictionary<(string text, bool bold, Color fg), FormattedText> _textCache = new();
+    private readonly System.Text.StringBuilder _runText = new();
 
     public TerminalEmulator? Emulator
     {
@@ -75,6 +104,19 @@ public class TerminalView : Control
         _blink.Tick += (_, _) =>
         {
             if (!IsEffectivelyVisible) return;
+            var buf0 = _emulator?.Buffer;
+            var drift = Interlocked.Exchange(ref _scrollDrift, 0);
+            if (drift != 0 && buf0 is not null)
+            {
+                // New output appends scrollback lines; while the user reads
+                // history, shift the offset so the viewport stays on the same
+                // content instead of being dragged toward the bottom.
+                _viewOffset = _viewOffset > 0
+                    ? Math.Clamp(_viewOffset + drift, 0, buf0.ScrollbackCount)
+                    : 0;
+                SetScrolledUp(_viewOffset > 0);
+                Interlocked.Exchange(ref _dirty, 1);
+            }
             var blink = !IsPreview && Environment.TickCount64 - _lastBlink >= 530;
             if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
             if (!IsPreview && IsFocused)
@@ -86,6 +128,7 @@ public class TerminalView : Control
                     _imeClient.NotifyCursorRectangleChanged();
                 }
             }
+            if (_selecting) DragScrollStep();
             if (Interlocked.Exchange(ref _dirty, 0) != 0 || blink || _emulator?.Buffer.SynchronizedOutput == true)
                 InvalidateVisual();
         };
@@ -99,30 +142,55 @@ public class TerminalView : Control
         TextInputMethodClientRequestedEvent.AddClassHandler<TerminalView>(
             (v, e) => { if (!v.IsPreview) { e.Client = v._imeClient; e.Handled = true; } },
             handledEventsToo: true);
+        SearchQueryProperty.Changed.AddClassHandler<TerminalView>((v, _) =>
+        {
+            v._hits = null;
+            v._hitLine = -1;
+            v.InvalidateVisual();
+        });
         AffectsRender<TerminalView>(TerminalFontSizeProperty);
     }
 
     private void OnEmulatorChanged(TerminalEmulator? old, TerminalEmulator? next)
     {
-        if (old is not null) old.Changed -= OnBufferChanged;
+        if (old is not null)
+        {
+            old.Changed -= OnBufferChanged;
+            old.Buffer.ScrollbackChanged -= OnScrollbackChanged;
+        }
         _emulator = next;
         _typedTail = "";
         _imeAnchorValid = false;
+        _selAnchor = _selEnd = null;
+        _hits = null;
+        _hitLine = -1;
         if (next is not null && _attached) next.Changed += OnBufferChanged;
-        if (next is not null) next.Parser.DefaultColorQuery = TerminalPalette.QueryDefaultColor;
-        _viewOffset = 0;
+        if (next is not null)
+        {
+            next.Parser.DefaultColorQuery = TerminalPalette.QueryDefaultColor;
+            next.Buffer.ScrollbackChanged += OnScrollbackChanged;
+        }
+        ResetScroll();
         MeasureGlyphs();
         InvalidateVisual();
     }
 
     private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
 
+    private void OnScrollbackChanged(int delta) => Interlocked.Add(ref _scrollDrift, delta);
+
+    private void SetScrolledUp(bool value) => SetAndRaise(IsScrolledUpProperty, ref _isScrolledUp, value);
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         _attached = true;
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
-        ThemeManager.Changed += OnBufferChanged;
+        ThemeManager.Changed += OnThemeChanged;
+        // A hidden ancestor flip (single↔split, pop-out dock) arranges us again
+        // without touching Bounds/IsVisible — recheck the emulator size on every
+        // layout pass so the grid can never stay stuck at a stale width.
+        LayoutUpdated += OnLayoutUpdated;
         _blink.Interval = TimeSpan.FromMilliseconds(IsPreview ? 50 : 16);
         _blink.Start();
         TryResizeEmulator();
@@ -132,9 +200,18 @@ public class TerminalView : Control
     {
         _attached = false;
         _blink.Stop();
+        LayoutUpdated -= OnLayoutUpdated;
         if (_emulator is not null) _emulator.Changed -= OnBufferChanged;
-        ThemeManager.Changed -= OnBufferChanged;
+        ThemeManager.Changed -= OnThemeChanged;
         base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnLayoutUpdated(object? sender, EventArgs e) => TryResizeEmulator();
+
+    private void OnThemeChanged()
+    {
+        _textCache.Clear();   // cached runs carry resolved theme colors
+        Interlocked.Exchange(ref _dirty, 1);
     }
 
     private void MeasureGlyphs()
@@ -145,6 +222,7 @@ public class TerminalView : Control
             _typeface, TerminalFontSize, Brushes.White);
         _cellW = Math.Max(4, probe.Width);
         _cellH = Math.Max(8, probe.Height * 1.0 + 2);
+        _textCache.Clear();   // typeface/size changed — cached layouts are stale
         TryResizeEmulator();
     }
 
@@ -224,7 +302,54 @@ public class TerminalView : Control
         var y = IsPreview ? (Bounds.Height - rows * _cellH * scale) / 2 - row0 * _cellH * scale : 0;
         using var transform = ctx.PushTransform(new Matrix(scale, 0, 0, scale, x, y));
         for (var r = row0; r < row0 + rows; r++)
-            RenderRow(ctx, b.Cells.AsSpan(r * b.Columns, b.Columns), r, b.Columns);
+            RenderRow(ctx, b.Cells, r, b.Columns);
+
+        // Mouse selection — translucent overlay on top of the glyphs.
+        if (!IsPreview && _selAnchor is { } sa && _selEnd is { } se && sa != se)
+        {
+            var (sl, sc0) = sa.CompareTo(se) <= 0 ? sa : se;
+            var (el, ec1) = sa.CompareTo(se) <= 0 ? se : sa;
+            var selBrush = new SolidColorBrush(TerminalPalette.SelectionColor);
+            for (var v = row0; v < row0 + rows; v++)
+            {
+                var abs = b.BaseLine + v;
+                if (abs < sl || abs > el) continue;
+                var c0 = abs == sl ? sc0 : 0;
+                var c1 = abs == el ? ec1 : b.Columns - 1;
+                // snap to glyph edges: never split a wide glyph in half
+                var span = b.Cells.AsSpan(v * b.Columns, b.Columns);
+                if (c0 > 0 && c0 < span.Length && span[c0].IsWideContinuation) c0--;
+                if (c1 >= 0 && c1 < span.Length - 1 && span[c1].IsWide) c1++;
+                ctx.DrawRectangle(selBrush, null,
+                    new Rect(c0 * _cellW, v * _cellH, (c1 - c0 + 1) * _cellW, _cellH));
+            }
+        }
+
+        // Search matches — flat highlight per hit, current match stronger.
+        if (!IsPreview && SearchQuery is { Length: > 0 } query)
+        {
+            var matchBrush = new SolidColorBrush(TerminalPalette.MatchColor);
+            var currentBrush = new SolidColorBrush(TerminalPalette.MatchCurrentColor);
+            for (var v = row0; v < row0 + rows; v++)
+            {
+                var span = b.Cells.AsSpan(v * b.Columns, b.Columns);
+                var (text, hitCols) = ScreenBuffer.FlattenRow(span);
+                var absLine = b.BaseLine + v;
+                var from = 0;
+                while (from <= text.Length - query.Length)
+                {
+                    var hit = text.IndexOf(query, from, StringComparison.OrdinalIgnoreCase);
+                    if (hit < 0) break;
+                    var c0 = hitCols[hit];
+                    var cEnd = hitCols[hit + query.Length - 1];
+                    var cw = cEnd + (span[cEnd].IsWide ? 2 : 1);
+                    var isCurrent = _hitLine == absLine && _hitCol == c0;
+                    ctx.DrawRectangle(isCurrent ? currentBrush : matchBrush, null,
+                        new Rect(c0 * _cellW, v * _cellH, (cw - c0) * _cellW, _cellH));
+                    from = hit + Math.Max(1, query.Length);
+                }
+            }
+        }
 
         // Cursor
         if (_viewOffset == 0 && b.CursorVisible
@@ -235,13 +360,13 @@ public class TerminalView : Control
             var cx = b.CursorX * _cellW;
             var cy = b.CursorY * _cellH;
             ctx.DrawRectangle(
-                new SolidColorBrush(Color.FromArgb(180, 0x38, 0xBD, 0xF8)),
+                new SolidColorBrush(TerminalPalette.CursorColor),
                 null, new Rect(cx, cy, _cellW * (b.Cells[b.CursorY * b.Columns + b.CursorX].IsWide ? 2 : 1), _cellH));
             // repaint glyph under cursor in dark
             var cell = b.Cells[b.CursorY * b.Columns + b.CursorX];
             if (cell.Char is not (' ' or '\0'))
-                DrawRun(ctx, cell.Char.ToString(), b.CursorX, b.CursorY,
-                    new SolidColorBrush(bg), CellAttrs.None);
+                DrawRun(ctx, cell.Text, b.CursorX, b.CursorY,
+                    new SolidColorBrush(bg), CellAttrs.None, bg);
         }
 
         // Use the same anchor resolver for the inline composition and the OS
@@ -260,12 +385,15 @@ public class TerminalView : Control
         // is hidden, or when the echoed input clearly lives somewhere else.
         if (!IsPreview && _imeAnchorValid && _preedit is null
             && _viewOffset == 0 && _cursorOn && IsFocused
+            && _imeAnchorRow >= row0 && _imeAnchorRow < row0 + rows
+            && _imeAnchorCol >= col0 && _imeAnchorCol < col0 + cols
             && !b.Cells[_imeAnchorRow * b.Columns + _imeAnchorCol].Attrs.HasFlag(CellAttrs.Inverse)
             && (!b.CursorVisible || _imeAnchorCol != b.CursorX || _imeAnchorRow != b.CursorY))
         {
             var ax = _imeAnchorCol * _cellW;
             var ay = _imeAnchorRow * _cellH;
-            ctx.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(0xFF, 0x38, 0xBD, 0xF8)), 2),
+            var cc = TerminalPalette.CursorColor;
+            ctx.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B)), 2),
                 new Point(ax + 1, ay + 2), new Point(ax + 1, ay + _cellH - 3));
         }
 
@@ -274,15 +402,17 @@ public class TerminalView : Control
         if (!IsPreview && _preedit is { Length: > 0 } preedit && _viewOffset == 0
             && anchorRow >= row0 && anchorRow < row0 + rows)
         {
-            var accent = new SolidColorBrush(Color.FromArgb(0xFF, 0x38, 0xBD, 0xF8));
+            var cc = TerminalPalette.CursorColor;
+            var accent = new SolidColorBrush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B));
+            var accentFill = new SolidColorBrush(Color.FromArgb(40, cc.R, cc.G, cc.B));
             var startCol = PreeditStartCol(anchorCol, preedit, b.Columns);
             var px = startCol * _cellW;
             var py = anchorRow * _cellH;
             var pw = PreeditCells(preedit, preedit.Length) * _cellW;
-            ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(40, 0x38, 0xBD, 0xF8)),
-                null, new Rect(px, py, pw, _cellH));
+            ctx.DrawRectangle(accentFill, null, new Rect(px, py, pw, _cellH));
+            var fgC = TerminalPalette.Resolve(TerminalColor.Default, true);
             DrawRun(ctx, preedit, startCol, anchorRow,
-                new SolidColorBrush(TerminalPalette.Resolve(TerminalColor.Default, true)), CellAttrs.None);
+                new SolidColorBrush(fgC), CellAttrs.None, fgC);
             ctx.DrawLine(new Pen(accent, 1),
                 new Point(px, py + _cellH - 1.5), new Point(px + pw, py + _cellH - 1.5));
             if (_cursorOn)
@@ -341,36 +471,23 @@ public class TerminalView : Control
             for (var r = 0; r < f.Rows; r++)
             {
                 var cells = f.Cells.AsSpan(r * f.Columns, f.Columns);
-                var inkEnd = 0;
-                for (var i = f.Columns - 1; i >= 0; i--)
-                    if (cells[i].Char is not (' ' or '\0'))
-                    { inkEnd = i + (cells[i].IsWide ? 2 : 1); break; }
-                for (var c = 0; c < f.Columns; c++)
+                var inkEnd = RowInkEnd(f, r);
+                var (text, cols) = ScreenBuffer.FlattenRow(cells);
+                var from = 0;
+                while (from <= text.Length - needle.Length)
                 {
-                    if (c >= inkEnd) break;
-                    var ci = c;
-                    var ti = 0;
-                    while (ti < needle.Length && ci < f.Columns)
-                    {
-                        if (cells[ci].IsWideContinuation) { ci++; continue; }
-                        var ch = cells[ci].Char;
-                        if (ch is '\0') ch = ' ';
-                        if (ch != needle[ti]) break;
-                        ci++;
-                        ti++;
-                    }
-                    if (ti == needle.Length)
-                    {
-                        // Step past a trailing wide-char continuation, and never
-                        // anchor into blank padding: a tail ending in spaces would
-                        // otherwise drift the anchor right of the visible text.
-                        if (ci < f.Columns && cells[ci].IsWideContinuation) ci++;
-                        ci = Math.Min(ci, inkEnd);
-                        var dist = Math.Abs(r - f.CursorY) * 4096L + Math.Abs(ci - f.CursorX);
-                        if (dist < anyDist) { anyDist = dist; anyCol = ci; anyRow = r; }
-                        if ((r != f.CursorY || ci != f.CursorX) && dist < offDist)
-                        { offDist = dist; offCol = ci; offRow = r; }
-                    }
+                    var ti = text.IndexOf(needle, from, StringComparison.Ordinal);
+                    if (ti < 0) break;
+                    if (cols[ti] >= inkEnd) break;   // matches never start in blank padding
+                    // End cell after the matched cluster — never inside a wide
+                    // glyph's padding and never into blank space past the ink.
+                    var lastCol = cols[ti + needle.Length - 1];
+                    var ci = Math.Min(lastCol + (cells[lastCol].IsWide ? 2 : 1), inkEnd);
+                    var dist = Math.Abs(r - f.CursorY) * 4096L + Math.Abs(ci - f.CursorX);
+                    if (dist < anyDist) { anyDist = dist; anyCol = ci; anyRow = r; }
+                    if ((r != f.CursorY || ci != f.CursorX) && dist < offDist)
+                    { offDist = dist; offCol = ci; offRow = r; }
+                    from = ti + 1;
                 }
             }
             if (!f.CursorVisible && offCol >= 0)
@@ -422,14 +539,9 @@ public class TerminalView : Control
     }
 
     /// <summary>Cell width of the first <paramref name="len"/> chars of a preedit
-    /// string (CJK glyphs occupy two cells, matching <see cref="ScreenBuffer.CharWidth"/>).</summary>
+    /// string (CJK/emoji take two cells; combining marks join their cluster).</summary>
     private static int PreeditCells(string text, int len)
-    {
-        var w = 0;
-        for (var i = 0; i < len && i < text.Length; i++)
-            w += ScreenBuffer.CharWidth(text[i]);
-        return w;
-    }
+        => GraphemeWidth.OfText(text[..Math.Min(len, text.Length)]);
 
     /// <summary>Column where the preedit overlay starts: the cursor column, shifted
     /// left when the composition would overflow the right edge.</summary>
@@ -448,11 +560,12 @@ public class TerminalView : Control
         return true;
     }
 
-    private void RenderRow(DrawingContext ctx, ReadOnlySpan<TerminalCell> cells, int row, int cols)
+    /// <summary>Render one frame row: batch contiguous same-styled cells into runs.</summary>
+    private void RenderRow(DrawingContext ctx, TerminalCell[] cells, int row, int cols)
     {
+        var rowBase = row * cols;
         var runStart = -1;
         var runLen = 0;
-        var runText = new System.Text.StringBuilder();
         var curFg = default(TerminalColor);
         var curBg = default(TerminalColor);
         var curAttrs = CellAttrs.None;
@@ -460,33 +573,27 @@ public class TerminalView : Control
 
         for (var c = 0; c < cols; c++)
         {
-            var cell = cells[c];
+            var cell = cells[rowBase + c];
             if (cell.IsWideContinuation) continue;
-            var ch = cell.Char is '\0' ? ' ' : cell.Char;
 
             var keyMatch = started && cell.Fg == curFg && cell.Bg == curBg && cell.Attrs == curAttrs;
             if (!keyMatch)
             {
                 if (started && runLen > 0)
-                    Flush(ctx, runText, runStart, runLen, row, curFg, curBg, curAttrs);
+                    Flush(ctx, runStart, runLen, row, curFg, curBg, curAttrs);
                 runStart = c;
                 runLen = 0;
-                runText.Clear();
                 curFg = cell.Fg; curBg = cell.Bg; curAttrs = cell.Attrs;
                 started = true;
             }
-            runText.Append(ch);
             runLen += cell.IsWide ? 2 : 1;
         }
         if (started && runLen > 0)
-            Flush(ctx, runText, runStart, runLen, row, curFg, curBg, curAttrs);
+            Flush(ctx, runStart, runLen, row, curFg, curBg, curAttrs);
 
-        void Flush(DrawingContext c2, System.Text.StringBuilder text, int startCol, int cellCount, int row2,
+        void Flush(DrawingContext c2, int startCol, int cellCount, int row2,
             TerminalColor fg, TerminalColor bg, CellAttrs attrs)
         {
-            var trimmed = text.ToString();
-            if (attrs.HasFlag(CellAttrs.Hidden)) trimmed = new string(' ', trimmed.Length);
-
             // Resolve defaults in their original roles before swapping. Swapping
             // the Default tokens first loses the foreground/background distinction
             // and used to omit the background of Claude's reverse-video cursor.
@@ -500,55 +607,144 @@ public class TerminalView : Control
 
             if (attrs.HasFlag(CellAttrs.Dim))
                 fgC = Color.FromArgb((byte)(fgC.A * 0.6), fgC.R, fgC.G, fgC.B);
-            DrawRun(c2, trimmed, startCol, row2, new SolidColorBrush(fgC), attrs);
+            if (!attrs.HasFlag(CellAttrs.Hidden))
+                DrawCells(c2, cells, rowBase + startCol, startCol, cellCount, row2, fgC, attrs);
+            else if (attrs.HasFlag(CellAttrs.Underline) || attrs.HasFlag(CellAttrs.Strike))
+                DrawTextDecorations(c2, startCol, cellCount, row2, new SolidColorBrush(fgC), attrs);
         }
     }
 
-    private void DrawRun(DrawingContext ctx, string text, int col, int row, IBrush fg, CellAttrs attrs)
+    /// <summary>
+    /// Draw the cells of one run: single-byte chars batch into one layout call,
+    /// multi-unit clusters and wide glyphs draw at their own grid position so
+    /// fallback fonts can never drift away from the cell grid.
+    /// </summary>
+    private void DrawCells(DrawingContext ctx, TerminalCell[] cells, int baseIndex,
+        int startCol, int cellCount, int row, Color fg, CellAttrs attrs)
+    {
+        var bold = attrs.HasFlag(CellAttrs.Bold);
+        var brush = new SolidColorBrush(fg);
+        var sb = _runText;
+        sb.Clear();
+        var asciiCol = -1;
+        var drawCol = startCol;
+        var end = baseIndex + cellCount;
+
+        void FlushAscii()
+        {
+            if (asciiCol < 0 || sb.Length == 0) return;
+            var ft = Layout(sb.ToString(), bold, fg);
+            ctx.DrawText(ft, new Point(asciiCol * _cellW, row * _cellH + (_cellH - ft.Height) / 2));
+            sb.Clear();
+            asciiCol = -1;
+        }
+
+        for (var i = baseIndex; i < end; i++)
+        {
+            ref readonly var cell = ref cells[i];
+            if (cell.IsWideContinuation) continue;
+            if (cell.Tail is null && cell.Char <= '\x7f')
+            {
+                if (asciiCol < 0) asciiCol = drawCol;
+                sb.Append(cell.Char == '\0' ? ' ' : cell.Char);
+            }
+            else
+            {
+                FlushAscii();
+                var ft = Layout(cell.Text, bold, fg);
+                ctx.DrawText(ft, new Point(drawCol * _cellW, row * _cellH + (_cellH - ft.Height) / 2));
+            }
+            drawCol += cell.IsWide ? 2 : 1;
+        }
+        FlushAscii();
+
+        if (attrs.HasFlag(CellAttrs.Underline) || attrs.HasFlag(CellAttrs.Strike))
+            DrawTextDecorations(ctx, startCol, cellCount, row, brush, attrs);
+    }
+
+    /// <summary>Underline/strike lines spanning <paramref name="cellCount"/> cells.</summary>
+    private void DrawTextDecorations(DrawingContext ctx, int col, int cellCount, int row, IBrush fg, CellAttrs attrs)
+    {
+        var pen = new Pen(fg, 1);
+        var w = cellCount * _cellW;
+        if (attrs.HasFlag(CellAttrs.Underline))
+            ctx.DrawLine(pen, new Point(col * _cellW, row * _cellH + _cellH - 2),
+                new Point(col * _cellW + w, row * _cellH + _cellH - 2));
+        if (attrs.HasFlag(CellAttrs.Strike))
+            ctx.DrawLine(pen, new Point(col * _cellW, row * _cellH + _cellH / 2),
+                new Point(col * _cellW + w, row * _cellH + _cellH / 2));
+    }
+
+    /// <summary>Text layout cache — same string+style+color reuses one FormattedText.</summary>
+    private FormattedText Layout(string text, bool bold, Color fg)
+    {
+        var key = (text, bold, fg);
+        if (_textCache.TryGetValue(key, out var ft)) return ft;
+        if (_textCache.Count > 4096) _textCache.Clear();
+        ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            bold ? _boldTypeface : _typeface, TerminalFontSize, new SolidColorBrush(fg));
+        _textCache[key] = ft;
+        return ft;
+    }
+
+    /// <summary>
+    /// Draw an arbitrary string (preedit overlay, glyph under the cursor):
+    /// cluster-aware — multi-code-unit graphemes render as one glyph and advance
+    /// by their cell width.
+    /// </summary>
+    private void DrawRun(DrawingContext ctx, string text, int col, int row, IBrush fg, CellAttrs attrs, Color fgKey)
     {
         if (string.IsNullOrEmpty(text)) return;
-        var tf = attrs.HasFlag(CellAttrs.Bold) ? _boldTypeface : _typeface;
-        // Fallback CJK fonts do not necessarily advance by exactly two terminal
-        // cells. Position them on the grid explicitly, otherwise the visible text
-        // drifts away from both the terminal caret and the IME composition anchor.
+        var bold = attrs.HasFlag(CellAttrs.Bold);
         var drawCol = col;
-        Dictionary<char, FormattedText>? glyphs = null;
-        for (var i = 0; i < text.Length;)
+        var i = 0;
+        while (i < text.Length)
         {
-            FormattedText ft;
-            var width = 0;
             if (text[i] <= '\x7f')
             {
                 var start = i;
                 while (i < text.Length && text[i] <= '\x7f') i++;
-                ft = Format(text[start..i]);
-                width = i - start;
+                var ft = Layout(text[start..i], bold, fgKey);
+                ctx.DrawText(ft, new Point(drawCol * _cellW, row * _cellH + (_cellH - ft.Height) / 2));
+                drawCol += i - start;
             }
             else
             {
-                var ch = text[i++];
-                glyphs ??= new();
-                if (!glyphs.TryGetValue(ch, out ft!)) glyphs[ch] = ft = Format(ch.ToString());
-                width = ScreenBuffer.CharWidth(ch);
+                var len = ClusterLength(text, i);
+                var cluster = text.Substring(i, len);
+                var ft = Layout(cluster, bold, fgKey);
+                ctx.DrawText(ft, new Point(drawCol * _cellW, row * _cellH + (_cellH - ft.Height) / 2));
+                drawCol += Math.Max(1, GraphemeWidth.OfCluster(cluster));
+                i += len;
             }
-            ctx.DrawText(ft, new Point(drawCol * _cellW, row * _cellH + (_cellH - ft.Height) / 2));
-            drawCol += width;
         }
 
-        FormattedText Format(string value) => new(value, CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight, tf, TerminalFontSize, fg);
-
+        var cellWidth = Math.Max(1, GraphemeWidth.OfText(text));
         if (attrs.HasFlag(CellAttrs.Underline) || attrs.HasFlag(CellAttrs.Strike))
+            DrawTextDecorations(ctx, col, cellWidth, row, fg, attrs);
+    }
+
+    /// <summary>Length in UTF-16 units of the grapheme cluster starting at
+    /// <paramref name="i"/>: a base rune plus its combining marks, VS, ZWJ
+    /// members and flag-pair second half.</summary>
+    internal static int ClusterLength(string s, int i)
+    {
+        var len = char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1]) ? 2 : 1;
+        var rune = len == 2 ? char.ConvertToUtf32(s[i], s[i + 1]) : s[i];
+        var joinNext = rune == 0x200D;
+        var singleRI = GraphemeWidth.IsRegionalIndicator(rune);
+        var end = i + len;
+        while (end < s.Length)
         {
-            var pen = new Pen(fg, 1);
-            var w = text.Sum(ScreenBuffer.CharWidth) * _cellW; // wide glyphs take 2 cells
-            if (attrs.HasFlag(CellAttrs.Underline))
-                ctx.DrawLine(pen, new Point(col * _cellW, row * _cellH + _cellH - 2),
-                    new Point(col * _cellW + w, row * _cellH + _cellH - 2));
-            if (attrs.HasFlag(CellAttrs.Strike))
-                ctx.DrawLine(pen, new Point(col * _cellW, row * _cellH + _cellH / 2),
-                    new Point(col * _cellW + w, row * _cellH + _cellH / 2));
+            var rl = char.IsHighSurrogate(s[end]) && end + 1 < s.Length && char.IsLowSurrogate(s[end + 1]) ? 2 : 1;
+            var r2 = rl == 2 ? char.ConvertToUtf32(s[end], s[end + 1]) : s[end];
+            if (!(joinNext || GraphemeWidth.IsZeroWidthRune(r2) || (singleRI && GraphemeWidth.IsRegionalIndicator(r2))))
+                break;
+            if (singleRI && GraphemeWidth.IsRegionalIndicator(r2)) singleRI = false;
+            joinNext = r2 == 0x200D;
+            end += rl;
         }
+        return end - i;
     }
 
     // ---------- input ----------
@@ -557,7 +753,7 @@ public class TerminalView : Control
     {
         base.OnTextInput(e);
         if (IsPreview || _emulator is null || e.Text is null) return;
-        _viewOffset = 0;
+        ResetScroll();
         _emulator.SendText(e.Text);
         _typedTail += e.Text;
         if (_typedTail.Length > 32) _typedTail = _typedTail[^32..];
@@ -655,19 +851,27 @@ public class TerminalView : Control
 
         if (send is null)
         {
-            // Ctrl+Shift+V paste, plain Ctrl+key → control byte
+            // Ctrl+Shift+C copy / Ctrl+Shift+V paste, plain Ctrl+key → control byte.
+            // Bare Ctrl+C keeps sending ETX — the terminal interrupt stays intact.
             if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
+                if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                {
+                    _ = CopySelectionAsync();
+                    e.Handled = true;
+                    return;
+                }
                 if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {
                     PasteClipboard();
                     e.Handled = true;
                     return;
                 }
-                if (e.Key >= Key.A && e.Key <= Key.Z)
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                    && e.Key >= Key.A && e.Key <= Key.Z)
                 {
                     _emulator.SendBytes([(byte)(e.Key - Key.A + 1)]);
-                    _viewOffset = 0;
+                    ResetScroll();
                     e.Handled = true;
                     return;
                 }
@@ -675,7 +879,7 @@ public class TerminalView : Control
             return;
         }
 
-        _viewOffset = 0;
+        ResetScroll();
         _emulator.SendText(send);
         e.Handled = true;
     }
@@ -688,7 +892,7 @@ public class TerminalView : Control
             var text = clip is null ? null : await clip.GetTextAsync();
             if (!string.IsNullOrEmpty(text))
             {
-                _viewOffset = 0;
+                ResetScroll();
                 _emulator?.PasteText(text);
             }
         }
@@ -706,13 +910,248 @@ public class TerminalView : Control
     {
         if (_emulator is null) return;
         _viewOffset = Math.Clamp(_viewOffset + delta, 0, _emulator.Buffer.ScrollbackCount);
+        SetScrolledUp(_viewOffset > 0);
         InvalidateVisual();
     }
+
+    /// <summary>Back to the live bottom; also clears the scrolled-up flag.</summary>
+    private void ResetScroll()
+    {
+        _viewOffset = 0;
+        SetScrolledUp(false);
+    }
+
+    /// <summary>Snap the viewport back to the live bottom (the "回到底部" affordance).</summary>
+    public void ScrollToBottom()
+    {
+        if (_viewOffset == 0) return;
+        ResetScroll();
+        InvalidateVisual();
+    }
+
+    // ---------- selection ----------
+
+    /// <summary>Map a point to (absolute buffer line, column) of the cell under it.</summary>
+    private (int line, int col) PointToCell(Point p)
+    {
+        var buf = _emulator!.Buffer;
+        var col = Math.Clamp((int)(p.X / _cellW), 0, buf.Columns - 1);
+        var row = Math.Clamp((int)(p.Y / _cellH), 0, buf.Rows - 1);
+        // frame row v shows absolute line scrollbackCount - viewOffset + v
+        return (buf.ScrollbackCount - _viewOffset + row, col);
+    }
+
+    private static bool IsWordChar(char ch)
+        => !char.IsWhiteSpace(ch) && ch is not (
+            '"' or '\'' or '`' or '(' or ')' or '[' or ']' or '{' or '}'
+            or '<' or '>' or '|' or '^' or '\0');
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (!IsPreview) Focus();
+        if (IsPreview) return;
+        Focus();
+        if (_emulator is null) return;
+        var point = e.GetCurrentPoint(this);
+        if (!point.Properties.IsLeftButtonPressed) return;
+        var pos = e.GetPosition(this);
+        var (line, col) = PointToCell(pos);
+        _lastPointer = pos;
+        var buf = _emulator.Buffer;
+        lock (buf.SyncRoot)
+        {
+            if (e.ClickCount >= 3)
+            {
+                // triple click: whole line (soft-wrap continuation included via copy)
+                _selAnchor = (line, 0);
+                _selEnd = (line, buf.Columns - 1);
+                _selecting = true;
+            }
+            else if (e.ClickCount == 2)
+            {
+                // double click: expand to word boundaries on the flattened row
+                var row = buf.GetLine(Math.Min(line, buf.TotalLines - 1));
+                var (text, cols) = ScreenBuffer.FlattenRow(row);
+                var idx = cols.Length == 0 ? -1 : TextIndexAtCol(cols, col);
+                if (idx >= 0 && idx < text.Length && IsWordChar(text[idx]))
+                {
+                    var lo = idx;
+                    var hi = idx + 1;
+                    while (lo > 0 && IsWordChar(text[lo - 1])) lo--;
+                    while (hi < text.Length && IsWordChar(text[hi])) hi++;
+                    var lastCell = cols[hi - 1];
+                    _selAnchor = (line, cols[lo]);
+                    _selEnd = (line, lastCell + (row[lastCell].IsWide ? 2 : 1) - 1);
+                    _selecting = true;
+                }
+                else { _selAnchor = _selEnd = null; }
+            }
+            else
+            {
+                _selAnchor = (line, col);
+                _selEnd = (line, col);
+                _selecting = true;
+            }
+        }
+        e.Pointer.Capture(this);
+        InvalidateVisual();
+        e.Handled = true;
+    }
+
+    /// <summary>First flattened-text index whose cell column is ≥ col (the cell
+    /// owning that column when the point lands on a wide glyph's padding).</summary>
+    private static int TextIndexAtCol(int[] cols, int col)
+    {
+        var lo = 0;
+        var hi = cols.Length - 1;
+        var best = -1;
+        while (lo <= hi)
+        {
+            var mid = (lo + hi) / 2;
+            if (cols[mid] <= col) { best = mid; lo = mid + 1; }
+            else hi = mid - 1;
+        }
+        return best;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (!_selecting || _emulator is null) return;
+        var pos = e.GetPosition(this);
+        _lastPointer = pos;
+        _selEnd = PointToCell(pos);
+        InvalidateVisual();
+    }
+
+    /// <summary>While dragging past the viewport edge, keep scrolling into history
+    /// (or back toward the bottom) and extend the selection to the edge row.</summary>
+    private void DragScrollStep()
+    {
+        if (_emulator is null) return;
+        var overTop = _lastPointer.Y < 0;
+        var overBottom = _lastPointer.Y > Bounds.Height;
+        if (!overTop && !overBottom) return;
+        var distance = overTop ? -_lastPointer.Y : _lastPointer.Y - Bounds.Height;
+        var lines = Math.Clamp((int)(distance / (_cellH * 2)) + 1, 1, 8);
+        ScrollBy(overTop ? lines : -lines);
+        _selEnd = PointToCell(new Point(_lastPointer.X,
+            Math.Clamp(_lastPointer.Y, 0, Bounds.Height - 1)));
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (_selecting)
+        {
+            _selecting = false;
+            if (_selAnchor == _selEnd) { _selAnchor = _selEnd = null; InvalidateVisual(); }
+            e.Pointer.Capture(null);
+        }
+    }
+
+    /// <summary>Selected text (normalized, soft-wrapped lines joined), or null.</summary>
+    public string? GetSelectedText()
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null || _selAnchor is not { } a || _selEnd is not { } e2 || a == e2) return null;
+        var (sl, sc) = a.CompareTo(e2) <= 0 ? a : e2;
+        var (el, ec) = a.CompareTo(e2) <= 0 ? e2 : a;
+        lock (buf.SyncRoot)
+        {
+            el = Math.Min(el, buf.TotalLines - 1);
+            return sl > el ? null : buf.ExtractText(sl, sc, el, ec);
+        }
+    }
+
+    /// <summary>Copy the current selection to the clipboard (Ctrl+Shift+C).</summary>
+    public async Task CopySelectionAsync()
+    {
+        var text = GetSelectedText();
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clip is not null) await clip.SetTextAsync(text);
+        }
+        catch { }
+    }
+
+    // ---------- search / history ----------
+
+    /// <summary>All match positions (absolute line, cell col, cell len), lazy.</summary>
+    private List<(int line, int col, int len)> EnsureHits()
+    {
+        var buf = _emulator!.Buffer;
+        var query = SearchQuery;
+        lock (buf.SyncRoot)
+        {
+            if (_hits is not null && _hitsVersion == buf.Version
+                && string.Equals(_hitsQuery, query, StringComparison.Ordinal))
+                return _hits;
+            _hits = [];
+            _hitsQuery = query;
+            _hitsVersion = buf.Version;
+            if (string.IsNullOrEmpty(query)) return _hits;
+            for (var line = 0; line < buf.TotalLines && _hits.Count < 4096; line++)
+            {
+                var row = buf.GetLine(line);
+                var (text, cols) = ScreenBuffer.FlattenRow(row);
+                var from = 0;
+                while (from <= text.Length - query.Length)
+                {
+                    var hit = text.IndexOf(query, from, StringComparison.OrdinalIgnoreCase);
+                    if (hit < 0) break;
+                    var c0 = cols[hit];
+                    var cEnd = cols[hit + query.Length - 1];
+                    _hits.Add((line, c0, cEnd + (row[cEnd].IsWide ? 2 : 1) - c0));
+                    from = hit + Math.Max(1, query.Length);
+                }
+            }
+            return _hits;
+        }
+    }
+
+    /// <summary>Jump the viewport to the previous/next search match.</summary>
+    /// <param name="direction">+1 next, -1 previous.</param>
+    public bool GoToMatch(int direction)
+    {
+        if (_emulator is null || string.IsNullOrEmpty(SearchQuery)) return false;
+        var hits = EnsureHits();
+        if (hits.Count == 0) { _hitLine = -1; InvalidateVisual(); return false; }
+
+        // Locate the current marker; when unset start from the viewport's first line.
+        var idx = hits.FindIndex(h => h.line == _hitLine && h.col == _hitCol);
+        if (idx < 0)
+        {
+            var buf = _emulator.Buffer;
+            var topLine = buf.ScrollbackCount - _viewOffset;
+            idx = direction > 0
+                ? hits.FindIndex(h => h.line >= topLine)
+                : hits.FindLastIndex(h => h.line <= topLine + buf.Rows - 1);
+            if (idx < 0) idx = direction > 0 ? 0 : hits.Count - 1;
+        }
+        else idx = (idx + direction + hits.Count) % hits.Count;
+
+        var (line, col, len) = hits[idx];
+        _hitLine = line; _hitCol = col; _hitLen = len;
+        RevealLine(line);
+        return true;
+    }
+
+    /// <summary>Scroll so absolute buffer <paramref name="line"/> is visible
+    /// (roughly upper third), keeping the bottom when it is already on screen.</summary>
+    public void RevealLine(int line)
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return;
+        var firstVisible = buf.ScrollbackCount - _viewOffset;
+        if (line >= firstVisible && line < firstVisible + buf.Rows) { InvalidateVisual(); return; }
+        // visual row v shows abs (scrollback - offset + v); aim for v ≈ Rows/3
+        _viewOffset = Math.Clamp(buf.ScrollbackCount - line + buf.Rows / 3, 0, buf.ScrollbackCount);
+        SetScrolledUp(_viewOffset > 0);
+        InvalidateVisual();
     }
 
     /// <summary>
@@ -739,8 +1178,11 @@ public class TerminalView : Control
                     return new Rect(0, 0, view._cellW, view._cellH);
                 // The IME can query this before the next Render, immediately
                 // after output or composition starts. Do not use a stale anchor.
+                // CaptureFrame is version-cached — this stays cheap.
                 var (baseCol, baseRow, _) = view.ResolveImeAnchor(buf.CaptureFrame());
-                var row = Math.Clamp(baseRow, 0, buf.Rows - 1);
+                // While scrolled into history the anchor row shifts down by the
+                // view offset (screen row r shows at visual row r + offset).
+                var row = Math.Clamp(baseRow + view._viewOffset, 0, buf.Rows - 1);
                 // While composing, anchor to the caret inside the preedit overlay
                 // so the candidate window tracks it.
                 if (view._preedit is { Length: > 0 } p)

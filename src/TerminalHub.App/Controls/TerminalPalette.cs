@@ -9,10 +9,25 @@ public static class TerminalPalette
     public static Color DefaultFg = Color.FromRgb(0xCC, 0xCC, 0xCC);
     public static Color DefaultBg = Color.FromRgb(0x0C, 0x0C, 0x0C);
 
+    /// <summary>Block-cursor fill / IME anchor accent.</summary>
+    public static Color CursorColor { get; private set; } = Color.FromArgb(0xB4, 0x38, 0xBD, 0xF8);
+    /// <summary>Translucent fill under a mouse selection.</summary>
+    public static Color SelectionColor { get; private set; } = Color.FromArgb(0x48, 0x38, 0xBD, 0xF8);
+    /// <summary>Search-match highlight inside the terminal viewport.</summary>
+    public static Color MatchColor { get; private set; } = Color.FromArgb(0x50, 0xF5, 0x9E, 0x0B);
+    /// <summary>The current search hit (navigated to).</summary>
+    public static Color MatchCurrentColor { get; private set; } = Color.FromArgb(0xA0, 0xF5, 0x9E, 0x0B);
+
     public static void SetTheme(string theme)
     {
+        var light = theme is "Paper" or "White";
         DefaultFg = Color.Parse(theme is "Paper" ? "#3C352B" : theme is "White" ? "#1E2D41" : "#D8DDE7");
         DefaultBg = Color.Parse(theme is "Paper" ? "#FCF8EE" : theme is "White" ? "#FAFCFF" : theme is "Black" ? "#050607" : "#0C1018");
+        // Light themes need a deeper accent or cursor/selection wash out on paper.
+        CursorColor = light ? Color.FromArgb(0xDC, 0x1D, 0x4E, 0xD8) : Color.FromArgb(0xB4, 0x38, 0xBD, 0xF8);
+        SelectionColor = light ? Color.FromArgb(0x55, 0x1D, 0x4E, 0xD8) : Color.FromArgb(0x48, 0x38, 0xBD, 0xF8);
+        MatchColor = light ? Color.FromArgb(0x60, 0xD9, 0x77, 0x06) : Color.FromArgb(0x50, 0xF5, 0x9E, 0x0B);
+        MatchCurrentColor = light ? Color.FromArgb(0xB0, 0xB4, 0x53, 0x09) : Color.FromArgb(0xA0, 0xF5, 0x9E, 0x0B);
     }
 
     public static string QueryDefaultColor(bool foreground)

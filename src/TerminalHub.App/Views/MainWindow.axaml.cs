@@ -9,6 +9,7 @@ using TerminalHub.App.ViewModels;
 using TerminalHub.App.Controls;
 using TerminalHub.Core.Deploy;
 using TerminalHub.Core.Settings;
+using TerminalHub.Core.Terminal;
 
 namespace TerminalHub.App.Views;
 
@@ -55,6 +56,19 @@ public partial class MainWindow : Window
         // otherwise eat Ctrl+W as kill-word / Ctrl+Tab as a shell byte).
         AddHandler(InputElement.KeyDownEvent, OnSessionShortcutKeyDown,
             RoutingStrategies.Tunnel);
+        // TerminalView marks its PointerPressed handled (drag selection), so pane
+        // focus taps need handledEventsToo to still reach these pane wrappers.
+        LeftPaneBox.AddHandler(InputElement.PointerPressedEvent,
+            (_, _) => Vm.FocusPane(0), RoutingStrategies.Bubble, handledEventsToo: true);
+        RightPaneBox.AddHandler(InputElement.PointerPressedEvent,
+            (_, _) => Vm.FocusPane(1), RoutingStrategies.Bubble, handledEventsToo: true);
+        // Shelf drag reorder — threshold-gated so plain clicks still just select.
+        SessionShelf.AddHandler(InputElement.PointerPressedEvent, OnShelfPointerPressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        SessionShelf.AddHandler(InputElement.PointerMovedEvent, OnShelfPointerMoved,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        SessionShelf.AddHandler(InputElement.PointerReleasedEvent, OnShelfPointerReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += (_, _) =>
         {
             FitToScreen();
@@ -260,10 +274,62 @@ public partial class MainWindow : Window
     private void OnClearLastPublishResultClick(object? sender, RoutedEventArgs e)
         => Vm.ClearLastPublishResult();
 
-    /// <summary>Split panes: a press on a pane focuses it — its session becomes
-    /// active so the middle input row, Output and Search follow it.</summary>
-    private void OnLeftPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(0);
-    private void OnRightPanePressed(object? sender, PointerPressedEventArgs e) => Vm.FocusPane(1);
+    /// <summary>The terminal showing the session Search/Output follows — the
+    /// focused split pane, or the single main view outside split mode.</summary>
+    private TerminalView? ActiveTerminal()
+        => Vm.IsSplit ? (Vm.FocusedPane == 0 ? LeftTerminal : RightTerminal) : MainTerminal;
+
+    private void OnScrollToBottomClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control c && c.Parent is Panel panel)
+            panel.Children.OfType<TerminalView>().FirstOrDefault()?.ScrollToBottom();
+    }
+
+    private void OnSearchPrevMatch(object? sender, RoutedEventArgs e) => ActiveTerminal()?.GoToMatch(-1);
+    private void OnSearchNextMatch(object? sender, RoutedEventArgs e) => ActiveTerminal()?.GoToMatch(+1);
+
+    /// <summary>Double-click a search result row → scroll the terminal to that
+    /// absolute buffer line (keeps the scrolled-up state, no snap to bottom).</summary>
+    private void OnSearchHitDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Control c && c.DataContext is ScreenBuffer.SearchHit hit)
+            ActiveTerminal()?.RevealLine(hit.Line);
+    }
+
+    // Session-card drag reorder — a small threshold keeps click→activate intact;
+    // the move fires when the pointer actually travels onto another card.
+    private SessionCardViewModel? _dragCard;
+    private Point _dragOrigin;
+    private bool _cardDragging;
+
+    private void OnShelfPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        _dragCard = null;
+        _cardDragging = false;
+        if (!e.GetCurrentPoint(SessionShelf).Properties.IsLeftButtonPressed) return;
+        _dragCard = (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
+            ?.DataContext as SessionCardViewModel;
+        _dragOrigin = e.GetPosition(SessionShelf);
+    }
+
+    private void OnShelfPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragCard is null) return;
+        var pos = e.GetPosition(SessionShelf);
+        if (!_cardDragging && Math.Abs(pos.Y - _dragOrigin.Y) + Math.Abs(pos.X - _dragOrigin.X) < 12)
+            return;
+        _cardDragging = true;
+        var target = (SessionShelf.InputHitTest(pos) as Visual)
+            ?.FindAncestorOfType<StageCard>(includeSelf: true)
+            ?.DataContext as SessionCardViewModel;
+        Vm.MoveSessionCard(_dragCard, target);
+    }
+
+    private void OnShelfPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _dragCard = null;
+        _cardDragging = false;
+    }
 
     private void OnDeployMenuOpening(object? sender, EventArgs e) => RefreshDeployContextMenu();
 
@@ -377,6 +443,11 @@ public partial class MainWindow : Window
             Vm.CycleSession(shift ? -1 : +1);
             e.Handled = true;
         }
+        // Font zoom lives on Ctrl+non-letter keys — the bare Ctrl+A..Z control
+        // bytes below keep flowing to the shell untouched.
+        else if (e.Key is Key.OemPlus or Key.Add) { Vm.AdjustFontSize(+1); e.Handled = true; }
+        else if (e.Key is Key.OemMinus or Key.Subtract) { Vm.AdjustFontSize(-1); e.Handled = true; }
+        else if (e.Key is Key.D0 or Key.NumPad0) { Vm.ResetFontSize(); e.Handled = true; }
         else if (!shift) return;   // bare Ctrl+letter → control byte for the shell
         else if (e.Key == Key.J)
         {

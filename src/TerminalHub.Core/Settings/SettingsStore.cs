@@ -19,6 +19,13 @@ public sealed class SettingsStore
 
     public static string DefaultPath()
     {
+        // Test isolation: when TERMINALHUB_SETTINGS_DIR is set, every store
+        // gets its own throwaway file so windows opened in one test can't
+        // leak persisted state (e.g. the saved workspace) into the next.
+        var overrideDir = Environment.GetEnvironmentVariable("TERMINALHUB_SETTINGS_DIR");
+        if (!string.IsNullOrEmpty(overrideDir))
+            return Path.Combine(overrideDir, $"settings-{Guid.NewGuid():N}.json");
+
         var dir = OperatingSystem.IsWindows()
             ? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

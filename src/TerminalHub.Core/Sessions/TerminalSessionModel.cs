@@ -11,6 +11,10 @@ public sealed class TerminalSessionModel : IDisposable
     public SessionTag Tag { get; set; } = SessionTag.None;
     public required TerminalEmulator Emulator { get; init; }
     public string WorkingDirectory { get; set; } = "";
+    /// <summary>Shell command this session was spawned with (pwsh, ssh…); saved
+    /// into the workspace layout so a restart respawns the same kind of session.</summary>
+    public string Shell { get; set; } = "";
+    public string ShellArguments { get; set; } = "";
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.Now;
 
     public IPtySession Pty => Emulator.Pty;

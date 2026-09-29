@@ -14,11 +14,22 @@ public sealed class ScreenBuffer
     private long _syncStarted;
     private TerminalFrame? _heldFrame;
 
+    /// <summary>Incremented once per parser batch / resize; frames are cached against it.</summary>
+    public int Version => _version;
+    private int _version;
+    private int _frameCacheVersion = -1;
+    private readonly Dictionary<int, TerminalFrame> _frameCache = new(2);
+    internal void BumpVersion() => _version++;
+
     public void SetSynchronizedOutput(bool enabled)
     {
         if (enabled && !SynchronizedOutput)
         {
             _heldFrame = CaptureFrame();
+            // The held frame just landed in _frameCache[0]; drop it so that after
+            // the sync window expires CaptureFrame re-reads the live grid at the
+            // same version instead of replaying the pre-sync image forever.
+            _frameCache.Clear();
             _syncStarted = Environment.TickCount64;
         }
         SynchronizedOutput = enabled;
@@ -32,21 +43,33 @@ public sealed class ScreenBuffer
             // A crashed/unfinished synchronized update must not freeze the screen indefinitely.
             if (SynchronizedOutput && Environment.TickCount64 - _syncStarted < 150 && _heldFrame is { } held)
                 return held;
+            offset = OnAlternateScreen ? 0 : Math.Clamp(offset, 0, ScrollbackCount);
+            if (_frameCacheVersion != _version) { _frameCache.Clear(); _frameCacheVersion = _version; }
+            if (_frameCache.TryGetValue(offset, out var cached))
+                return cached;
             var cells = new TerminalCell[Rows * Columns];
             Array.Fill(cells, TerminalCell.Blank(TerminalColor.Default));
-            offset = OnAlternateScreen ? 0 : Math.Clamp(offset, 0, ScrollbackCount);
             for (var row = 0; row < Rows; row++)
             {
                 var source = GetLine(ScrollbackCount + row - offset);
                 source[..Math.Min(source.Length, Columns)].CopyTo(cells.AsSpan(row * Columns));
             }
-            return new TerminalFrame(Columns, Rows, cells, CursorX, CursorY,
-                CursorVisible && offset == 0, OnAlternateScreen);
+            var frame = new TerminalFrame(Columns, Rows, cells, CursorX, CursorY,
+                CursorVisible && offset == 0, OnAlternateScreen, ScrollbackCount - offset);
+            _frameCache[offset] = frame;
+            return frame;
         }
     }
     private readonly List<TerminalCell[]> _scrollback = new();
     private TerminalCell[] _screen;
     private TerminalCell[]? _savedScreen;
+    /// <summary>Per screen row: this row auto-wrapped into the next one (soft wrap).</summary>
+    private bool[] _wrapped;
+    private bool[]? _savedWrapped;
+    /// <summary>Soft-wrap flag for each scrollback line (parallel to <see cref="_scrollback"/>).</summary>
+    private readonly List<bool> _scrollWrapped = new();
+    /// <summary>Cell that a following zero-width rune joins (set by the last PutCluster).</summary>
+    private int _lastGlyphRow = -1, _lastGlyphCol;
     private int _scrollbackLimit = 2000;
 
     // Cursor + saved state
@@ -112,7 +135,9 @@ public sealed class ScreenBuffer
     public int DirtyRowMin { get; private set; } = int.MaxValue;
     public int DirtyRowMax { get; private set; } = -1;
 
-    public event Action? ScrollbackChanged;
+    /// <summary>Scrollback line-count delta: +1 per appended line, -count on clear.
+    /// A scrolled view adds the delta to its offset to stay on the same content.</summary>
+    public event Action<int>? ScrollbackChanged;
 
     public int Columns { get; private set; }
     public int Rows { get; private set; }
@@ -131,6 +156,7 @@ public sealed class ScreenBuffer
         _scrollTop = 0;
         _scrollBottom = rows - 1;
         _screen = NewBlankScreen(columns, rows);
+        _wrapped = new bool[rows];
     }
 
     private TerminalCell[] NewBlankScreen(int cols, int rows)
@@ -180,22 +206,91 @@ public sealed class ScreenBuffer
 
     public void PutChar(char ch)
     {
+        if (_decSpecial[_activeCharset] && ch is >= '`' and <= '~')
+            ch = DecSpecialMap(ch);
+        PutCluster(ch.ToString(), Math.Max(1, GraphemeWidth.OfRune(ch)));
+    }
+
+    /// <summary>Write one full code point; runes above the BMP are stored as a
+    /// UTF-16 pair inside the cell instead of degrading to a fallback glyph.</summary>
+    public void PutRune(int rune)
+    {
+        var text = rune <= 0xFFFF ? ((char)rune).ToString() : char.ConvertFromUtf32(rune);
+        PutCluster(text, Math.Clamp(GraphemeWidth.OfRune(rune), 1, 2));
+    }
+
+    /// <summary>
+    /// Extend the most recently written cell with a zero-width rune (combining
+    /// mark, variation selector, ZWJ member or the second half of a flag pair).
+    /// Returns false when no glyph can absorb it — the caller writes it standalone.
+    /// </summary>
+    public bool AppendToLastGrapheme(int rune)
+    {
+        if (_lastGlyphRow < 0) return false;
+        ref var cell = ref CellAt(_lastGlyphRow, _lastGlyphCol);
+        if (cell.Char is ' ' or '\0') return false;
+        cell.Tail = string.Concat(cell.Tail,
+            rune <= 0xFFFF ? new string((char)rune, 1) : char.ConvertFromUtf32(rune));
+        // VS16 / enclosing keycap flip a text-presentation base into a 2-cell emoji.
+        if (!cell.IsWide && GraphemeWidth.EmojiWidthTrigger(rune) && GraphemeWidth.IsEmojiBase(cell.Char))
+            TryWidenCell(_lastGlyphRow, _lastGlyphCol);
+        Touch(_lastGlyphRow);
+        return true;
+    }
+
+    /// <summary>True while the last written cell holds a single regional indicator —
+    /// a second RI joins it to form one flag glyph.</summary>
+    internal bool LastGlyphIsRegionalIndicator
+    {
+        get
+        {
+            if (_lastGlyphRow < 0) return false;
+            ref var cell = ref CellAt(_lastGlyphRow, _lastGlyphCol);
+            return cell.Tail is { Length: 1 }
+                && char.IsHighSurrogate(cell.Char)
+                && GraphemeWidth.IsRegionalIndicator(char.ConvertToUtf32(cell.Char, cell.Tail[0]));
+        }
+    }
+
+    /// <summary>Grow the 1-cell glyph at (row,col) into 2 cells when the cell to
+    /// its right is free; nudges the cursor past the widened glyph.</summary>
+    private void TryWidenCell(int row, int col)
+    {
+        if (col + 1 >= Columns) return;
+        ref var next = ref CellAt(row, col + 1);
+        if (next.IsWideContinuation || next.Char is not (' ' or '\0') || next.Tail is not null) return;
+        ref var cell = ref CellAt(row, col);
+        cell.IsWide = true;
+        next.IsWideContinuation = true;
+        next.IsWide = false;
+        next.Char = '\0';
+        next.Tail = null;
+        next.Attrs = cell.Attrs;
+        next.Fg = cell.Fg;
+        next.Bg = cell.Bg;
+        if (CursorY == row && CursorX == col + 1)
+        {
+            if (CursorX + 1 >= Columns) { CursorX = Columns - 1; _pendingWrap = true; }
+            else CursorX++;
+        }
+    }
+
+    private void PutCluster(string text, int width)
+    {
         if (_pendingWrap)
         {
             if (AutoWrap)
             {
+                _wrapped[CursorY] = true;
                 LineFeed();
                 CarriageReturn();
             }
             _pendingWrap = false;
         }
 
-        if (_decSpecial[_activeCharset] && ch is >= '`' and <= '~')
-            ch = DecSpecialMap(ch);
-
-        var width = CharWidth(ch);
         if (width == 2 && CursorX == Columns - 1)
         {
+            _wrapped[CursorY] = true;
             LineFeed();
             CarriageReturn();
         }
@@ -204,18 +299,28 @@ public sealed class ScreenBuffer
             ShiftRight(CursorY, CursorX, width);
 
         ref var cell = ref CellAt(CursorY, CursorX);
-        cell.Char = ch;
+        // Overwriting half of a wide glyph orphans its other half — clear it.
+        if (cell.IsWide && CursorX + 1 < Columns)
+            ClearContinuationCell(CursorY, CursorX + 1);
+        else if (cell.IsWideContinuation && CursorX > 0)
+            ClearWideLead(CursorY, CursorX - 1);
+
+        cell.Char = text[0];
+        cell.Tail = text.Length > 1 ? text[1..] : null;
         cell.Attrs = CurrentAttrs;
         cell.Fg = CurrentFg;
         cell.Bg = CurrentBg;
         cell.IsWide = width == 2;
         cell.IsWideContinuation = false;
         Touch(CursorY);
+        _lastGlyphRow = CursorY;
+        _lastGlyphCol = CursorX;
 
         if (width == 2 && CursorX + 1 < Columns)
         {
             ref var next = ref CellAt(CursorY, CursorX + 1);
             next.Char = '\0';
+            next.Tail = null;
             next.IsWideContinuation = true;
             next.IsWide = false;
             next.Attrs = CurrentAttrs;
@@ -235,8 +340,26 @@ public sealed class ScreenBuffer
         }
     }
 
+    private void ClearContinuationCell(int row, int col)
+    {
+        ref var cont = ref CellAt(row, col);
+        cont.Char = '\0';
+        cont.Tail = null;
+        cont.IsWideContinuation = false;
+        cont.IsWide = false;
+    }
+
+    private void ClearWideLead(int row, int col)
+    {
+        ref var lead = ref CellAt(row, col);
+        lead.Char = ' ';
+        lead.Tail = null;
+        lead.IsWide = false;
+    }
+
     private void ShiftRight(int row, int col, int count)
     {
+        _lastGlyphRow = -1;
         var baseIdx = row * Columns;
         for (var i = Columns - 1; i >= col + count; i--)
             _screen[baseIdx + i] = _screen[baseIdx + i - count];
@@ -247,6 +370,7 @@ public sealed class ScreenBuffer
 
     private void ShiftLeft(int row, int col, int count)
     {
+        _lastGlyphRow = -1;
         var baseIdx = row * Columns;
         for (var i = col; i < Columns - count; i++)
             _screen[baseIdx + i] = _screen[baseIdx + i + count];
@@ -304,20 +428,28 @@ public sealed class ScreenBuffer
     /// <summary>Scroll [top..bottom] up n lines; top lines of the *full screen* go to scrollback.</summary>
     public void ScrollUpRegion(int top, int bottom, int n)
     {
+        _lastGlyphRow = -1;
         for (var i = 0; i < n; i++)
         {
             var rowArr = new TerminalCell[Columns];
             Array.Copy(_screen, top * Columns, rowArr, 0, Columns);
+            var leavingWrapped = _wrapped[top];
             Array.Copy(_screen, (top + 1) * Columns, _screen, top * Columns, (bottom - top) * Columns);
+            Array.Copy(_wrapped, top + 1, _wrapped, top, bottom - top);
+            _wrapped[bottom] = false;
             var blank = TerminalCell.Blank(CurrentBg);
             for (var c = 0; c < Columns; c++) _screen[bottom * Columns + c] = blank;
 
             if (!OnAlternateScreen && top == 0 && bottom == Rows - 1)
             {
                 _scrollback.Add(rowArr);
+                _scrollWrapped.Add(leavingWrapped);
                 if (_scrollback.Count > _scrollbackLimit)
+                {
                     _scrollback.RemoveAt(0);
-                ScrollbackChanged?.Invoke();
+                    _scrollWrapped.RemoveAt(0);
+                }
+                ScrollbackChanged?.Invoke(1);
             }
         }
         TouchAll();
@@ -325,10 +457,13 @@ public sealed class ScreenBuffer
 
     public void ScrollDownRegion(int top, int bottom, int n)
     {
+        _lastGlyphRow = -1;
         var blank = TerminalCell.Blank(CurrentBg);
         for (var i = 0; i < n; i++)
         {
             Array.Copy(_screen, top * Columns, _screen, (top + 1) * Columns, (bottom - top) * Columns);
+            Array.Copy(_wrapped, top, _wrapped, top + 1, bottom - top);
+            _wrapped[top] = false;
             for (var c = 0; c < Columns; c++) _screen[top * Columns + c] = blank;
         }
         TouchAll();
@@ -398,13 +533,16 @@ public sealed class ScreenBuffer
             case 2:
                 var all = NewBlankScreen(Columns, Rows);
                 Array.Copy(all, _screen, all.Length);
+                Array.Clear(_wrapped);
                 TouchAll();
                 break;
             case 3: // xterm ED3: scrollback only — the visible screen stays put
-                _scrollback.Clear(); ScrollbackChanged?.Invoke();
+                ScrollbackChanged?.Invoke(-_scrollback.Count);
+                _scrollback.Clear(); _scrollWrapped.Clear();
                 break;
         }
         _pendingWrap = false;
+        _lastGlyphRow = -1;
     }
 
     public void EraseInLine(int mode)
@@ -430,12 +568,14 @@ public sealed class ScreenBuffer
 
     private void Fill(int r1, int c1, int r2, int c2, TerminalCell blank)
     {
+        _lastGlyphRow = -1;
         for (var r = r1; r <= r2; r++)
         {
             var cStart = r == r1 ? c1 : 0;
             var cEnd = r == r2 ? c2 : Columns - 1;
             for (var c = cStart; c <= cEnd; c++)
                 _screen[r * Columns + c] = blank;
+            if (cStart == 0 && cEnd == Columns - 1) _wrapped[r] = false;
             Touch(r);
         }
     }
@@ -473,23 +613,29 @@ public sealed class ScreenBuffer
     {
         if (on == OnAlternateScreen) return;
         OnAlternateScreen = on;
+        _lastGlyphRow = -1;
         if (on)
         {
             _savedScreen = _screen;
+            _savedWrapped = _wrapped;
             _screen = NewBlankScreen(Columns, Rows);
+            _wrapped = new bool[Rows];
         }
         else
         {
             _screen = _savedScreen ?? NewBlankScreen(Columns, Rows);
+            _wrapped = _savedWrapped ?? new bool[Rows];
             _savedScreen = null;
+            _savedWrapped = null;
         }
         TouchAll();
     }
 
     public void ClearScrollback()
     {
+        ScrollbackChanged?.Invoke(-_scrollback.Count);
         _scrollback.Clear();
-        ScrollbackChanged?.Invoke();
+        _scrollWrapped.Clear();
     }
 
     public void SetTitle(string title)
@@ -508,6 +654,8 @@ public sealed class ScreenBuffer
 
     public void AlignTest() // DECALN: fill screen with 'E'
     {
+        _lastGlyphRow = -1;
+        Array.Clear(_wrapped);
         var cell = new TerminalCell { Char = 'E', Attrs = CellAttrs.None, Fg = TerminalColor.Default, Bg = TerminalColor.Default };
         for (var i = 0; i < _screen.Length; i++) _screen[i] = cell;
         TouchAll();
@@ -521,17 +669,23 @@ public sealed class ScreenBuffer
         {
         if (columns == Columns && rows == Rows) return;
         var newScreen = NewBlankScreen(columns, rows);
+        var newWrapped = new bool[rows];
         var copyRows = Math.Min(rows, Rows);
         var copyCols = Math.Min(columns, Columns);
         for (var r = 0; r < copyRows; r++)
             Array.Copy(_screen, r * Columns, newScreen, r * columns, copyCols);
+        Array.Copy(_wrapped, 0, newWrapped, 0, copyRows);
         _screen = newScreen;
+        _wrapped = newWrapped;
         if (_savedScreen is { } saved)
         {
             var resized = NewBlankScreen(columns, rows);
+            var savedWrapped = new bool[rows];
             for (var r = 0; r < copyRows; r++)
                 Array.Copy(saved, r * Columns, resized, r * columns, copyCols);
+            Array.Copy(_savedWrapped!, 0, savedWrapped, 0, copyRows);
             _savedScreen = resized;
+            _savedWrapped = savedWrapped;
         }
         Columns = columns;
         Rows = rows;
@@ -540,27 +694,71 @@ public sealed class ScreenBuffer
         _scrollTop = 0;
         _scrollBottom = rows - 1;
         _pendingWrap = false;
+        _lastGlyphRow = -1;
+        BumpVersion();
         TouchAll();
         }
     }
 
     // ---------- helpers ----------
 
-    public static int CharWidth(char ch)
+    /// <summary>Cell width of a single UTF-16 unit — delegates to the shared
+    /// <see cref="GraphemeWidth"/> table used by renderer, cursor and selection.</summary>
+    public static int CharWidth(char ch) => Math.Max(1, GraphemeWidth.OfChar(ch));
+
+    /// <summary>True when absolute line <paramref name="line"/> soft-wrapped onto the
+    /// next line (long logical line split by autowrap — no real newline).</summary>
+    public bool IsLineWrapped(int line)
+        => line < _scrollback.Count
+            ? line < _scrollWrapped.Count && _scrollWrapped[line]
+            : _wrapped[line - _scrollback.Count];
+
+    /// <summary>
+    /// Flatten a cell row into plain text plus the cell column of each text char
+    /// (cluster members share the cell's start column; continuation cells and
+    /// unwritten cells contribute a ' ' so column indices stay aligned).
+    /// </summary>
+    public static (string Text, int[] Cols) FlattenRow(ReadOnlySpan<TerminalCell> row)
     {
-        var c = (int)ch;
-        // Common double-width ranges (CJK, fullwidth, Hangul, emoji blocks).
-        if (c >= 0x1100 &&
-           (c <= 0x115F || c == 0x2329 || c == 0x232A ||
-           (c >= 0x2E80 && c <= 0xA4CF && c != 0x303F) ||
-           (c >= 0xAC00 && c <= 0xD7A3) ||
-           (c >= 0xF900 && c <= 0xFAFF) ||
-           (c >= 0xFE30 && c <= 0xFE6F) ||
-           (c >= 0xFF00 && c <= 0xFF60) ||
-           (c >= 0xFFE0 && c <= 0xFFE6) ||
-           (c >= 0x1F300 && c <= 0x1FAFF)))
-            return 2;
-        return 1;
+        var sb = new StringBuilder(row.Length);
+        var cols = new List<int>(row.Length);
+        for (var c = 0; c < row.Length; c++)
+        {
+            ref readonly var cell = ref row[c];
+            if (cell.IsWideContinuation) continue;
+            if (cell.Char == '\0') { sb.Append(' '); cols.Add(c); continue; }
+            sb.Append(cell.Char);
+            cols.Add(c);
+            if (cell.Tail is { } tail)
+                for (var i = 0; i < tail.Length; i++) { sb.Append(tail[i]); cols.Add(c); }
+        }
+        return (sb.ToString(), cols.ToArray());
+    }
+
+    /// <summary>
+    /// Extract display text of absolute lines [startLine..endLine] over columns
+    /// [startCol..endCol]; soft-wrapped lines join without a newline.
+    /// </summary>
+    public string ExtractText(int startLine, int startCol, int endLine, int endCol)
+    {
+        var sb = new StringBuilder();
+        for (var line = startLine; line <= endLine; line++)
+        {
+            var row = GetLine(line);
+            var c1 = line == startLine ? startCol : 0;
+            var c2 = line == endLine ? endCol : Columns - 1;
+            c2 = Math.Min(c2, row.Length - 1);
+            for (var c = Math.Max(0, c1); c <= c2; c++)
+            {
+                ref readonly var cell = ref row[c];
+                if (cell.IsWideContinuation) continue;
+                cell.AppendText(sb);
+            }
+            // trim trailing blanks; soft-wrapped rows join the next line directly
+            while (sb.Length > 0 && sb[^1] == ' ') sb.Length--;
+            if (line < endLine && !IsLineWrapped(line)) sb.Append('\n');
+        }
+        return sb.ToString();
     }
 
     private static char DecSpecialMap(char ch) => ch switch
@@ -588,7 +786,10 @@ public sealed class ScreenBuffer
             var len = row.Length;
             while (len > 0 && (row[len - 1].Char == ' ' || row[len - 1].Char == '\0')) len--;
             for (var c = 0; c < len; c++)
-                sb.Append(row[c].Char == '\0' ? ' ' : row[c].Char);
+            {
+                if (row[c].IsWideContinuation) continue;
+                row[c].AppendText(sb);
+            }
             if (r < end) sb.Append('\n');
         }
         return sb.ToString();
@@ -616,7 +817,7 @@ public sealed class ScreenBuffer
             hist.Clear();
             for (var c = 0; c < len; c++)
             {
-                sb.Append(row[c].Char == '\0' ? ' ' : row[c].Char);
+                if (!row[c].IsWideContinuation) row[c].AppendText(sb);
                 if (!row[c].Fg.IsDefault && len > 0)
                     hist[row[c].Fg] = hist.GetValueOrDefault(row[c].Fg) + 1;
             }
@@ -634,8 +835,11 @@ public sealed class ScreenBuffer
     {
         var span = GetScreenRow(row);
         var sb = new StringBuilder(span.Length);
-        foreach (var cell in span)
-            sb.Append(cell.Char == '\0' ? ' ' : cell.Char);
+        foreach (ref readonly var cell in span)
+        {
+            if (cell.IsWideContinuation) continue;
+            cell.AppendText(sb);
+        }
         return sb.ToString().TrimEnd();
     }
 
@@ -644,8 +848,11 @@ public sealed class ScreenBuffer
     {
         var span = _scrollback[index].AsSpan();
         var sb = new StringBuilder(span.Length);
-        foreach (var cell in span)
-            sb.Append(cell.Char == '\0' ? ' ' : cell.Char);
+        foreach (ref readonly var cell in span)
+        {
+            if (cell.IsWideContinuation) continue;
+            cell.AppendText(sb);
+        }
         return sb.ToString().TrimEnd();
     }
 

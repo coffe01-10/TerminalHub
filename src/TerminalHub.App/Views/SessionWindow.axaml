@@ -34,9 +34,17 @@
     <!-- Terminal viewport -->
     <Border Grid.Row="1" CornerRadius="8" Background="{DynamicResource UiCanvas}"
             BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Padding="10,8" ClipToBounds="True">
-      <ctl:TerminalView x:Name="PopoutTerminal"
-                        Emulator="{Binding Emulator}"
-                        TerminalFontSize="{Binding FontSize}"/>
+      <Panel>
+        <ctl:TerminalView x:Name="PopoutTerminal"
+                          Emulator="{Binding Emulator}"
+                          TerminalFontSize="{Binding FontSize}"
+                          TerminalFontFamily="{Binding FontFamily}"/>
+        <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,6,6" Padding="10,4" CornerRadius="8" FontSize="10"
+                Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
+                IsVisible="{Binding #PopoutTerminal.IsScrolledUp}"/>
+      </Panel>
     </Border>
   </Grid>
 </Window>

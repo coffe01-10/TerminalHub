@@ -186,7 +186,7 @@ public class TerminalImeTests
         var group = new DrawingGroup();
         using (var context = group.Open())
             typeof(TerminalView).GetMethod("DrawRun", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(view, [context, "大大大v", 2, 0, Brushes.White, CellAttrs.None]);
+                .Invoke(view, [context, "大大大v", 2, 0, Brushes.White, CellAttrs.None, Colors.White]);
 
         var glyphs = Glyphs(group, Matrix.Identity).ToArray();
         var cellW = CellWidth(view);

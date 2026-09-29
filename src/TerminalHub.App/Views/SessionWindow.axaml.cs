@@ -13,12 +13,12 @@ public partial class SessionWindow : Window
     /// <summary>Parameterless ctor for the XAML designer.</summary>
     public SessionWindow() => InitializeComponent();
 
-    public SessionWindow(TerminalSessionModel session, double fontSize)
+    public SessionWindow(TerminalSessionModel session, double fontSize, Avalonia.Media.FontFamily? fontFamily = null)
     {
         InitializeComponent();
         if (!OperatingSystem.IsWindows())
             TransparencyLevelHint = new[] { WindowTransparencyLevel.None };
-        DataContext = new SessionWindowViewModel(session, fontSize);
+        DataContext = new SessionWindowViewModel(session, fontSize, fontFamily);
         Opened += (_, _) => PopoutTerminal.Focus();
         // The emulator outlives the popout — drop the VM's event subscriptions
         // so each close doesn't leak a dead VM (and its queued UI posts).
@@ -32,6 +32,9 @@ public partial class SessionWindow : Window
     public TerminalHub.App.Controls.TerminalView Terminal => PopoutTerminal;
 
     private void OnReturnClick(object? sender, RoutedEventArgs e) => Close();
+
+    private void OnScrollToBottomClick(object? sender, RoutedEventArgs e)
+        => PopoutTerminal.ScrollToBottom();
 
     protected override void OnKeyDown(KeyEventArgs e)
     {

@@ -225,37 +225,64 @@
                              HorizontalAlignment="Center"/>
                 </StackPanel>
                 <!-- single view -->
-                <ctl:TerminalView x:Name="MainTerminal" IsVisible="{Binding !IsSplit}"
-                                  Emulator="{Binding ActiveSession.Emulator}"
-                                  TerminalFontSize="{Binding FontSize}"/>
+                <Panel IsVisible="{Binding !IsSplit}">
+                  <ctl:TerminalView x:Name="MainTerminal"
+                                    Emulator="{Binding ActiveSession.Emulator}"
+                                    TerminalFontSize="{Binding FontSize}"
+                                    TerminalFontFamily="{Binding TerminalFont}"
+                                    SearchQuery="{Binding Dashboard.SearchQuery}"/>
+                  <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                          Margin="0,0,6,6" Padding="10,4" CornerRadius="8" FontSize="10"
+                          Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                          Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
+                          IsVisible="{Binding #MainTerminal.IsScrolledUp}"
+                          ToolTip.Tip="回到实时输出底部"/>
+                </Panel>
                 <!-- split view: two independent sessions + draggable divider -->
                 <Grid IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*">
-                  <Border BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
+                  <Border x:Name="LeftPaneBox" BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
                           Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
                     <Border.Styles>
                       <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
                       <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
                     </Border.Styles>
-                    <ctl:TerminalView Emulator="{Binding LeftPane.Emulator}"
-                                      TerminalFontSize="{Binding FontSize}"
-                                      PointerPressed="OnLeftPanePressed"/>
+                    <Panel>
+                      <ctl:TerminalView x:Name="LeftTerminal" Emulator="{Binding LeftPane.Emulator}"
+                                        TerminalFontSize="{Binding FontSize}"
+                                        TerminalFontFamily="{Binding TerminalFont}"
+                                        SearchQuery="{Binding Dashboard.SearchQuery}"/>
+                      <Button Content="⬇" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                              Margin="0,0,6,6" Padding="8,3" CornerRadius="8" FontSize="10"
+                              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                              Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
+                              IsVisible="{Binding #LeftTerminal.IsScrolledUp}"
+                              ToolTip.Tip="回到实时输出底部"/>
+                    </Panel>
                   </Border>
                   <GridSplitter Grid.Column="1" Width="5" Background="{DynamicResource UiRaised}"
                                 ResizeBehavior="BasedOnAlignment"/>
-                  <Border Grid.Column="2" BorderThickness="1.5" CornerRadius="6" Margin="3,0,0,0"
+                  <Border x:Name="RightPaneBox" Grid.Column="2" BorderThickness="1.5" CornerRadius="6" Margin="3,0,0,0"
                           Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}">
                     <Border.Styles>
                       <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
                       <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
                     </Border.Styles>
-                    <Panel PointerPressed="OnRightPanePressed" Background="Transparent">
-                      <ctl:TerminalView Emulator="{Binding RightPane.Emulator}"
+                    <Panel Background="Transparent">
+                      <ctl:TerminalView x:Name="RightTerminal" Emulator="{Binding RightPane.Emulator}"
                                         TerminalFontSize="{Binding FontSize}"
+                                        TerminalFontFamily="{Binding TerminalFont}"
+                                        SearchQuery="{Binding Dashboard.SearchQuery}"
                                         IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
                       <TextBlock Text="右栏暂无会话 — 点击左侧会话卡分配到这里"
                                  Foreground="{DynamicResource UiFaint}" FontSize="11" TextWrapping="Wrap"
                                  HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"
                                  IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                      <Button Content="⬇" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                              Margin="0,0,6,6" Padding="8,3" CornerRadius="8" FontSize="10"
+                              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                              Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
+                              IsVisible="{Binding #RightTerminal.IsScrolledUp}"
+                              ToolTip.Tip="回到实时输出底部"/>
                     </Panel>
                   </Border>
                 </Grid>
@@ -404,18 +431,27 @@
                     <!-- Search: filter active-session scrollback+screen, matched terms highlighted -->
                     <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
                           RowDefinitions="Auto,Auto,*">
-                      <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,0">
+                      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="8,6,8,0">
                         <TextBox Text="{Binding Dashboard.SearchQuery}"
                                  Watermark="在当前会话中搜索…" FontSize="11"
                                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                                  CornerRadius="6" Padding="8,4"/>
-                        <TextBlock Grid.Column="1" Text="{Binding Dashboard.SearchStatus}"
+                        <Button Grid.Column="1" Content="▲" Padding="8,2" Margin="6,0,0,0" FontSize="10"
+                                Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}"
+                                Foreground="{DynamicResource UiMuted}" CornerRadius="6" VerticalAlignment="Center"
+                                Click="OnSearchPrevMatch" ToolTip.Tip="上一处匹配（终端视口跟随）"/>
+                        <Button Grid.Column="2" Content="▼" Padding="8,2" Margin="4,0,0,0" FontSize="10"
+                                Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}"
+                                Foreground="{DynamicResource UiMuted}" CornerRadius="6" VerticalAlignment="Center"
+                                Click="OnSearchNextMatch" ToolTip.Tip="下一处匹配（终端视口跟随）"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Dashboard.SearchStatus}"
                                    Foreground="{DynamicResource UiFaint}" FontSize="10" Margin="10,0"
                                    VerticalAlignment="Center" MinWidth="70"/>
                       </Grid>
-                      <TextBlock Grid.Row="1" Text="作用域: 当前活动会话 scrollback + 屏幕"
+                      <TextBlock Grid.Row="1" Text="作用域: 当前活动会话 scrollback + 屏幕 · 双击结果行定位到终端"
                                  Foreground="{DynamicResource UiFaint}" FontSize="9" Margin="10,4,0,2"/>
                       <ListBox Grid.Row="2" ItemsSource="{Binding Dashboard.SearchHits}"
+                               DoubleTapped="OnSearchHitDoubleTapped"
                                Background="Transparent" BorderThickness="0" Padding="6">
                         <ListBox.Styles>
                           <Style Selector="ListBoxItem">
@@ -1363,8 +1399,13 @@
                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                  CornerRadius="6" Padding="8,4" FontSize="11"/>
 
-        <TextBlock Text="字体大小 Font size" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+        <TextBlock Text="字体大小 Font size（Ctrl+= / Ctrl+- 缩放，Ctrl+0 复位）" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
         <TextBox Text="{Binding FontSize, Mode=TwoWay}"
+                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
+                 CornerRadius="6" Padding="8,4" FontSize="11"/>
+
+        <TextBlock Text="终端字体 Font family" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+        <TextBox Text="{Binding TerminalFontName}" Watermark="留空用内置 Cascadia/Consolas 等宽栈"
                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                  CornerRadius="6" Padding="8,4" FontSize="11"/>
 

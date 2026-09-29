@@ -1228,6 +1228,7 @@ public class LogsPanelTests
             window.Show();
             await Task.Delay(400);
             var vm = (MainWindowViewModel)window.DataContext!;
+            vm.InspectorVisible = true;
             vm.SelectedRightTab = 2; // Logs
             await Task.Delay(150);
 
@@ -1550,6 +1551,7 @@ public class LogsPanelTests
             window.Show();
             await Task.Delay(400);
             var vm = (MainWindowViewModel)window.DataContext!;
+            vm.InspectorVisible = true;
             vm.SelectedRightTab = 2;
             await Task.Delay(150);
 

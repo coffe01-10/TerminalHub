@@ -340,4 +340,130 @@ public class TerminalCoreTests
         Assert.Empty(b.SearchLines(""));
         Assert.Empty(b.SearchLines("   "));
     }
+
+    // ---------- Unicode / grapheme width ----------
+
+    [Fact]
+    public void CjkGlyph_OccupiesTwoCells_WithContinuation()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("中x");
+        var cell = b.CellAt(0, 0);
+        Assert.True(cell.IsWide);
+        Assert.Equal('中', cell.Char);
+        Assert.True(b.CellAt(0, 1).IsWideContinuation);
+        Assert.Equal('x', b.CellAt(0, 2).Char);
+        Assert.Equal(3, b.CursorX);
+    }
+
+    [Fact]
+    public void Emoji_AboveBmp_StoredWhole_NotReplacementChar()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("\U0001F600!");                    // 😀 then '!'
+        var cell = b.CellAt(0, 0);
+        Assert.Equal("😀", cell.Text);            // surrogate pair kept intact
+        Assert.True(cell.IsWide);
+        Assert.Equal('!', b.CellAt(0, 2).Char);
+        Assert.Equal(3, b.CursorX);
+        Assert.Equal("😀!", b.RowText(0).TrimEnd());
+    }
+
+    [Fact]
+    public void CombiningMark_JoinsBaseCell()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("éx");               // 'e' + U+0301 then 'x'
+        var cell = b.CellAt(0, 0);
+        Assert.Equal("é", cell.Text);
+        Assert.False(cell.IsWide);
+        Assert.Equal('x', b.CellAt(0, 1).Char);
+        Assert.Equal(2, b.CursorX);
+        Assert.Equal("éx", b.RowText(0).TrimEnd());
+    }
+
+    [Fact]
+    public void Vs16_WidensEmojiBase_InPlace()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("❤\uFE0F!");                        // '❤' + VS16 then '!'
+        var cell = b.CellAt(0, 0);
+        Assert.True(cell.IsWide);                  // VS16 flipped it to emoji width
+        Assert.True(b.CellAt(0, 1).IsWideContinuation);
+        Assert.Equal('!', b.CellAt(0, 2).Char);
+    }
+
+    [Fact]
+    public void ZwjSequence_StaysInOneCell()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("\U0001F468‍\U0001F469‍\U0001F467x"); // 👨‍👩‍👧 then 'x'
+        var cell = b.CellAt(0, 0);
+        Assert.Equal("👨‍👩‍👧", cell.Text);
+        Assert.True(cell.IsWide);
+        Assert.Equal('x', b.CellAt(0, 2).Char);
+        Assert.Equal(3, b.CursorX);
+    }
+
+    [Fact]
+    public void FlagPair_TwoRegionalIndicators_OneCell()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("\U0001F1E8\U0001F1F3!");           // 🇨🇳 then '!'
+        Assert.Equal("🇨🇳", b.CellAt(0, 0).Text);
+        Assert.Equal('!', b.CellAt(0, 2).Char);
+        Assert.Equal(3, b.CursorX);
+    }
+
+    [Fact]
+    public void WideCharAtRightEdge_WrapsToNextRow()
+    {
+        var (p, b) = Make(5, 4);
+        p.Feed("abcd中");                          // '中' can't split across cols 4-5
+        Assert.Equal('中', b.CellAt(1, 0).Char);
+        Assert.True(b.CellAt(1, 0).IsWide);
+        Assert.True(b.IsLineWrapped(0));
+    }
+
+    [Fact]
+    public void ExtractText_SoftWrappedLine_JoinsWithoutNewline()
+    {
+        var (p, b) = Make(5, 4);
+        p.Feed("abcdefghijkl");                     // wraps into 5+5 + 2
+        Assert.True(b.IsLineWrapped(0));
+        Assert.True(b.IsLineWrapped(1));
+        var text = b.ExtractText(b.ScrollbackCount, 0,
+            b.ScrollbackCount + 2, 4);
+        Assert.Equal("abcdefghijkl", text);
+    }
+
+    [Fact]
+    public void ExtractText_HardNewline_ProducesNewline()
+    {
+        var (p, b) = Make(10, 4);
+        p.Feed("one\r\ntwo");
+        var text = b.ExtractText(b.ScrollbackCount, 0, b.ScrollbackCount + 1, 9);
+        Assert.Equal("one\ntwo", text);
+    }
+
+    [Fact]
+    public void FlattenRow_MapsClusterCharsToCellColumns()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("A中B");                            // A=col0, 中=col1-2, B=col3
+        var (text, cols) = ScreenBuffer.FlattenRow(b.GetScreenRow(0));
+        Assert.StartsWith("A中B", text);
+        Assert.Equal(0, cols[0]);                  // A
+        Assert.Equal(1, cols[1]);                  // 中
+        Assert.Equal(3, cols[2]);                  // B
+    }
+
+    [Fact]
+    public void Backspace_FromContinuationCell_LandsOnGlyphStart()
+    {
+        var (p, b) = Make(20, 4);
+        p.Feed("中");
+        b.Backspace();                              // cursor was at 2 → lands on 1 (continuation)
+        Assert.Equal(0, b.CursorX);                 // snapped to the glyph's lead cell
+    }
 }

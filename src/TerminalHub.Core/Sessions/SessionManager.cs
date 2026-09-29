@@ -44,6 +44,8 @@ public sealed class SessionManager
             Tag = tag,
             Emulator = emulator,
             WorkingDirectory = options.WorkingDirectory,
+            Shell = options.Shell,
+            ShellArguments = options.Arguments,
         };
         emulator.Pty.Exited += (_, _) => SessionStateChanged?.Invoke(session);
 

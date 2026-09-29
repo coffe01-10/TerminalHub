@@ -18,6 +18,30 @@ public sealed record StartupSession
     public ShellKind Shell { get; init; } = ShellKind.PowerShell;
 }
 
+/// <summary>One session in the saved workspace layout. Recreated as a NEW
+/// process on launch — the old PTY process is gone, this only restores shape.</summary>
+public sealed record WorkspaceSession
+{
+    public string Name { get; init; } = "Terminal 01";
+    public string Tag { get; init; } = "";
+    public string WorkingDirectory { get; init; } = "";
+    /// <summary>Resolved shell command line (pwsh, cmd.exe, ssh…), not a ShellKind.</summary>
+    public string Shell { get; init; } = "";
+    public string Arguments { get; init; } = "";
+}
+
+/// <summary>Saved workspace layout: session order + active session + split panes.
+/// Indices point into <see cref="Sessions"/>; -1 = none.</summary>
+public sealed class WorkspaceState
+{
+    public List<WorkspaceSession> Sessions { get; set; } = [];
+    public int ActiveIndex { get; set; } = -1;
+    public bool IsSplit { get; set; }
+    public int LeftIndex { get; set; } = -1;
+    public int RightIndex { get; set; } = -1;
+    public int FocusedPane { get; set; }
+}
+
 /// <summary>Logs panel: one named session's remembered filter combo (per-session filter memory).</summary>
 public sealed class LogsSessionFilterState
 {
@@ -38,6 +62,8 @@ public sealed class AppSettings
     public ShellKind Shell { get; set; } = ShellKind.PowerShell;
     public string CustomShellPath { get; set; } = "";
     public double FontSize { get; set; } = 13;
+    /// <summary>Terminal font family list ("" = built-in monospace stack).</summary>
+    public string FontFamily { get; set; } = "";
     public string Theme { get; set; } = "DarkGlass";
     public bool InspectorVisible { get; set; }
     public bool OutputVisible { get; set; }
@@ -118,6 +144,16 @@ public sealed class AppSettings
         new StartupSession { Name = "Terminal 02", Tag = "测试环境" },
         new StartupSession { Name = "Terminal 03", Tag = "部署控制" },
     ];
+
+    /// <summary>Last closed window layout. When it has sessions it wins over
+    /// <see cref="StartupSessions"/> — restored as fresh processes on launch.
+    /// Null/empty until the app has run once.</summary>
+    public WorkspaceState Workspace
+    {
+        get => _workspace;
+        set => _workspace = value ?? new WorkspaceState();
+    }
+    private WorkspaceState _workspace = new();
 
     /// <summary>Resolved shell command line for the current platform.
     /// <paramref name="shell"/> overrides the configured kind (per-session choice).</summary>

@@ -36,6 +36,8 @@ public sealed class VtParser
     private int _utf8Remaining;
     private int _utf8Value;
     private int _utf8Min;
+    /// <summary>The last emitted rune was U+200D ZWJ — the next rune joins the same cluster.</summary>
+    private bool _afterZwj;
 
     // Replies (DA / DECRPM / OSC queries / kitty flags) are queued while parsing
     // under SyncRoot and written back AFTER the lock is released — ConPtySession.Write
@@ -59,6 +61,7 @@ public sealed class VtParser
         byte[][] responses;
         lock (_buffer.SyncRoot)
         {
+            if (data.Length > 0) _buffer.BumpVersion();
             foreach (var b in data)
                 FeedByte(b);
             responses = _responses.ToArray();
@@ -106,6 +109,7 @@ public sealed class VtParser
     private void Enter(State s)
     {
         _state = s;
+        _afterZwj = false;          // any escape/control breaks a pending join
         if (s is State.Escape)
         {
             _intermediates.Clear(); // fresh ESC sequence — no stale intermediates
@@ -140,34 +144,47 @@ public sealed class VtParser
                 {
                     var rune = _utf8Value;
                     if (rune < _utf8Min) rune = 0xFFFD;         // overlong
-                    if (rune > 0xFFFF)
-                        _buffer.PutChar('\uFFFD');              // beyond BMP: fallback glyph
-                    else
-                        _buffer.PutChar((char)rune);
+                    EmitRune(rune);
                 }
                 return;
             }
             _utf8Remaining = 0; // invalid continuation: resync
+            _afterZwj = false;
         }
 
         switch (b)
         {
             case 0x00: case 0x7F: break;                        // NUL/DEL ignored
             case 0x07: break;                                   // BEL
-            case 0x08: _buffer.Backspace(); break;
-            case 0x09: _buffer.Tab(); break;
-            case 0x0A: case 0x0B: case 0x0C: _buffer.LineFeed(); break;
-            case 0x0D: _buffer.CarriageReturn(); break;
-            case 0x0E: _buffer.ShiftOut(); break;
-            case 0x0F: _buffer.ShiftIn(); break;
+            case 0x08: _afterZwj = false; _buffer.Backspace(); break;
+            case 0x09: _afterZwj = false; _buffer.Tab(); break;
+            case 0x0A: case 0x0B: case 0x0C: _afterZwj = false; _buffer.LineFeed(); break;
+            case 0x0D: _afterZwj = false; _buffer.CarriageReturn(); break;
+            case 0x0E: _afterZwj = false; _buffer.ShiftOut(); break;
+            case 0x0F: _afterZwj = false; _buffer.ShiftIn(); break;
             case 0x9B: Enter(State.Csi); break;                 // 8-bit CSI
             case 0x9D: Enter(State.Osc); break;
-            case >= 0x80 and < 0xC0: _buffer.PutChar('\uFFFD'); break;
+            case >= 0x80 and < 0xC0: _afterZwj = false; _buffer.PutChar('\uFFFD'); break;
             case >= 0xC0 and < 0xE0: _utf8Value = b & 0x1F; _utf8Remaining = 1; _utf8Min = 0x80; break;
             case >= 0xE0 and < 0xF0: _utf8Value = b & 0x0F; _utf8Remaining = 2; _utf8Min = 0x800; break;
             case >= 0xF0: _utf8Value = b & 0x07; _utf8Remaining = 3; _utf8Min = 0x10000; break;
-            default: _buffer.PutChar((char)b); break;
+            default: _afterZwj = false; _buffer.PutChar((char)b); break;
         }
+    }
+
+    /// <summary>
+    /// Emit a decoded code point: zero-width runes, ZWJ followers and the second
+    /// regional indicator of a flag extend the previous cell's cluster; every
+    /// other rune starts a new cell (supplementary planes included).
+    /// </summary>
+    private void EmitRune(int rune)
+    {
+        var joins = _afterZwj
+            || GraphemeWidth.IsZeroWidthRune(rune)
+            || (GraphemeWidth.IsRegionalIndicator(rune) && _buffer.LastGlyphIsRegionalIndicator);
+        if (!joins || !_buffer.AppendToLastGrapheme(rune))
+            _buffer.PutRune(rune);
+        _afterZwj = rune == 0x200D;
     }
 
     // ---------- escape ----------

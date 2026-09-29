@@ -358,9 +358,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public AppSettings Settings => _settings;
     public ISystemMonitor Monitor => _monitor;
 
-    /// <summary>Called once at startup to spawn configured sessions.</summary>
+    /// <summary>Called once at startup to spawn configured sessions. A saved
+    /// workspace layout wins over the static startup-session list — it is the
+    /// same shape the user closed the app with (fresh processes each time).</summary>
     public async Task SpawnStartupSessionsAsync()
     {
+        if (_settings.Workspace.Sessions.Count > 0)
+        {
+            await RestoreWorkspaceAsync(_settings.Workspace);
+            return;
+        }
         if (_settings.StartupSessions.Count == 0)
         {
             await NewSession();
@@ -368,6 +375,44 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         foreach (var s in _settings.StartupSessions)
             await CreateSessionAsync(s.Name, ParseTag(s.Tag), s.WorkingDirectory, s.Shell); // failures log to Output, next session still spawns
+    }
+
+    /// <summary>Respawn the saved workspace: session order/names/cwd/shell, then
+    /// the split layout and active session. A spawn failure drops that index only.</summary>
+    private async Task RestoreWorkspaceAsync(WorkspaceState ws)
+    {
+        var byIndex = new Dictionary<int, TerminalSessionModel>();
+        for (var i = 0; i < ws.Sessions.Count; i++)
+        {
+            var s = ws.Sessions[i];
+            var model = await CreateSessionAsync(
+                string.IsNullOrWhiteSpace(s.Name) ? null : s.Name,
+                ParseTag(s.Tag), s.WorkingDirectory,
+                shellCommand: string.IsNullOrWhiteSpace(s.Shell) ? null : s.Shell,
+                arguments: s.Arguments);
+            if (model is not null) byIndex[i] = model;
+        }
+        if (byIndex.Count == 0)
+        {
+            await NewSession();
+            return;
+        }
+
+        if (ws.IsSplit
+            && byIndex.TryGetValue(ws.LeftIndex, out var left)
+            && byIndex.TryGetValue(ws.RightIndex, out var right)
+            && !ReferenceEquals(left, right))
+        {
+            LeftPane = left;
+            RightPane = right;
+            FocusedPane = ws.FocusedPane == 1 ? 1 : 0;
+            IsSplit = true;
+            _sessions.Activate(FocusedPane == 1 ? right : left);
+        }
+        else if (byIndex.TryGetValue(ws.ActiveIndex, out var active))
+        {
+            _sessions.Activate(active);
+        }
     }
 
     private static SessionTag ParseTag(string tag) => tag switch
@@ -380,9 +425,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _ => SessionTag.None,
     };
 
-    private async Task<TerminalSessionModel?> CreateSessionAsync(string? name, SessionTag tag, string cwd, ShellKind? shell = null)
+    private async Task<TerminalSessionModel?> CreateSessionAsync(
+        string? name, SessionTag tag, string cwd,
+        ShellKind? shell = null, string? shellCommand = null, string? arguments = null)
     {
-        var shellCmd = _settings.ResolveShellCommand(shell);
+        var shellCmd = !string.IsNullOrWhiteSpace(shellCommand)
+            ? shellCommand
+            : _settings.ResolveShellCommand(shell);
         if (string.IsNullOrEmpty(cwd))
             cwd = OperatingSystem.IsWindows() ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
@@ -391,8 +440,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return await _sessions.CreateAsync(
                 PtySessionFactory.Create,
                 new PtyOptions { Shell = shellCmd, WorkingDirectory = cwd,
-                    Arguments = OperatingSystem.IsWindows() && shellCmd is "pwsh" or "powershell"
-                        ? ShellIntegration.PowerShellArguments : "",
+                    Arguments = arguments
+                        ?? (OperatingSystem.IsWindows() && shellCmd is "pwsh" or "powershell"
+                            ? ShellIntegration.PowerShellArguments : ""),
                     Environment = OperatingSystem.IsWindows() && shellCmd == "cmd.exe"
                         ? new Dictionary<string, string> { ["PROMPT"] = "$E]9;9;$P$E\\$P$G" }
                         : new Dictionary<string, string>() },
@@ -589,7 +639,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         DetachedSessions.Add(session);
-        var win = new SessionWindow(session, FontSize);
+        var win = new SessionWindow(session, FontSize, TerminalFont);
         _popouts.Add(win);
         PositionPopout(win);
         win.Closed += (_, _) => OnPopoutClosed(win, session);
@@ -1315,6 +1365,45 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Ctrl+= / Ctrl+- zoom, persisted with the rest of the workspace.</summary>
+    public void AdjustFontSize(double delta)
+        => FontSize = Math.Clamp(Math.Round(FontSize + delta), 8, 32);
+
+    /// <summary>Ctrl+0 — back to the default 13pt.</summary>
+    public void ResetFontSize() => FontSize = 13;
+
+    /// <summary>Terminal font family; an empty setting falls back to the bundled stack.</summary>
+    public Avalonia.Media.FontFamily TerminalFont =>
+        string.IsNullOrWhiteSpace(_settings.FontFamily)
+            ? new Avalonia.Media.FontFamily("Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace")
+            : new Avalonia.Media.FontFamily(_settings.FontFamily);
+
+    /// <summary>Settings-panel text for <see cref="AppSettings.FontFamily"/>.</summary>
+    public string TerminalFontName
+    {
+        get => _settings.FontFamily;
+        set
+        {
+            value ??= "";
+            if (_settings.FontFamily == value) return;
+            _settings.FontFamily = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(TerminalFont));
+        }
+    }
+
+    /// <summary>Shelf drag: drop <paramref name="card"/> onto <paramref name="target"/>'s
+    /// slot. Card order is the workspace order saved by <see cref="SnapshotWorkspace"/>.</summary>
+    public void MoveSessionCard(SessionCardViewModel? card, SessionCardViewModel? target)
+    {
+        if (card is null || target is null || ReferenceEquals(card, target)) return;
+        var from = SessionCards.IndexOf(card);
+        var to = SessionCards.IndexOf(target);
+        if (from < 0 || to < 0 || from == to) return;
+        SessionCards.Move(from, to);
+        SyncActive();
+    }
+
     public string WorkspaceNameLive
     {
         get => _settings.WorkspaceName;
@@ -1328,7 +1417,39 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SettingsOpen = false;
     }
 
-    private void SaveSettingsInternal() => _settingsStore.Save(_settings);
+    /// <summary>Every save also snapshots the live workspace (session order,
+    /// names, cwd, shell, split, active) so a later launch restores this shape
+    /// as fresh processes.</summary>
+    private void SaveSettingsInternal()
+    {
+        SnapshotWorkspace();
+        _settingsStore.Save(_settings);
+    }
+
+    /// <summary>Copy the live layout into <see cref="AppSettings.Workspace"/>.
+    /// Order follows the session shelf (the user-visible order after drag
+    /// reorder); popout sessions go last so they come back as normal cards.</summary>
+    private void SnapshotWorkspace()
+    {
+        var ordered = SessionCards.Select(c => c.Model)
+            .Concat(DetachedSessions)
+            .ToList();
+        var ws = _settings.Workspace;
+        ws.Sessions = ordered.Select(m => new WorkspaceSession
+        {
+            Name = m.Name,
+            Tag = m.Tag.DisplayName(),
+            WorkingDirectory = m.WorkingDirectory,
+            Shell = m.Shell,
+            Arguments = m.ShellArguments,
+        }).ToList();
+        ws.ActiveIndex = IndexOf(_sessions.Active);
+        ws.IsSplit = IsSplit;
+        ws.LeftIndex = IndexOf(LeftPane);
+        ws.RightIndex = IndexOf(RightPane);
+        ws.FocusedPane = FocusedPane;
+        int IndexOf(TerminalSessionModel? m) => m is null ? -1 : ordered.IndexOf(m);
+    }
 
     /// <summary>Logs filter changed → copy into <see cref="_settings"/> and save
     /// (small JSON; every change is fine, no debounce needed). The global fields keep
@@ -1658,7 +1779,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return $"{bytes} B";
     }
 
-    public void PersistSettings() => _settingsStore.Save(_settings);
+    public void PersistSettings() => SaveSettingsInternal();
 
     public void Dispose()
     {

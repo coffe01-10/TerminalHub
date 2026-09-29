@@ -12,12 +12,20 @@ namespace TerminalHub.Tests;
 
 public class TestApp
 {
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<TerminalHub.App.App>()
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        // Isolate default-path settings: each SettingsStore created without an
+        // explicit path gets its own temp file, so a workspace saved by one
+        // test can't be "restored" into the next test's window.
+        Environment.SetEnvironmentVariable(
+            "TERMINALHUB_SETTINGS_DIR",
+            Path.Combine(Path.GetTempPath(), "TerminalHub.Tests", Guid.NewGuid().ToString("N")));
+        return AppBuilder.Configure<TerminalHub.App.App>()
             .UseSkia()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
             .WithInterFont()
             .LogToTrace();
+    }
 }
 
 public class UiSmokeTests
