@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
+        Vm.PaletteRequested += OpenPalette;
         Vm.PropertyChanged += OnStageSelectionChanged;
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
         Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
@@ -542,6 +543,7 @@ public partial class MainWindow : Window
     /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
+        if (PalettePanel.IsVisible) { HandlePaletteKey(e); return; }
         if (e.Source is ShortcutEditor) return;
         if (Vm.HandleSessionShortcut(e)) { e.Handled = true; return; }
         // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
@@ -632,6 +634,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+        Vm.PaletteRequested -= OpenPalette;
         _stageReady = false;
         Vm.PropertyChanged -= OnStageSelectionChanged;
         ++_selectionGeneration;

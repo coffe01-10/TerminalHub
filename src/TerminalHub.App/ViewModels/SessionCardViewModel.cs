@@ -41,6 +41,9 @@ public partial class SessionCardViewModel : ViewModelBase
     public string StatusText => !Model.IsRunning
         ? Model.Pty.ExitCode is { } code ? $"已退出 · {code}" : "未运行"
         : HasUnreadOutput ? "有新输出" : "运行中";
+    public string CommandStatusText => Model.Emulator.CommandState is not { } command ? ""
+        : command.Running ? "命令运行中"
+        : $"{(command.ExitCode is null ? "命令结束" : command.ExitCode == 0 ? "命令完成" : $"命令失败 · {command.ExitCode}")} · {command.Duration.TotalSeconds:0.0}s";
     public IBrush StatusBrush => Controls.ThemeManager.Brush(!Model.IsRunning
         ? Model.Pty.ExitCode is { } code ? code == 0 ? "Good" : "Bad" : "Muted"
         : HasUnreadOutput ? "Accent" : "Good");
@@ -48,6 +51,7 @@ public partial class SessionCardViewModel : ViewModelBase
     partial void OnHasUnreadOutputChanged(bool value)
     {
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(CommandStatusText));
         OnPropertyChanged(nameof(StatusBrush));
     }
 
@@ -78,6 +82,7 @@ public partial class SessionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(StatusBrush));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(WorkingDirectory));
+        OnPropertyChanged(nameof(CommandStatusText));
         OnPropertyChanged(nameof(DirectoryName));
     }
 

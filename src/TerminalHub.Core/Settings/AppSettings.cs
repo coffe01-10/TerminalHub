@@ -28,6 +28,8 @@ public sealed record WorkspaceSession
     /// <summary>Resolved shell command line (pwsh, cmd.exe, ssh…), not a ShellKind.</summary>
     public string Shell { get; init; } = "";
     public string Arguments { get; init; } = "";
+    public string StartupCommand { get; init; } = "";
+    public bool RunStartupCommand { get; init; }
 }
 
 /// <summary>Saved workspace layout: session order + active session + split panes.
@@ -76,6 +78,9 @@ public sealed class AppSettings
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
     public int DockVisibilityMode { get; set; }
     public string WorkspaceName { get; set; } = "MangaFlow";
+    public List<WorkspaceTemplate> WorkspaceTemplates { get; set; } = [];
+    public bool NotifyCommandCompletion { get; set; }
+    public string FileEditorPath { get; set; } = "";
     /// <summary>When true, session output is also written to a local log file.</summary>
     public bool SessionLogToFile { get; set; }
     /// <summary>Logs panel: last text filter ("" = none). Survives restarts.</summary>

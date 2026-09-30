@@ -9,6 +9,7 @@ public sealed class TerminalSessionModel : IDisposable
     public Guid Id => Emulator.Pty.Id;
     public required string Name { get; set; }
     public SessionTag Tag { get; set; } = SessionTag.None;
+    public bool IsRemote => Tag == SessionTag.Ssh || Path.GetFileNameWithoutExtension(Shell).Equals("ssh", StringComparison.OrdinalIgnoreCase);
     public required TerminalEmulator Emulator { get; init; }
     public string WorkingDirectory { get; set; } = "";
     /// <summary>Shell command this session was spawned with (pwsh, ssh…); saved

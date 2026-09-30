@@ -25,6 +25,7 @@ public struct TerminalCell
     public char Char;
     /// <summary>Remaining UTF-16 units of this cluster after <see cref="Char"/>.</summary>
     public string? Tail;
+    public string? Hyperlink;
     public CellAttrs Attrs;
     public TerminalColor Fg;
     public TerminalColor Bg;

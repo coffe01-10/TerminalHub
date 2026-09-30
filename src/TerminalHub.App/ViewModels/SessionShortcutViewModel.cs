@@ -11,6 +11,7 @@ public sealed partial class SessionShortcutViewModel : ObservableObject
     {
         SessionShortcutAction.Next => "下一个终端",
         SessionShortcutAction.Previous => "上一个终端",
+        SessionShortcutAction.CommandPalette => "命令面板",
         _ => $"第 {Binding.SessionIndex + 1} 个终端"
     };
     private readonly Action _changed;

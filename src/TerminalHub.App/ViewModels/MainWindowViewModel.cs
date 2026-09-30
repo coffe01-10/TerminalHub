@@ -322,8 +322,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _openFolder = openFolder ?? OpenFolderInFileManager;
         _settingsStore = settingsStore ?? new SettingsStore();
         _settings = _settingsStore.Load();
+        if (!_settings.SessionShortcuts.Any(s => s.Action == SessionShortcutAction.CommandPalette))
+            _settings.SessionShortcuts.Add(new() { Action = SessionShortcutAction.CommandPalette, Gesture = "Ctrl+Shift+P" });
         LoadSessionShortcuts();
+        foreach (var template in _settings.WorkspaceTemplates) WorkspaceTemplates.Add(template);
         ThemeManager.Apply(_settings.Theme);
+        TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
         _inspectorVisible = _settings.InspectorVisible;
         _outputVisible = _settings.OutputVisible;
         _dockVisibilityMode = _settings.DockVisibilityMode;
@@ -431,7 +435,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>Respawn the saved workspace: session order/names/cwd/shell, then
     /// the split layout and active session. A spawn failure drops that index only.</summary>
-    private async Task RestoreWorkspaceAsync(WorkspaceState ws)
+    private async Task RestoreWorkspaceAsync(WorkspaceState ws, bool runStartupCommands = false)
     {
         var byIndex = new Dictionary<int, TerminalSessionModel>();
         for (var i = 0; i < ws.Sessions.Count; i++)
@@ -442,7 +446,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 ParseTag(s.Tag), s.WorkingDirectory,
                 shellCommand: string.IsNullOrWhiteSpace(s.Shell) ? null : s.Shell,
                 arguments: s.Arguments);
-            if (model is not null) byIndex[i] = model;
+            if (model is not null)
+            {
+                byIndex[i] = model;
+                _startupCommands[model.Id] = (s.StartupCommand, s.RunStartupCommand);
+                if (runStartupCommands && s.RunStartupCommand && !string.IsNullOrWhiteSpace(s.StartupCommand)
+                    && !model.IsRemote)
+                {
+                    model.Emulator.PasteText(s.StartupCommand);
+                    model.Emulator.SendText("\r");
+                }
+            }
         }
         if (byIndex.Count == 0)
         {
@@ -463,6 +477,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         else if (byIndex.TryGetValue(ws.ActiveIndex, out var active))
         {
+            IsSplit = false;
+            LeftPane = RightPane = null;
             _sessions.Activate(active);
         }
     }
@@ -492,14 +508,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrEmpty(cwd))
             cwd = OperatingSystem.IsWindows() ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
+        if (OperatingSystem.IsWindows() && ShellIntegration.IsPowerShell(shellCmd)
+            && (string.IsNullOrWhiteSpace(arguments) || arguments == ShellIntegration.LegacyPowerShellArguments))
+            arguments = ShellIntegration.PowerShellArguments;
+
         try
         {
             return await _sessions.CreateAsync(
                 PtySessionFactory.Create,
                 new PtyOptions { Shell = shellCmd, WorkingDirectory = cwd,
-                    Arguments = arguments
-                        ?? (OperatingSystem.IsWindows() && shellCmd is "pwsh" or "powershell"
-                            ? ShellIntegration.PowerShellArguments : ""),
+                    Arguments = arguments ?? "",
                     Environment = OperatingSystem.IsWindows() && shellCmd == "cmd.exe"
                         ? new Dictionary<string, string> { ["PROMPT"] = "$E]9;9;$P$E\\$P$G" }
                         : new Dictionary<string, string>() },
@@ -745,6 +763,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (shortcut is null) return false;
         switch (shortcut.Binding.Action)
         {
+            case SessionShortcutAction.CommandPalette: PaletteRequested?.Invoke(); break;
             case SessionShortcutAction.Next: CycleSession(1); break;
             case SessionShortcutAction.Previous: CycleSession(-1); break;
             case SessionShortcutAction.Select:
@@ -1592,6 +1611,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// as fresh processes.</summary>
     private void SaveSettingsInternal()
     {
+        TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
         if (!ShellSetupOpen) SnapshotWorkspace();
         _settingsStore.Save(_settings);
     }
@@ -1600,12 +1620,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// Order follows the session shelf (the user-visible order after drag
     /// reorder); popout sessions go last so they come back as normal cards.</summary>
     private void SnapshotWorkspace()
+        => _settings.Workspace = CaptureWorkspace();
+
+    private readonly Dictionary<Guid, (string Command, bool Run)> _startupCommands = new();
+    private WorkspaceState CaptureWorkspace()
     {
         var ordered = SessionCards.Select(c => c.Model)
             .Concat(DetachedSessions)
             .Where(m => !m.ExcludeFromWorkspace)
             .ToList();
-        var ws = _settings.Workspace;
+        var ws = new WorkspaceState();
         ws.Sessions = ordered.Select(m => new WorkspaceSession
         {
             Name = m.Name,
@@ -1615,12 +1639,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             WorkingDirectory = m.Tag == SessionTag.Ssh ? "" : m.WorkingDirectory,
             Shell = m.Shell,
             Arguments = m.ShellArguments,
+            StartupCommand = _startupCommands.GetValueOrDefault(m.Id).Command ?? "",
+            RunStartupCommand = _startupCommands.GetValueOrDefault(m.Id).Run,
         }).ToList();
         ws.ActiveIndex = IndexOf(_sessions.Active);
         ws.IsSplit = IsSplit;
         ws.LeftIndex = IndexOf(LeftPane);
         ws.RightIndex = IndexOf(RightPane);
         ws.FocusedPane = FocusedPane;
+        return ws;
         int IndexOf(TerminalSessionModel? m) => m is null ? -1 : ordered.IndexOf(m);
     }
 
@@ -1840,6 +1867,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (s.Tag != SessionTag.Ssh && !string.IsNullOrEmpty(s.WorkingDirectory))
                 lock (_cwdLock) HistoryFor(s).Push(s.WorkingDirectory);
             s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
+            s.Emulator.CommandCompleted += command => OnCommandCompleted(s, command);
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {

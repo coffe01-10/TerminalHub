@@ -6,6 +6,7 @@
         xmlns:files="using:TerminalHub.Core.Files"
         xmlns:ssh="using:TerminalHub.Core.Ssh"
         xmlns:corepty="using:TerminalHub.Core.Pty"
+        xmlns:settings="using:TerminalHub.Core.Settings"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="TerminalHub.App.Views.MainWindow"
         x:Name="Root"
@@ -28,6 +29,7 @@
     <StreamGeometry x:Key="ToolPopout">M9,1 H15 V7 H13 V4.5 L7.5,10 L6,8.5 L11.5,3 H9 Z M1,4 H6 V6 H3 V13 H10 V10 H12 V15 H1 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolMore">M2,7 H4 V9 H2 Z M7,7 H9 V9 H7 Z M12,7 H14 V9 H12 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolOutput">M1,2 H15 V14 H1 Z M3,4 V9 H13 V4 Z M3,11 V12 H13 V11 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolSearch">M7,1 A6,6 0 1 0 7,13 A6,6 0 1 0 7,1 M7,3 A4,4 0 1 1 7,11 A4,4 0 1 1 7,3 M11,10 L16,15 L14.5,16.5 L9.5,11.5 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolTools">M1,2 H15 V14 H1 Z M3,4 V12 H10 V4 Z M12,4 V12 H13 V4 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolSettings">M6,1 H10 V3 L12,4 L14,3 L16,6 L14,8 L14,10 L16,12 L14,15 L12,14 L10,15 H6 L4,14 L2,15 L0,12 L2,10 V8 L0,6 L2,3 L4,4 L6,3 Z M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolWindow">M1,2 H15 V14 H1 Z M3,4 V12 H13 V4 Z</StreamGeometry>
@@ -49,6 +51,8 @@
       <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
       <Setter Property="FontSize" Value="11"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="Button.terminal-tool:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
@@ -134,6 +138,9 @@
           <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
                       Spacing="10" VerticalAlignment="Center">
             <TextBlock Text="{Binding OsLabel}" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center"/>
+            <Button x:Name="PaletteButton" Classes="terminal-tool" Click="OnOpenPalette" ToolTip.Tip="命令面板 · 在快捷键设置中修改按键">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSearch}"/><TextBlock Text="查找" VerticalAlignment="Center"/></StackPanel>
+            </Button>
             <Button Classes="terminal-tool" Classes.selected="{Binding OutputVisible}" Command="{Binding ToggleOutputCommand}" ToolTip.Tip="显示 / 隐藏输出 · Ctrl+Shift+J">
               <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolOutput}"/><TextBlock Text="输出" VerticalAlignment="Center"/></StackPanel>
             </Button>
@@ -254,7 +261,7 @@
                 <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
-                  <TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/>
+                  <StackPanel Spacing="2"><TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/><TextBlock Text="{Binding ActiveCard.CommandStatusText}" FontSize="9" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding ActiveCard.CommandStatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/></StackPanel>
                 </Border>
               </Grid>
               <Button Grid.Column="2" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N" AutomationProperties.Name="新建终端">
@@ -328,6 +335,7 @@
                 <Panel IsVisible="{Binding !IsSplit}">
                   <ctl:TerminalView x:Name="MainTerminal"
                                     Emulator="{Binding ActiveSession.Emulator}"
+                                    WorkingDirectory="{Binding ActiveWorkingDirectory}" ShellCommand="{Binding ActiveSession.Shell}" IsRemote="{Binding ActiveSession.IsRemote}" ToolTip.Tip="Ctrl+点击打开网址或文件；拖入文件插入路径"
                                     TerminalFontSize="{Binding FontSize}"
                                     TerminalFontFamily="{Binding TerminalFont}"
                                     SearchQuery="{Binding Dashboard.SearchQuery}"/>
@@ -357,6 +365,7 @@
                       </Border>
                       <Panel Grid.Row="1" Margin="6,7,6,4">
                       <ctl:TerminalView x:Name="LeftTerminal" Emulator="{Binding LeftPane.Emulator}"
+                                        WorkingDirectory="{Binding LeftPane.WorkingDirectory}" ShellCommand="{Binding LeftPane.Shell}" IsRemote="{Binding LeftPane.IsRemote}"
                                         TerminalFontSize="{Binding FontSize}"
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"/>
@@ -388,6 +397,7 @@
                       </Border>
                       <Panel Grid.Row="1" Margin="6,7,6,4" Background="Transparent">
                       <ctl:TerminalView x:Name="RightTerminal" Emulator="{Binding RightPane.Emulator}"
+                                        WorkingDirectory="{Binding RightPane.WorkingDirectory}" ShellCommand="{Binding RightPane.Shell}" IsRemote="{Binding RightPane.IsRemote}"
                                         TerminalFontSize="{Binding FontSize}"
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"
@@ -1434,6 +1444,36 @@
                   <ComboBox SelectedIndex="{Binding DockVisibilityMode}"><ComboBoxItem>自动隐藏 · 底部「工具」呼出</ComboBoxItem><ComboBoxItem>始终显示</ComboBoxItem><ComboBoxItem>隐藏</ComboBoxItem></ComboBox>
                   <TextBlock Text="工作空间名称" Foreground="{DynamicResource UiInk}"/>
                   <TextBox Text="{Binding WorkspaceNameLive}"/>
+                  <TextBlock Text="工作区模板" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <ComboBox x:Name="WorkspaceTemplatePicker" ItemsSource="{Binding WorkspaceTemplates}" SelectedItem="{Binding SelectedTemplate}">
+                    <ComboBox.ItemTemplate><DataTemplate x:DataType="settings:WorkspaceTemplate"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBox Text="{Binding TemplateName}" Watermark="模板名称，例如：前端项目"/>
+                  <WrapPanel>
+                    <Button Content="存为新模板" Command="{Binding SaveCurrentAsTemplateCommand}" Margin="0,0,6,6"/>
+                    <Button Content="打开模板" Command="{Binding OpenTemplateCommand}" IsEnabled="{Binding !IsOpeningTemplate}" Margin="0,0,6,6"/>
+                    <Button Content="保存修改" Command="{Binding SaveTemplateChangesCommand}" Margin="0,0,6,6"/>
+                    <Button Content="更新为当前布局" Command="{Binding UpdateTemplateLayoutCommand}" Margin="0,0,6,6"/>
+                    <Button Content="删除模板" Command="{Binding DeleteTemplateCommand}" Margin="0,0,6,6"/>
+                  </WrapPanel>
+                  <TextBlock Text="{Binding TemplateMessage}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                  <TextBlock Text="打开模板保留现有终端；启动命令只在手动打开模板且启用时执行（本地 Shell）。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                  <ItemsControl ItemsSource="{Binding TemplateSessions}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:WorkspaceSessionEditor">
+                        <Expander Header="{Binding Name}" HorizontalAlignment="Stretch" Margin="0,0,0,8">
+                          <StackPanel Spacing="8">
+                            <TextBox Text="{Binding Name}" Watermark="终端名称"/>
+                            <TextBox Text="{Binding WorkingDirectory}" Watermark="工作目录"/>
+                            <TextBox Text="{Binding Shell}" Watermark="Shell"/>
+                            <TextBox Text="{Binding Arguments}" Watermark="Shell 参数"/>
+                            <TextBox Text="{Binding StartupCommand}" Watermark="启动命令，例如：npm run dev"/>
+                            <CheckBox Content="打开模板时执行启动命令（本地 Shell）" IsChecked="{Binding RunStartupCommand}" IsEnabled="{Binding CanRunStartupCommand}"/>
+                          </StackPanel>
+                        </Expander>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
                 </StackPanel>
               </Border>
             </ScrollViewer>
@@ -1469,6 +1509,23 @@
               </StackPanel>
             </Border>
           </TabItem>
+          <TabItem Header="关于">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="14" Margin="4,12">
+              <TextBlock Text="Terminal Hub" FontSize="20" Foreground="{DynamicResource UiInk}"/>
+              <TextBlock Text="{Binding AppVersionText}" Foreground="{DynamicResource UiMuted}"/>
+              <TextBlock Text="报错行号编辑器（可选 VS Code / Code.exe）" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+              <TextBox Text="{Binding Settings.FileEditorPath}" Watermark="留空用记事本打开；Code.exe 支持定位行号"/>
+              <CheckBox Content="提醒后台命令完成或失败" IsChecked="{Binding Settings.NotifyCommandCompletion}"/>
+              <TextBlock Text="支持命令完成协议的 Shell 提供结果与耗时；其他 Shell 保留输出与进程状态提示。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+              <Button Content="查看当前版本说明" Command="{Binding OpenReleaseNotesCommand}"/>
+              <Button Content="检查更新" Command="{Binding CheckForUpdatesCommand}"/>
+              <Button Content="打开 GitHub 发布页" Command="{Binding OpenProjectReleasesCommand}"/>
+              <TextBlock Text="{Binding UpdateMessage}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+              <Button Content="下载新版" Command="{Binding OpenUpdateDownloadCommand}" IsEnabled="{Binding HasUpdate}"/>
+            </StackPanel>
+            </ScrollViewer>
+          </TabItem>
         </TabControl>
         <Border Grid.Row="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,1,0,0" Padding="20,12">
           <Grid ColumnDefinitions="*,Auto">
@@ -1478,6 +1535,35 @@
           </Grid>
         </Border>
       </Grid>
+    </Border>
+    <Border ZIndex="290" Background="#66000000" IsVisible="{Binding #PalettePanel.IsVisible}" PointerPressed="OnPaletteBackdrop"/>
+    <Border x:Name="PalettePanel" IsVisible="False" ZIndex="300" Width="620" MaxHeight="500"
+            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24,90,24,24" Padding="20"
+            Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+            BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="14">
+      <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+        <TextBlock Text="查找终端与操作" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold"/>
+        <TextBox x:Name="PaletteSearch" Grid.Row="1" Watermark="输入终端名、目录或操作…" TextChanged="OnPaletteTextChanged"/>
+        <ListBox x:Name="PaletteResults" Grid.Row="2" MaxHeight="320" Background="Transparent" BorderThickness="0" DoubleTapped="OnExecutePalette">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
+            <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:PaletteEntry">
+              <Grid ColumnDefinitions="*,Auto" Margin="6,5">
+                <StackPanel Spacing="4"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource UiMuted}" TextTrimming="CharacterEllipsis"/></StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding Shortcut}" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0"/>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Grid.Row="3" Spacing="6"><TextBlock x:Name="PaletteEmpty" Text="没有匹配的终端或操作" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="↑ ↓ 选择 · Enter 执行 · Esc 返回" FontSize="11" Foreground="{DynamicResource UiFaint}"/></StackPanel>
+      </Grid>
+    </Border>
+    <Border IsVisible="{Binding NotificationVisible}" ZIndex="220" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24,0,24,90" MaxWidth="380" Padding="16" CornerRadius="12" Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1">
+      <StackPanel Spacing="10"><TextBlock Text="{Binding NotificationText}" TextWrapping="Wrap" Foreground="{DynamicResource UiInk}"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="查看终端" Command="{Binding ShowNotificationSessionCommand}"/><Button Content="关闭" Command="{Binding DismissNotificationCommand}"/></StackPanel></StackPanel>
     </Border>
   </Panel>
 </Window>

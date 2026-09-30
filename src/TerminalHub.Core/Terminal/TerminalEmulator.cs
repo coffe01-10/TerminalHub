@@ -19,6 +19,9 @@ public sealed class TerminalEmulator : IDisposable
 
     /// <summary>Raised (on a background thread) when the buffer changed.</summary>
     public event Action? Changed;
+    private long _commandStarted;
+    public ShellCommandState? CommandState { get; private set; }
+    public event Action<ShellCommandState>? CommandCompleted;
     public event Action<string>? TitleChanged
     {
         add => Buffer.TitleChanged += value;
@@ -38,6 +41,19 @@ public sealed class TerminalEmulator : IDisposable
         _pty = pty ?? new MockPtySession();
         _pty.OutputReceived += OnPtyOutput;
         Parser.BufferChanged += () => Changed?.Invoke();
+        Parser.CommandMarker += (marker, code) =>
+        {
+            if (marker == 'C')
+            {
+                _commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+                CommandState = new(true, null, TimeSpan.Zero);
+            }
+            else if (CommandState?.Running == true)
+            {
+                CommandState = new(false, code, System.Diagnostics.Stopwatch.GetElapsedTime(_commandStarted));
+                CommandCompleted?.Invoke(CommandState);
+            }
+        };
     }
 
     public IPtySession Pty => _pty;

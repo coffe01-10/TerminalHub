@@ -14,7 +14,7 @@ namespace TerminalHub.App.Controls;
 /// Monospace grid renderer + input surface for a <see cref="TerminalEmulator"/>.
 /// Batches same-styled cells into runs; supports scrollback via wheel/PgUp.
 /// </summary>
-public class TerminalView : Control
+public partial class TerminalView : Control
 {
     public static readonly StyledProperty<TerminalEmulator?> EmulatorProperty =
         AvaloniaProperty.Register<TerminalView, TerminalEmulator?>(nameof(Emulator));
@@ -104,6 +104,7 @@ public class TerminalView : Control
 
     public TerminalView()
     {
+        InitializeContentActions();
         Focusable = true;
         // IME stays enabled so CJK input methods can compose; committed text
         // arrives via TextInput and inline preedit is drawn at the cursor cell.
@@ -1131,6 +1132,9 @@ public class TerminalView : Control
         Focus();
         if (_emulator is null) return;
         var point = e.GetCurrentPoint(this);
+        if (point.Properties.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && !ApplicationOwnsMouse(e.KeyModifiers) && OpenContentAt(e.GetPosition(this)))
+        { e.Handled = true; return; }
         if (ApplicationOwnsMouse(e.KeyModifiers))
         {
             var button = point.Properties.PointerUpdateKind switch

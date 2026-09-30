@@ -18,7 +18,18 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
             desktop.MainWindow = new MainWindow();
+            Program.Activation?.Attach(() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var window = desktop.MainWindow;
+                if (window is null) return;
+                if (window.WindowState == Avalonia.Controls.WindowState.Minimized)
+                    window.WindowState = Avalonia.Controls.WindowState.Normal;
+                window.Show();
+                window.Activate();
+            }));
+        }
         base.OnFrameworkInitializationCompleted();
     }
 }

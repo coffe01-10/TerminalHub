@@ -1,10 +1,10 @@
-; Terminal Hub / 终端控制中心 — Inno Setup installer script
+﻿; Terminal Hub / 终端控制中心 — Inno Setup installer script
 ; Build:   scripts\publish-windows.ps1   (or: iscc packaging\TerminalHub.iss)
 ; Expects: artifacts\publish\win-x64\TerminalHub.exe + payload
 
 #define AppName      "Terminal Hub"
 #define AppNameZh    "终端控制中心"
-#define AppVersion   "0.2.0"
+#define AppVersion   "0.3.0"
 #define AppPublisher "coffe01-10"
 #define AppExe       "TerminalHub.exe"
 
@@ -19,18 +19,21 @@ OutputDir=..\artifacts\installer
 OutputBaseFilename=TerminalHub-Setup-{#AppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 MinVersion=10.0.17763
 ; single-instance friendly: no service, per-machine or per-user install
 PrivilegesRequired=lowest
-SetupIconFile=
+SetupIconFile=..\src\TerminalHub.App\Assets\terminal-hub-icon.ico
+AppMutex=TerminalHub.SingleInstance
+CloseApplications=no
+RestartApplications=no
 UninstallDisplayIcon={app}\TerminalHub.exe
 WizardStyle=modern
 
 [Languages]
 Name: "english";    MessagesFile: "compiler:Default.isl"
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "Languages\ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut / 创建桌面快捷方式"; GroupDescription: "Shortcuts:"
@@ -45,18 +48,3 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
-
-[UninstallRun]
-; kill running instance before uninstall
-Filename: "taskkill.exe"; Parameters: "/F /IM {#AppExe}"; Flags: runhidden; RunOnceId: "killapp"
-
-[Code]
-// Single-instance guard: refuse install while running (clean-exit friendly)
-function InitializeSetup(): Boolean;
-var
-  ResultCode: Integer;
-begin
-  Result := True;
-  if Exec('taskkill.exe', '/F /IM TerminalHub.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    Log('Terminated running TerminalHub instance (code ' + IntToStr(ResultCode) + ')');
-end;

@@ -10,6 +10,7 @@ internal static class Program
 {
     /// <summary>Global mutex keeps a single instance running.</summary>
     private static Mutex? _singleInstance;
+    internal static SingleInstanceActivation? Activation { get; private set; }
 
     private const string RelaunchedEnvVar = "TERMINALHUB_RELAUNCHED";
 
@@ -32,19 +33,23 @@ internal static class Program
             && RelaunchViaShell(args))
             return 0;
 
-        _singleInstance = new Mutex(initiallyOwned: true, "TerminalHub.SingleInstance", out var createdNew);
+        var instanceName = Environment.GetEnvironmentVariable("TERMINALHUB_INSTANCE_NAME") ?? "TerminalHub";
+        _singleInstance = new Mutex(initiallyOwned: true, instanceName + ".SingleInstance", out var createdNew);
         if (!createdNew)
         {
-            // Second instance: exit quietly. (Later: forward args to first instance.)
+            SingleInstanceActivation.RequestAsync(instanceName + ".Activate").GetAwaiter().GetResult();
+            _singleInstance.Dispose();
             return 0;
         }
 
         try
         {
+            Activation = new SingleInstanceActivation(instanceName + ".Activate");
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         finally
         {
+            Activation?.Dispose();
             _singleInstance.ReleaseMutex();
             _singleInstance.Dispose();
         }

@@ -38,6 +38,7 @@
       <Panel>
         <ctl:TerminalView x:Name="PopoutTerminal"
                           Emulator="{Binding Emulator}"
+                          WorkingDirectory="{Binding Model.WorkingDirectory}" ShellCommand="{Binding Model.Shell}" IsRemote="{Binding Model.IsRemote}"
                           TerminalFontSize="{Binding FontSize}"
                           TerminalFontFamily="{Binding FontFamily}"/>
         <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"

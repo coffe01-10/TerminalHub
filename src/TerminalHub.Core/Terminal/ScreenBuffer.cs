@@ -107,6 +107,7 @@ public sealed class ScreenBuffer
 
     // Parser-visible state
     public CellAttrs CurrentAttrs = CellAttrs.None;
+    public string? CurrentHyperlink;
     public TerminalColor CurrentFg = TerminalColor.Default;
     public TerminalColor CurrentBg = TerminalColor.Default;
     public bool AutoWrap = true;
@@ -292,6 +293,7 @@ public sealed class ScreenBuffer
         next.Char = '\0';
         next.Tail = null;
         next.Attrs = cell.Attrs;
+        next.Hyperlink = cell.Hyperlink;
         next.Fg = cell.Fg;
         next.Bg = cell.Bg;
         if (CursorY == row && CursorX == col + 1)
@@ -335,6 +337,7 @@ public sealed class ScreenBuffer
 
         cell.Char = text[0];
         cell.Tail = text.Length > 1 ? text[1..] : null;
+        cell.Hyperlink = CurrentHyperlink;
         cell.Attrs = CurrentAttrs;
         cell.Fg = CurrentFg;
         cell.Bg = CurrentBg;
@@ -349,6 +352,7 @@ public sealed class ScreenBuffer
             ref var next = ref CellAt(CursorY, CursorX + 1);
             next.Char = '\0';
             next.Tail = null;
+            next.Hyperlink = CurrentHyperlink;
             next.IsWideContinuation = true;
             next.IsWide = false;
             next.Attrs = CurrentAttrs;
@@ -373,6 +377,7 @@ public sealed class ScreenBuffer
         ref var cont = ref CellAt(row, col);
         cont.Char = '\0';
         cont.Tail = null;
+        cont.Hyperlink = null;
         cont.IsWideContinuation = false;
         cont.IsWide = false;
     }
@@ -382,6 +387,7 @@ public sealed class ScreenBuffer
         ref var lead = ref CellAt(row, col);
         lead.Char = ' ';
         lead.Tail = null;
+        lead.Hyperlink = null;
         lead.IsWide = false;
     }
 

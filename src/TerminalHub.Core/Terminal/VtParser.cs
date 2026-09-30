@@ -50,6 +50,8 @@ public sealed class VtParser
     // under SyncRoot and written back AFTER the lock is released — ConPtySession.Write
     // blocks on WriteFile and must never stall the render lock.
     private readonly List<byte[]> _responses = new();
+    private readonly List<(char Marker, int? ExitCode)> _commandMarkers = new();
+    public event Action<char, int?>? CommandMarker;
     public Func<bool, string>? DefaultColorQuery { get; set; }
 
     /// <summary>Raised after a batch of input has been applied (renderer hint).</summary>
@@ -66,6 +68,7 @@ public sealed class VtParser
     public void Feed(ReadOnlySpan<byte> data)
     {
         byte[][] responses;
+        (char Marker, int? ExitCode)[] commandMarkers;
         lock (_buffer.SyncRoot)
         {
             if (data.Length > 0) _buffer.BumpVersion();
@@ -73,12 +76,15 @@ public sealed class VtParser
                 FeedByte(b);
             responses = _responses.ToArray();
             _responses.Clear();
+            commandMarkers = _commandMarkers.ToArray();
+            _commandMarkers.Clear();
         }
         // Replies (DA, DECRPM, OSC queries, kitty flags) go out AFTER releasing
         // SyncRoot — ConPtySession.Write blocks on WriteFile and must never stall
         // the render lock.
         foreach (var r in responses)
             _responder?.Invoke(r);
+        foreach (var marker in commandMarkers) CommandMarker?.Invoke(marker.Marker, marker.ExitCode);
         BufferChanged?.Invoke();
     }
 
@@ -252,6 +258,7 @@ public sealed class VtParser
     private void Reset()
     {
         _buffer.CurrentAttrs = CellAttrs.None;
+        _buffer.CurrentHyperlink = null;
         _buffer.CurrentFg = TerminalColor.Default;
         _buffer.CurrentBg = TerminalColor.Default;
         _buffer.AutoWrap = true;
@@ -580,7 +587,15 @@ public sealed class VtParser
             case 0: case 1: case 2:
                 _buffer.SetTitle(text);
                 break;
-            case 8: break;   // hyperlink — ignore payload
+            case 8:
+                var separator = text.IndexOf(';');
+                if (separator >= 0) _buffer.CurrentHyperlink = text[(separator + 1)..] is { Length: > 0 } url ? url : null;
+                break;
+            case 133:
+                var parts = text.Split(';');
+                if (parts[0] is "C" or "D")
+                    _commandMarkers.Add((parts[0][0], parts.Length > 1 && int.TryParse(parts[1], out var code) ? code : null));
+                break;
             case 777: break; // notifications
             case 4: break;   // palette query/set
             case 10: case 11:
