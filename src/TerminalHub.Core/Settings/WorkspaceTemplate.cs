@@ -11,4 +11,5 @@ public sealed class WorkspaceTemplate : System.ComponentModel.INotifyPropertyCha
         set { _name = value; PropertyChanged?.Invoke(this, new(nameof(Name))); }
     }
     public WorkspaceState Layout { get; set; } = new();
+    public DateTimeOffset LastUsed { get; set; }
 }

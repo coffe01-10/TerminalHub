@@ -16,6 +16,8 @@ public sealed class TerminalSessionModel : IDisposable
     /// into the workspace layout so a restart respawns the same kind of session.</summary>
     public string Shell { get; set; } = "";
     public string ShellArguments { get; set; } = "";
+    public string GroupId { get; set; } = "";
+    public bool Pinned { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.Now;
 
     public IPtySession Pty => Emulator.Pty;

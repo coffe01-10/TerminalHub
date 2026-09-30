@@ -36,3 +36,7 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj --filter FullyQuali
 ```
 
 系统输入法的实际候选窗、桌面缩放和多显示器体验尚未人工验证；Grok/Codex 登录后的编辑行为本轮未验证。上述 ConPTY 与 Headless 结果不能代替这些体验。
+
+## 2026-09-30 v0.4 未重复实机
+
+v0.4 工作区功能没有重跑 Claude、Codex 或 Grok 的实机编辑。新增的 Headless 用例只确认两个终端视图在字号 13 和 20 下仍对到同一格；已有用例继续覆盖字体变化后、绘制前的输入法坐标。真实 PowerShell 用更新后的 OSC 133 回车处理仍能报告成功和非零退出码。系统输入法候选窗、多显示器和登录后的 Codex / Grok 仍然没有验证。

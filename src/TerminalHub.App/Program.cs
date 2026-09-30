@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Avalonia;
 using TerminalHub.Core.Pty;
+using TerminalHub.Core.Settings;
 using TerminalHub.Pty;
 
 namespace TerminalHub.App;
@@ -11,6 +12,16 @@ internal static class Program
     /// <summary>Global mutex keeps a single instance running.</summary>
     private static Mutex? _singleInstance;
     internal static SingleInstanceActivation? Activation { get; private set; }
+    internal static string? PendingDirectory { get; private set; }
+    internal static string? PendingDirectoryError { get; private set; }
+
+    internal static (string? Directory, string? Error) TakePendingLaunch()
+    {
+        var result = (PendingDirectory, PendingDirectoryError);
+        PendingDirectory = null;
+        PendingDirectoryError = null;
+        return result;
+    }
 
     private const string RelaunchedEnvVar = "TERMINALHUB_RELAUNCHED";
 
@@ -33,14 +44,24 @@ internal static class Program
             && RelaunchViaShell(args))
             return 0;
 
+        LaunchRequest.TryGetDirectory(args, out var launchDirectory, out var launchError);
         var instanceName = Environment.GetEnvironmentVariable("TERMINALHUB_INSTANCE_NAME") ?? "TerminalHub";
         _singleInstance = new Mutex(initiallyOwned: true, instanceName + ".SingleInstance", out var createdNew);
         if (!createdNew)
         {
-            SingleInstanceActivation.RequestAsync(instanceName + ".Activate").GetAwaiter().GetResult();
+            var pipe = instanceName + ".Activate";
+            if (launchError is not null)
+                SingleInstanceActivation.RequestNoticeAsync(pipe, launchError).GetAwaiter().GetResult();
+            else if (launchDirectory.Length > 0)
+                SingleInstanceActivation.RequestDirectoryAsync(pipe, launchDirectory).GetAwaiter().GetResult();
+            else
+                SingleInstanceActivation.RequestAsync(pipe).GetAwaiter().GetResult();
             _singleInstance.Dispose();
             return 0;
         }
+
+        PendingDirectory = launchDirectory.Length > 0 ? launchDirectory : null;
+        PendingDirectoryError = launchError;
 
         try
         {

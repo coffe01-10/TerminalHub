@@ -17,13 +17,21 @@ internal static class ScreenReflow
     }
 
     public static Result Rewrap(List<TerminalCell[]> source, List<bool> wrapped,
-        int columns, Position cursor, Position savedCursor)
+        int columns, Position cursor, Position savedCursor, IReadOnlyList<Position>? extra = null)
     {
         var lines = new List<TerminalCell[]>();
         var flags = new List<bool>();
         var row = Blank(columns);
         var col = 0;
-        var positions = new[] { cursor, savedCursor };
+        Position[] positions;
+        if (extra is null || extra.Count == 0) positions = [cursor, savedCursor];
+        else
+        {
+            positions = new Position[2 + extra.Count];
+            positions[0] = cursor;
+            positions[1] = savedCursor;
+            for (var i = 0; i < extra.Count; i++) positions[i + 2] = extra[i];
+        }
 
         void Map(Position position, int column, bool pending = false)
         {

@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using TerminalHub.App.ViewModels;
@@ -36,7 +37,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
         Vm.PaletteRequested += OpenPalette;
+        Vm.RevealCommandRequested += OnRevealCommand;
         Vm.PropertyChanged += OnStageSelectionChanged;
+        SessionShelf.SelectionChanged += OnShelfSelectionChanged;
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
         Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
         SizeChanged += (_, _) => UpdateStageLayout();
@@ -73,13 +76,24 @@ public partial class MainWindow : Window
             RoutingStrategies.Tunnel, handledEventsToo: true);
         SessionShelf.PointerCaptureLost += (_, _) => EndShelfDrag(commit: false);
         _shelfDragTimer.Tick += (_, _) => UpdateShelfDrag(autoScroll: true);
-        Opened += (_, _) =>
+        Opened += async (_, _) =>
         {
-            AppWindowIcon.Refresh(this);
-            FitToScreen();
-            _ = Vm.SpawnStartupSessionsAsync();
-            _stageReady = true;
-            UpdateDockMode();
+            try
+            {
+                AppWindowIcon.Refresh(this);
+                FitToScreen();
+                await Vm.SpawnStartupSessionsAsync();
+                _stageReady = true;
+                UpdateDockMode();
+                var pending = Program.TakePendingLaunch();
+                if (pending.Error is not null) Vm.ShowLaunchNotice(pending.Error);
+                else if (pending.Directory is not null) await Vm.OpenLaunchDirectoryAsync(pending.Directory);
+            }
+            finally
+            {
+                _stageReady = true;
+                UpdateDockMode();
+            }
         };
         // The Logs tab may start hidden (IsVisible), so template/loaded race each other —
         // attach idempotently from whichever fires first.
@@ -105,7 +119,8 @@ public partial class MainWindow : Window
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? (Bounds.Width < 1250 ? 300 : 326) : 0);
         Dispatcher.UIThread.Post(() =>
         {
-            if (_stageReady && IsVisible && Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
+            if (_stageReady && IsVisible && Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
+                SessionShelf.ScrollIntoView(active);
         }, DispatcherPriority.Loaded);
     }
 
@@ -124,7 +139,7 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             if (!_stageReady || generation != _selectionGeneration || !IsVisible || _dragCard is not null) return;
-            if (Vm.ActiveCard is { } active) SessionShelf.ScrollIntoView(active);
+            if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active)) SessionShelf.ScrollIntoView(active);
             // Apply a shelf scroll before reading the card's visible origin.
             SessionShelf.UpdateLayout();
             var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
@@ -340,8 +355,65 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _shelfDragTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private (SessionCardViewModel Model, StageCard Card, double Top)[] _dragSlots = [];
 
+    private bool _activateHeader;
+
+    public void AcceptLaunch(string? path, string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error)) Vm.ShowLaunchNotice(error);
+        else if (!string.IsNullOrWhiteSpace(path)) _ = Vm.OpenLaunchDirectoryAsync(path);
+    }
+
+    private void OnRevealCommand(CommandRecord record)
+    {
+        if (ActiveTerminal()?.TryRevealAnchor(record.Start) == true) return;
+        Vm.CommandNotice = "这段输出已被历史缓冲裁掉，无法定位。";
+    }
+
+    private void OnShelfSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_shelfSelectionGuard) return;
+        _shelfSelectionGuard = true;
+        try
+        {
+            if (SessionShelf.SelectedItem is SessionGroupHeader header)
+            {
+                if (_activateHeader)
+                {
+                    Vm.ToggleGroup(header);
+                    _activateHeader = false;
+                    SessionShelf.SelectedItem = Vm.ActiveCard;
+                    return;
+                }
+                var items = Vm.ShelfItems;
+                var index = items.IndexOf(header);
+                var originIndex = e.RemovedItems.Count > 0 ? items.IndexOf(e.RemovedItems[0]!) : -1;
+                if (originIndex >= 0 && originIndex != index)
+                {
+                    var step = originIndex < index ? 1 : -1;
+                    SessionCardViewModel? next = null;
+                    for (var i = index + step; i >= 0 && i < items.Count; i += step)
+                        if (items[i] is SessionCardViewModel candidate) { next = candidate; break; }
+                    if (next is null)
+                        for (var i = index - step; i >= 0 && i < items.Count; i -= step)
+                            if (items[i] is SessionCardViewModel candidate) { next = candidate; break; }
+                    SessionShelf.SelectedItem = next ?? (object?)Vm.ActiveCard;
+                    if (next is not null && !ReferenceEquals(next, Vm.ActiveCard)) Vm.ActiveCard = next;
+                }
+                else SessionShelf.SelectedItem = Vm.ActiveCard;
+                return;
+            }
+            _activateHeader = false;
+            if (SessionShelf.SelectedItem is SessionCardViewModel card && !ReferenceEquals(card, Vm.ActiveCard))
+                Vm.ActiveCard = card;
+        }
+        finally { _shelfSelectionGuard = false; }
+    }
+
+    private bool _shelfSelectionGuard;
+
     private void OnShelfPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        _activateHeader = IsGroupHeader(e.Source);
         if (!e.GetCurrentPoint(SessionShelf).Properties.IsLeftButtonPressed) return;
         _dragCard = (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
             ?.DataContext as SessionCardViewModel;
@@ -633,9 +705,154 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool IsGroupHeader(object? source)
+    {
+        for (var node = source as Visual; node is not null; node = node.GetVisualParent())
+        {
+            if (node is Control { DataContext: SessionGroupHeader }) return true;
+            if (node is ListBox) return false;
+        }
+        return false;
+    }
+
+    private void OnSessionMenuOpening(object? sender, EventArgs e)
+    {
+        if (PinSessionItem is not null)
+            PinSessionItem.Header = Vm.ActiveCard?.Model.Pinned == true ? "取消置顶" : "置顶";
+        if (ToggleGroupItem is not null)
+        {
+            var group = Vm.SessionGroups.FirstOrDefault(item => item.Id == Vm.ActiveCard?.Model.GroupId);
+            ToggleGroupItem.IsEnabled = group is not null;
+            ToggleGroupItem.Header = group?.Collapsed == true ? "展开当前分组" : "折叠当前分组";
+        }
+        if (MoveToGroupMenu is null) return;
+        MoveToGroupMenu.Items.Clear();
+        foreach (var group in Vm.SessionGroups)
+        {
+            var item = new MenuItem { Header = group.Name, Tag = group.Id };
+            item.Click += (_, _) =>
+            {
+                if (Vm.ActiveCard is { } card) Vm.MoveCardToGroup(card, group.Id);
+            };
+            MoveToGroupMenu.Items.Add(item);
+        }
+        if (MoveToGroupMenu.Items.Count == 0)
+            MoveToGroupMenu.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
+    }
+
+    private async void OnCreateGroupForActive(object? sender, RoutedEventArgs e)
+    {
+        var name = await PromptTextAsync("新建分组", "分组名称", "");
+        if (!string.IsNullOrWhiteSpace(name)) Vm.CreateGroup(name, Vm.ActiveCard);
+    }
+
+    private async void OnCreateEmptyGroup(object? sender, RoutedEventArgs e)
+    {
+        var name = await PromptTextAsync("新建分组", "分组名称", "");
+        if (!string.IsNullOrWhiteSpace(name)) Vm.CreateGroup(name);
+    }
+
+    private async void OnRenameActiveGroup(object? sender, RoutedEventArgs e)
+    {
+        var group = Vm.SessionGroups.FirstOrDefault(item => item.Id == Vm.ActiveCard?.Model.GroupId);
+        if (group is null)
+        {
+            Vm.Dashboard.AppendOutput("info", "当前终端不在分组中。", "ui");
+            return;
+        }
+        var name = await PromptTextAsync("重命名分组", "分组名称", group.Name);
+        if (!string.IsNullOrWhiteSpace(name)) Vm.RenameGroup(group, name);
+    }
+
+    private void OnCommandDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is ListBox { SelectedItem: CommandRecordViewModel item })
+            Vm.LocateCommandCommand.Execute(item);
+    }
+
+    private async void OnExportTemplate(object? sender, RoutedEventArgs e)
+    {
+        var json = Vm.ExportSelectedTemplateJson();
+        if (json.Length == 0)
+        {
+            Vm.TemplateMessage = "先选择一个模板。";
+            return;
+        }
+        try
+        {
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "导出工作区模板",
+                SuggestedFileName = (Vm.SelectedTemplate?.Name ?? "模板") + ".json",
+                FileTypeChoices = [new FilePickerFileType("工作区模板") { Patterns = ["*.json"] }],
+            });
+            if (file is null) return;
+            await using var stream = await file.OpenWriteAsync();
+            await using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(json);
+            Vm.TemplateMessage = "已导出模板。";
+        }
+        catch (Exception ex)
+        {
+            Vm.TemplateMessage = "导出失败：" + ex.Message;
+        }
+    }
+
+    private async void OnImportTemplate(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "导入工作区模板",
+                AllowMultiple = false,
+                FileTypeFilter = [new FilePickerFileType("工作区模板") { Patterns = ["*.json"] }],
+            });
+            if (files.Count == 0) return;
+            await using var stream = await files[0].OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            Vm.ImportTemplateJson(await reader.ReadToEndAsync());
+        }
+        catch (Exception ex)
+        {
+            Vm.TemplateMessage = "导入失败：" + ex.Message;
+        }
+    }
+
+    private async Task<string?> PromptTextAsync(string title, string label, string initial)
+    {
+        var input = new TextBox { Text = initial, Watermark = label };
+        var save = new Button { Content = "确定", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var dialog = new Window
+        {
+            Title = title, Width = 380, Height = 180, CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = ThemeManager.Brush("Surface"),
+            Content = new StackPanel
+            {
+                Margin = new Thickness(22), Spacing = 14,
+                Children = { new TextBlock { Text = label, Foreground = ThemeManager.Brush("Ink") }, input, save }
+            }
+        };
+        save.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(input.Text)) dialog.Close(input.Text.Trim()); };
+        input.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(input.Text)) dialog.Close(input.Text.Trim());
+            else if (e.Key == Key.Escape) dialog.Close(null);
+        };
+        dialog.Opened += (_, _) => { input.Focus(); input.SelectAll(); };
+        try { return await dialog.ShowDialog<string?>(this); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Text dialog closed: {ex.Message}");
+            return null;
+        }
+    }
+
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         Vm.PaletteRequested -= OpenPalette;
+        Vm.RevealCommandRequested -= OnRevealCommand;
         _stageReady = false;
         Vm.PropertyChanged -= OnStageSelectionChanged;
         ++_selectionGeneration;

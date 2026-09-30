@@ -30,6 +30,9 @@ public sealed record WorkspaceSession
     public string Arguments { get; init; } = "";
     public string StartupCommand { get; init; } = "";
     public bool RunStartupCommand { get; init; }
+    public string GroupId { get; init; } = "";
+    public string GroupName { get; init; } = "";
+    public bool Pinned { get; init; }
 }
 
 /// <summary>Saved workspace layout: session order + active session + split panes.
@@ -79,6 +82,8 @@ public sealed class AppSettings
     public int DockVisibilityMode { get; set; }
     public string WorkspaceName { get; set; } = "MangaFlow";
     public List<WorkspaceTemplate> WorkspaceTemplates { get; set; } = [];
+    public List<SessionGroup> SessionGroups { get; set; } = [];
+    public List<FavoriteCommand> FavoriteCommands { get; set; } = [];
     public bool NotifyCommandCompletion { get; set; }
     public string FileEditorPath { get; set; } = "";
     /// <summary>When true, session output is also written to a local log file.</summary>

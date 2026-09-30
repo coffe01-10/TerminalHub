@@ -227,7 +227,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// mode the picked card is assigned to the focused pane.</summary>
     partial void OnActiveCardChanged(SessionCardViewModel? value)
     {
-        if (value is null) return;
+        if (_rebuildingShelf || value is null) return;
         if (IsSplit && value.Model is { } picked)
         {
             AssignToPane(FocusedPane, picked);
@@ -327,8 +327,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settings = _settingsStore.Load();
         if (!_settings.SessionShortcuts.Any(s => s.Action == SessionShortcutAction.CommandPalette))
             _settings.SessionShortcuts.Add(new() { Action = SessionShortcutAction.CommandPalette, Gesture = "Ctrl+Shift+P" });
+        LoadGroups();
+        LoadFavorites();
+        LoadExplorerMenu();
         LoadSessionShortcuts();
-        foreach (var template in _settings.WorkspaceTemplates) WorkspaceTemplates.Add(template);
+        foreach (var template in _settings.WorkspaceTemplates.OrderByDescending(t => t.LastUsed).ThenBy(t => t.Name))
+            WorkspaceTemplates.Add(template);
         ThemeManager.Apply(_settings.Theme);
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
         _inspectorVisible = _settings.InspectorVisible;
@@ -452,6 +456,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (model is not null)
             {
                 byIndex[i] = model;
+                RememberSessionLayout(model, s);
                 _startupCommands[model.Id] = (s.StartupCommand, s.RunStartupCommand);
                 if (runStartupCommands && s.RunStartupCommand && !string.IsNullOrWhiteSpace(s.StartupCommand)
                     && !model.IsRemote)
@@ -716,8 +721,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void ValidateSessionShortcuts()
     {
-        var reserved = new[] { "Ctrl+C", "Ctrl+V", "Ctrl+Shift+C", "Ctrl+Shift+N", "Ctrl+Shift+W",
-            "Ctrl+Shift+B", "Ctrl+Shift+J", "Ctrl+OemPlus", "Ctrl+OemMinus", "Ctrl+0" }.Select(ParseSessionGesture).ToArray();
         foreach (var shortcut in SessionShortcuts)
         {
             shortcut.Error = "";
@@ -729,7 +732,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if ((gesture.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0
                     && gesture.Key is not (>= Key.F1 and <= Key.F24))
                     shortcut.Error = "请使用 Ctrl、Alt 或功能键，避免占用普通输入。";
-                else if (reserved.Any(g => g.Matches(new KeyEventArgs { Key = gesture.Key, KeyModifiers = gesture.KeyModifiers })))
+                else if (IsReservedShortcut(gesture))
                     shortcut.Error = "与复制、粘贴或现有应用操作冲突。";
                 else shortcut.ParsedGesture = gesture;
             }
@@ -739,6 +742,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         foreach (var group in SessionShortcuts.Where(s => s.ParsedGesture is not null)
             .GroupBy(s => (s.ParsedGesture!.Key, s.ParsedGesture.KeyModifiers)).Where(g => g.Count() > 1))
             foreach (var shortcut in group) shortcut.Error = "与其他终端切换快捷键重复。";
+        ValidateFavoriteGestures();
         OnPropertyChanged(nameof(NextSessionMenuText));
         OnPropertyChanged(nameof(PreviousSessionMenuText));
     }
@@ -760,10 +764,25 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return KeyGesture.Parse(string.Join('+', parts));
     }
 
+    private static bool IsReservedShortcut(KeyGesture gesture)
+    {
+        string[] reserved = ["Ctrl+C", "Ctrl+V", "Ctrl+Shift+C", "Ctrl+Shift+N", "Ctrl+Shift+W",
+            "Ctrl+Shift+B", "Ctrl+Shift+J", "Ctrl+OemPlus", "Ctrl+OemMinus", "Ctrl+0"];
+        return reserved.Select(ParseSessionGesture).Any(item =>
+            item.Matches(new KeyEventArgs { Key = gesture.Key, KeyModifiers = gesture.KeyModifiers }));
+    }
+
     public bool HandleSessionShortcut(Avalonia.Input.KeyEventArgs e)
     {
         var shortcut = SessionShortcuts.FirstOrDefault(s => s.Error.Length == 0 && s.ParsedGesture?.Matches(e) == true);
-        if (shortcut is null) return false;
+        if (shortcut is null)
+        {
+            if (e.Source is Avalonia.Controls.TextBox) return false;
+            var favorite = FavoriteCommands.FirstOrDefault(item => item.Error.Length == 0 && item.ParsedGesture?.Matches(e) == true);
+            if (favorite is null) return false;
+            InsertFavorite(favorite.Model);
+            return true;
+        }
         switch (shortcut.Binding.Action)
         {
             case SessionShortcutAction.CommandPalette: PaletteRequested?.Invoke(); break;
@@ -771,7 +790,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             case SessionShortcutAction.Previous: CycleSession(-1); break;
             case SessionShortcutAction.Select:
                 if (shortcut.Binding.SessionIndex >= 0 && shortcut.Binding.SessionIndex < SessionCards.Count)
-                    ActiveCard = SessionCards[shortcut.Binding.SessionIndex];
+                    ActivateCard(SessionCards[shortcut.Binding.SessionIndex]);
                 break;
         }
         return true;
@@ -875,7 +894,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private void OnSessionCardsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => Logs.RefreshSessions();
+    {
+        Logs.RefreshSessions();
+        if (!_disposed) RebuildShelf();
+    }
 
     /// <summary>Best-effort clipboard copy (no-op when headless / clipboard locked).</summary>
     private static async Task CopyTextToClipboardAsync(string text)
@@ -1592,6 +1614,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var from = SessionCards.IndexOf(card);
         var to = SessionCards.IndexOf(target);
         if (from < 0 || to < 0 || from == to) return;
+        card.Model.GroupId = target.Model.GroupId;
+        card.Model.Pinned = target.Model.Pinned;
         SessionCards.Move(from, to);
         SyncActive();
     }
@@ -1615,6 +1639,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SaveSettingsInternal()
     {
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
+        _settings.SessionGroups = SessionGroups.ToList();
+        _settings.FavoriteCommands = FavoriteCommands.Select(favorite => favorite.Model).ToList();
         if (!ShellSetupOpen) SnapshotWorkspace();
         _settingsStore.Save(_settings);
     }
@@ -1644,6 +1670,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Arguments = m.ShellArguments,
             StartupCommand = _startupCommands.GetValueOrDefault(m.Id).Command ?? "",
             RunStartupCommand = _startupCommands.GetValueOrDefault(m.Id).Run,
+            GroupId = m.GroupId,
+            GroupName = SessionGroups.FirstOrDefault(group => group.Id == m.GroupId)?.Name ?? "",
+            Pinned = m.Pinned,
         }).ToList();
         ws.ActiveIndex = IndexOf(_sessions.Active);
         ws.IsSplit = IsSplit;
@@ -1955,6 +1984,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (!ReferenceEquals(ActiveCard, target))
             ActiveCard = target;
+        BindCommandSession(ActiveSession);
         UpdateDisplayedCards();
         Dashboard.RefreshSearch();
         UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
@@ -1970,6 +2000,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         TerminalCount = SessionCards.Count;
         RunningCount = SessionCards.Count(c => c.Model.IsRunning);
         foreach (var c in SessionCards) c.Refresh();
+        UpdateGroupActivity();
         StatusLine = $"工作空间  {WorkspaceName}      {TerminalCount} 个终端      {RunningCount} 个运行中";
     }
 
@@ -2034,6 +2065,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _disposed = true;   // popout Closed handlers must not reattach anymore
+        StopTemplatePreview();
+        BindCommandSession(null);
         StopPublishElapsedTimer();
         // Kill detached PTYs before closing their windows — OnPopoutClosed removes
         // them from DetachedSessions, so disposing after the closes would leak them.

@@ -167,8 +167,8 @@
             <TextBlock Grid.Column="1" Text="{Binding TerminalCount, StringFormat='{}{0:00}'}"
                        Foreground="{DynamicResource UiMuted}" FontSize="11"/>
           </Grid>
-          <ListBox x:Name="SessionShelf" Grid.Row="1" ItemsSource="{Binding SessionCards}"
-                   SelectedItem="{Binding ActiveCard}" Background="Transparent" BorderThickness="0"
+          <ListBox x:Name="SessionShelf" Grid.Row="1" ItemsSource="{Binding ShelfItems}"
+                   SelectedItem="{Binding ActiveCard, Mode=OneWay}" Background="Transparent" BorderThickness="0"
                    Padding="14,14,10,16" ClipToBounds="False"
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                    ScrollViewer.VerticalScrollBarVisibility="Auto">
@@ -193,7 +193,7 @@
                 </Setter>
               </ControlTheme>
             </ListBox.ItemContainerTheme>
-            <ListBox.ItemTemplate>
+            <ListBox.DataTemplates>
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
                                Classes.active="{Binding IsActive}" CornerRadius="{DynamicResource CardCorner}" Padding="9"
@@ -224,7 +224,7 @@
                       <ctl:StagePreview Emulator="{Binding Model.Emulator}"/>
                     </Border>
                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="3,6,3,0">
-                      <TextBlock Text="{Binding DirectoryName}" FontSize="9" Foreground="{DynamicResource UiMuted}"
+                      <TextBlock Text="{Binding ShelfCaption}" FontSize="9" Foreground="{DynamicResource UiMuted}"
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding WorkingDirectory}"/>
                       <TextBlock Grid.Column="1" Text="当前终端" IsVisible="{Binding IsActive}" FontSize="9" Foreground="{DynamicResource UiAccent}"/>
                     </Grid>
@@ -232,7 +232,17 @@
                   </Grid>
                 </ctl:StageCard>
               </DataTemplate>
-            </ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SessionGroupHeader">
+                <Border Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
+                        CornerRadius="8" Padding="10,6" Margin="6,0" Cursor="Hand">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Title}" FontSize="11" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Activity}" FontSize="10" Foreground="{DynamicResource UiAccent}"
+                               Margin="8,0,0,0" VerticalAlignment="Center"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.DataTemplates>
           </ListBox>
           <Button Grid.Row="2" CornerRadius="12" Margin="14,8,10,0" Padding="14,9"
                   Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
@@ -305,8 +315,14 @@
               <Button x:Name="SessionMenuButton" Grid.Column="6" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
                 <PathIcon Data="{StaticResource ToolMore}"/>
                 <Button.Flyout>
-                  <MenuFlyout>
+                  <MenuFlyout Opening="OnSessionMenuOpening">
                     <MenuItem Header="重命名会话       F2" Click="OnRenameActive"/>
+                    <MenuItem x:Name="PinSessionItem" Header="置顶" Command="{Binding TogglePinActiveCommand}"/>
+                    <MenuItem Header="移出分组" Command="{Binding RemoveActiveFromGroupCommand}"/>
+                    <MenuItem x:Name="MoveToGroupMenu" Header="移入分组"/>
+                    <MenuItem Header="新建分组" Click="OnCreateGroupForActive"/>
+                    <MenuItem Header="重命名当前分组" Click="OnRenameActiveGroup"/>
+                    <MenuItem x:Name="ToggleGroupItem" Header="折叠当前分组" Command="{Binding ToggleActiveGroupCommand}"/>
                     <MenuItem Header="查看当前工作区" Command="{Binding ShowWorkspaceCommand}"/>
                     <MenuItem Header="关闭会话        Ctrl+Shift+W" Command="{Binding CloseActiveSessionCommand}"/>
                     <MenuItem Header="{Binding NextSessionMenuText}" Command="{Binding CycleSessionNextCommand}"/>
@@ -632,6 +648,7 @@
               <ListBoxItem>Files</ListBoxItem>
               <ListBoxItem>Logs</ListBoxItem>
               <ListBoxItem>SSH</ListBoxItem>
+              <ListBoxItem>命令</ListBoxItem>
             </ListBox>
 
             <Panel Grid.Row="1" Margin="0,4,0,0">
@@ -1207,6 +1224,32 @@
                            Text="连接使用本机 ssh 命令:密码 / 密钥确认直接在终端会话中完成;密钥建议用 ssh-agent 或 ~/.ssh/config。"/>
               </Grid>
 
+              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
+                    RowDefinitions="Auto,*,Auto">
+                <WrapPanel Orientation="Horizontal">
+                  <Button Content="上一条" Margin="0,0,6,6" Command="{Binding PreviousCommandCommand}"/>
+                  <Button Content="下一条" Margin="0,0,6,6" Command="{Binding NextCommandCommand}"/>
+                  <Button Content="定位" Margin="0,0,6,6" Command="{Binding LocateCommandCommand}"/>
+                  <Button Content="复制命令和输出" Margin="0,0,6,6" Command="{Binding CopyCommandRecordCommand}"/>
+                </WrapPanel>
+                <ListBox Grid.Row="1" ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
+                         Background="Transparent" BorderThickness="0" DoubleTapped="OnCommandDoubleTapped">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CommandRecordViewModel">
+                      <StackPanel Margin="2,4" Spacing="2">
+                        <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource UiMuted}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding LocateText}" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Grid.Row="2" Spacing="4" Margin="2,6,2,0">
+                  <TextBlock Text="{Binding CommandNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                  <TextBlock Text="只记录带命令开始/完成标记的终端。历史被裁掉后不能定位，也不会复制到别的命令。" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiFaint}"/>
+                </StackPanel>
+              </Grid>
+
             </Panel>
           </Grid>
         </Border>
@@ -1221,6 +1264,10 @@
               <TextBlock Text="工作空间" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
               <TextBlock Text="{Binding ActiveDirectoryName}" Foreground="{DynamicResource UiInk}" FontSize="11" FontWeight="SemiBold"/>
             </StackPanel>
+            <TextBlock Text="{Binding LaunchNotice}" Foreground="{DynamicResource UiBad}" FontSize="11"
+                       TextTrimming="CharacterEllipsis" MaxWidth="420"
+                       ToolTip.Tip="{Binding LaunchNotice}"
+                       IsVisible="{Binding LaunchNotice, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
             <TextBlock Text="{Binding TerminalCount, StringFormat='◔ {0} 个终端'}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
             <TextBlock Text="{Binding RunningCount, StringFormat='⊕ {0} 个运行中'}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
           </StackPanel>
@@ -1454,10 +1501,29 @@
                     <Button Content="打开模板" Command="{Binding OpenTemplateCommand}" IsEnabled="{Binding !IsOpeningTemplate}" Margin="0,0,6,6"/>
                     <Button Content="保存修改" Command="{Binding SaveTemplateChangesCommand}" Margin="0,0,6,6"/>
                     <Button Content="更新为当前布局" Command="{Binding UpdateTemplateLayoutCommand}" Margin="0,0,6,6"/>
+                    <Button Content="复制模板" Command="{Binding DuplicateTemplateCommand}" Margin="0,0,6,6"/>
+                    <Button Content="导出模板" Click="OnExportTemplate" Margin="0,0,6,6"/>
+                    <Button Content="导入模板" Click="OnImportTemplate" Margin="0,0,6,6"/>
                     <Button Content="删除模板" Command="{Binding DeleteTemplateCommand}" Margin="0,0,6,6"/>
                   </WrapPanel>
+                  <TextBlock Text="打开前预览" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <TextBlock Text="{Binding TemplatePreview}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
                   <TextBlock Text="{Binding TemplateMessage}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
-                  <TextBlock Text="打开模板保留现有终端；启动命令只在手动打开模板且启用时执行（本地 Shell）。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                  <TextBlock Text="预览显示当前编辑。打开当前选中的模板会带上这些修改，并保留现有终端。启动命令只在打开且启用时执行；导入不会执行。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                  <TextBlock Text="会话分组" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <ItemsControl ItemsSource="{Binding SessionGroups}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="settings:SessionGroup">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                          <TextBox Text="{Binding Name}" Watermark="分组名称"/>
+                          <Button Grid.Column="1" Content="删除" Margin="6,0,0,0"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteGroupCommand}"
+                                  CommandParameter="{Binding}"/>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button Content="新建分组" Click="OnCreateEmptyGroup" HorizontalAlignment="Left"/>
                   <ItemsControl ItemsSource="{Binding TemplateSessions}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:WorkspaceSessionEditor">
@@ -1482,7 +1548,7 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Spacing="12" Margin="4,12,4,4">
                 <TextBlock Text="点击右侧输入框，再按你想使用的快捷键。Backspace / Delete 清除；Tab 移到下一项。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-                <TextBlock Text="第 1–9 个终端按左侧当前顺序定位，排序后随之变化。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="Alt+1 到 Alt+9 按侧栏完整顺序切换，包括折叠分组里的终端。置顶或拖动后序号跟着新顺序变化。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
                 <ItemsControl ItemsSource="{Binding SessionShortcuts}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:SessionShortcutViewModel">
@@ -1506,6 +1572,9 @@
                 <ComboBox SelectedIndex="{Binding ShellIndex}"><ComboBoxItem>PowerShell (pwsh)</ComboBoxItem><ComboBoxItem>cmd.exe</ComboBoxItem><ComboBoxItem>WSL / bash</ComboBoxItem><ComboBoxItem>bash</ComboBoxItem><ComboBoxItem>自定义</ComboBoxItem></ComboBox>
                 <TextBlock Text="自定义 Shell 路径" Foreground="{DynamicResource UiInk}"/>
                 <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="C:\…\pwsh.exe"/>
+                <CheckBox Content="在资源管理器文件夹右键中显示 Terminal Hub" IsChecked="{Binding ExplorerMenuEnabled}"/>
+                <TextBlock Text="{Binding ExplorerMenuMessage}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="勾选后，文件夹或其空白处的右键菜单会出现“在 Terminal Hub 中打开”。取消勾选即移除。带空格或中文的路径会传给已打开的窗口。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
               </StackPanel>
             </Border>
           </TabItem>
@@ -1524,6 +1593,33 @@
               <TextBlock Text="{Binding UpdateMessage}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
               <Button Content="下载新版" Command="{Binding OpenUpdateDownloadCommand}" IsEnabled="{Binding HasUpdate}"/>
             </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="命令">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="12" Margin="4,12,4,4">
+                <TextBlock Text="收藏命令会填入当前终端，不会自动按 Enter。多行命令只在终端开启括号粘贴时填入；否则不填入，避免逐行执行。Shell 不一致时仍会填入单行命令，并给出提示。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{Binding FavoriteNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                <ItemsControl ItemsSource="{Binding FavoriteCommands}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FavoriteCommandViewModel">
+                      <Border BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                        <StackPanel Spacing="8">
+                          <TextBox Text="{Binding Name}" Watermark="名称，例如：启动开发服务"/>
+                          <TextBox Text="{Binding Command}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" Watermark="命令文本"/>
+                          <TextBox Text="{Binding Shell}" Watermark="适用 Shell，留空表示任意"/>
+                          <ctl:ShortcutEditor Text="{Binding Shortcut, Mode=TwoWay}" ToolTip.Tip="可选快捷键。按键录入；Backspace 清除"/>
+                          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource UiBad}" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                          <Button Content="删除" HorizontalAlignment="Left"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteFavoriteCommand}"
+                                  CommandParameter="{Binding}"/>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="添加收藏" Command="{Binding AddFavoriteCommand}" HorizontalAlignment="Left"/>
+              </StackPanel>
             </ScrollViewer>
           </TabItem>
         </TabControl>

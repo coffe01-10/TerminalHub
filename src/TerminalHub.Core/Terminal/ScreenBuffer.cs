@@ -112,6 +112,7 @@ public sealed class ScreenBuffer
     {
         if (_scrollback.Count <= _scrollbackLimit + ScrollbackSlack) return;
         var drop = _scrollback.Count - _scrollbackLimit;
+        RebaseAnchors(drop);
         _scrollback.RemoveRange(0, drop);
         _scrollWrapped.RemoveRange(0, drop);
         RemovedLineCount += drop;
@@ -146,6 +147,8 @@ public sealed class ScreenBuffer
     public bool ApplicationKeypad;
 
     private bool _pendingWrap;
+    /// <summary>The cursor is sitting on the last glyph; the next character wraps.</summary>
+    internal bool PendingWrap => _pendingWrap;
     private int _scrollTop, _scrollBottom; // inclusive
     private int _activeCharset;            // 0=G0 1=G1
     private readonly bool[] _decSpecial = new bool[2];
@@ -193,6 +196,51 @@ public sealed class ScreenBuffer
     /// <summary>Scrollback line-count delta: +1 per appended line, -count on clear.
     /// A scrolled view adds the delta to its offset to stay on the same content.</summary>
     public event Action<int>? ScrollbackChanged;
+
+    public readonly List<BufferAnchor> Anchors = [];
+
+    public BufferAnchor CreateAnchor(int line, int column)
+    {
+        var anchor = new BufferAnchor
+        {
+            Line = line,
+            Column = Math.Max(0, column),
+            RemovedBaseline = RemovedLineCount,
+            Alive = line >= 0 && line < TotalLines,
+            Alternate = OnAlternateScreen,
+        };
+        Anchors.Add(anchor);
+        return anchor;
+    }
+
+    public int? ResolveAnchor(BufferAnchor anchor)
+    {
+        if (!anchor.Alive || anchor.Alternate != OnAlternateScreen) return null;
+        var line = anchor.Line - (RemovedLineCount - anchor.RemovedBaseline);
+        if (line < 0 || line >= TotalLines)
+        {
+            anchor.Alive = false;
+            return null;
+        }
+        return (int)line;
+    }
+
+    private void RebaseAnchors(int drop)
+    {
+        if (drop == 0) return;
+        var nextRemoved = RemovedLineCount + drop;
+        foreach (var anchor in Anchors)
+        {
+            if (!anchor.Alive) continue;
+            var line = anchor.Line - (RemovedLineCount - anchor.RemovedBaseline) - drop;
+            if (line < 0) anchor.Alive = false;
+            else
+            {
+                anchor.Line = (int)line;
+                anchor.RemovedBaseline = nextRemoved;
+            }
+        }
+    }
 
     public int Columns { get; private set; }
     public int Rows { get; private set; }
@@ -750,6 +798,7 @@ public sealed class ScreenBuffer
 
     public void ClearScrollback()
     {
+        RebaseAnchors(_scrollback.Count);
         RemovedLineCount += _scrollback.Count;
         ScrollbackChanged?.Invoke(-_scrollback.Count);
         _scrollback.Clear();
@@ -856,8 +905,29 @@ public sealed class ScreenBuffer
         var savedLine = oldHistory + _savedPrimary.Y;
         if (columns != Columns)
         {
+            var extras = new List<ScreenReflow.Position>();
+            foreach (var anchor in Anchors)
+            {
+                if (!anchor.Alive) continue;
+                if (anchor.Alternate) { anchor.Alive = false; continue; }
+                var absolute = anchor.Line - (RemovedLineCount - anchor.RemovedBaseline);
+                if (absolute < 0 || absolute >= lines.Count) { anchor.Alive = false; continue; }
+                var pastEnd = anchor.Column >= Columns;
+                var position = new ScreenReflow.Position((int)absolute,
+                    Math.Clamp(pastEnd ? Columns - 1 : anchor.Column, 0, Math.Max(0, Columns - 1)), pastEnd);
+                extras.Add(position);
+                anchor.Mapped = position;
+            }
             var result = ScreenReflow.Rewrap(lines, flags, columns,
-                new(cursorLine, cursorX, pendingWrap), new(savedLine, _savedPrimary.X, _savedPrimary.PendingWrap));
+                new(cursorLine, cursorX, pendingWrap), new(savedLine, _savedPrimary.X, _savedPrimary.PendingWrap), extras);
+            foreach (var anchor in Anchors)
+            {
+                if (anchor.Mapped is not { } mapped) continue;
+                anchor.Line = mapped.Line;
+                anchor.Column = mapped.Pending ? columns : mapped.Column;
+                anchor.RemovedBaseline = RemovedLineCount;
+                anchor.Mapped = null;
+            }
             lines = result.Lines;
             flags = result.Wrapped;
             cursorLine = result.Cursor.Line;

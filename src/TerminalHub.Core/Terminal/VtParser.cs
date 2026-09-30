@@ -55,8 +55,12 @@ public sealed class VtParser
     // under SyncRoot and written back AFTER the lock is released — ConPtySession.Write
     // blocks on WriteFile and must never stall the render lock.
     private readonly List<byte[]> _responses = new();
-    private readonly List<(char Marker, int? ExitCode)> _commandMarkers = new();
+    private readonly List<(char Marker, int? ExitCode, string? Text, int Line, int Column, long Removed)> _commandMarkers = new();
     public event Action<char, int?>? CommandMarker;
+    /// <summary>Invoked as each marker arrives, inside the buffer lock.
+    /// Capture anchors and directory before later bytes change the screen or cwd.</summary>
+    public Action<IReadOnlyList<(char Marker, int? ExitCode, string? Text, int Line, int Column, long Removed)>>? ObserveCommands { get; set; }
+    public event Action? CommandsObserved;
     public Func<bool, string>? DefaultColorQuery { get; set; }
 
     /// <summary>Raised after a batch of input has been applied (renderer hint).</summary>
@@ -73,7 +77,7 @@ public sealed class VtParser
     public void Feed(ReadOnlySpan<byte> data)
     {
         byte[][] responses;
-        (char Marker, int? ExitCode)[] commandMarkers;
+        (char Marker, int? ExitCode, string? Text, int Line, int Column, long Removed)[] commandMarkers;
         lock (_buffer.SyncRoot)
         {
             if (data.Length > 0) _buffer.BumpVersion();
@@ -90,6 +94,7 @@ public sealed class VtParser
         foreach (var r in responses)
             _responder?.Invoke(r);
         foreach (var marker in commandMarkers) CommandMarker?.Invoke(marker.Marker, marker.ExitCode);
+        if (commandMarkers.Length > 0) CommandsObserved?.Invoke();
         BufferChanged?.Invoke();
     }
 
@@ -723,9 +728,23 @@ public sealed class VtParser
                 if (separator >= 0) _buffer.CurrentHyperlink = text[(separator + 1)..] is { Length: > 0 } url ? url : null;
                 break;
             case 133:
-                var parts = text.Split(';');
-                if (parts[0] is "C" or "D")
-                    _commandMarkers.Add((parts[0][0], parts.Length > 1 && int.TryParse(parts[1], out var code) ? code : null));
+                var markSplit = text.IndexOf(';');
+                var head = markSplit < 0 ? text : text[..markSplit];
+                var rest = markSplit < 0 ? "" : text[(markSplit + 1)..];
+                if (head is "A" or "B" or "C" or "D" or "E")
+                {
+                    int? exit = null;
+                    if (head == "D")
+                    {
+                        var codeText = rest.Split(';')[0];
+                        if (int.TryParse(codeText, out var code)) exit = code;
+                    }
+                    var markedColumn = _buffer.PendingWrap ? _buffer.Columns : _buffer.CursorX;
+                    var marker = (head[0], exit, head == "E" ? rest : null,
+                        _buffer.ScrollbackCount + _buffer.CursorY, markedColumn, _buffer.RemovedLineCount);
+                    _commandMarkers.Add(marker);
+                    ObserveCommands?.Invoke([marker]);
+                }
                 break;
             case 777: break; // notifications
             case 4: break;   // palette query/set

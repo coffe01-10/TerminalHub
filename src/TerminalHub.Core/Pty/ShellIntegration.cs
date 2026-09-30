@@ -14,5 +14,8 @@ public static class ShellIntegration
         "& $global:TerminalHubOriginalPrompt }; " +
         "if (Get-Module -ListAvailable PSReadLine) { Import-Module PSReadLine; " +
         "Set-PSReadLineKeyHandler -Key Enter -ScriptBlock { $global:LASTEXITCODE = $null; $global:TerminalHubCommandActive = $true; " +
+        "$thLine = ''; $thCursor = 0; [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$thLine, [ref]$thCursor); " +
+        "$thLine = $thLine.Replace([char]7, ' ').Replace([char]27, ' '); " +
+        "[Console]::Write([char]27 + ']133;E;' + $thLine + [char]7); " +
         "[Console]::Write([char]27 + ']133;C' + [char]7); [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine() } }";
 }

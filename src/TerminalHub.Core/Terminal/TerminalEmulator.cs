@@ -21,6 +21,8 @@ public sealed class TerminalEmulator : IDisposable
     public event Action? Changed;
     private long _commandStarted;
     public ShellCommandState? CommandState { get; private set; }
+    public CommandJournal Commands { get; } = new();
+    public event Action? CommandsChanged;
     public event Action<ShellCommandState>? CommandCompleted;
     public event Action<string>? TitleChanged
     {
@@ -41,6 +43,8 @@ public sealed class TerminalEmulator : IDisposable
         _pty = pty ?? new MockPtySession();
         _pty.OutputReceived += OnPtyOutput;
         Parser.BufferChanged += () => Changed?.Invoke();
+        Parser.ObserveCommands = markers => Commands.Apply(markers, Buffer);
+        Parser.CommandsObserved += () => CommandsChanged?.Invoke();
         Parser.CommandMarker += (marker, code) =>
         {
             if (marker == 'C')
@@ -48,7 +52,7 @@ public sealed class TerminalEmulator : IDisposable
                 _commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 CommandState = new(true, null, TimeSpan.Zero);
             }
-            else if (CommandState?.Running == true)
+            else if (marker == 'D' && CommandState?.Running == true)
             {
                 CommandState = new(false, code, System.Diagnostics.Stopwatch.GetElapsedTime(_commandStarted));
                 CommandCompleted?.Invoke(CommandState);

@@ -20,7 +20,15 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow();
-            Program.Activation?.Attach(() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            Program.Activation?.Attach(Activate, (path, error) =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    Activate();
+                    if (desktop.MainWindow is MainWindow window)
+                        window.AcceptLaunch(path, error);
+                }));
+
+            void Activate() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 var window = desktop.MainWindow;
                 if (window is null) return;
@@ -28,7 +36,7 @@ public partial class App : Application
                     window.WindowState = Avalonia.Controls.WindowState.Normal;
                 window.Show();
                 window.Activate();
-            }));
+            });
         }
         base.OnFrameworkInitializationCompleted();
     }

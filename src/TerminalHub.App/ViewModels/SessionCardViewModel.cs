@@ -27,6 +27,14 @@ public partial class SessionCardViewModel : ViewModelBase
     public string Name => Model.Name;
     public string WorkingDirectory => Model.WorkingDirectory;
     public string DirectoryName => Path.GetFileName(WorkingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name ? name : WorkingDirectory;
+    private string _shelfCaption = "";
+    public string ShelfCaption => _shelfCaption.Length > 0 ? _shelfCaption : DirectoryName;
+    public void SetShelfCaption(string caption)
+    {
+        if (_shelfCaption == caption) return;
+        _shelfCaption = caption;
+        OnPropertyChanged(nameof(ShelfCaption));
+    }
     public string TagText => Model.Tag.DisplayName();
     public bool HasTag => Model.Tag != SessionTag.None;
     public IBrush TagBrush => new SolidColorBrush(Color.Parse(Model.Tag.AccentColor()));
@@ -85,6 +93,7 @@ public partial class SessionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(WorkingDirectory));
         OnPropertyChanged(nameof(CommandStatusText));
         OnPropertyChanged(nameof(DirectoryName));
+        OnPropertyChanged(nameof(ShelfCaption));
     }
 
     private void RefreshPreview()

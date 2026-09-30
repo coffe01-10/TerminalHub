@@ -1491,6 +1491,18 @@ public partial class TerminalView : Control
         InvalidateVisual();
     }
 
+    /// <summary>Scroll a command-record anchor into view. False when that line was trimmed.</summary>
+    public bool TryRevealAnchor(BufferAnchor anchor)
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return false;
+        int? line;
+        lock (buf.SyncRoot) line = buf.ResolveAnchor(anchor);
+        if (line is null) return false;
+        RevealLine(line.Value);
+        return true;
+    }
+
     /// <summary>A result clicked after history trimming still refers to its original line.</summary>
     public bool RevealSearchHit(ScreenBuffer.SearchHit hit)
     {

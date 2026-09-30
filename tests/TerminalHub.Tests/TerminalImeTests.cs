@@ -32,6 +32,19 @@ public class TerminalImeTests
     }
 
     [AvaloniaFact]
+    public void TwoViews_UseTheSameCell_WhenFontSizesDiffer()
+    {
+        using var emulator = new TerminalEmulator(columns: 40, rows: 8);
+        var main = new TerminalView { Emulator = emulator, TerminalFontSize = 13 };
+        var other = new TerminalView { Emulator = emulator, TerminalFontSize = 20 };
+        emulator.Parser.Feed("ab中文cd");
+        var mainColumn = Client(main).CursorRectangle.X / CellWidth(main);
+        var otherColumn = Client(other).CursorRectangle.X / CellWidth(other);
+        Assert.Equal(emulator.Buffer.CursorX, mainColumn, 3);
+        Assert.Equal(emulator.Buffer.CursorX, otherColumn, 3);
+    }
+
+    [AvaloniaFact]
     public void VisibleCursor_ReflowAndFontChange_UpdatesImeBeforeRender()
     {
         using var emulator = new TerminalEmulator(columns: 20, rows: 6);

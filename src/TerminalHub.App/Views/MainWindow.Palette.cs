@@ -16,10 +16,22 @@ public partial class MainWindow
         if (PalettePanel.IsVisible) { ClosePalette(); return; }
         _palettePreviousFocus = FocusManager?.GetFocusedElement();
         _paletteEntries = Vm.SessionCards.Select((card, index) => new PaletteEntry("切换 · " + card.Name,
-            card.WorkingDirectory + " · " + card.Model.Shell,
+            Vm.DescribeSession(card),
             Vm.SessionShortcuts.FirstOrDefault(s => s.Binding.Action == TerminalHub.Core.Settings.SessionShortcutAction.Select
                 && s.Binding.SessionIndex == index && s.Error.Length == 0 && s.ParsedGesture is not null)?.Gesture ?? "",
-            () => { Vm.ActiveCard = card; return Task.CompletedTask; })).ToList();
+            () => { Vm.ActivateCard(card); return Task.CompletedTask; })).ToList();
+        foreach (var favorite in Vm.FavoriteCommands)
+        {
+            var preview = favorite.Command.Replace("\r", "").Replace('\n', ' ');
+            var shell = string.IsNullOrWhiteSpace(favorite.Shell) ? "任意 Shell" : favorite.Shell;
+            Add("收藏 · " + favorite.Name, shell + " · " + preview, favorite.Shortcut,
+                () => { Vm.InsertFavorite(favorite.Model); return Task.CompletedTask; });
+        }
+        Add("查看命令记录", "定位当前终端最近命令的输出", "", () =>
+        {
+            Vm.ShowCommandHistoryCommand.Execute(null);
+            return Task.CompletedTask;
+        });
         Add("新建终端", "打开新的 Shell", "Ctrl+Shift+N", () => Vm.NewSessionCommand.ExecuteAsync(null));
         Add("切换分屏", "并排查看终端", "", () => { Vm.ToggleSplitCommand.Execute(null); return Task.CompletedTask; });
         Add("重命名当前终端", "修改终端名称", "F2", async () =>
