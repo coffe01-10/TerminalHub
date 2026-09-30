@@ -16,10 +16,15 @@ public sealed class VtParser
     private State _state = State.Ground;
     private int _charsetTarget;
 
-    // CSI accumulation
+    // CSI accumulation. ':' separates subparameters of the current parameter
+    // (SGR 38:2:R:G:B, 4:3). It is not another ';'.
     private readonly List<int> _params = new();
+    private readonly List<int[]?> _subparams = new();
+    private readonly List<int> _currentSubs = new();
     private int _currentParam;
+    private int _paramValue = -1;
     private bool _hasParam;
+    private bool _inSub;
     private bool _privateMarker;   // '?', '>', '!', etc.
     private char _privateChar;
     private readonly List<char> _intermediates = new();
@@ -135,8 +140,8 @@ public sealed class VtParser
         else if (s is State.Csi)
         {
             _params.Clear();
-            _currentParam = 0;
-            _hasParam = false;
+            _subparams.Clear();
+            ResetCurrentParameter();
             _privateMarker = false;
             _privateChar = '\0';
             _intermediates.Clear();
@@ -162,7 +167,9 @@ public sealed class VtParser
                 if (--_utf8Remaining == 0)
                 {
                     var rune = _utf8Value;
-                    if (rune < _utf8Min) rune = 0xFFFD;         // overlong
+                    // Overlong, above U+10FFFF, or a surrogate is not a scalar.
+                    // EmitRune also rejects these so ConvertFromUtf32 cannot throw.
+                    if (rune < _utf8Min || !IsUnicodeScalar(rune)) rune = 0xFFFD;
                     EmitRune(rune);
                 }
                 return;
@@ -196,8 +203,12 @@ public sealed class VtParser
     /// regional indicator of a flag extend the previous cell's cluster; every
     /// other rune starts a new cell (supplementary planes included).
     /// </summary>
+    private static bool IsUnicodeScalar(int rune)
+        => (uint)rune <= 0x10FFFF && rune is not (>= 0xD800 and <= 0xDFFF);
+
     private void EmitRune(int rune)
     {
+        if (!IsUnicodeScalar(rune)) rune = 0xFFFD;
         var joins = _afterZwj
             || GraphemeWidth.IsZeroWidthRune(rune)
             || (GraphemeWidth.IsRegionalIndicator(rune) && _buffer.LastGlyphIsRegionalIndicator);
@@ -225,8 +236,9 @@ public sealed class VtParser
             case (byte)'M': _buffer.ReverseIndex(); Enter(State.Ground); break;
             case (byte)'H': Enter(State.Ground); break;         // HTS
             case (byte)'c': Reset(); Enter(State.Ground); break; // RIS
-            case (byte)'=': _buffer.ApplicationCursorKeys = true; Enter(State.Ground); break;
-            case (byte)'>': _buffer.ApplicationCursorKeys = false; Enter(State.Ground); break;
+            // DECKPAM / DECKPNM — application vs numeric keypad, not DECCKM.
+            case (byte)'=': _buffer.ApplicationKeypad = true; Enter(State.Ground); break;
+            case (byte)'>': _buffer.ApplicationKeypad = false; Enter(State.Ground); break;
             case >= 0x20 and <= 0x2F:
                 _intermediates.Add((char)b);
                 _state = State.EscIntermediate;
@@ -257,6 +269,14 @@ public sealed class VtParser
 
     private void Reset()
     {
+        // Leave the alternate screen before erasing, or RIS would clear the
+        // alternate grid and leave the primary screen untouched.
+        _buffer.UseAlternateScreen(false);
+        _buffer.ApplicationCursorKeys = false;
+        _buffer.ApplicationKeypad = false;
+        _buffer.DesignateCharset(0, false);
+        _buffer.DesignateCharset(1, false);
+        _buffer.SelectCharset(0);
         _buffer.CurrentAttrs = CellAttrs.None;
         _buffer.CurrentHyperlink = null;
         _buffer.CurrentFg = TerminalColor.Default;
@@ -272,8 +292,32 @@ public sealed class VtParser
         _buffer.SetOriginMode(false);
         _buffer.ResetKittyKeyboard();
         _buffer.ResetScrollRegion();
+        _buffer.ResetSavedCursor(bothScreens: true);
+        _buffer.ClearScrollback();
         _buffer.EraseInDisplay(2);
         _buffer.CursorPosition(1, 1);
+    }
+
+    /// <summary>DECSTR (CSI ! p): modes and SGR, without erasing or leaving the alt screen.</summary>
+    private void SoftReset()
+    {
+        var b = _buffer;
+        b.CurrentAttrs = CellAttrs.None;
+        b.CurrentHyperlink = null;
+        b.CurrentFg = TerminalColor.Default;
+        b.CurrentBg = TerminalColor.Default;
+        b.AutoWrap = true;
+        b.InsertMode = false;
+        b.ApplicationCursorKeys = false;
+        b.ApplicationKeypad = false;
+        b.SetCursorVisible(true);
+        b.DesignateCharset(0, false);
+        b.DesignateCharset(1, false);
+        b.SelectCharset(0);
+        b.ResetScrollRegion();
+        // DECSTR changes the addressing mode without moving the current cursor.
+        b.OriginMode = false;
+        b.ResetSavedCursor();
     }
 
     // ---------- CSI ----------
@@ -289,8 +333,18 @@ public sealed class VtParser
         switch (b)
         {
             case (byte)';':
-                if (_params.Count < MaxCsiParams)
-                    _params.Add(_hasParam ? _currentParam : -1);
+                PushParameter();
+                return;
+            case (byte)':':
+                // First colon keeps the parameter value; later colons push subparameters.
+                // An empty field (38:2::R:G:B) is stored as -1, not as zero.
+                if (!_inSub)
+                {
+                    _paramValue = _hasParam ? _currentParam : -1;
+                    _inSub = true;
+                }
+                else if (_currentSubs.Count < MaxCsiParams)
+                    _currentSubs.Add(_hasParam ? _currentParam : -1);
                 _currentParam = 0;
                 _hasParam = false;
                 return;
@@ -314,15 +368,51 @@ public sealed class VtParser
         // Final byte 0x40-0x7E
         if (b is >= 0x40 and <= 0x7E)
         {
-            if (_hasParam || _params.Count > 0 || _currentParam != 0)
-                _params.Add(_hasParam ? _currentParam : (_params.Count == 0 ? _currentParam : -1));
+            if (_hasParam || _inSub || _currentSubs.Count > 0 || _params.Count > 0 || _currentParam != 0)
+                PushParameter();
             DispatchCsi((char)b);
         }
         Enter(State.Ground);
     }
 
+    private void ResetCurrentParameter()
+    {
+        _currentSubs.Clear();
+        _currentParam = 0;
+        _paramValue = -1;
+        _hasParam = false;
+        _inSub = false;
+    }
+
+    private void PushParameter()
+    {
+        if (_params.Count >= MaxCsiParams)
+        {
+            ResetCurrentParameter();
+            return;
+        }
+        int value;
+        if (_inSub)
+        {
+            if (_currentSubs.Count < MaxCsiParams)
+                _currentSubs.Add(_hasParam ? _currentParam : -1);
+            value = _paramValue;
+        }
+        else value = _hasParam ? _currentParam : -1;
+        _params.Add(value);
+        _subparams.Add(_currentSubs.Count > 0 ? _currentSubs.ToArray() : null);
+        ResetCurrentParameter();
+    }
+
     private int Param(int i, int def = 1)
         => i < _params.Count && _params[i] >= 0 ? _params[i] : def;
+
+    private int Subparam(int paramIndex, int subIndex, int def)
+    {
+        if (paramIndex >= _subparams.Count || _subparams[paramIndex] is not { } subs || subIndex >= subs.Length)
+            return def;
+        return subs[subIndex] >= 0 ? subs[subIndex] : def;
+    }
 
     private void DispatchCsi(char final)
     {
@@ -352,6 +442,11 @@ public sealed class VtParser
                     case '=': b.KittySet(flags, Param(1, 1)); break;
                 }
             }
+            return;
+        }
+        if (_privateMarker && _privateChar == '!' && final == 'p')
+        {
+            SoftReset();
             return;
         }
 
@@ -386,7 +481,11 @@ public sealed class VtParser
             case 'c': Respond("\x1b[?1;2c"); break;  // DA: vt220
             case 'n':
                 if (Param(0, 0) == 6) // DSR cursor position report
-                    Respond($"\x1b[{b.CursorY + 1};{b.CursorX + 1}R");
+                {
+                    // Origin mode reports the row relative to the scroll-region top.
+                    var row = b.OriginMode ? b.CursorY - b.ScrollRegionTop + 1 : b.CursorY + 1;
+                    Respond($"\x1b[{row};{b.CursorX + 1}R");
+                }
                 else if (Param(0, 0) == 5)
                     Respond("\x1b[0n");
                 break;
@@ -486,7 +585,11 @@ public sealed class VtParser
                 case 1: b.CurrentAttrs |= CellAttrs.Bold; break;
                 case 2: b.CurrentAttrs |= CellAttrs.Dim; break;
                 case 3: b.CurrentAttrs |= CellAttrs.Italic; break;
-                case 4: b.CurrentAttrs |= CellAttrs.Underline; break;
+                case 4:
+                    // 4:0 off, 4:1..4:5 underline styles. 4:3 is curly underline, not italic.
+                    if (Subparam(i, 0, 1) == 0) b.CurrentAttrs &= ~CellAttrs.Underline;
+                    else b.CurrentAttrs |= CellAttrs.Underline;
+                    break;
                 case 5: case 6: b.CurrentAttrs |= CellAttrs.Blink; break;
                 case 7: b.CurrentAttrs |= CellAttrs.Inverse; break;
                 case 8: b.CurrentAttrs |= CellAttrs.Hidden; break;
@@ -505,11 +608,21 @@ public sealed class VtParser
                 case >= 90 and <= 97: b.CurrentFg = TerminalColor.Indexed(p - 90 + 8); break;
                 case >= 100 and <= 107: b.CurrentBg = TerminalColor.Indexed(p - 100 + 8); break;
                 case 38: case 48:
-                    var (color, consumed) = ParseExtendedColor(i);
+                    TerminalColor color;
+                    if (i < _subparams.Count && _subparams[i] is { Length: > 0 } subs)
+                        color = ColorFromSubs(subs);
+                    else
+                    {
+                        int consumed;
+                        (color, consumed) = ParseExtendedColor(i);
+                        i += consumed;
+                    }
                     if (p == 38) b.CurrentFg = color; else b.CurrentBg = color;
-                    i += consumed;
                     break;
                 case 58: // underline color — consume args, ignore
+                    // Colon components belong to this parameter; do not eat the
+                    // following semicolon SGR attributes (e.g. 58:2::R:G:B;5;1).
+                    if (i < _subparams.Count && _subparams[i] is not null) break;
                     if (i + 1 < _params.Count && _params[i + 1] == 5) i += 2;
                     else if (i + 1 < _params.Count && _params[i + 1] == 2) i += 4;
                     break;
@@ -524,9 +637,27 @@ public sealed class VtParser
         if (i + 2 < _params.Count && _params[i + 1] == 5)
             return (TerminalColor.Indexed(_params[i + 2]), 2);
         if (i + 4 < _params.Count && _params[i + 1] == 2)
-            return (TerminalColor.Rgb(_params[i + 2], _params[i + 3], _params[i + 4]), 4);
+            return (TerminalColor.Rgb(Byte(_params[i + 2]), Byte(_params[i + 3]), Byte(_params[i + 4])), 4);
         return (TerminalColor.Default, 0);
     }
+
+    /// <summary>ISO-8613-6 colon form: 2:R:G:B, 2::R:G:B, or 2:colorspace:R:G:B. 5:index stays indexed.</summary>
+    private static TerminalColor ColorFromSubs(int[] subs)
+    {
+        if (subs.Length >= 2 && subs[0] == 5)
+            return TerminalColor.Indexed(subs[1] < 0 ? 0 : subs[1]);
+        if (subs[0] != 2) return TerminalColor.Default;
+        var start = 1;
+        var components = subs.Length - 1;
+        // A colorspace id is present when the slot is empty or four numbers follow the 2.
+        if (components >= 4 || (components > 0 && subs[1] < 0)) start = 2;
+        return TerminalColor.Rgb(ByteAt(subs, start), ByteAt(subs, start + 1), ByteAt(subs, start + 2));
+    }
+
+    private static int ByteAt(int[] values, int index)
+        => index < 0 || index >= values.Length ? 0 : Byte(values[index]);
+
+    private static int Byte(int value) => value < 0 ? 0 : value > 255 ? 255 : value;
 
     // ---------- OSC ----------
 

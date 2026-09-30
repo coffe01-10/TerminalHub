@@ -9,12 +9,12 @@ namespace TerminalHub.Core.Logging;
 public static partial class LineClassifier
 {
     [GeneratedRegex(
-        @"(?<!\b0\s)(?<!\bno\s)\berrors?\b(?!\s*[:=]\s*0)|\berr:|exception|fatal|(?<!\b0\s)(?<!\bno\s)\bfailed\b|\bfailure\b(?!\s*[:=]\s*0)|command not found|permission denied|no such file|exit[\s_]*(code|status)?[\s_:=]*[1-9]|exited? with (code )?[1-9]|(?<!0\s*个?\s*)错误(?!\s*[:：]\s*0)|失败|无法",
+        @"(?<!\b0\s)(?<!\bno\s)\berrors?\b(?!\s*[:=]\s*0)|\berr:|exception|fatal|(?<!\b0\s)(?<!\bno\s)\bfailed\b|\bfailure\b(?!\s*[:=]\s*0)|command not found|permission denied|no such file|exit[\s_]*(code|status)?[\s_:=]*[1-9]|exited? with (code )?[1-9]|(?<!(?<!\d)0\s*个?\s*)错误(?!\s*[:：]\s*0)|失败|无法",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex ErrorPattern();
 
     [GeneratedRegex(
-        @"\bwarn(ing)?\b(?!\s*[:=]\s*0)|deprecated|deprecat|(?<!0\s*个?\s*)警告(?!\s*[:：]\s*0)|注意",
+        @"(?<!\b0\s)(?<!\bno\s)\bwarn(ing)?s?\b(?!\s*[:=]\s*0)|deprecated|deprecat|(?<!(?<!\d)0\s*个?\s*)警告(?!\s*[:：]\s*0)|注意",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex WarnPattern();
 

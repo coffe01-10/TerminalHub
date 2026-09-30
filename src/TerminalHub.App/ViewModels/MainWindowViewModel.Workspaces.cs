@@ -81,7 +81,12 @@ public partial class MainWindowViewModel
         {
             await RestoreWorkspaceAsync(template.Layout, runStartupCommands: true);
             WorkspaceNameLive = template.Name;
-            PersistSettings();
+            // Session cards are posted from SessionAdded. Saving here would
+            // snapshot an empty shelf if those posts have not run yet.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (!_disposed) PersistSettings();
+            });
             TemplateMessage = $"已打开 {template.Name}；原有终端继续运行。";
         }
         finally { IsOpeningTemplate = false; }

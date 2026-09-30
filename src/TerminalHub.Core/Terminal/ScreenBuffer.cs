@@ -22,21 +22,38 @@ public sealed class ScreenBuffer
     private int _version;
     private int _frameCacheVersion = -1;
     private readonly Dictionary<int, TerminalFrame> _frameCache = new(2);
+    // Main/preview share offset 0; keep a few history views without retaining
+    // a complete cell array for every offset visited while output is idle.
+    private const int MaxCachedFrames = 4;
     internal void BumpVersion() => _version++;
 
     public void SetSynchronizedOutput(bool enabled)
     {
-        if (enabled && !SynchronizedOutput)
+        if (enabled)
         {
-            _heldFrame = CaptureFrame();
-            // The held frame just landed in _frameCache[0]; drop it so that after
-            // the sync window expires CaptureFrame re-reads the live grid at the
-            // same version instead of replaying the pre-sync image forever.
-            _frameCache.Clear();
-            _syncStarted = Environment.TickCount64;
+            // A timed-out BSU leaves the flag set. Drop it before capturing, or the
+            // next enable would keep showing the frame from the previous window.
+            ExpireSynchronizedOutput();
+            if (!SynchronizedOutput)
+            {
+                _heldFrame = CaptureFrame();
+                // The held frame just landed in _frameCache[0]; drop it so that after
+                // the sync window expires CaptureFrame re-reads the live grid at the
+                // same version instead of replaying the pre-sync image forever.
+                _frameCache.Clear();
+                _syncStarted = Environment.TickCount64;
+            }
         }
         SynchronizedOutput = enabled;
         if (!enabled) _heldFrame = null;
+    }
+
+    /// <summary>150ms without an end-sync: show the live grid and stop the redraw flag.</summary>
+    private void ExpireSynchronizedOutput()
+    {
+        if (!SynchronizedOutput || Environment.TickCount64 - _syncStarted < 150) return;
+        SynchronizedOutput = false;
+        _heldFrame = null;
     }
 
     public TerminalFrame CaptureFrame(int offset = 0)
@@ -44,7 +61,8 @@ public sealed class ScreenBuffer
         lock (SyncRoot)
         {
             // A crashed/unfinished synchronized update must not freeze the screen indefinitely.
-            if (SynchronizedOutput && Environment.TickCount64 - _syncStarted < 150 && _heldFrame is { } held)
+            ExpireSynchronizedOutput();
+            if (SynchronizedOutput && _heldFrame is { } held)
                 return held;
             offset = OnAlternateScreen ? 0 : Math.Clamp(offset, 0, ScrollbackCount);
             if (_frameCacheVersion != _version) { _frameCache.Clear(); _frameCacheVersion = _version; }
@@ -59,6 +77,11 @@ public sealed class ScreenBuffer
             }
             var frame = new TerminalFrame(Columns, Rows, cells, CursorX, CursorY,
                 CursorVisible && offset == 0, OnAlternateScreen, ScrollbackCount - offset);
+            if (_frameCache.Count == MaxCachedFrames)
+            {
+                foreach (var oldOffset in _frameCache.Keys)
+                    if (oldOffset != 0) { _frameCache.Remove(oldOffset); break; }
+            }
             _frameCache[offset] = frame;
             return frame;
         }
@@ -99,11 +122,16 @@ public sealed class ScreenBuffer
     public int CursorX { get; private set; }
     public int CursorY { get; private set; }
     public bool CursorVisible { get; private set; } = true;
-    private int _savedX, _savedY;
-    private bool _savedPendingWrap;
-    private CellAttrs _savedAttrs;
-    private TerminalColor _savedFg, _savedBg;
-    private bool _savedOriginMode;
+    private struct SavedCursor
+    {
+        public int X, Y;
+        public bool PendingWrap;
+        public CellAttrs Attrs;
+        public TerminalColor Fg, Bg;
+        public bool OriginMode;
+    }
+    // DECSC on the primary screen must survive a save made on the alternate screen.
+    private SavedCursor _savedPrimary, _savedAlt;
 
     // Parser-visible state
     public CellAttrs CurrentAttrs = CellAttrs.None;
@@ -114,6 +142,8 @@ public sealed class ScreenBuffer
     public bool InsertMode;
     public bool OriginMode;
     public bool ApplicationCursorKeys;
+    /// <summary>DECKPAM (ESC =) / DECKPNM (ESC &gt;). Independent of <see cref="ApplicationCursorKeys"/>.</summary>
+    public bool ApplicationKeypad;
 
     private bool _pendingWrap;
     private int _scrollTop, _scrollBottom; // inclusive
@@ -242,9 +272,13 @@ public sealed class ScreenBuffer
     /// UTF-16 pair inside the cell instead of degrading to a fallback glyph.</summary>
     public void PutRune(int rune)
     {
+        if (!IsUnicodeScalar(rune)) rune = 0xFFFD;
         var text = rune <= 0xFFFF ? ((char)rune).ToString() : char.ConvertFromUtf32(rune);
         PutCluster(text, Math.Clamp(GraphemeWidth.OfRune(rune), 1, 2));
     }
+
+    private static bool IsUnicodeScalar(int rune)
+        => (uint)rune <= 0x10FFFF && rune is not (>= 0xD800 and <= 0xDFFF);
 
     /// <summary>
     /// Extend the most recently written cell with a zero-width rune (combining
@@ -254,6 +288,7 @@ public sealed class ScreenBuffer
     public bool AppendToLastGrapheme(int rune)
     {
         if (_lastGlyphRow < 0) return false;
+        if (!IsUnicodeScalar(rune)) rune = 0xFFFD;
         ref var cell = ref CellAt(_lastGlyphRow, _lastGlyphCol);
         if (cell.Char is ' ' or '\0') return false;
         cell.Tail = string.Concat(cell.Tail,
@@ -335,19 +370,22 @@ public sealed class ScreenBuffer
         else if (cell.IsWideContinuation && CursorX > 0)
             ClearWideLead(CursorY, CursorX - 1);
 
+        // A wide glyph with no room for its continuation must not stay IsWide:
+        // the renderer would walk one cell past this row.
+        var wide = width == 2 && CursorX + 1 < Columns;
         cell.Char = text[0];
         cell.Tail = text.Length > 1 ? text[1..] : null;
         cell.Hyperlink = CurrentHyperlink;
         cell.Attrs = CurrentAttrs;
         cell.Fg = CurrentFg;
         cell.Bg = CurrentBg;
-        cell.IsWide = width == 2;
+        cell.IsWide = wide;
         cell.IsWideContinuation = false;
         Touch(CursorY);
         _lastGlyphRow = CursorY;
         _lastGlyphCol = CursorX;
 
-        if (width == 2 && CursorX + 1 < Columns)
+        if (wide)
         {
             ref var next = ref CellAt(CursorY, CursorX + 1);
             next.Char = '\0';
@@ -360,7 +398,7 @@ public sealed class ScreenBuffer
             next.Bg = CurrentBg;
         }
 
-        var newX = CursorX + width;
+        var newX = CursorX + (wide ? 2 : 1);
         if (newX >= Columns)
         {
             CursorX = Columns - 1;
@@ -511,8 +549,21 @@ public sealed class ScreenBuffer
 
     // ---------- cursor ----------
 
-    public void CursorUp(int n) { _pendingWrap = false; CursorY = Math.Max(RegionTop(), CursorY - Math.Max(1, n)); }
-    public void CursorDown(int n) { _pendingWrap = false; CursorY = Math.Min(RegionBottom(), CursorY + Math.Max(1, n)); }
+    public void CursorUp(int n)
+    {
+        _pendingWrap = false;
+        // Even below the region, moving up stops at its top. A cursor already
+        // above the top can move to the screen edge without being pulled down.
+        var min = CursorY >= _scrollTop ? _scrollTop : 0;
+        CursorY = Math.Max(min, CursorY - Math.Max(1, n));
+    }
+
+    public void CursorDown(int n)
+    {
+        _pendingWrap = false;
+        var max = CursorY <= _scrollBottom ? _scrollBottom : Rows - 1;
+        CursorY = Math.Min(max, CursorY + Math.Max(1, n));
+    }
     public void CursorForward(int n) { _pendingWrap = false; CursorX = Math.Min(Columns - 1, CursorX + Math.Max(1, n)); }
     public void CursorBack(int n) { _pendingWrap = false; CursorX = Math.Max(0, CursorX - Math.Max(1, n)); }
     public void CursorNextLine(int n) { CursorDown(n); CursorX = 0; }
@@ -533,19 +584,38 @@ public sealed class ScreenBuffer
 
     public void SaveCursor()
     {
-        _savedX = CursorX; _savedY = CursorY;
-        _savedPendingWrap = _pendingWrap;
-        _savedAttrs = CurrentAttrs; _savedFg = CurrentFg; _savedBg = CurrentBg;
-        _savedOriginMode = OriginMode;
+        ref var slot = ref ActiveSavedCursor();
+        slot.X = CursorX;
+        slot.Y = CursorY;
+        slot.PendingWrap = _pendingWrap;
+        slot.Attrs = CurrentAttrs;
+        slot.Fg = CurrentFg;
+        slot.Bg = CurrentBg;
+        slot.OriginMode = OriginMode;
     }
 
     public void RestoreCursor()
     {
-        CursorX = Math.Min(_savedX, Columns - 1);
-        CursorY = Math.Min(_savedY, Rows - 1);
-        CurrentAttrs = _savedAttrs; CurrentFg = _savedFg; CurrentBg = _savedBg;
-        OriginMode = _savedOriginMode;
-        _pendingWrap = _savedPendingWrap;
+        ref var slot = ref ActiveSavedCursor();
+        CursorX = Math.Min(slot.X, Columns - 1);
+        CursorY = Math.Min(slot.Y, Rows - 1);
+        CurrentAttrs = slot.Attrs;
+        CurrentFg = slot.Fg;
+        CurrentBg = slot.Bg;
+        OriginMode = slot.OriginMode;
+        _pendingWrap = slot.PendingWrap;
+    }
+
+    private ref SavedCursor ActiveSavedCursor()
+    {
+        if (OnAlternateScreen) return ref _savedAlt;
+        return ref _savedPrimary;
+    }
+
+    public void ResetSavedCursor(bool bothScreens = false)
+    {
+        if (bothScreens) _savedPrimary = _savedAlt = default;
+        else ActiveSavedCursor() = default;
     }
 
     public void SetScrollRegion(int top, int bottom)
@@ -752,6 +822,8 @@ public sealed class ScreenBuffer
             }
             Columns = columns;
             Rows = rows;
+            _savedAlt.X = Math.Min(_savedAlt.X, columns - 1);
+            _savedAlt.Y = Math.Min(_savedAlt.Y, rows - 1);
             _scrollTop = 0;
             _scrollBottom = rows - 1;
             _lastGlyphRow = -1;
@@ -772,7 +844,7 @@ public sealed class ScreenBuffer
         {
             // Unused rows below the prompt must not push it into history when
             // narrowing. Hard blank lines above the cursor remain real lines.
-            while (lastRow > Math.Max(cursorY, _savedY) && !wrapped[lastRow]
+            while (lastRow > Math.Max(cursorY, _savedPrimary.Y) && !wrapped[lastRow]
                 && screen.AsSpan(lastRow * Columns, Columns).ToArray().All(ScreenReflow.IsPadding)) lastRow--;
         }
         for (var r = 0; r <= lastRow; r++)
@@ -781,19 +853,19 @@ public sealed class ScreenBuffer
             flags.Add(wrapped[r]);
         }
         var cursorLine = oldHistory + cursorY;
-        var savedLine = oldHistory + _savedY;
+        var savedLine = oldHistory + _savedPrimary.Y;
         if (columns != Columns)
         {
             var result = ScreenReflow.Rewrap(lines, flags, columns,
-                new(cursorLine, cursorX, pendingWrap), new(savedLine, _savedX, _savedPendingWrap));
+                new(cursorLine, cursorX, pendingWrap), new(savedLine, _savedPrimary.X, _savedPrimary.PendingWrap));
             lines = result.Lines;
             flags = result.Wrapped;
             cursorLine = result.Cursor.Line;
             cursorX = result.Cursor.Column;
             pendingWrap = result.Cursor.Pending;
             savedLine = result.SavedCursor.Line;
-            _savedX = result.SavedCursor.Column;
-            _savedPendingWrap = result.SavedCursor.Pending;
+            _savedPrimary.X = result.SavedCursor.Column;
+            _savedPrimary.PendingWrap = result.SavedCursor.Pending;
         }
         var historyCount = Math.Max(0, lines.Count - rows);
         _scrollback.Clear();
@@ -809,8 +881,8 @@ public sealed class ScreenBuffer
         }
         cursorY = Math.Clamp(cursorLine - historyCount, 0, rows - 1);
         cursorX = Math.Min(cursorX, columns - 1);
-        _savedY = Math.Clamp(savedLine - historyCount, 0, rows - 1);
-        _savedX = Math.Min(_savedX, columns - 1);
+        _savedPrimary.Y = Math.Clamp(savedLine - historyCount, 0, rows - 1);
+        _savedPrimary.X = Math.Min(_savedPrimary.X, columns - 1);
         ScrollbackChanged?.Invoke(historyCount - oldHistory);
         TrimScrollbackIfNeeded();
     }

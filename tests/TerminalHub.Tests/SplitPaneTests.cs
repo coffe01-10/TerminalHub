@@ -237,4 +237,34 @@ public class SplitPaneTests
         Assert.NotSame(right, vm.LeftPane); // panes must not collapse onto one session
         window.Close();
     }
+
+    [AvaloniaFact]
+    public async Task Split_CloseFocusedSide_WhenNoOtherSession_ExitsSplit()
+    {
+        var (window, vm) = await Boot();
+        while (vm.SessionCards.Count > 2)
+        {
+            var extra = vm.SessionCards.First(c => !ReferenceEquals(c.Model, vm.ActiveSession));
+            vm.CloseSessionCommand.Execute(extra);
+            await Task.Delay(150);
+        }
+        vm.ToggleSplitCommand.Execute(null);
+        await Task.Delay(250);
+        Assert.Equal(2, vm.SessionCards.Count);
+        Assert.True(vm.IsSplit);
+        Assert.NotSame(vm.LeftPane, vm.RightPane);
+
+        vm.FocusPane(1);
+        var right = vm.RightPane;
+        var rightCard = vm.SessionCards.First(c => ReferenceEquals(c.Model, right));
+        vm.CloseSessionCommand.Execute(rightCard);
+        await Task.Delay(400);
+
+        Assert.False(vm.IsSplit);
+        Assert.Null(vm.LeftPane);
+        Assert.Null(vm.RightPane);
+        Assert.Single(vm.SessionCards);
+        Assert.NotSame(right, vm.ActiveSession);
+        window.Close();
+    }
 }

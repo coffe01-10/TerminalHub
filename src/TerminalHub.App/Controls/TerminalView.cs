@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Input.TextInput;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using TerminalHub.Core.Terminal;
 
@@ -53,10 +54,14 @@ public partial class TerminalView : Control
     private int _scrollDrift;         // scrollback lines appended while scrolled up
     private bool _cursorOn = true;
     private readonly DispatcherTimer _blink;
+    private readonly Dictionary<Color, IBrush> _brushCache = new();
     private readonly TerminalImeClient _imeClient;
     private string? _preedit;         // IME composition text (null = not composing)
     private int _preeditCaret;        // caret index inside _preedit, in chars
     private Rect _lastImeRect;        // last rect reported to the IME
+    private (ScreenBuffer? Buffer, int Version, int Offset, double Width, double Height,
+        string TypedTail, string? Preedit, int Caret, bool Sync) _lastImeInputs;
+    private bool _imeRefreshPending = true;
     private string _typedTail = "";   // fallback for hidden-cursor TUIs without a bordered prompt
     private int _imeAnchorCol, _imeAnchorRow;
     private bool _imeAnchorValid;     // _imeAnchorCol/Row resolved against the latest frame
@@ -64,6 +69,8 @@ public partial class TerminalView : Control
     // Mouse selection — absolute buffer lines (scrollback indexes stay stable).
     private (int line, int col)? _selAnchor, _selEnd;
     private bool _selecting;
+    /// <summary>Double- or triple-click kept a selection whose inclusive ends may be the same cell.</summary>
+    private bool _wordSelection;
     private Point _lastPointer;
     private int _applicationMouseButton = -1;
     private (int column, int row)? _lastMouseCell;
@@ -110,31 +117,41 @@ public partial class TerminalView : Control
         // arrives via TextInput and inline preedit is drawn at the cursor cell.
         _imeClient = new TerminalImeClient(this);
         _blink = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
-        _blink.Tick += (_, _) =>
-        {
-            if (!IsEffectivelyVisible) return;
-            var buf0 = _emulator?.Buffer;
+        _blink.Tick += OnRefreshTick;
+    }
+
+    private void OnRefreshTick(object? sender, EventArgs e)
+    {
+        if (!IsEffectivelyVisible) return;
+        var buf = _emulator?.Buffer;
+        var dirty = Interlocked.Exchange(ref _dirty, 0) != 0;
+        var drift = Interlocked.Exchange(ref _scrollDrift, 0);
+        // Idle ticks do not need the buffer lock. Render and immediate selection
+        // queries still synchronize from the current frame before using coordinates.
+        if (dirty || drift != 0 || buf?.LayoutVersion != _seenLayoutVersion
+            || buf?.RemovedLineCount != _seenRemovedLines)
             SynchronizeCoordinates();
-            var drift = Interlocked.Exchange(ref _scrollDrift, 0);
-            if (drift != 0 && buf0 is not null)
+        if (drift != 0 && buf is not null)
+        {
+            _viewOffset = _viewOffset > 0
+                ? Math.Clamp(_viewOffset + drift, 0, buf.ScrollbackCount)
+                : 0;
+            SetScrolledUp(_viewOffset > 0);
+            dirty = true;
+        }
+        var blink = !IsPreview && IsFocused
+            && Environment.TickCount64 - _lastBlink >= 530;
+        if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
+        if (_selecting) DragScrollStep();
+        var sync = buf?.SynchronizedOutput == true;
+        if (!IsPreview && IsFocused)
+        {
+            var inputs = (buf, buf?.Version ?? -1, _viewOffset, _cellW, _cellH,
+                _typedTail, _preedit, _preeditCaret, sync);
+            if (_imeRefreshPending || sync || inputs != _lastImeInputs)
             {
-                // New output appends scrollback lines; while the user reads
-                // history, shift the offset so the viewport stays on the same
-                // content instead of being dragged toward the bottom.
-                _viewOffset = _viewOffset > 0
-                    ? Math.Clamp(_viewOffset + drift, 0, buf0.ScrollbackCount)
-                    : 0;
-                SetScrolledUp(_viewOffset > 0);
-                Interlocked.Exchange(ref _dirty, 1);
-            }
-            // Blink only repaints the focused view — the cursor and carets are
-            // drawn for IsFocused (or previews, which don't blink) anyway, so
-            // ticking unfocused panes was a wasted InvalidateVisual every 530ms.
-            var blink = !IsPreview && IsFocused
-                && Environment.TickCount64 - _lastBlink >= 530;
-            if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
-            if (!IsPreview && IsFocused)
-            {
+                _imeRefreshPending = false;
+                _lastImeInputs = inputs;
                 var imeRect = _imeClient.CursorRectangle;
                 if (imeRect != _lastImeRect)
                 {
@@ -142,10 +159,8 @@ public partial class TerminalView : Control
                     _imeClient.NotifyCursorRectangleChanged();
                 }
             }
-            if (_selecting) DragScrollStep();
-            if (Interlocked.Exchange(ref _dirty, 0) != 0 || blink || _emulator?.Buffer.SynchronizedOutput == true)
-                InvalidateVisual();
-        };
+        }
+        if (dirty || blink || sync) InvalidateVisual();
     }
 
     static TerminalView()
@@ -189,6 +204,7 @@ public partial class TerminalView : Control
         _preeditCaret = 0;
         _imeAnchorValid = false;
         _selAnchor = _selEnd = null;
+        _wordSelection = false;
         _hits = null;
         _hitLine = -1;
         if (next is not null && _attached) next.Changed += OnBufferChanged;
@@ -222,6 +238,7 @@ public partial class TerminalView : Control
                 // or a primary/alternate screen switch. Never copy stale cells.
                 _seenLayoutVersion = buf.LayoutVersion;
                 _selAnchor = _selEnd = null;
+                _wordSelection = false;
                 _hitLine = -1;
                 _hits = null;
                 ResetScroll();
@@ -233,7 +250,10 @@ public partial class TerminalView : Control
                 // If either endpoint was discarded, the complete selection is
                 // gone. Clear it rather than silently copying replacement lines.
                 if (a.line < removed || e.line < removed)
+                {
                     _selAnchor = _selEnd = null;
+                    _wordSelection = false;
+                }
                 else
                 {
                     _selAnchor = (a.line - (int)removed, a.col);
@@ -330,7 +350,7 @@ public partial class TerminalView : Control
         }
 
         var bg = TerminalPalette.Resolve(TerminalColor.Default, false);
-        ctx.DrawRectangle(new SolidColorBrush(bg), null, new Rect(Bounds.Size));
+        ctx.DrawRectangle(Brush(bg), null, new Rect(Bounds.Size));
 
         // Preview mirrors the live terminal grid without resizing it. The frame
         // is cropped to the used cell window (all four sides) so a shell that
@@ -377,11 +397,11 @@ public partial class TerminalView : Control
             RenderRow(ctx, b.Cells, r, b.Columns);
 
         // Mouse selection — translucent overlay on top of the glyphs.
-        if (!IsPreview && _selAnchor is { } sa && _selEnd is { } se && sa != se)
+        if (!IsPreview && _selAnchor is { } sa && _selEnd is { } se && (sa != se || _wordSelection))
         {
             var (sl, sc0) = sa.CompareTo(se) <= 0 ? sa : se;
             var (el, ec1) = sa.CompareTo(se) <= 0 ? se : sa;
-            var selBrush = new SolidColorBrush(TerminalPalette.SelectionColor);
+            var selBrush = Brush(TerminalPalette.SelectionColor);
             for (var v = row0; v < row0 + rows; v++)
             {
                 var abs = b.BaseLine + v;
@@ -400,8 +420,8 @@ public partial class TerminalView : Control
         // Search matches — flat highlight per hit, current match stronger.
         if (!IsPreview && SearchQuery is { Length: > 0 } query)
         {
-            var matchBrush = new SolidColorBrush(TerminalPalette.MatchColor);
-            var currentBrush = new SolidColorBrush(TerminalPalette.MatchCurrentColor);
+            var matchBrush = Brush(TerminalPalette.MatchColor);
+            var currentBrush = Brush(TerminalPalette.MatchCurrentColor);
             for (var v = row0; v < row0 + rows; v++)
             {
                 var span = b.Cells.AsSpan(v * b.Columns, b.Columns);
@@ -414,7 +434,7 @@ public partial class TerminalView : Control
                     if (hit < 0) break;
                     var c0 = hitCols[hit];
                     var cEnd = hitCols[hit + query.Length - 1];
-                    var cw = cEnd + (span[cEnd].IsWide ? 2 : 1);
+                    var cw = cEnd + GlyphColumns(span, cEnd);
                     var isCurrent = _hitLine == absLine && _hitCol == c0;
                     ctx.DrawRectangle(isCurrent ? currentBrush : matchBrush, null,
                         new Rect(c0 * _cellW, v * _cellH, (cw - c0) * _cellW, _cellH));
@@ -431,14 +451,15 @@ public partial class TerminalView : Control
         {
             var cx = b.CursorX * _cellW;
             var cy = b.CursorY * _cellH;
+            var cursorIndex = b.CursorY * b.Columns + b.CursorX;
             ctx.DrawRectangle(
-                new SolidColorBrush(TerminalPalette.CursorColor),
-                null, new Rect(cx, cy, _cellW * (b.Cells[b.CursorY * b.Columns + b.CursorX].IsWide ? 2 : 1), _cellH));
+                Brush(TerminalPalette.CursorColor),
+                null, new Rect(cx, cy, _cellW * GlyphColumns(b.Cells, b.Columns, cursorIndex), _cellH));
             // repaint glyph under cursor in dark
             var cell = b.Cells[b.CursorY * b.Columns + b.CursorX];
             if (cell.Char is not (' ' or '\0'))
                 DrawRun(ctx, cell.Text, b.CursorX, b.CursorY,
-                    new SolidColorBrush(bg), CellAttrs.None, bg);
+                    Brush(bg), CellAttrs.None, bg);
         }
 
         // Use the same anchor resolver for the inline composition and the OS
@@ -465,7 +486,7 @@ public partial class TerminalView : Control
             var ax = _imeAnchorCol * _cellW;
             var ay = _imeAnchorRow * _cellH;
             var cc = TerminalPalette.CursorColor;
-            ctx.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B)), 2),
+            ctx.DrawLine(new Pen(Brush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B)), 2),
                 new Point(ax + 1, ay + 2), new Point(ax + 1, ay + _cellH - 3));
         }
 
@@ -475,8 +496,8 @@ public partial class TerminalView : Control
             && anchorRow >= row0 && anchorRow < row0 + rows)
         {
             var cc = TerminalPalette.CursorColor;
-            var accent = new SolidColorBrush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B));
-            var accentFill = new SolidColorBrush(Color.FromArgb(40, cc.R, cc.G, cc.B));
+            var accent = Brush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B));
+            var accentFill = Brush(Color.FromArgb(40, cc.R, cc.G, cc.B));
             var startCol = PreeditStartCol(anchorCol, preedit, b.Columns);
             var px = startCol * _cellW;
             var py = anchorRow * _cellH;
@@ -484,7 +505,7 @@ public partial class TerminalView : Control
             ctx.DrawRectangle(accentFill, null, new Rect(px, py, pw, _cellH));
             var fgC = TerminalPalette.Resolve(TerminalColor.Default, true);
             DrawRun(ctx, preedit, startCol, anchorRow,
-                new SolidColorBrush(fgC), CellAttrs.None, fgC);
+                Brush(fgC), CellAttrs.None, fgC);
             ctx.DrawLine(new Pen(accent, 1),
                 new Point(px, py + _cellH - 1.5), new Point(px + pw, py + _cellH - 1.5));
             if (_cursorOn)
@@ -606,8 +627,19 @@ public partial class TerminalView : Control
         var cells = f.Cells.AsSpan(r * f.Columns, f.Columns);
         for (var i = f.Columns - 1; i >= 0; i--)
             if (cells[i].Char is not (' ' or '\0'))
-                return i + (cells[i].IsWide ? 2 : 1);
+                return Math.Min(f.Columns, i + GlyphColumns(cells, i));
         return 0;
+    }
+
+    /// <summary>Painted columns of a cell. IsWide counts as two only when the next cell in the same row is its continuation.</summary>
+    private static int GlyphColumns(ReadOnlySpan<TerminalCell> row, int col)
+        => col >= 0 && col + 1 < row.Length && row[col].IsWide && row[col + 1].IsWideContinuation ? 2 : 1;
+
+    private static int GlyphColumns(TerminalCell[] cells, int columns, int index)
+    {
+        if ((uint)index >= (uint)cells.Length || columns <= 0) return 1;
+        var col = index % columns;
+        return GlyphColumns(cells.AsSpan(index - col, columns), col);
     }
 
     /// <summary>Cell width of the first <paramref name="len"/> chars of a preedit
@@ -658,7 +690,9 @@ public partial class TerminalView : Control
                 curFg = cell.Fg; curBg = cell.Bg; curAttrs = cell.Attrs;
                 started = true;
             }
-            runLen += cell.IsWide ? 2 : 1;
+            var span = GlyphColumns(cells.AsSpan(rowBase, cols), c);
+            if (c + span > cols) span = 1;
+            runLen += span;
         }
         if (started && runLen > 0)
             Flush(ctx, runStart, runLen, row, curFg, curBg, curAttrs);
@@ -675,14 +709,15 @@ public partial class TerminalView : Control
             if (inverse) (fgC, bgC) = (bgC, fgC);
             var rect = new Rect(startCol * _cellW, row2 * _cellH, cellCount * _cellW, _cellH);
             if (inverse || !bg.IsDefault)
-                c2.DrawRectangle(new SolidColorBrush(bgC), null, rect);
+                c2.DrawRectangle(Brush(bgC), null, rect);
 
             if (attrs.HasFlag(CellAttrs.Dim))
                 fgC = Color.FromArgb((byte)(fgC.A * 0.6), fgC.R, fgC.G, fgC.B);
+            var painted = Math.Min(cellCount, Math.Max(0, cols - startCol));
             if (!attrs.HasFlag(CellAttrs.Hidden))
-                DrawCells(c2, cells, rowBase + startCol, startCol, cellCount, row2, fgC, attrs);
+                DrawCells(c2, cells, rowBase + startCol, startCol, painted, row2, cols, fgC, attrs);
             else if (attrs.HasFlag(CellAttrs.Underline) || attrs.HasFlag(CellAttrs.Strike))
-                DrawTextDecorations(c2, startCol, cellCount, row2, new SolidColorBrush(fgC), attrs);
+                DrawTextDecorations(c2, startCol, painted, row2, Brush(fgC), attrs);
         }
     }
 
@@ -692,15 +727,16 @@ public partial class TerminalView : Control
     /// fallback fonts can never drift away from the cell grid.
     /// </summary>
     private void DrawCells(DrawingContext ctx, TerminalCell[] cells, int baseIndex,
-        int startCol, int cellCount, int row, Color fg, CellAttrs attrs)
+        int startCol, int cellCount, int row, int columns, Color fg, CellAttrs attrs)
     {
         var bold = attrs.HasFlag(CellAttrs.Bold);
-        var brush = new SolidColorBrush(fg);
+        var brush = Brush(fg);
         var sb = _runText;
         sb.Clear();
         var asciiCol = -1;
         var drawCol = startCol;
-        var end = baseIndex + cellCount;
+        var rowEnd = baseIndex - startCol + columns;
+        var end = Math.Min(baseIndex + cellCount, Math.Min(rowEnd, cells.Length));
 
         void FlushAscii()
         {
@@ -726,7 +762,7 @@ public partial class TerminalView : Control
                 var ft = Layout(cell.Text, bold, fg);
                 ctx.DrawText(ft, new Point(drawCol * _cellW, row * _cellH + (_cellH - ft.Height) / 2));
             }
-            drawCol += cell.IsWide ? 2 : 1;
+            drawCol += GlyphColumns(cells, columns, i);
         }
         FlushAscii();
 
@@ -747,6 +783,18 @@ public partial class TerminalView : Control
                 new Point(col * _cellW + w, row * _cellH + _cellH / 2));
     }
 
+    /// <summary>Reuse immutable brushes for common terminal colors.</summary>
+    private IBrush Brush(Color color)
+    {
+        if (_brushCache.TryGetValue(color, out var brush)) return brush;
+        // RGB output can introduce unlimited distinct colors. Reuse common
+        // colors, but do not turn this allocation fix into another growing cache.
+        if (_brushCache.Count == 128) _brushCache.Clear();
+        brush = new ImmutableSolidColorBrush(color);
+        _brushCache[color] = brush;
+        return brush;
+    }
+
     /// <summary>Text layout cache — same string+style+color reuses one FormattedText.</summary>
     private FormattedText Layout(string text, bool bold, Color fg)
     {
@@ -754,7 +802,7 @@ public partial class TerminalView : Control
         if (_textCache.TryGetValue(key, out var ft)) return ft;
         if (_textCache.Count > 4096) _textCache.Clear();
         ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            bold ? _boldTypeface : _typeface, TerminalFontSize, new SolidColorBrush(fg));
+            bold ? _boldTypeface : _typeface, TerminalFontSize, Brush(fg));
         _textCache[key] = ft;
         return ft;
     }
@@ -835,6 +883,7 @@ public partial class TerminalView : Control
     protected override void OnGotFocus(GotFocusEventArgs e)
     {
         base.OnGotFocus(e);
+        _imeRefreshPending = true;
         if (!IsPreview) _emulator?.SendFocus(true);
     }
 
@@ -1147,6 +1196,7 @@ public partial class TerminalView : Control
             if (button < 0) return;
             ResetScroll();
             _selAnchor = _selEnd = null;
+            _wordSelection = false;
             _applicationMouseButton = button;
             _applicationPointer = e.Pointer;
             e.Pointer.Capture(this);
@@ -1170,9 +1220,15 @@ public partial class TerminalView : Control
         {
             if (e.ClickCount >= 3)
             {
-                // triple click: whole line (soft-wrap continuation included via copy)
-                _selAnchor = (line, 0);
-                _selEnd = (line, buf.Columns - 1);
+                // Triple click selects the logical line, including soft-wrap continuations.
+                var start = line;
+                var end = line;
+                var last = buf.TotalLines - 1;
+                while (start > 0 && buf.IsLineWrapped(start - 1)) start--;
+                while (end < last && buf.IsLineWrapped(end)) end++;
+                _selAnchor = (start, 0);
+                _selEnd = (end, Math.Max(0, buf.Columns - 1));
+                _wordSelection = true;
                 _selecting = true;
             }
             else if (e.ClickCount == 2)
@@ -1190,15 +1246,17 @@ public partial class TerminalView : Control
                     var lastCell = cols[hi - 1];
                     _selAnchor = (line, cols[lo]);
                     _selEnd = (line, lastCell + (row[lastCell].IsWide ? 2 : 1) - 1);
+                    _wordSelection = true;
                     _selecting = true;
                 }
-                else { _selAnchor = _selEnd = null; }
+                else { _selAnchor = _selEnd = null; _wordSelection = false; }
             }
             else
             {
                 var cell = SnapToCluster((line, col));
                 _selAnchor = cell;
                 _selEnd = cell;
+                _wordSelection = false;
                 _selecting = true;
             }
         }
@@ -1287,7 +1345,8 @@ public partial class TerminalView : Control
                 return;
             _selecting = false;
             _selectionPointer = null;
-            if (_selAnchor == _selEnd) { _selAnchor = _selEnd = null; InvalidateVisual(); }
+            // A one-cell word has equal inclusive ends. A plain click does not.
+            if (_selAnchor == _selEnd && !_wordSelection) { _selAnchor = _selEnd = null; InvalidateVisual(); }
             e.Pointer.Capture(null);
         }
     }
@@ -1334,7 +1393,7 @@ public partial class TerminalView : Control
         lock (buf.SyncRoot)
         {
             SynchronizeCoordinates();
-            if (_selAnchor is not { } a || _selEnd is not { } e2 || a == e2) return null;
+            if (_selAnchor is not { } a || _selEnd is not { } e2 || (a == e2 && !_wordSelection)) return null;
             var (sl, sc) = a.CompareTo(e2) <= 0 ? a : e2;
             var (el, ec) = a.CompareTo(e2) <= 0 ? e2 : a;
             el = Math.Min(el, buf.TotalLines - 1);

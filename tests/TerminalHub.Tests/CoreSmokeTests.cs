@@ -49,6 +49,33 @@ public class CoreSmokeTests
             Assert.Equal(15, loaded.FontSize);
             Assert.Equal("TestWS", loaded.WorkspaceName);
             Assert.Equal(ShellKind.Bash, loaded.Shell);
+            Assert.False(store.LoadFailed);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void SettingsStore_LoadFailure_DoesNotOverwriteTheFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"th-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, "{ this is not json");
+            var original = File.ReadAllText(path);
+            var store = new SettingsStore(path);
+            var loaded = store.Load();
+            Assert.True(store.LoadFailed);
+            Assert.Equal(13, loaded.FontSize);
+            store.Save(new AppSettings { FontSize = 99, WorkspaceName = "replaced" });
+            Assert.Equal(original, File.ReadAllText(path));
+
+            var missing = Path.Combine(Path.GetTempPath(), $"th-settings-{Guid.NewGuid():N}.json");
+            var fresh = new SettingsStore(missing);
+            Assert.Equal(13, fresh.Load().FontSize);
+            Assert.False(fresh.LoadFailed);
+            fresh.Save(new AppSettings { WorkspaceName = "first" });
+            Assert.Equal("first", fresh.Load().WorkspaceName);
+            File.Delete(missing);
         }
         finally { File.Delete(path); }
     }

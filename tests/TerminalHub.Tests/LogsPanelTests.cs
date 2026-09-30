@@ -877,6 +877,14 @@ public class LogsPanelTests
             Assert.Contains("disk-write-check", content);
             Assert.Contains("(Terminal 01)", content);
             Assert.False(file.IsEnabled);
+
+            file = new SessionLogFile();
+            path = file.Enable(dir);
+            file.Write("Terminal 01", "info", "中文");
+            var counted = (long)typeof(SessionLogFile).GetField("_writtenBytes",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(file)!;
+            Assert.Equal(new FileInfo(path).Length, counted);
+            file.Disable();
         }
         finally
         {

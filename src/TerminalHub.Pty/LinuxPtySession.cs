@@ -8,9 +8,10 @@ namespace TerminalHub.Pty;
 
 /// <summary>
 /// Real PTY on Linux/macOS via libc forkpty().
-/// All native allocations happen in the parent before fork; the child only calls
-/// pre-warmed libc functions (chdir / execve / kill) so no managed locks are needed
-/// between fork and exec.
+/// All native allocations happen in the parent before fork. After forkpty the
+/// child calls warmed chdir/execve stubs and a pre-resolved _exit address. SafeFileHandle is
+/// constructed in the parent, after the pid==0 branch, so the child does not
+/// allocate managed objects or enter the parent's catch.
 /// </summary>
 public sealed class LinuxPtySession : IPtySession
 {
@@ -35,10 +36,13 @@ public sealed class LinuxPtySession : IPtySession
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
     public event Action<IPtySession, int>? Exited;
 
-    public Task StartAsync(PtyOptions options, CancellationToken cancellationToken = default)
+    public unsafe Task StartAsync(PtyOptions options, CancellationToken cancellationToken = default)
     {
         var parts = SplitCommandLine(options.Shell + " " + options.Arguments);
         if (parts.Length == 0) throw new ArgumentException("Empty shell command");
+        // Calling _exit to warm its P/Invoke stub would terminate the parent.
+        // Resolve it before fork and use a direct unmanaged call in the child.
+        var exit = (delegate* unmanaged[Cdecl]<int, void>)WarmChildPath();
 
         var exeBytes = ToNativeString(ResolveExecutable(parts[0]));
         var cwdBytes = string.IsNullOrEmpty(options.WorkingDirectory)
@@ -47,34 +51,47 @@ public sealed class LinuxPtySession : IPtySession
         _argvBlock = BuildPointerBlock(parts);
         _envpBlock = BuildEnvironmentBlock(options);
 
-        // Warm every stub the child might invoke so no stub code is JIT-built post-fork.
-        WarmChildPath();
-
         var win = new Winsize { ws_row = (ushort)options.Rows, ws_col = (ushort)options.Columns };
         int pid;
+        int masterFd;
         try
         {
-            pid = Native.forkpty(out var masterFd, IntPtr.Zero, IntPtr.Zero, ref win);
-            if (pid < 0)
-                throw new InvalidOperationException($"forkpty failed: errno={Marshal.GetLastWin32Error()}");
-            _master = new SafeFileHandle(masterFd, ownsHandle: true);
+            pid = Native.forkpty(out masterFd, IntPtr.Zero, IntPtr.Zero, ref win);
         }
         catch
         {
             FreeNativeAllocations(); // argv/envp blocks — no child will inherit them
             throw;
         }
-
+        if (pid < 0)
+        {
+            FreeNativeAllocations();
+            throw new InvalidOperationException($"forkpty failed: errno={Marshal.GetLastWin32Error()}");
+        }
         if (pid == 0)
         {
-            // CHILD — only pre-warmed libc calls, nothing that allocates managed objects.
-            if (cwdBytes is not null)
-                Native.chdir(cwdBytes);
+            // CHILD — only pre-warmed libc calls. No managed allocation, and this
+            // branch must not fall into the parent's catch.
+            if (cwdBytes is not null && Native.chdir(cwdBytes) != 0)
+                exit(127);
             Native.execve(exeBytes, _argvBlock, _envpBlock);
             // exec failed: exit with 127 (the shell convention for a command we
             // could not run). Killing ourselves instead would surface as a
             // signal death and the parent would report a meaningless -1.
-            Native._exit(127);
+            exit(127);
+        }
+        try
+        {
+            _master = new SafeFileHandle(masterFd, ownsHandle: true);
+        }
+        catch
+        {
+            try { Native.kill(pid, Native.SIGKILL); } catch { /* child already gone */ }
+            var status = 0;
+            try { Native.waitpid(pid, ref status, 0); } catch { /* already reaped */ }
+            try { Native.close(masterFd); } catch { /* fd already closed */ }
+            FreeNativeAllocations();
+            throw;
         }
 
         _childPid = pid;
@@ -122,14 +139,15 @@ public sealed class LinuxPtySession : IPtySession
         _argvBlock = _envpBlock = IntPtr.Zero;
     }
 
-    private static void WarmChildPath()
+    private static IntPtr WarmChildPath()
     {
         Native.getpid();
-        var dot = new byte[] { (byte)'.', 0 };
-        Native.chdir(dot);
-        var bad = new byte[] { (byte)'/', (byte)'x', 0 };
-        Native.execve(bad, IntPtr.Zero, IntPtr.Zero);
-        Native.kill(0, 0);
+        // An empty path always fails, without changing the parent's cwd or
+        // accidentally executing a real /x file while warming the stub.
+        var empty = new byte[] { 0 };
+        Native.chdir(empty);
+        Native.execve(empty, IntPtr.Zero, IntPtr.Zero);
+        return Native.ExitAddress;
     }
 
     private static byte[] ToNativeString(string s) => Encoding.UTF8.GetBytes(s + '\0');
@@ -201,10 +219,18 @@ public sealed class LinuxPtySession : IPtySession
                 // After POLLHUP, read() still returns the kernel-buffered tail
                 // before reporting EIO/EOF — so the child's final output survives
                 // its exit (the old IsRunning gate dropped it).
-                if (n <= 0) break;
+                if (n < 0)
+                {
+                    if (Marshal.GetLastWin32Error() == Native.EINTR) continue;
+                    break;
+                }
+                if (n == 0) break; // EOF
                 var chunk = new byte[n];
                 Array.Copy(buffer, chunk, n);
-                OutputReceived?.Invoke(this, chunk);
+                // A subscriber exception must not fault this task. It does not
+                // continue later subscribers of the same Invoke.
+                try { OutputReceived?.Invoke(this, chunk); }
+                catch (Exception ex) { Debug.WriteLine($"PTY output subscriber failed: {ex.Message}"); }
             }
         }
         catch (ObjectDisposedException) { /* master fd closed beneath us */ }
@@ -350,6 +376,9 @@ public sealed class LinuxPtySession : IPtySession
 
     private static class Native
     {
+        // libc stays loaded for the session API's lifetime, like its DllImports.
+        public static readonly IntPtr ExitAddress = NativeLibrary.GetExport(
+            NativeLibrary.Load("libc", typeof(LinuxPtySession).Assembly, null), "_exit");
         public const int WNOHANG = 1;
         public const int SIGHUP = 1;
         public const int SIGKILL = 9;
@@ -362,7 +391,7 @@ public sealed class LinuxPtySession : IPtySession
         [DllImport("libc", SetLastError = true)]
         public static extern int forkpty(out int amaster, IntPtr name, IntPtr termp, ref Winsize winp);
 
-        [DllImport("libc")] public static extern int read(int fd, byte[] buf, int count);
+        [DllImport("libc", SetLastError = true)] public static extern int read(int fd, byte[] buf, int count);
         [DllImport("libc", SetLastError = true)] public static extern int write(int fd, ref byte buf, int count);
         [DllImport("libc", SetLastError = true)] public static extern int poll(ref PollFd fds, nint nfds, int timeoutMs);
         [DllImport("libc")] public static extern int ioctl(int fd, uint request, ref Winsize winp);
@@ -371,8 +400,8 @@ public sealed class LinuxPtySession : IPtySession
         [DllImport("libc")] public static extern int getpid();
         [DllImport("libc")] public static extern int waitpid(int pid, ref int status, int options);
         [DllImport("libc")] public static extern int chdir(byte[] path);
+        [DllImport("libc")] public static extern int close(int fd);
         [DllImport("libc")] public static extern int execve(byte[] path, IntPtr argv, IntPtr envp);
-        [DllImport("libc")] public static extern void _exit(int status);
 
         public static bool WIFEXITED(int status) => (status & 0x7f) == 0;
         public static int WEXITSTATUS(int status) => (status >> 8) & 0xff;

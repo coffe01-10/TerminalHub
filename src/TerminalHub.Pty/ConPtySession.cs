@@ -174,20 +174,29 @@ public sealed class ConPtySession : IPtySession
         // CreatePipe handles are synchronous-only: an async FileStream over them
         // throws in the ctor. Blocking ReadFile is what ConPTY expects anyway.
         var buffer = new byte[64 * 1024];
-        try
+        while (!ct.IsCancellationRequested)
         {
-            while (!ct.IsCancellationRequested)
+            int n;
+            try
             {
                 if (_ptyOut is null
-                    || !Native.ReadFile(_ptyOut, buffer, buffer.Length, out var n, IntPtr.Zero)
+                    || !Native.ReadFile(_ptyOut, buffer, buffer.Length, out n, IntPtr.Zero)
                     || n == 0)
                     break;
-                var chunk = new byte[n];
-                Array.Copy(buffer, chunk, n);
-                OutputReceived?.Invoke(this, chunk);
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ConPTY ReadLoop ended: {ex.Message}");
+                break;
+            }
+            var chunk = new byte[n];
+            Array.Copy(buffer, chunk, n);
+            // One subscriber failure must not end the read while the child is
+            // still alive. This does not resume later subscribers of the same
+            // Invoke, and it does not repair a parser exception on the next chunk.
+            try { OutputReceived?.Invoke(this, chunk); }
+            catch (Exception ex) { Debug.WriteLine($"ConPTY output subscriber failed: {ex.Message}"); }
         }
-        catch (Exception ex) { Debug.WriteLine($"ConPTY ReadLoop ended: {ex.Message}"); }
     }
 
     public void Write(ReadOnlySpan<byte> data)
@@ -259,8 +268,9 @@ public sealed class ConPtySession : IPtySession
         }
         _ptyIn?.Dispose();
         _ptyOut?.Dispose();
-        // The closed pseudo console broke the blocked ReadFile; wait briefly so
-        // the reader never touches a disposed handle.
+        // ReadFile/WriteFile take SafeFileHandle, so an in-flight call keeps the
+        // handle alive and a later call throws ObjectDisposedException, which the
+        // read loop catches. The wait only lets that loop notice the closed console.
         try { _readTask?.Wait(300); } catch { }
     }
 

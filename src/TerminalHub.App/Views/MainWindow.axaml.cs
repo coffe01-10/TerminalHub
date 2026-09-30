@@ -549,7 +549,8 @@ public partial class MainWindow : Window
         // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
         if (e.Key == Key.F2 && e.KeyModifiers == KeyModifiers.None
             && e.Source is not (TextBox or TerminalView)) { OnRenameActive(sender, e); return; }
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
+        // AltGr arrives as Ctrl+Alt. Those keys belong to the character, not font zoom.
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Alt)) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         // Font zoom lives on Ctrl+non-letter keys — the bare Ctrl+A..Z control
         // bytes below keep flowing to the shell untouched.

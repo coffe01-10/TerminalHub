@@ -25,16 +25,42 @@ public static partial class TerminalContentLinks
         foreach (Match match in PathPattern().Matches(text))
         {
             if (index < match.Index || index >= match.Index + match.Length) continue;
-            var path = match.Groups["path"].Value.Trim();
-            try
+            if (TryResolve(match, cwd, out var link)) return link;
+            // A missing path may contain spaces and swallow a later real file.
+            // Keep looking at shorter candidates inside that span that cover the click.
+            var regionEnd = match.Index + match.Length;
+            for (var start = match.Index; start < regionEnd; start++)
             {
-                path = Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(path, cwd);
-                if (!File.Exists(path) && !Directory.Exists(path)) return null;
-                return new(path, false, Number("line"), Number("column"));
+                if (!CanStartPath(text[start])) continue;
+                var sub = PathPattern().Match(text, start);
+                if (!sub.Success || sub.Index != start) continue;
+                if (sub.Index == match.Index && sub.Length == match.Length) continue;
+                if (sub.Index + sub.Length > regionEnd) continue;
+                if (index < sub.Index || index >= sub.Index + sub.Length) continue;
+                if (TryResolve(sub, cwd, out var inner)) return inner;
             }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException) { return null; }
-            int? Number(string group) => int.TryParse(match.Groups[group].Value, out var value) && value > 0 ? value : null;
         }
         return null;
+    }
+
+    private static bool CanStartPath(char c)
+        => char.IsLetterOrDigit(c) || c is '.' or '/' or '\\';
+
+    private static bool TryResolve(Match match, string cwd, out TerminalContentLink? link)
+    {
+        link = null;
+        var path = match.Groups["path"].Value.Trim();
+        try
+        {
+            path = Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(path, cwd);
+            if (!File.Exists(path) && !Directory.Exists(path)) return false;
+            link = new(path, false, Number("line"), Number("column"));
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException)
+        {
+            return false;
+        }
+        int? Number(string group) => int.TryParse(match.Groups[group].Value, out var value) && value > 0 ? value : null;
     }
 }

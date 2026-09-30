@@ -13,6 +13,8 @@ public sealed class SessionLogFile : IDisposable
 {
     /// <summary>Rotate to a fresh file after writing this many bytes.</summary>
     public const long MaxFileBytes = 16 * 1024 * 1024;
+    /// <summary>Keep the latest 32 logs; older files still in use survive until closed.</summary>
+    public const int RetainedFileCount = 32;
 
     private readonly object _gate = new();
     private StreamWriter? _writer;
@@ -21,6 +23,7 @@ public sealed class SessionLogFile : IDisposable
 
     public bool IsEnabled => _writer is not null;
     public string? CurrentPath { get; private set; }
+    public event Action<string>? Failed;
 
     /// <summary>`<config>/terminalhub/logs`.</summary>
     public static string DefaultDir()
@@ -33,8 +36,12 @@ public sealed class SessionLogFile : IDisposable
         {
             CloseLocked();
             _dir = dir ?? DefaultDir();
-            var path = OpenNewLocked(_dir);
-            return path;
+            try { return OpenNewLocked(_dir); }
+            catch
+            {
+                CloseLocked();
+                throw;
+            }
         }
     }
 
@@ -42,26 +49,41 @@ public sealed class SessionLogFile : IDisposable
     /// threads write concurrently — guard the non-thread-safe StreamWriter.</summary>
     public void Write(string source, string level, string message)
     {
+        string? failure = null;
         lock (_gate)
         {
             if (_writer is null) return;
-            var line = $"{DateTime.Now:HH:mm:ss.fff} [{level}] ({source}) {message}";
-            _writer.WriteLine(line);
-            _writtenBytes += line.Length + Environment.NewLine.Length;
-            if (_writtenBytes >= MaxFileBytes)
+            try
             {
-                // Rotate: close and open the next timestamped file. Inline (not
-                // via Enable) — Enable takes the same lock.
+                var line = $"{DateTime.Now:HH:mm:ss.fff} [{level}] ({source}) {message}";
+                _writer.WriteLine(line);
+                CountBytes(line);
+                if (_writtenBytes >= MaxFileBytes)
+                {
+                    // Rotate: close and open the next timestamped file. Inline (not
+                    // via Enable) — Enable takes the same lock.
+                    CloseLocked();
+                    OpenNewLocked(_dir ?? DefaultDir());
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
+            {
+                // A full disk or a locked log must not escape into the PTY read callback.
                 CloseLocked();
-                OpenNewLocked(_dir ?? DefaultDir());
+                failure = ex.Message;
             }
         }
+        if (failure is not null) Failed?.Invoke(failure);
     }
 
     /// <summary>Close the current log file.</summary>
     public void Disable()
     {
-        lock (_gate) CloseLocked();
+        lock (_gate)
+        {
+            CloseLocked();
+            PruneLogsLocked();
+        }
     }
 
     public void Dispose() => Disable();
@@ -69,10 +91,15 @@ public sealed class SessionLogFile : IDisposable
     // Both called with _gate held.
     private void CloseLocked()
     {
-        _writer?.Dispose();
+        var writer = _writer;
         _writer = null;
         CurrentPath = null;
         _writtenBytes = 0;
+        try { writer?.Dispose(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
+        {
+            System.Diagnostics.Debug.WriteLine($"Closing session log failed: {ex.Message}");
+        }
     }
 
     private string OpenNewLocked(string dir)
@@ -87,8 +114,61 @@ public sealed class SessionLogFile : IDisposable
         _writer = new StreamWriter(
             new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
         { AutoFlush = true };
-        _writer.WriteLine($"# Terminal Hub session log — started {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        var header = $"# Terminal Hub session log — started {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+        _writer.WriteLine(header);
+        _writtenBytes = _writer.Encoding.GetPreamble().Length;
+        CountBytes(header);
         CurrentPath = path;
+        PruneLogsLocked();
         return path;
+    }
+
+    // DeleteOnClose with exclusive sharing refuses an active writer on Windows
+    // and takes an exclusive advisory flock on local Unix files. Only our own
+    // timestamped logs are candidates; exports and other files are untouched.
+    private void PruneLogsLocked()
+    {
+        if (_dir is null) return;
+        try
+        {
+            var oldFiles = new DirectoryInfo(_dir).GetFiles("terminalhub-*.log")
+                .Where(f => IsSessionLogName(f.Name))
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .ThenByDescending(f => f.Name, StringComparer.Ordinal)
+                .Skip(RetainedFileCount);
+            foreach (var file in oldFiles)
+            {
+                try
+                {
+                    using var closedLog = new FileStream(file.FullName, FileMode.Open,
+                        FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Retaining session log {file.Name}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine($"Listing session logs failed: {ex.Message}");
+        }
+    }
+
+    private static bool IsSessionLogName(string name)
+    {
+        var stem = Path.GetFileNameWithoutExtension(name);
+        if (stem.Length < 31 || !DateTime.TryParseExact(stem.AsSpan(12, 19),
+            "yyyyMMdd-HHmmss-fff", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out _)) return false;
+        return stem.Length == 31 || stem[31] == '-' && int.TryParse(stem.AsSpan(32), out var collision) && collision >= 2;
+    }
+
+    // Called with _gate held. Counts UTF-8 bytes, including the newline, not UTF-16 chars.
+    private void CountBytes(string line)
+    {
+        if (_writer is null) return;
+        _writtenBytes += _writer.Encoding.GetByteCount(line);
+        _writtenBytes += _writer.Encoding.GetByteCount(_writer.NewLine);
     }
 }

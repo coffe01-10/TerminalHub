@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using TerminalHub.App.ViewModels;
 using TerminalHub.Core.Ssh;
 using Xunit;
@@ -31,8 +32,56 @@ public class SshPanelTests
         // A host containing spaces must reach ssh as ONE argument instead of
         // being split into a mangled remote command.
         var h = new SshHost { Host = "my host", User = "u" };
-        Assert.Equal("-p 22 \"u@my host\"", h.SshArguments);
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("-p 22 \"u@my host\"", h.SshArguments);
+            Assert.Equal(new[] { "ssh", "-p", "22", "u@my host" }, SplitWindows(h.CommandLine));
+        }
+        else
+            Assert.Equal("-p 22 'u@my host'", h.SshArguments);
     }
+
+    [Fact]
+    public void SshHost_EmbeddedQuote_StaysOneArgument()
+    {
+        var h = new SshHost { Host = "a\"b" };
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("-p 22 \"a\\\"b\"", h.SshArguments);
+            Assert.Equal(new[] { "ssh", "-p", "22", "a\"b" }, SplitWindows(h.CommandLine));
+        }
+        else
+            Assert.Equal("-p 22 'a\"b'", h.SshArguments);
+    }
+
+    [Fact]
+    public void SshHost_LeadingDash_IsSeparatedFromOptions()
+    {
+        var h = new SshHost { Host = "-bad" };
+        Assert.Equal("-p 22 -- -bad", h.SshArguments);
+        if (OperatingSystem.IsWindows())
+            Assert.Equal(new[] { "ssh", "-p", "22", "--", "-bad" }, SplitWindows(h.CommandLine));
+    }
+
+    private static string[] SplitWindows(string command)
+    {
+        var ptr = CommandLineToArgvW(command, out var count);
+        Assert.NotEqual(IntPtr.Zero, ptr);
+        try
+        {
+            var args = new string[count];
+            for (var i = 0; i < count; i++)
+                args[i] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(ptr, i * IntPtr.Size))!;
+            return args;
+        }
+        finally { LocalFree(ptr); }
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CommandLineToArgvW(string lpCmdLine, out int pNumArgs);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr hMem);
 
     private static (SshViewModel vm, List<SshHost> store, List<SshHost> connected) MakeVm(bool sshAvailable = true)
     {

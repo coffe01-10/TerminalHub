@@ -246,9 +246,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Files.NotifySessionAvailability();
     }
 
-    /// <summary>Assign a session to a pane, keeping the two panes distinct.</summary>
+    /// <summary>Assign a session to a pane, keeping the two panes distinct.
+    /// One remaining session exits split instead of occupying both panes.</summary>
     private void AssignToPane(int pane, TerminalSessionModel s)
     {
+        if (!IsSplit) return;
         if (pane == 0)
         {
             LeftPane = s;
@@ -259,9 +261,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             RightPane = s;
             if (ReferenceEquals(LeftPane, s))
-                LeftPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, s))
-                           ?? s; // only one session exists — left keeps it
+                LeftPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, s));
         }
+        if (LeftPane is null || RightPane is null || ReferenceEquals(LeftPane, RightPane))
+            ExitSplit();
     }
 
     private readonly SparklineBuffer _statusCpu = new(40);
@@ -1804,11 +1807,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ApplyDisplayedCwd(path, sendCd: true, recordHistory: true);
     }
 
-    private static string QuoteForShell(string path)
+    private string QuoteForShell(string path)
     {
-        if (OperatingSystem.IsWindows())
-            return "\"" + path.Replace("\"", "\"\"") + "\"";
-        return "'" + path.Replace("'", "'\\''") + "'";
+        var shell = ActiveSession?.Shell;
+        if (string.IsNullOrWhiteSpace(shell))
+            shell = OperatingSystem.IsWindows() ? "powershell" : "sh";
+        return ShellPathInput.Format(new[] { path }, shell);
     }
 
     /// <summary>Per-session UTF-8 line decoders feeding the real Output log.
@@ -1904,11 +1908,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     RightPane = PaneFallbackFor(s, LeftPane);
                 if (ReferenceEquals(LeftPane, s))
                     LeftPane = PaneFallbackFor(s, RightPane);
-                if (LeftPane is null && RightPane is null)
-                {
-                    IsSplit = false;
-                    FocusedPane = 0;
-                }
+                // A null side used to stay split; the later active-card sync then
+                // assigned the only remaining session to both panes.
+                if (LeftPane is null || RightPane is null || ReferenceEquals(LeftPane, RightPane))
+                    ExitSplit();
             }
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
             if (vm is not null) SessionCards.Remove(vm);

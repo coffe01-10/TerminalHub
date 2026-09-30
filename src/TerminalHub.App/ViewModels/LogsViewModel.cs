@@ -216,18 +216,21 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     public string LevelWarnChipLabel { get; private set; } = FormatLevelChipLabel("warn", 0);
     public string LevelErrorChipLabel { get; private set; } = FormatLevelChipLabel("error", 0);
 
-    /// <summary>Recount <see cref="_buffer"/> by level and push chip labels / count props.</summary>
+    private void CountLevel(LogEntry entry, int delta)
+    {
+        LevelAllCount += delta;
+        if (string.Equals(entry.Level, "info", StringComparison.OrdinalIgnoreCase)) LevelInfoCount += delta;
+        else if (string.Equals(entry.Level, "warn", StringComparison.OrdinalIgnoreCase)) LevelWarnCount += delta;
+        else if (string.Equals(entry.Level, "error", StringComparison.OrdinalIgnoreCase)) LevelErrorCount += delta;
+    }
+
+    /// <summary>Publish totals maintained when the deep buffer appends/trims/clears.</summary>
     private void RefreshLevelCounts()
     {
-        var c = CountLevelsInBuffer(_buffer);
-        LevelAllCount = c.All;
-        LevelInfoCount = c.Info;
-        LevelWarnCount = c.Warn;
-        LevelErrorCount = c.Error;
-        LevelAllChipLabel = FormatLevelChipLabel("全部", c.All);
-        LevelInfoChipLabel = FormatLevelChipLabel("info", c.Info);
-        LevelWarnChipLabel = FormatLevelChipLabel("warn", c.Warn);
-        LevelErrorChipLabel = FormatLevelChipLabel("error", c.Error);
+        LevelAllChipLabel = FormatLevelChipLabel("全部", LevelAllCount);
+        LevelInfoChipLabel = FormatLevelChipLabel("info", LevelInfoCount);
+        LevelWarnChipLabel = FormatLevelChipLabel("warn", LevelWarnCount);
+        LevelErrorChipLabel = FormatLevelChipLabel("error", LevelErrorCount);
         OnPropertyChanged(nameof(LevelAllCount));
         OnPropertyChanged(nameof(LevelInfoCount));
         OnPropertyChanged(nameof(LevelWarnCount));
@@ -321,6 +324,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         var trimmed = false;
         while (_buffer.Count > _capacity)
         {
+            CountLevel(_buffer[0], -1);
             _buffer.RemoveAt(0);
             trimmed = true;
         }
@@ -351,6 +355,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     {
         _dashboard = dashboard;
         _file = file;
+        _file.Failed += OnFileWriteFailed;
         _logDir = logDir;
         _sessionNames = sessionNames;
         _persistFileLogging = persistFileLogging;
@@ -453,9 +458,11 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
                 foreach (LogEntry entry in e.NewItems)
                 {
                     _buffer.Add(entry);
+                    CountLevel(entry, +1);
                     while (_buffer.Count > _capacity)
                     {
                         var evicted = _buffer[0];
+                        CountLevel(evicted, -1);
                         _buffer.RemoveAt(0);
                         var shown = Entries.IndexOf(evicted);
                         if (shown >= 0) Entries.RemoveAt(shown);
@@ -470,6 +477,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
                 if (!RetainHistoryOnClear)
                 {
                     _buffer.Clear();
+                    LevelAllCount = LevelInfoCount = LevelWarnCount = LevelErrorCount = 0;
                     Entries.Clear();
                     bufferChanged = true;
                 }
@@ -648,7 +656,9 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                FileLogging = false;
                 FileStatus = $"日志文件打开失败: {ex.Message}";
+                return;
             }
         }
         else
@@ -658,6 +668,13 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         }
         _persistFileLogging?.Invoke(value);
     }
+
+    private void OnFileWriteFailed(string message)
+        => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            FileLogging = false;
+            FileStatus = $"日志写入失败，已停止: {message}";
+        });
 
     /// <summary>One line for export / clipboard: always absolute HH:mm:ss [level] (source) message.
     /// Display in the list may use relative labels via <see cref="FormatDisplayTime"/>; export must not.</summary>
@@ -716,7 +733,12 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     {
         if (Entries.Count == 0) return;
         var dismissed = new HashSet<LogEntry>(Entries, ReferenceEqualityComparer.Instance);
-        _buffer.RemoveAll(e => dismissed.Contains(e));
+        _buffer.RemoveAll(e =>
+        {
+            if (!dismissed.Contains(e)) return false;
+            CountLevel(e, -1);
+            return true;
+        });
         var n = Entries.Count;
         Entries.Clear();
         RefreshLevelCounts();
@@ -870,5 +892,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     }
 
     public void Dispose()
-        => ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged -= OnLogChanged;
+    {
+        _file.Failed -= OnFileWriteFailed;
+        ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged -= OnLogChanged;
+    }
 }

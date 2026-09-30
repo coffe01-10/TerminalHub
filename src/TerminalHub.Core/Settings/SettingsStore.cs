@@ -12,6 +12,9 @@ public sealed class SettingsStore
 
     private readonly string _path;
 
+    /// <summary>True when an existing file could not be read. Saves stay off for this process so a later write does not replace that file with defaults.</summary>
+    public bool LoadFailed { get; private set; }
+
     public SettingsStore(string? path = null)
     {
         _path = path ?? DefaultPath();
@@ -41,21 +44,29 @@ public sealed class SettingsStore
     {
         try
         {
-            if (File.Exists(_path))
+            if (!File.Exists(_path))
+                return new AppSettings();
+            var json = File.ReadAllText(_path);
+            var loaded = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
+            if (loaded is null)
             {
-                var json = File.ReadAllText(_path);
-                return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+                LoadFailed = true;
+                return new AppSettings();
             }
+            return loaded;
         }
         catch
         {
-            // Corrupt settings should never block startup; fall back to defaults.
+            // Corrupt or unreadable settings must not block startup, and must not
+            // be overwritten by a later save of the in-memory defaults.
+            LoadFailed = true;
+            return new AppSettings();
         }
-        return new AppSettings();
     }
 
     public void Save(AppSettings settings)
     {
+        if (LoadFailed) return;
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);

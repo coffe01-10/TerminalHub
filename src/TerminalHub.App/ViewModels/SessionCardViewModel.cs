@@ -22,6 +22,7 @@ public partial class SessionCardViewModel : ViewModelBase
     [ObservableProperty] private bool _hasUnreadOutput;
     private bool _isDisplayed;
     private long _seenOutputVersion;
+    private int _previewVersion = -1;
 
     public string Name => Model.Name;
     public string WorkingDirectory => Model.WorkingDirectory;
@@ -89,7 +90,13 @@ public partial class SessionCardViewModel : ViewModelBase
     private void RefreshPreview()
     {
         List<ScreenBuffer.PreviewLine> lines;
-        lock (Model.Emulator.Buffer.SyncRoot) lines = Model.Emulator.Buffer.TailLines(12);
+        var buffer = Model.Emulator.Buffer;
+        lock (buffer.SyncRoot)
+        {
+            if (_previewVersion == buffer.Version) return;
+            lines = buffer.TailLines(12);
+            _previewVersion = buffer.Version;
+        }
         PreviewLines = lines
             .Select(l => new PreviewLineView(l.Text,
                 l.FgHex is null ? DefaultPreviewBrush : new SolidColorBrush(Color.Parse(l.FgHex))))

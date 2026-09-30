@@ -548,6 +548,7 @@ public class TerminalCoreTests
         p.Feed("\u001b[?7l");                        // DECAWM off
         p.Feed("abcd中");
         Assert.Equal('中', b.CellAt(0, 4).Char);
+        Assert.False(b.CellAt(0, 4).IsWide);         // no continuation cell in the last column
         Assert.Equal(0, b.CursorY);                  // no wrap with autowrap disabled
     }
 

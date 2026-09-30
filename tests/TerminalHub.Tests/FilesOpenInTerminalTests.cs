@@ -101,9 +101,9 @@ public class FilesOpenInTerminalTests
             await Task.Delay(200);
 
             // The mock PTY echoes the typed command straight back into the buffer.
-            // Windows shells quote with "..."; POSIX shells with '...'.
+            // Quoting follows the session shell — same helper the VM itself uses.
             var emu = vm.ActiveSession!.Emulator;
-            var expectedCd = OperatingSystem.IsWindows() ? $"cd \"{DirA}\"" : $"cd '{DirA}'";
+            var expectedCd = "cd " + TerminalHub.Core.Pty.ShellPathInput.Format(new[] { DirA }, vm.ActiveSession.Shell);
             Assert.Contains(expectedCd, emu.Buffer.TailText(30));
             // CWD chrome sync: path bar + Files both followed, history pushed (Back armed).
             Assert.Equal(DirA, vm.ActiveSession.WorkingDirectory);
