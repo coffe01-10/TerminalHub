@@ -26,6 +26,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly SettingsStore _settingsStore;
 
     public ObservableCollection<SessionCardViewModel> SessionCards { get; } = [];
+    public List<AvailableShell> AvailableStartupShells { get; private set; } = [];
+    [ObservableProperty] private bool _shellSetupOpen;
+    [ObservableProperty] private string _shellSetupMessage = "";
+    [ObservableProperty] private AvailableShell? _selectedStartupShell;
+    [ObservableProperty] private string _startupCustomShell = "";
+    private readonly Func<string, bool> _shellAvailable;
+    private string? _missingStartupShell;
 
     [ObservableProperty] private TerminalSessionModel? _activeSession;
     [ObservableProperty] private SessionCardViewModel? _activeCard;
@@ -307,8 +314,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly Action<string> _openFolder;
 
     public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null,
-        Action<string>? openFolder = null)
+        Action<string>? openFolder = null, Func<string, bool>? shellAvailable = null)
     {
+        _shellAvailable = shellAvailable ?? (command => PtySessionFactory.UseMock || ShellDiscovery.Exists(command));
         _openFolder = openFolder ?? OpenFolderInFileManager;
         _settingsStore = settingsStore ?? new SettingsStore();
         _settings = _settingsStore.Load();
@@ -368,6 +376,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// same shape the user closed the app with (fresh processes each time).</summary>
     public async Task SpawnStartupSessionsAsync()
     {
+        var configuredShell = _settings.ResolveShellCommand();
+        var usesConfiguredShell = _settings.Workspace.Sessions.Count > 0
+            ? _settings.Workspace.Sessions.Any(s => string.IsNullOrWhiteSpace(s.Shell) || s.Shell == configuredShell)
+            : _settings.StartupSessions.Count == 0
+                || _settings.StartupSessions.Any(s => _settings.ResolveShellCommand(s.Shell) == configuredShell);
+        if (usesConfiguredShell && !_shellAvailable(configuredShell))
+        {
+            _missingStartupShell = configuredShell;
+            AvailableStartupShells = ShellDiscovery.Find(_shellAvailable);
+            OnPropertyChanged(nameof(AvailableStartupShells));
+            SelectedStartupShell = AvailableStartupShells.FirstOrDefault();
+            ShellSetupMessage = $"未找到 {configuredShell}。请选择本机可用的 Shell，或填写已安装程序的路径。";
+            ShellSetupOpen = true;
+            return;
+        }
         if (_settings.Workspace.Sessions.Count > 0)
         {
             await RestoreWorkspaceAsync(_settings.Workspace);
@@ -380,6 +403,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         foreach (var s in _settings.StartupSessions)
             await CreateSessionAsync(s.Name, ParseTag(s.Tag), s.WorkingDirectory, s.Shell); // failures log to Output, next session still spawns
+    }
+
+    [RelayCommand]
+    private async Task ContinueShellSetup()
+    {
+        var command = string.IsNullOrWhiteSpace(StartupCustomShell)
+            ? SelectedStartupShell?.Command : StartupCustomShell.Trim().Trim('"');
+        if (string.IsNullOrEmpty(command) || !_shellAvailable(command))
+        {
+            ShellSetupMessage = "未找到所选 Shell，请选择可用程序或填写正确的路径。";
+            return;
+        }
+        var kind = string.IsNullOrWhiteSpace(StartupCustomShell) ? SelectedStartupShell!.Kind : ShellKind.Custom;
+        _settings.Shell = kind;
+        if (kind == ShellKind.Custom) _settings.CustomShellPath = command;
+        OnPropertyChanged(nameof(ShellIndex));
+        OnPropertyChanged(nameof(Settings));
+        // Do not snapshot an empty stage over the workspace we are about to restore.
+        _settingsStore.Save(_settings);
+        ShellSetupOpen = false;
+        await SpawnStartupSessionsAsync();
     }
 
     /// <summary>Respawn the saved workspace: session order/names/cwd/shell, then
@@ -437,6 +481,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var shellCmd = !string.IsNullOrWhiteSpace(shellCommand)
             ? shellCommand
             : _settings.ResolveShellCommand(shell);
+        if (_missingStartupShell is not null && shellCmd == _missingStartupShell)
+        {
+            shellCmd = _settings.ResolveShellCommand();
+            arguments = null; // arguments for the missing shell don't belong to its replacement
+        }
         if (string.IsNullOrEmpty(cwd))
             cwd = OperatingSystem.IsWindows() ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
@@ -513,8 +562,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _focusedPane;
     public string LeftPaneName => LeftPane?.Name ?? "未分配会话";
     public string RightPaneName => RightPane?.Name ?? "未分配会话";
-    partial void OnLeftPaneChanged(TerminalSessionModel? value) => OnPropertyChanged(nameof(LeftPaneName));
-    partial void OnRightPaneChanged(TerminalSessionModel? value) => OnPropertyChanged(nameof(RightPaneName));
+    partial void OnLeftPaneChanged(TerminalSessionModel? value)
+    {
+        OnPropertyChanged(nameof(LeftPaneName));
+        UpdateDisplayedCards();
+    }
+    partial void OnRightPaneChanged(TerminalSessionModel? value)
+    {
+        OnPropertyChanged(nameof(RightPaneName));
+        UpdateDisplayedCards();
+    }
+    partial void OnIsSplitChanged(bool value) => UpdateDisplayedCards();
 
     [RelayCommand]
     private void ToggleSplit()
@@ -1450,7 +1508,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// as fresh processes.</summary>
     private void SaveSettingsInternal()
     {
-        SnapshotWorkspace();
+        if (!ShellSetupOpen) SnapshotWorkspace();
         _settingsStore.Save(_settings);
     }
 
@@ -1782,6 +1840,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (!ReferenceEquals(ActiveCard, target))
             ActiveCard = target;
+        UpdateDisplayedCards();
         Dashboard.RefreshSearch();
         UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
         if (InspectorVisible && SelectedRightTab == 1
@@ -1792,10 +1851,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void RefreshCounts()
     {
+        UpdateDisplayedCards();
         TerminalCount = SessionCards.Count;
         RunningCount = SessionCards.Count(c => c.Model.IsRunning);
         foreach (var c in SessionCards) c.Refresh();
         StatusLine = $"工作空间  {WorkspaceName}      {TerminalCount} 个终端      {RunningCount} 个运行中";
+    }
+
+    private void UpdateDisplayedCards()
+    {
+        foreach (var card in SessionCards)
+            card.SetDisplayed(IsSplit
+                ? ReferenceEquals(card.Model, LeftPane) || ReferenceEquals(card.Model, RightPane)
+                : ReferenceEquals(card.Model, ActiveSession));
     }
 
     private void OnSampled(ISystemMonitor m)

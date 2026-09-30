@@ -1,0 +1,22 @@
+Terminal Hub v0.1.0 — Windows x64 初版
+
+解压整个文件夹，双击 TerminalHub.exe。无需安装 .NET SDK。
+系统要求：Windows 10 1809 或更高版本 / Windows 11，x64。
+
+未安装 PowerShell 7 时，首次启动会让你选择本机可用的 Shell。
+可以选择 Windows PowerShell、命令提示符或填写自定义程序路径。
+WSL 选项需要已经安装并配置好 Linux 发行版。
+
+Ctrl+Shift+N 新建会话；Ctrl+Tab 切换会话。
+Ctrl+Shift+C 复制选中文本；Ctrl+V 粘贴；Ctrl+C 中断程序。
+鼠标拖选；应用启用鼠标协议时按住 Shift 使用本地拖选。
+点击分屏并点击窗格，确定当前输入目标。
+会话卡显示新输出、进程退出和非零退出码。
+
+关闭应用会结束本次启动的终端进程。
+下次打开会恢复会话布局并创建新 Shell，不会恢复旧进程。
+配置保存在 %APPDATA%\TerminalHub\settings.json。
+
+当前为未签名初版，系统可能显示发布者提示。
+反馈问题请附 Windows 版本、Shell/CLI 版本和具体复现步骤：
+https://github.com/coffe01-10/TerminalHub/issues

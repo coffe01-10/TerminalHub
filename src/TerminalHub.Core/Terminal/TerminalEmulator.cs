@@ -13,6 +13,9 @@ public sealed class TerminalEmulator : IDisposable
 
     public ScreenBuffer Buffer { get; }
     public VtParser Parser { get; }
+    private long _outputVersion;
+    /// <summary>PTY output only; resizing or theme changes are not unread output.</summary>
+    public long OutputVersion => Interlocked.Read(ref _outputVersion);
 
     /// <summary>Raised (on a background thread) when the buffer changed.</summary>
     public event Action? Changed;
@@ -99,7 +102,10 @@ public sealed class TerminalEmulator : IDisposable
     }
 
     private void OnPtyOutput(IPtySession _, ReadOnlyMemory<byte> data)
-        => Parser.Feed(data.Span);
+    {
+        if (!data.IsEmpty) Interlocked.Increment(ref _outputVersion);
+        Parser.Feed(data.Span);
+    }
 
     public void Dispose()
     {

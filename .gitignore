@@ -32,6 +32,7 @@ bld/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+app/
 
 # Avalonia / WinUI / WPF
 *.pfx

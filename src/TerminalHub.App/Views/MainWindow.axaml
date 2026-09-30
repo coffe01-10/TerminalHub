@@ -5,6 +5,7 @@
         xmlns:mon="using:TerminalHub.Core.Monitoring"
         xmlns:files="using:TerminalHub.Core.Files"
         xmlns:ssh="using:TerminalHub.Core.Ssh"
+        xmlns:corepty="using:TerminalHub.Core.Pty"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="TerminalHub.App.Views.MainWindow"
         x:Name="Root"
@@ -140,11 +141,12 @@
                   </ctl:StageCard.Styles>
                   <Grid RowDefinitions="24,*,Auto">
                     <Grid ColumnDefinitions="*,Auto" Margin="3,0,3,4">
-                      <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-                        <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}"/>
-                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="155" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource UiInk}"/>
-                      </StackPanel>
-                      <TextBlock Grid.Column="1" Text="•••" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+                      <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="0,0,7,0">
+                        <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" Margin="0,0,7,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource UiInk}"/>
+                      </Grid>
+                      <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
+                                 FontSize="9" VerticalAlignment="Center"/>
                     </Grid>
                     <Border Grid.Row="1" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="3" ClipToBounds="True">
                       <ctl:StagePreview Emulator="{Binding Model.Emulator}"/>
@@ -1290,6 +1292,26 @@
             <TextBlock Text="Settings" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
+      </StackPanel>
+    </Border>
+
+    <Border x:Name="ShellSetupPanel" IsVisible="{Binding ShellSetupOpen}" ZIndex="210"
+            HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="480" Margin="24"
+            Padding="24" Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiBorder}"
+            BorderThickness="1" BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="18">
+      <StackPanel Spacing="14">
+        <TextBlock Text="选择你的第一个 Shell" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+        <TextBlock Text="{Binding ShellSetupMessage}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+        <ComboBox x:Name="StartupShellPicker" ItemsSource="{Binding AvailableStartupShells}"
+                  SelectedItem="{Binding SelectedStartupShell}" HorizontalAlignment="Stretch">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="corepty:AvailableShell">
+              <TextBlock Text="{Binding Name}"/>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBox Text="{Binding StartupCustomShell}" Watermark="或填写自定义 Shell 的完整路径"/>
+        <Button Content="开始使用" Command="{Binding ContinueShellSetupCommand}" HorizontalAlignment="Right"/>
       </StackPanel>
     </Border>
 

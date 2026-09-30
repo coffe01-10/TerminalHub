@@ -103,7 +103,13 @@ Claude Code, Codex CLI, and other tools install and run inside your shell. See [
   <img src="docs/readme/typing.svg" width="470" alt="Illustrated terminal typing the restore, build, and run commands">
 </p>
 
-> **Development preview.** There is no signed release build yet; start from source below. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target.
+> **v0.1.0 initial release.** [Download the portable Windows ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.1.0) or start from source below. The app is unsigned. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target. See the [release notes](docs/releases/v0.1.0.md).
+
+### Portable Windows preview
+
+Run `pwsh -File scripts/publish-windows.ps1 -SkipInstaller` to generate `artifacts/TerminalHub-windows-x64-preview.zip`. Extract the entire folder and launch `TerminalHub.exe`; no .NET SDK is needed. The archive includes a quick-start guide and license. If the default shell is missing, the app offers installed shells directly.
+
+Session cards show unread background output and the terminal process's exit code. Viewing a session clears its unread indicator; both visible split panes count as viewed.
 
 ### Windows
 
@@ -116,7 +122,7 @@ dotnet restore TerminalHub.sln
 dotnet run --project src/TerminalHub.App
 ```
 
-Without `pwsh`, open Settings, change "New terminals use" to `cmd.exe`, then create a terminal. WSL, custom shells, and SSH connections require the corresponding programs to be installed locally.
+Without `pwsh`, select Windows PowerShell or Command Prompt at startup and click "开始使用". WSL, custom shells, and SSH connections require the corresponding programs locally; WSL also needs a configured distribution.
 
 ### Linux
 
@@ -129,7 +135,7 @@ cd TerminalHub
 bash scripts/run-linux.sh
 ```
 
-New sessions also default to `pwsh`; with only Bash installed, choose `bash` in Settings before creating a terminal. On a machine without a physical display, install Xvfb and run `bash scripts/run-linux.sh --headless`.
+New sessions also default to `pwsh`; with only Bash installed, choose Bash at startup. On a machine without a physical display, install Xvfb and run `bash scripts/run-linux.sh --headless`.
 
 ### First run
 

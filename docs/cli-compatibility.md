@@ -20,3 +20,19 @@
 - 动画：按真实缩略图边界展开，快速切换从当前姿态继续；几何与 PTY 尺寸不变由 Headless 用例验证。桌面实机流畅度仍需人工体验。
 
 参考：[Grok 终端支持](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/21-terminal-support.md)、[Grok 快捷键](https://docs.x.ai/build/keyboard-shortcuts)。
+
+## 2026-09-30 中文编辑与缩放验证
+
+本机已信任的项目目录，通过真实 Windows ConPTY 启动 Claude Code；没有接受新的目录信任，也没有提交模型请求。`WindowsCliEditingTests` 验证输入 `ab中文cd` 后：反色编辑光标从列 10 经三次左移到“文”的列 6，再右移到 `c` 的列 8；宽度从 100 缩到 60 后仍为列 8；Home/End 返回列 2/10；bracketed paste 的第二行中文仍保留独立编辑位置。每步读取真实输出帧，并核对 TerminalView 的 IME 锚点。
+
+Avalonia Headless 回归还覆盖：组合状态中的普通 Enter 不发送给 Shell，切换会话清除组合文字，字体与格尺寸改变后在 Render 前查询新 IME 坐标。
+
+手动启用实机回归（未设置环境变量时明确跳过）：
+
+```powershell
+$env:TERMINALHUB_CLAUDE_PATH = (Get-Command claude.exe).Source
+$env:TERMINALHUB_CLI_CWD = '已经信任的项目目录'
+dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj --filter FullyQualifiedName~WindowsCliEditingTests
+```
+
+系统输入法的实际候选窗、桌面缩放和多显示器体验尚未人工验证；Grok/Codex 登录后的编辑行为本轮未验证。上述 ConPTY 与 Headless 结果不能代替这些体验。

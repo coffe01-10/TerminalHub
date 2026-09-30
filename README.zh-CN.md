@@ -103,7 +103,13 @@ Claude Code、Codex CLI 等工具可以在 Shell 内单独安装和运行。已�
   <img src="docs/readme/typing.svg" width="470" alt="逐字输入还原、构建与启动命令的终端示意动画">
 </p>
 
-> **开发预览。** 当前尚未提供签名发布版本，请按下面的步骤从源码运行。Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。
+> **v0.1.0 初版。** Windows 可[下载便携 ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.1.0)，或按下面步骤从源码运行。程序尚未签名；Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。详见[版本说明](docs/releases/v0.1.0.md)。
+
+### Windows 便携预览
+
+开发者运行 `pwsh -File scripts/publish-windows.ps1 -SkipInstaller`，即可生成 `artifacts/TerminalHub-windows-x64-preview.zip`。解压整个文件夹后启动 `TerminalHub.exe`，无需安装 .NET SDK；包内附使用说明和许可证。缺少默认 Shell 时，应用会直接列出本机可用的 Shell 供选择。
+
+会话卡会提示后台新输出，并显示终端进程的退出码；打开对应会话后清除新输出提示。分屏中可见的两侧均视为正在查看。
 
 ### Windows
 
@@ -116,7 +122,7 @@ dotnet restore TerminalHub.sln
 dotnet run --project src/TerminalHub.App
 ```
 
-没有安装 `pwsh` 时，可打开设置，把「新终端使用」改为 `cmd.exe`，再点击「新建终端」。WSL、自定义 Shell 和 SSH 连接需要相应程序已在本机安装。
+没有安装 `pwsh` 时，首次启动直接选择 Windows PowerShell 或命令提示符，再点击「开始使用」。WSL、自定义 Shell 和 SSH 连接需要相应程序已在本机安装，WSL 还需配置 Linux 发行版。
 
 ### Linux
 
@@ -129,7 +135,7 @@ cd TerminalHub
 bash scripts/run-linux.sh
 ```
 
-默认会话同样使用 `pwsh`；若只安装了 Bash，打开设置选择 `bash`，再新建终端。无实体显示器时，安装 Xvfb 后可运行 `bash scripts/run-linux.sh --headless`。
+默认会话同样使用 `pwsh`；若只安装了 Bash，首次启动直接选择 Bash。无实体显示器时，安装 Xvfb 后可运行 `bash scripts/run-linux.sh --headless`。
 
 ### 第一次使用
 

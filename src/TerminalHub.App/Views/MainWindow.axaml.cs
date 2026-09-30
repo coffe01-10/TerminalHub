@@ -30,10 +30,11 @@ public partial class MainWindow : Window
     {
     }
 
-    public MainWindow(SettingsStore? settingsStore = null, Action<string>? openFolder = null)
+    public MainWindow(SettingsStore? settingsStore = null, Action<string>? openFolder = null,
+        Func<string, bool>? shellAvailable = null)
     {
         InitializeComponent();
-        DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder);
+        DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
         Vm.PropertyChanged += OnStageSelectionChanged;
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
         Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
@@ -313,7 +314,10 @@ public partial class MainWindow : Window
     private void OnSearchHitDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (e.Source is Control c && c.DataContext is ScreenBuffer.SearchHit hit)
-            ActiveTerminal()?.RevealLine(hit.Line);
+        {
+            ActiveTerminal()?.RevealSearchHit(hit);
+            Vm.Dashboard.RefreshSearch();
+        }
     }
 
     // Preview slot changes during the drag; commit collection order on release.

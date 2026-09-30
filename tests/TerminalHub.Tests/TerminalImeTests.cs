@@ -12,6 +12,39 @@ namespace TerminalHub.Tests;
 
 public class TerminalImeTests
 {
+    [AvaloniaFact]
+    public async Task CandidateEnter_DoesNotSubmitShell_AndSwitchClearsComposition()
+    {
+        using var emulator = new TerminalEmulator();
+        using var other = new TerminalEmulator();
+        var pty = (TerminalHub.Core.Pty.MockPtySession)emulator.Pty;
+        await emulator.StartAsync(new TerminalHub.Core.Pty.PtyOptions { Shell = "mock" });
+        var view = new TerminalView { Emulator = emulator };
+        var client = Client(view);
+        client.SetPreeditText("ni", 2);
+        var enter = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter };
+        view.RaiseEvent(enter);
+        Assert.True(enter.Handled);
+        Assert.Empty(pty.RawInput.ToString());
+        view.Emulator = other;
+        Assert.Equal(0, client.CursorRectangle.X, 6);
+        Assert.Null(typeof(TerminalView).GetField("_preedit", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view));
+    }
+
+    [AvaloniaFact]
+    public void VisibleCursor_ReflowAndFontChange_UpdatesImeBeforeRender()
+    {
+        using var emulator = new TerminalEmulator(columns: 20, rows: 6);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("ab中文cdefghijkl");
+        emulator.Resize(8, 6);
+        view.TerminalFontSize = 18;
+        var rect = Client(view).CursorRectangle;
+        Assert.Equal(emulator.Buffer.CursorX * CellWidth(view), rect.X, 6);
+        Assert.Equal(emulator.Buffer.CursorY * rect.Height, rect.Y, 6);
+        Draw(view);
+        Assert.Equal(rect, Client(view).CursorRectangle);
+    }
     private static TextInputMethodClient Client(TerminalView view) =>
         (TextInputMethodClient)typeof(TerminalView).GetField("_imeClient",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;

@@ -69,6 +69,10 @@ public sealed class ScreenBuffer
     /// <summary>Per screen row: this row auto-wrapped into the next one (soft wrap).</summary>
     private bool[] _wrapped;
     private bool[]? _savedWrapped;
+    private int _primaryX, _primaryY;
+    private bool _primaryPendingWrap;
+    /// <summary>Physical row coordinates changed (reflow or screen switch).</summary>
+    public int LayoutVersion { get; private set; }
     /// <summary>Soft-wrap flag for each scrollback line (parallel to <see cref="_scrollback"/>).</summary>
     private readonly List<bool> _scrollWrapped = new();
     /// <summary>Cell that a following zero-width rune joins (set by the last PutCluster).</summary>
@@ -87,6 +91,7 @@ public sealed class ScreenBuffer
         var drop = _scrollback.Count - _scrollbackLimit;
         _scrollback.RemoveRange(0, drop);
         _scrollWrapped.RemoveRange(0, drop);
+        RemovedLineCount += drop;
         ScrollbackChanged?.Invoke(-drop);
     }
 
@@ -95,6 +100,7 @@ public sealed class ScreenBuffer
     public int CursorY { get; private set; }
     public bool CursorVisible { get; private set; } = true;
     private int _savedX, _savedY;
+    private bool _savedPendingWrap;
     private CellAttrs _savedAttrs;
     private TerminalColor _savedFg, _savedBg;
     private bool _savedOriginMode;
@@ -160,6 +166,8 @@ public sealed class ScreenBuffer
     public int Columns { get; private set; }
     public int Rows { get; private set; }
     public int ScrollbackCount => _scrollback.Count;
+    /// <summary>Total oldest lines removed; views use the difference to rebase selections.</summary>
+    public long RemovedLineCount { get; private set; }
     public bool OnAlternateScreen { get; private set; }
     public string Title { get; private set; } = "";
     public event Action<string>? TitleChanged;
@@ -520,6 +528,7 @@ public sealed class ScreenBuffer
     public void SaveCursor()
     {
         _savedX = CursorX; _savedY = CursorY;
+        _savedPendingWrap = _pendingWrap;
         _savedAttrs = CurrentAttrs; _savedFg = CurrentFg; _savedBg = CurrentBg;
         _savedOriginMode = OriginMode;
     }
@@ -530,7 +539,7 @@ public sealed class ScreenBuffer
         CursorY = Math.Min(_savedY, Rows - 1);
         CurrentAttrs = _savedAttrs; CurrentFg = _savedFg; CurrentBg = _savedBg;
         OriginMode = _savedOriginMode;
-        _pendingWrap = false;
+        _pendingWrap = _savedPendingWrap;
     }
 
     public void SetScrollRegion(int top, int bottom)
@@ -563,8 +572,7 @@ public sealed class ScreenBuffer
                 TouchAll();
                 break;
             case 3: // xterm ED3: scrollback only — the visible screen stays put
-                ScrollbackChanged?.Invoke(-_scrollback.Count);
-                _scrollback.Clear(); _scrollWrapped.Clear();
+                ClearScrollback();
                 break;
         }
         _pendingWrap = false;
@@ -639,9 +647,13 @@ public sealed class ScreenBuffer
     {
         if (on == OnAlternateScreen) return;
         OnAlternateScreen = on;
+        LayoutVersion++;
         _lastGlyphRow = -1;
         if (on)
         {
+            _primaryX = CursorX;
+            _primaryY = CursorY;
+            _primaryPendingWrap = _pendingWrap;
             _savedScreen = _screen;
             _savedWrapped = _wrapped;
             _screen = NewBlankScreen(Columns, Rows);
@@ -653,12 +665,16 @@ public sealed class ScreenBuffer
             _wrapped = _savedWrapped ?? new bool[Rows];
             _savedScreen = null;
             _savedWrapped = null;
+            CursorX = _primaryX;
+            CursorY = _primaryY;
+            _pendingWrap = _primaryPendingWrap;
         }
         TouchAll();
     }
 
     public void ClearScrollback()
     {
+        RemovedLineCount += _scrollback.Count;
         ScrollbackChanged?.Invoke(-_scrollback.Count);
         _scrollback.Clear();
         _scrollWrapped.Clear();
@@ -693,54 +709,104 @@ public sealed class ScreenBuffer
     {
         lock (SyncRoot)
         {
-        if (columns == Columns && rows == Rows) return;
-        var newScreen = NewBlankScreen(columns, rows);
-        var newWrapped = new bool[rows];
-        var copyRows = Math.Min(rows, Rows);
-        var copyCols = Math.Min(columns, Columns);
-        // Shrinking rows: keep the BOTTOM rows (prompt/cursor area) and push the
-        // cut top rows into scrollback — dropping the bottom would erase the
-        // line the user is currently editing.
-        var lostRows = Rows - copyRows;
-        if (lostRows > 0 && !OnAlternateScreen)
-        {
-            for (var r = 0; r < lostRows; r++)
+            if (columns == Columns && rows == Rows) return;
+            if (OnAlternateScreen)
             {
-                var rowArr = new TerminalCell[Columns];
-                Array.Copy(_screen, r * Columns, rowArr, 0, Columns);
-                _scrollback.Add(rowArr);
-                _scrollWrapped.Add(_wrapped[r]);
-                TrimScrollbackIfNeeded();
+                // TUIs address fixed grid coordinates. Only the inactive primary
+                // screen/history reflows; the application redraws its own grid.
+                var primaryScreen = _savedScreen!;
+                var primaryWrapped = _savedWrapped!;
+                ResizePrimary(ref primaryScreen, ref primaryWrapped, columns, rows,
+                    ref _primaryX, ref _primaryY, ref _primaryPendingWrap);
+                _savedScreen = primaryScreen;
+                _savedWrapped = primaryWrapped;
+                var grid = NewBlankScreen(columns, rows);
+                for (var r = 0; r < Math.Min(rows, Rows); r++)
+                {
+                    Array.Copy(_screen, r * Columns, grid, r * columns, Math.Min(columns, Columns));
+                    // A fixed-grid crop must not leave a lead without its wide
+                    // continuation; drawing that run would cross into the next row.
+                    if (columns < Columns && grid[(r + 1) * columns - 1].IsWide)
+                        grid[(r + 1) * columns - 1] = TerminalCell.Blank(TerminalColor.Default);
+                }
+                _screen = grid;
+                _wrapped = new bool[rows];
+                CursorX = Math.Min(CursorX, columns - 1);
+                CursorY = Math.Min(CursorY, rows - 1);
+                _pendingWrap = false;
             }
-            ScrollbackChanged?.Invoke(lostRows);
-            CursorY = Math.Max(0, CursorY - lostRows);
+            else
+            {
+                var x = CursorX;
+                var y = CursorY;
+                ResizePrimary(ref _screen, ref _wrapped, columns, rows,
+                    ref x, ref y, ref _pendingWrap);
+                CursorX = x;
+                CursorY = y;
+            }
+            Columns = columns;
+            Rows = rows;
+            _scrollTop = 0;
+            _scrollBottom = rows - 1;
+            _lastGlyphRow = -1;
+            LayoutVersion++;
+            BumpVersion();
+            TouchAll();
         }
-        for (var r = 0; r < copyRows; r++)
-            Array.Copy(_screen, (lostRows + r) * Columns, newScreen, r * columns, copyCols);
-        Array.Copy(_wrapped, lostRows, newWrapped, 0, copyRows);
-        _screen = newScreen;
-        _wrapped = newWrapped;
-        if (_savedScreen is { } saved)
+    }
+
+    private void ResizePrimary(ref TerminalCell[] screen, ref bool[] wrapped,
+        int columns, int rows, ref int cursorX, ref int cursorY, ref bool pendingWrap)
+    {
+        var oldHistory = _scrollback.Count;
+        var lines = new List<TerminalCell[]>(_scrollback);
+        var flags = new List<bool>(_scrollWrapped);
+        var lastRow = Rows - 1;
+        if (columns != Columns)
         {
-            var resized = NewBlankScreen(columns, rows);
-            var savedWrapped = new bool[rows];
-            for (var r = 0; r < copyRows; r++)
-                Array.Copy(saved, (lostRows + r) * Columns, resized, r * columns, copyCols);
-            Array.Copy(_savedWrapped!, lostRows, savedWrapped, 0, copyRows);
-            _savedScreen = resized;
-            _savedWrapped = savedWrapped;
+            // Unused rows below the prompt must not push it into history when
+            // narrowing. Hard blank lines above the cursor remain real lines.
+            while (lastRow > Math.Max(cursorY, _savedY) && !wrapped[lastRow]
+                && screen.AsSpan(lastRow * Columns, Columns).ToArray().All(ScreenReflow.IsPadding)) lastRow--;
         }
-        Columns = columns;
-        Rows = rows;
-        CursorX = Math.Min(CursorX, columns - 1);
-        CursorY = Math.Min(CursorY, rows - 1);
-        _scrollTop = 0;
-        _scrollBottom = rows - 1;
-        _pendingWrap = false;
-        _lastGlyphRow = -1;
-        BumpVersion();
-        TouchAll();
+        for (var r = 0; r <= lastRow; r++)
+        {
+            lines.Add(screen.AsSpan(r * Columns, Columns).ToArray());
+            flags.Add(wrapped[r]);
         }
+        var cursorLine = oldHistory + cursorY;
+        var savedLine = oldHistory + _savedY;
+        if (columns != Columns)
+        {
+            var result = ScreenReflow.Rewrap(lines, flags, columns,
+                new(cursorLine, cursorX, pendingWrap), new(savedLine, _savedX, _savedPendingWrap));
+            lines = result.Lines;
+            flags = result.Wrapped;
+            cursorLine = result.Cursor.Line;
+            cursorX = result.Cursor.Column;
+            pendingWrap = result.Cursor.Pending;
+            savedLine = result.SavedCursor.Line;
+            _savedX = result.SavedCursor.Column;
+            _savedPendingWrap = result.SavedCursor.Pending;
+        }
+        var historyCount = Math.Max(0, lines.Count - rows);
+        _scrollback.Clear();
+        _scrollWrapped.Clear();
+        _scrollback.AddRange(lines.Take(historyCount));
+        _scrollWrapped.AddRange(flags.Take(historyCount));
+        screen = NewBlankScreen(columns, rows);
+        wrapped = new bool[rows];
+        for (var r = historyCount; r < lines.Count; r++)
+        {
+            Array.Copy(lines[r], 0, screen, (r - historyCount) * columns, columns);
+            wrapped[r - historyCount] = flags[r];
+        }
+        cursorY = Math.Clamp(cursorLine - historyCount, 0, rows - 1);
+        cursorX = Math.Min(cursorX, columns - 1);
+        _savedY = Math.Clamp(savedLine - historyCount, 0, rows - 1);
+        _savedX = Math.Min(_savedX, columns - 1);
+        ScrollbackChanged?.Invoke(historyCount - oldHistory);
+        TrimScrollbackIfNeeded();
     }
 
     // ---------- helpers ----------
@@ -788,6 +854,7 @@ public sealed class ScreenBuffer
         for (var line = startLine; line <= endLine; line++)
         {
             var row = GetLine(line);
+            var lineStart = sb.Length;
             var c1 = line == startLine ? startCol : 0;
             var c2 = line == endLine ? endCol : Columns - 1;
             c2 = Math.Min(c2, row.Length - 1);
@@ -795,10 +862,13 @@ public sealed class ScreenBuffer
             {
                 ref readonly var cell = ref row[c];
                 if (cell.IsWideContinuation) continue;
+                if (c == row.Length - 1 && line < endLine && IsLineWrapped(line)
+                    && ScreenReflow.IsPadding(cell) && GetLine(line + 1)[0].IsWide) continue;
                 cell.AppendText(sb);
             }
-            // trim trailing blanks; soft-wrapped rows join the next line directly
-            while (sb.Length > 0 && sb[^1] == ' ') sb.Length--;
+            // A space at an ordinary soft-wrap boundary belongs to the command.
+            if (!IsLineWrapped(line))
+                while (sb.Length > lineStart && sb[^1] == ' ') sb.Length--;
             if (line < endLine && !IsLineWrapped(line)) sb.Append('\n');
         }
         return sb.ToString();
@@ -900,7 +970,7 @@ public sealed class ScreenBuffer
     }
 
     /// <summary>One search hit: <paramref name="Line"/> is a global index (scrollback, then screen).</summary>
-    public readonly record struct SearchHit(int Line, string Text);
+    public readonly record struct SearchHit(int Line, string Text, long RemovedLines = 0, int LayoutVersion = 0);
 
     /// <summary>
     /// Case-insensitive substring search over scrollback + screen, oldest first.
@@ -915,13 +985,13 @@ public sealed class ScreenBuffer
         {
             var t = ScrollbackText(i);
             if (t.Contains(term, StringComparison.OrdinalIgnoreCase))
-                hits.Add(new SearchHit(idx, t));
+                hits.Add(new SearchHit(idx, t, RemovedLineCount, LayoutVersion));
         }
         for (var r = 0; r < Rows && hits.Count < max; r++, idx++)
         {
             var t = RowText(r);
             if (t.Contains(term, StringComparison.OrdinalIgnoreCase))
-                hits.Add(new SearchHit(idx, t));
+                hits.Add(new SearchHit(idx, t, RemovedLineCount, LayoutVersion));
         }
         return hits;
     }

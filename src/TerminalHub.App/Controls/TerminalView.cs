@@ -71,6 +71,8 @@ public class TerminalView : Control
     // The pointer holding the local-selection capture — a second pointer (pen,
     // touch, another mouse) must not move or release someone else's selection.
     private IPointer? _selectionPointer;
+    private long _seenRemovedLines;
+    private int _seenLayoutVersion;
 
     // Search state — hits are recomputed lazily against buffer version.
     private int _hitLine = -1, _hitCol = -1, _hitLen;  // current match marker
@@ -111,6 +113,7 @@ public class TerminalView : Control
         {
             if (!IsEffectivelyVisible) return;
             var buf0 = _emulator?.Buffer;
+            SynchronizeCoordinates();
             var drift = Interlocked.Exchange(ref _scrollDrift, 0);
             if (drift != 0 && buf0 is not null)
             {
@@ -172,6 +175,8 @@ public class TerminalView : Control
         _selectionPointer?.Capture(null);
         if (!IsPreview && IsFocused) old?.SendFocus(false);
         _emulator = next;
+        _seenRemovedLines = next?.Buffer.RemovedLineCount ?? 0;
+        _seenLayoutVersion = next?.Buffer.LayoutVersion ?? 0;
         if (!IsPreview && IsFocused) next?.SendFocus(true);
         _applicationPointer = null;
         _selectionPointer = null;
@@ -179,6 +184,8 @@ public class TerminalView : Control
         _lastMouseCell = null;
         _selecting = false;
         _typedTail = "";
+        _preedit = null;
+        _preeditCaret = 0;
         _imeAnchorValid = false;
         _selAnchor = _selEnd = null;
         _hits = null;
@@ -199,6 +206,43 @@ public class TerminalView : Control
     private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
 
     private void OnScrollbackChanged(int delta) => Interlocked.Add(ref _scrollDrift, delta);
+
+    private void SynchronizeCoordinates()
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return;
+        lock (buf.SyncRoot)
+        {
+            var removed = buf.RemovedLineCount - _seenRemovedLines;
+            _seenRemovedLines = buf.RemovedLineCount;
+            if (_seenLayoutVersion != buf.LayoutVersion)
+            {
+                // Physical rows no longer identify the same text after reflow
+                // or a primary/alternate screen switch. Never copy stale cells.
+                _seenLayoutVersion = buf.LayoutVersion;
+                _selAnchor = _selEnd = null;
+                _hitLine = -1;
+                _hits = null;
+                ResetScroll();
+                return;
+            }
+            if (removed == 0) return;
+            if (_selAnchor is { } a && _selEnd is { } e)
+            {
+                // If either endpoint was discarded, the complete selection is
+                // gone. Clear it rather than silently copying replacement lines.
+                if (a.line < removed || e.line < removed)
+                    _selAnchor = _selEnd = null;
+                else
+                {
+                    _selAnchor = (a.line - (int)removed, a.col);
+                    _selEnd = (e.line - (int)removed, e.col);
+                }
+            }
+            _hitLine = _hitLine < removed ? -1 : _hitLine - (int)removed;
+            _hits = null;
+        }
+    }
 
     private void SetScrolledUp(bool value) => SetAndRaise(IsScrolledUpProperty, ref _isScrolledUp, value);
 
@@ -275,6 +319,7 @@ public class TerminalView : Control
 
     public override void Render(DrawingContext ctx)
     {
+        SynchronizeCoordinates();
         using var clip = ctx.PushClip(new Rect(Bounds.Size));
         var b = _emulator?.Buffer.CaptureFrame(_viewOffset);
         if (b is null)
@@ -822,6 +867,13 @@ public class TerminalView : Control
             e.Handled = true;
             return;
         }
+        // Some Windows IMEs expose candidate confirmation as a normal Enter
+        // while preedit is still active. It must not also submit to the CLI.
+        if (_preedit is not null && e.Key is Key.Enter or Key.Return)
+        {
+            e.Handled = true;
+            return;
+        }
         // Maintain the typed-text trail that anchors IME feedback to the app's
         // input box. Only genuine non-text keys invalidate it — some IMEs pass
         // letters through as plain KeyDown when a composition starts, and those
@@ -1059,6 +1111,7 @@ public class TerminalView : Control
     /// <summary>Map a point to (absolute buffer line, column) of the cell under it.</summary>
     private (int line, int col) PointToCell(Point p)
     {
+        SynchronizeCoordinates();
         var buf = _emulator!.Buffer;
         var col = Math.Clamp((int)(p.X / _cellW), 0, buf.Columns - 1);
         var row = Math.Clamp((int)(p.Y / _cellH), 0, buf.Rows - 1);
@@ -1273,11 +1326,13 @@ public class TerminalView : Control
     public string? GetSelectedText()
     {
         var buf = _emulator?.Buffer;
-        if (buf is null || _selAnchor is not { } a || _selEnd is not { } e2 || a == e2) return null;
-        var (sl, sc) = a.CompareTo(e2) <= 0 ? a : e2;
-        var (el, ec) = a.CompareTo(e2) <= 0 ? e2 : a;
+        if (buf is null) return null;
         lock (buf.SyncRoot)
         {
+            SynchronizeCoordinates();
+            if (_selAnchor is not { } a || _selEnd is not { } e2 || a == e2) return null;
+            var (sl, sc) = a.CompareTo(e2) <= 0 ? a : e2;
+            var (el, ec) = a.CompareTo(e2) <= 0 ? e2 : a;
             el = Math.Min(el, buf.TotalLines - 1);
             return sl > el ? null : buf.ExtractText(sl, sc, el, ec);
         }
@@ -1305,6 +1360,7 @@ public class TerminalView : Control
         var query = SearchQuery;
         lock (buf.SyncRoot)
         {
+            SynchronizeCoordinates();
             if (_hits is not null && _hitsVersion == buf.Version
                 && string.Equals(_hitsQuery, query, StringComparison.Ordinal))
                 return _hits;
@@ -1370,6 +1426,21 @@ public class TerminalView : Control
         _viewOffset = Math.Clamp(buf.ScrollbackCount - line + buf.Rows / 3, 0, buf.ScrollbackCount);
         SetScrolledUp(_viewOffset > 0);
         InvalidateVisual();
+    }
+
+    /// <summary>A result clicked after history trimming still refers to its original line.</summary>
+    public bool RevealSearchHit(ScreenBuffer.SearchHit hit)
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return false;
+        lock (buf.SyncRoot)
+        {
+            SynchronizeCoordinates();
+            var line = hit.Line - (buf.RemovedLineCount - hit.RemovedLines);
+            if (hit.LayoutVersion != buf.LayoutVersion || line < 0 || line >= buf.TotalLines) return false;
+            RevealLine((int)line);
+            return true;
+        }
     }
 
     /// <summary>

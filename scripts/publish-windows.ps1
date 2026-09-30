@@ -1,7 +1,7 @@
 #requires -Version 7.0
 <#
 .SYNOPSIS
-  Publish Terminal Hub for Windows x64 and build the Inno Setup installer.
+  Publish a portable Windows x64 preview ZIP and optionally an Inno Setup installer.
 
 .USAGE
   scripts\publish-windows.ps1 [-SkipInstaller]
@@ -26,6 +26,13 @@ dotnet publish "$repo\src\TerminalHub.App\TerminalHub.App.csproj" `
 
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 Write-Host "==> Published to $out" -ForegroundColor Green
+
+# A portable preview is useful even without Inno Setup installed.
+Copy-Item -LiteralPath (Join-Path $repo 'packaging\QUICKSTART.zh-CN.txt') -Destination $out
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $out
+$previewZip = Join-Path $repo 'artifacts\TerminalHub-windows-x64-preview.zip'
+Compress-Archive -LiteralPath $out -DestinationPath $previewZip -Force
+Write-Host "==> Portable preview: $previewZip" -ForegroundColor Green
 
 if ($SkipInstaller) { exit 0 }
 

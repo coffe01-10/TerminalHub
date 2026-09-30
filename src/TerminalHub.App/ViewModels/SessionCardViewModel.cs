@@ -19,6 +19,9 @@ public partial class SessionCardViewModel : ViewModelBase
     [ObservableProperty] private int _stageDistance;
     [ObservableProperty] private string _previewText = "";
     [ObservableProperty] private List<PreviewLineView> _previewLines = [];
+    [ObservableProperty] private bool _hasUnreadOutput;
+    private bool _isDisplayed;
+    private long _seenOutputVersion;
 
     public string Name => Model.Name;
     public string WorkingDirectory => Model.WorkingDirectory;
@@ -35,18 +38,45 @@ public partial class SessionCardViewModel : ViewModelBase
             return new SolidColorBrush(new Color(0x3A, c.R, c.G, c.B));
         }
     }
-    public IBrush StatusBrush => Controls.ThemeManager.Brush(Model.IsRunning ? "Good" : "Bad");
+    public string StatusText => !Model.IsRunning
+        ? Model.Pty.ExitCode is { } code ? $"已退出 · {code}" : "未运行"
+        : HasUnreadOutput ? "有新输出" : "运行中";
+    public IBrush StatusBrush => Controls.ThemeManager.Brush(!Model.IsRunning
+        ? Model.Pty.ExitCode is { } code ? code == 0 ? "Good" : "Bad" : "Muted"
+        : HasUnreadOutput ? "Accent" : "Good");
+
+    partial void OnHasUnreadOutputChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusBrush));
+    }
+
+    public void SetDisplayed(bool displayed)
+    {
+        if (_isDisplayed == displayed) return;
+        _isDisplayed = displayed;
+        _seenOutputVersion = Model.Emulator.OutputVersion;
+        if (displayed) HasUnreadOutput = false;
+    }
 
     public SessionCardViewModel(TerminalSessionModel model)
     {
         Model = model;
+        _seenOutputVersion = model.Emulator.OutputVersion;
     }
 
     public void Refresh()
     {
+        var outputVersion = Model.Emulator.OutputVersion;
+        if (outputVersion != _seenOutputVersion)
+        {
+            if (!_isDisplayed) HasUnreadOutput = true;
+            _seenOutputVersion = outputVersion;
+        }
         RefreshPreview();
         OnPropertyChanged(nameof(Name));
         OnPropertyChanged(nameof(StatusBrush));
+        OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(WorkingDirectory));
         OnPropertyChanged(nameof(DirectoryName));
     }
