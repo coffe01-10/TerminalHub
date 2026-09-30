@@ -224,6 +224,7 @@ Output goes to `artifacts/publish/linux-x64/`. Self-contained builds carry the .
 - [CLI interaction compatibility](docs/cli-compatibility.md): paste, mouse, shortcuts, and the verified scope.
 - [Linux debugging notes](docs/local-debugging.md): X11, Xvfb, and local debugging; historical UI descriptions defer to current source.
 - [Product notes](docs/PRODUCT.md): design background and requirements history.
+- [Product roadmap](docs/TODO.md): planned features and iteration checklist (Chinese).
 
 Issues and improvement suggestions are welcome at [GitHub Issues](https://github.com/coffe01-10/TerminalHub/issues). For display or input problems, include your OS, shell / CLI version, reproduction steps, and a screenshot; when contributing a fix, add or run the regressions that cover the specific behavior.
 

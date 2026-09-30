@@ -224,6 +224,7 @@ bash scripts/publish-linux.sh
 - [CLI 交互适配](docs/cli-compatibility.md)：粘贴、鼠标、快捷键和兼容性验证范围。
 - [Linux 调试记录](docs/local-debugging.md)：X11、Xvfb 与本机调试；历史界面描述以当前源码为准。
 - [产品说明](docs/PRODUCT.md)：设计背景与需求记录。
+- [产品迭代待办](docs/TODO.md)：下一版功能与后续迭代计划。
 
 欢迎通过 [Issues](https://github.com/coffe01-10/TerminalHub/issues) 提交问题或改进建议。终端显示与输入问题请附上系统、Shell / CLI 版本、复现步骤和截图；贡献代码时请为修复的具体行为补充或运行相关回归。
 
