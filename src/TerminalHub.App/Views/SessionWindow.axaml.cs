@@ -19,7 +19,11 @@ public partial class SessionWindow : Window
         if (!OperatingSystem.IsWindows())
             TransparencyLevelHint = new[] { WindowTransparencyLevel.None };
         DataContext = new SessionWindowViewModel(session, fontSize, fontFamily);
-        Opened += (_, _) => PopoutTerminal.Focus();
+        Opened += (_, _) =>
+        {
+            Controls.AppWindowIcon.Refresh(this);
+            PopoutTerminal.Focus();
+        };
         // The emulator outlives the popout — drop the VM's event subscriptions
         // so each close doesn't leak a dead VM (and its queued UI posts).
         Closed += (_, _) => (DataContext as IDisposable)?.Dispose();

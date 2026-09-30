@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Avalonia.Platform.Storage;
+using Avalonia.Input;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -26,6 +27,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly SettingsStore _settingsStore;
 
     public ObservableCollection<SessionCardViewModel> SessionCards { get; } = [];
+    public ObservableCollection<SessionShortcutViewModel> SessionShortcuts { get; } = [];
     public List<AvailableShell> AvailableStartupShells { get; private set; } = [];
     [ObservableProperty] private bool _shellSetupOpen;
     [ObservableProperty] private string _shellSetupMessage = "";
@@ -320,6 +322,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _openFolder = openFolder ?? OpenFolderInFileManager;
         _settingsStore = settingsStore ?? new SettingsStore();
         _settings = _settingsStore.Load();
+        LoadSessionShortcuts();
         ThemeManager.Apply(_settings.Theme);
         _inspectorVisible = _settings.InspectorVisible;
         _outputVisible = _settings.OutputVisible;
@@ -681,6 +684,87 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [RelayCommand] private void CycleSessionNext() => CycleSession(+1);
     [RelayCommand] private void CycleSessionPrev() => CycleSession(-1);
+
+    private void LoadSessionShortcuts()
+    {
+        SessionShortcuts.Clear();
+        foreach (var binding in _settings.SessionShortcuts)
+            SessionShortcuts.Add(new SessionShortcutViewModel(binding, ValidateSessionShortcuts));
+        ValidateSessionShortcuts();
+    }
+
+    private void ValidateSessionShortcuts()
+    {
+        var reserved = new[] { "Ctrl+C", "Ctrl+V", "Ctrl+Shift+C", "Ctrl+Shift+N", "Ctrl+Shift+W",
+            "Ctrl+Shift+B", "Ctrl+Shift+J", "Ctrl+OemPlus", "Ctrl+OemMinus", "Ctrl+0" }.Select(ParseSessionGesture).ToArray();
+        foreach (var shortcut in SessionShortcuts)
+        {
+            shortcut.Error = "";
+            shortcut.ParsedGesture = null;
+            if (string.IsNullOrWhiteSpace(shortcut.Gesture)) continue;
+            try
+            {
+                var gesture = ParseSessionGesture(shortcut.Gesture);
+                if ((gesture.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0
+                    && gesture.Key is not (>= Key.F1 and <= Key.F24))
+                    shortcut.Error = "请使用 Ctrl、Alt 或功能键，避免占用普通输入。";
+                else if (reserved.Any(g => g.Matches(new KeyEventArgs { Key = gesture.Key, KeyModifiers = gesture.KeyModifiers })))
+                    shortcut.Error = "与复制、粘贴或现有应用操作冲突。";
+                else shortcut.ParsedGesture = gesture;
+            }
+            catch (Exception ex) when (ex is FormatException or ArgumentException)
+            { shortcut.Error = "无法识别这个快捷键，请重新按键录入。"; }
+        }
+        foreach (var group in SessionShortcuts.Where(s => s.ParsedGesture is not null)
+            .GroupBy(s => (s.ParsedGesture!.Key, s.ParsedGesture.KeyModifiers)).Where(g => g.Count() > 1))
+            foreach (var shortcut in group) shortcut.Error = "与其他终端切换快捷键重复。";
+        OnPropertyChanged(nameof(NextSessionMenuText));
+        OnPropertyChanged(nameof(PreviousSessionMenuText));
+    }
+
+    public string NextSessionMenuText => SessionMenuText(SessionShortcutAction.Next, "下一个会话");
+    public string PreviousSessionMenuText => SessionMenuText(SessionShortcutAction.Previous, "上一个会话");
+    private string SessionMenuText(SessionShortcutAction action, string label)
+    {
+        var binding = SessionShortcuts.FirstOrDefault(s => s.Binding.Action == action && s.Error.Length == 0 && s.ParsedGesture is not null);
+        return binding is null ? label : $"{label}      {binding.Gesture}";
+    }
+
+    private static KeyGesture ParseSessionGesture(string text)
+    {
+        // KeyGesture.Parse treats bare digits as enum values ("1" becomes Cancel),
+        // so translate the visible digit to the corresponding keyboard key.
+        var parts = text.Split('+', StringSplitOptions.TrimEntries);
+        if (parts[^1].Length == 1 && parts[^1][0] is >= '0' and <= '9') parts[^1] = "D" + parts[^1];
+        return KeyGesture.Parse(string.Join('+', parts));
+    }
+
+    public bool HandleSessionShortcut(Avalonia.Input.KeyEventArgs e)
+    {
+        var shortcut = SessionShortcuts.FirstOrDefault(s => s.Error.Length == 0 && s.ParsedGesture?.Matches(e) == true);
+        if (shortcut is null) return false;
+        switch (shortcut.Binding.Action)
+        {
+            case SessionShortcutAction.Next: CycleSession(1); break;
+            case SessionShortcutAction.Previous: CycleSession(-1); break;
+            case SessionShortcutAction.Select:
+                if (shortcut.Binding.SessionIndex >= 0 && shortcut.Binding.SessionIndex < SessionCards.Count)
+                    ActiveCard = SessionCards[shortcut.Binding.SessionIndex];
+                break;
+        }
+        return true;
+    }
+
+    [RelayCommand]
+    private void ResetSessionShortcuts()
+    {
+        _settings.SessionShortcuts = SessionShortcutBinding.Defaults();
+        LoadSessionShortcuts();
+    }
+
+    [RelayCommand] private void IncreaseFontSize() => AdjustFontSize(1);
+    [RelayCommand] private void DecreaseFontSize() => AdjustFontSize(-1);
+    [RelayCommand] private void ResetTerminalFontSize() => ResetFontSize();
 
     /// <summary>「••• → 复制 CWD」: copy the active session's real working directory.</summary>
     [RelayCommand]

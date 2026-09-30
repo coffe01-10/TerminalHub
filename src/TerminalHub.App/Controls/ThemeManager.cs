@@ -24,7 +24,7 @@ public static class ThemeManager
         {
             "Black" => new[] { "#08090B", "#101114", "#1B1D21", "#050607", "#303238", "#E8E9ED", "#A0A3AC", "#757985", "#A9C8F5", "#242D3A", "#0A1423", "#67C69C", "#F17C82", "#DDAD62", "#B29BD9" },
             "White" => new[] { "#E9EEF4", "#FFFFFF", "#F0F4F9", "#FAFCFF", "#CCD6E2", "#1E2D41", "#526278", "#64758B", "#245AB5", "#E2EDFF", "#FFFFFF", "#19734B", "#B3293A", "#8A5A12", "#7755AA" },
-            "Paper" => new[] { "#E7E0D1", "#F8F3E8", "#EEE6D7", "#FCF8EE", "#C8BDA9", "#3C352B", "#6C6050", "#80715F", "#986040", "#EBDAC4", "#FFFAF0", "#526844", "#A44234", "#82621F", "#766184" },
+            "Paper" => new[] { "#E7E0D1", "#F8F3E8", "#EEE6D7", "#FCF8EE", "#B4A58C", "#3C352B", "#625545", "#72634F", "#8C5132", "#EBDAC4", "#FFFAF0", "#466035", "#A44234", "#82621F", "#766184" },
             _ => new[] { "#0B111E", "#F0111926", "#1C2C3F", "#0C1018", "#52657B", "#E2E8F0", "#A8B9CC", "#7C91AA", "#65ACED", "#243E59", "#0A1524", "#34D399", "#F87171", "#FBBF24", "#A78BFA" }
         };
         string[] roles = ["Canvas", "Surface", "Raised", "Inset", "Border", "Ink", "Muted", "Faint", "Accent", "AccentSoft", "OnAccent", "Good", "Bad", "Warm", "Violet"];
@@ -70,6 +70,9 @@ public static class ThemeManager
         Map("Faint", "ButtonForegroundDisabled");
         Map("Inset", "TextControlBackgroundFocused");
         Map("Accent", "TextControlBorderBrushFocused");
+        Map("Ink", "TabItemHeaderForeground", "TabItemHeaderForegroundSelected", "TabItemHeaderForegroundPointerOver",
+            "ListBoxItemForeground", "ListBoxItemForegroundSelected", "ListBoxItemForegroundSelectedPointerOver");
+        Map("AccentSoft", "ListBoxItemBackgroundSelected", "ListBoxItemBackgroundSelectedPointerOver", "ListBoxItemBackgroundPointerOver");
         Map("Muted", "TextControlPlaceholderForeground", "TextControlPlaceholderForegroundFocused",
             "ComboBoxDropDownGlyphForeground", "ComboBoxPlaceHolderForeground");
         app.Resources["SurfaceCorner"] = new CornerRadius(Current == "Paper" ? 4 : Current == "Black" ? 10 : 18);
@@ -78,7 +81,7 @@ public static class ThemeManager
         app.Resources["TerminalCorner"] = new CornerRadius(Current == "Paper" ? 2 : 10);
         app.Resources["SurfaceShadow"] = BoxShadows.Parse(Current switch
         {
-            "Paper" => "0 2 0 0 #30A18D6C, 0 8 20 0 #18816D50",
+            "Paper" => "0 3 12 0 #18816D50",
             "White" => "0 12 36 0 #20314766",
             "Black" => "0 8 24 0 #80000000",
             _ => "0 18 42 0 #60000000"

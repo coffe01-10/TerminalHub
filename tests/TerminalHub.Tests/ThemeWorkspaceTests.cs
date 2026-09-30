@@ -57,6 +57,11 @@ public class ThemeWorkspaceTests
             vm.SettingsOpen = true;
             await Task.Delay(150);
             fixture.Window.CaptureRenderedFrame()!.Save(Path.Combine(output, $"settings-{ThemeManager.Current}.png"));
+            var settingsTabs = fixture.Window.FindControl<TabControl>("SettingsTabs")!;
+            settingsTabs.SelectedIndex = 2;
+            await Task.Delay(100);
+            fixture.Window.CaptureRenderedFrame()!.Save(Path.Combine(output, $"shortcuts-{ThemeManager.Current}.png"));
+            settingsTabs.SelectedIndex = 0;
             vm.SettingsOpen = false;
             vm.ToggleSplitCommand.Execute(null);
             await Task.Delay(150);

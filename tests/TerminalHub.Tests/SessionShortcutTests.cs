@@ -168,18 +168,17 @@ public class SessionShortcutTests
         var (window, vm) = await Boot();
         await Task.Delay(200);
 
-        var more = window.GetVisualDescendants().OfType<Button>()
-            .First(b => b.Content as string == "•••");
+        var more = window.FindControl<Button>("SessionMenuButton")!;
         Assert.NotNull(more.Flyout);
         var flyout = Assert.IsType<MenuFlyout>(more.Flyout);
-        var headers = flyout.Items.OfType<MenuItem>().Select(i => i.Header as string).ToList();
-        Assert.Contains(headers, h => h!.Contains("关闭会话"));
-        Assert.Contains(headers, h => h!.Contains("Ctrl+Tab"));
-        Assert.Contains(headers, h => h!.Contains("复制 CWD"));
 
         // MenuItem bindings resolve when the flyout opens (DataContext flows in).
         flyout.ShowAt(more);
         await Task.Delay(150);
+        var headers = flyout.Items.OfType<MenuItem>().Select(i => i.Header as string).ToList();
+        Assert.Contains(headers, h => h?.Contains("关闭会话") == true);
+        Assert.Contains(headers, h => h?.Contains("Ctrl+Tab") == true);
+        Assert.Contains(headers, h => h?.Contains("复制 CWD") == true);
         var items = flyout.Items.OfType<MenuItem>().ToList();
         Assert.Contains(items, i => ReferenceEquals(i.Command, vm.CloseActiveSessionCommand));
         Assert.Contains(items, i => ReferenceEquals(i.Command, vm.CopyActiveCwdCommand));

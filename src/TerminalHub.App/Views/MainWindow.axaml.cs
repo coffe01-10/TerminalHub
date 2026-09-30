@@ -74,6 +74,7 @@ public partial class MainWindow : Window
         _shelfDragTimer.Tick += (_, _) => UpdateShelfDrag(autoScroll: true);
         Opened += (_, _) =>
         {
+            AppWindowIcon.Refresh(this);
             FitToScreen();
             _ = Vm.SpawnStartupSessionsAsync();
             _stageReady = true;
@@ -147,7 +148,7 @@ public partial class MainWindow : Window
     {
         if (!_stageReady || Vm.DockVisibilityMode != 0) return;
         var point = e.GetPosition(this);
-        var inBottomZone = point.Y >= Bounds.Height - 54 &&
+        var inBottomZone = point.Y >= Bounds.Height - 72 &&
             Math.Abs(point.X - Bounds.Width / 2) < Math.Max(280, ActionDock.Bounds.Width / 2 + 32);
         if (inBottomZone || ActionDock.IsPointerOver)
         {
@@ -173,6 +174,13 @@ public partial class MainWindow : Window
     {
         ActionDock.Classes.Set("revealed", revealed);
         DockHint.Opacity = revealed ? 0 : 1;
+        DockHint.IsHitTestVisible = !revealed;
+    }
+
+    private void OnDockHintEntered(object? sender, PointerEventArgs e)
+    {
+        _dockHideTimer.Stop();
+        SetDockRevealed(true);
     }
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -534,19 +542,16 @@ public partial class MainWindow : Window
     /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Source is ShortcutEditor) return;
+        if (Vm.HandleSessionShortcut(e)) { e.Handled = true; return; }
         // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
         if (e.Key == Key.F2 && e.KeyModifiers == KeyModifiers.None
             && e.Source is not (TextBox or TerminalView)) { OnRenameActive(sender, e); return; }
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-        if (e.Key == Key.Tab)
-        {
-            Vm.CycleSession(shift ? -1 : +1);
-            e.Handled = true;
-        }
         // Font zoom lives on Ctrl+non-letter keys — the bare Ctrl+A..Z control
         // bytes below keep flowing to the shell untouched.
-        else if (e.Key is Key.OemPlus or Key.Add) { Vm.AdjustFontSize(+1); e.Handled = true; }
+        if (e.Key is Key.OemPlus or Key.Add) { Vm.AdjustFontSize(+1); e.Handled = true; }
         else if (e.Key is Key.OemMinus or Key.Subtract) { Vm.AdjustFontSize(-1); e.Handled = true; }
         else if (e.Key is Key.D0 or Key.NumPad0) { Vm.ResetFontSize(); e.Handled = true; }
         else if (!shift) return;   // bare Ctrl+letter → control byte for the shell

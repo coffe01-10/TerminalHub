@@ -18,7 +18,75 @@
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="64">
 
+  <Window.Resources>
+    <StreamGeometry x:Key="ToolAdd">M7,2 H9 V7 H14 V9 H9 V14 H7 V9 H2 V7 H7 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolClose">M3,2 L8,7 L13,2 L14,3 L9,8 L14,13 L13,14 L8,9 L3,14 L2,13 L7,8 L2,3 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolBack">M7,2 L8.5,3.5 L5,7 H14 V9 H5 L8.5,12.5 L7,14 L1,8 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolForward">M9,2 L7.5,3.5 L11,7 H2 V9 H11 L7.5,12.5 L9,14 L15,8 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolRefresh">M13,2 V7 H8 L10,5 A4,4 0 1 0 12,9 H14 A6,6 0 1 1 11.5,3.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolSplit">M1,2 H15 V14 H1 Z M3,4 V12 H7 V4 Z M9,4 V12 H13 V4 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolPopout">M9,1 H15 V7 H13 V4.5 L7.5,10 L6,8.5 L11.5,3 H9 Z M1,4 H6 V6 H3 V13 H10 V10 H12 V15 H1 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolMore">M2,7 H4 V9 H2 Z M7,7 H9 V9 H7 Z M12,7 H14 V9 H12 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolOutput">M1,2 H15 V14 H1 Z M3,4 V9 H13 V4 Z M3,11 V12 H13 V11 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolTools">M1,2 H15 V14 H1 Z M3,4 V12 H10 V4 Z M12,4 V12 H13 V4 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolSettings">M6,1 H10 V3 L12,4 L14,3 L16,6 L14,8 L14,10 L16,12 L14,15 L12,14 L10,15 H6 L4,14 L2,15 L0,12 L2,10 V8 L0,6 L2,3 L4,4 L6,3 Z M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolWindow">M1,2 H15 V14 H1 Z M3,4 V12 H13 V4 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolMinimize">M2,7 H14 V9 H2 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolMonitor">M1,11 H4 V15 H1 Z M6,6 H9 V15 H6 Z M11,1 H14 V15 H11 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolSsh">M1,3 L6,8 L1,13 L2.5,14.5 L9,8 L2.5,1.5 Z M9,12 H15 V14 H9 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolLogs">M1,2 H15 V14 H1 Z M3,4 V5 H13 V4 Z M3,7 V8 H13 V7 Z M3,10 V12 H10 V10 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolDeploy">M1,8 L8,1 L15,8 L13.5,9.5 L9,5 V13 H7 V5 L2.5,9.5 Z M2,13 H4 V15 H12 V13 H14 V17 H2 Z</StreamGeometry>
+  </Window.Resources>
+
   <Window.Styles>
+    <Style Selector="Button.terminal-tool">
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="MinWidth" Value="32"/>
+      <Setter Property="Padding" Value="8,0"/>
+      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.terminal-tool:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
+    </Style>
+    <Style Selector="Button.terminal-tool:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource UiInset}"/>
+    </Style>
+    <Style Selector="Button.terminal-tool:disabled /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Opacity" Value="0.4"/>
+    </Style>
+    <Style Selector="Button.terminal-tool.selected">
+      <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
+    </Style>
+    <Style Selector="Button.terminal-tool PathIcon">
+      <Setter Property="Width" Value="14"/>
+      <Setter Property="Height" Value="14"/>
+      <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+    </Style>
+    <Style Selector="Button.terminal-tool.selected PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
+    </Style>
+    <Style Selector="Button.terminal-tool:pointerover PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
+    </Style>
+    <Style Selector="Button.dock PathIcon">
+      <Setter Property="Width" Value="20"/><Setter Property="Height" Value="20"/>
+      <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+    </Style>
+    <Style Selector="Button.dock.dock-active PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
+    </Style>
+    <Style Selector="TabControl#SettingsTabs TabItem">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Padding" Value="12,8"/>
+    </Style>
     <Style Selector="Border.settings-group">
       <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
@@ -58,10 +126,7 @@
       <Border Grid.Row="0" Background="Transparent" Padding="26,0" PointerPressed="OnTitleBarPointerPressed">
         <Grid ColumnDefinitions="Auto,*">
           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <Border Width="32" Height="32" CornerRadius="9" Background="{DynamicResource UiRaised}">
-              <TextBlock Text="▦" FontSize="22" Foreground="{DynamicResource UiAccent}"
-                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            </Border>
+            <Image Source="avares://TerminalHub/Assets/terminal-hub-icon.png" Width="32" Height="32"/>
             <TextBlock Text="Terminal Hub" FontFamily="{DynamicResource HeadingFont}" Foreground="{DynamicResource UiInk}" FontSize="17"
                        FontWeight="SemiBold" VerticalAlignment="Center"/>
             <TextBlock Text="/   前台调度" Foreground="{DynamicResource UiMuted}" FontSize="12" Margin="14,0,0,0" VerticalAlignment="Center"/>
@@ -69,18 +134,18 @@
           <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
                       Spacing="10" VerticalAlignment="Center">
             <TextBlock Text="{Binding OsLabel}" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center"/>
-            <Button Content="▤ 输出" Command="{Binding ToggleOutputCommand}" ToolTip.Tip="显示 / 隐藏输出 · Ctrl+Shift+J"
-                    Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0" FontSize="12"/>
-            <Button Content="◫ 工具" Command="{Binding ToggleInspectorCommand}" ToolTip.Tip="显示 / 隐藏右栏 · Ctrl+Shift+B"
-                    Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0" FontSize="12"/>
-            <Button Content="⚙" FontFamily="Segoe UI Symbol" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
-                    Command="{Binding DockSelectCommand}" CommandParameter="5"/>
-            <Button Content="—" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
-                    Click="OnMinimizeClick"/>
-            <Button Content="▢" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0" FontSize="10"
-                    Click="OnMaximizeClick"/>
-            <Button Content="✕" Padding="6,0" Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0" FontSize="10"
-                    Click="OnCloseClick"/>
+            <Button Classes="terminal-tool" Classes.selected="{Binding OutputVisible}" Command="{Binding ToggleOutputCommand}" ToolTip.Tip="显示 / 隐藏输出 · Ctrl+Shift+J">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolOutput}"/><TextBlock Text="输出" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button Classes="terminal-tool" Classes.selected="{Binding InspectorVisible}" Command="{Binding ToggleInspectorCommand}" ToolTip.Tip="显示 / 隐藏右栏 · Ctrl+Shift+B">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}"/><TextBlock Text="工具" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button Classes="terminal-tool" Classes.selected="{Binding SettingsOpen}" Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="设置" AutomationProperties.Name="设置">
+              <PathIcon Data="{StaticResource ToolSettings}"/>
+            </Button>
+            <Button Classes="terminal-tool" Click="OnMinimizeClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化"><PathIcon Data="{StaticResource ToolMinimize}"/></Button>
+            <Button Classes="terminal-tool" Click="OnMaximizeClick" ToolTip.Tip="最大化 / 还原" AutomationProperties.Name="最大化 / 还原"><PathIcon Data="{StaticResource ToolWindow}"/></Button>
+            <Button Classes="terminal-tool" Click="OnCloseClick" ToolTip.Tip="关闭应用" AutomationProperties.Name="关闭应用"><PathIcon Data="{StaticResource ToolClose}"/></Button>
           </StackPanel>
         </Grid>
       </Border>
@@ -177,7 +242,7 @@
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                 BoxShadow="{DynamicResource SurfaceShadow}">
-          <Grid RowDefinitions="46,34,*,Auto" Margin="8">
+          <Grid RowDefinitions="44,40,*,Auto" Margin="8">
 
             <!-- The active window has one title; other sessions live on the shelf. -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,0,4,4">
@@ -185,51 +250,60 @@
                 <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <TextBlock Text="{Binding ActiveCard.Name}" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                <Border Background="{DynamicResource UiRaised}" CornerRadius="5" Padding="7,3"
+              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,12,0">
+                <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
-                  <TextBlock Text="前台" FontSize="9" Foreground="{DynamicResource UiInk}"/>
+                  <TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/>
                 </Border>
-              </StackPanel>
-              <Button Grid.Column="2" Content="＋" Padding="9,4" Background="Transparent" Foreground="{DynamicResource UiMuted}"
-                      BorderThickness="0" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N"/>
-              <Button Grid.Column="3" Content="×" Padding="9,4" Background="Transparent" Foreground="{DynamicResource UiMuted}"
-                      BorderThickness="0" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W"/>
+              </Grid>
+              <Button Grid.Column="2" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N" AutomationProperties.Name="新建终端">
+                <PathIcon Data="{StaticResource ToolAdd}"/>
+              </Button>
+              <Button Grid.Column="3" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
+                <PathIcon Data="{StaticResource ToolClose}"/>
+              </Button>
             </Grid>
 
             <!-- Toolbar: ← back / ⟳ refresh CWD / → forward + path -->
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
-              <Button Content="←" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource UiMuted}" Padding="6,0"
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="4,0">
+              <Button Classes="terminal-tool"
                       Command="{Binding CwdBackCommand}" IsEnabled="{Binding CanCwdBack}"
-                      ToolTip.Tip="后退目录历史"/>
-              <Button Grid.Column="1" Content="⟳" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource UiMuted}" Padding="6,0"
-                      Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新 CWD"/>
-              <Button Grid.Column="2" Content="→" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource UiMuted}" Padding="6,0"
-                      Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
-                      ToolTip.Tip="前进目录历史"/>
-              <Button Grid.Column="3" Command="{Binding ShowWorkspaceCommand}" Background="Transparent" BorderThickness="0"
-                      HorizontalContentAlignment="Left" Padding="8,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
-                <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+                      ToolTip.Tip="后退目录历史" AutomationProperties.Name="后退目录历史">
+                <PathIcon Data="{StaticResource ToolBack}"/>
               </Button>
-              <Button Grid.Column="4" Content="◫ 分屏" Background="Transparent" BorderThickness="0"
-                      Foreground="{Binding IsSplit, Converter={x:Static vm:BoolBrushConverter.Instance}}"
-                      FontSize="11" Padding="6,0"
+              <Button Grid.Column="1" Classes="terminal-tool"
+                      Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新当前目录" AutomationProperties.Name="刷新当前目录">
+                <PathIcon Data="{StaticResource ToolRefresh}"/>
+              </Button>
+              <Button Grid.Column="2" Classes="terminal-tool"
+                      Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
+                      ToolTip.Tip="前进目录历史" AutomationProperties.Name="前进目录历史">
+                <PathIcon Data="{StaticResource ToolForward}"/>
+              </Button>
+              <Button Grid.Column="3" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
+                      HorizontalContentAlignment="Left" Margin="6,0,10,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
+                <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" FontSize="11"/>
+              </Button>
+              <Button Grid.Column="4" Classes="terminal-tool" Classes.selected="{Binding IsSplit}" Margin="0,0,4,0"
                       Command="{Binding ToggleSplitCommand}"
-                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。"/>
-              <Button Grid.Column="5" Content="↗ 弹出" Background="Transparent" BorderThickness="0"
-                      Foreground="{DynamicResource UiMuted}" FontSize="11" Padding="6,0"
+                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。">
+                <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSplit}"/><TextBlock Text="分屏" VerticalAlignment="Center"/></StackPanel>
+              </Button>
+              <Button Grid.Column="5" Classes="terminal-tool" Margin="0,0,4,0"
                       Command="{Binding OpenInNewWindowCommand}"
-                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）"/>
-              <Button x:Name="SessionMenuButton" Grid.Column="6" Content="•••" Background="Transparent" BorderThickness="0"
-                      Foreground="{DynamicResource UiMuted}" Padding="6,0" ToolTip.Tip="会话操作">
+                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）">
+                <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolPopout}"/><TextBlock Text="弹出" VerticalAlignment="Center"/></StackPanel>
+              </Button>
+              <Button x:Name="SessionMenuButton" Grid.Column="6" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
+                <PathIcon Data="{StaticResource ToolMore}"/>
                 <Button.Flyout>
                   <MenuFlyout>
                     <MenuItem Header="重命名会话       F2" Click="OnRenameActive"/>
                     <MenuItem Header="查看当前工作区" Command="{Binding ShowWorkspaceCommand}"/>
                     <MenuItem Header="关闭会话        Ctrl+Shift+W" Command="{Binding CloseActiveSessionCommand}"/>
-                    <MenuItem Header="下一个会话      Ctrl+Tab" Command="{Binding CycleSessionNextCommand}"/>
-                    <MenuItem Header="上一个会话      Ctrl+Shift+Tab" Command="{Binding CycleSessionPrevCommand}"/>
+                    <MenuItem Header="{Binding NextSessionMenuText}" Command="{Binding CycleSessionNextCommand}"/>
+                    <MenuItem Header="{Binding PreviousSessionMenuText}" Command="{Binding CycleSessionPrevCommand}"/>
                     <Separator/>
                     <MenuItem Header="复制 CWD" Command="{Binding CopyActiveCwdCommand}"/>
                   </MenuFlyout>
@@ -1153,9 +1227,11 @@
     </Grid>
 
     <Border x:Name="DockHint" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-            Width="40" Height="3" CornerRadius="2" Background="{DynamicResource UiSurface}" Margin="0,0,0,38"
-            IsHitTestVisible="False"
-            IsVisible="{Binding DockVisibilityMode, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+            CornerRadius="9" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Margin="0,0,0,34" Padding="12,4" ZIndex="99"
+            PointerEntered="OnDockHintEntered"
+            IsVisible="{Binding DockVisibilityMode, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
+      <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}" Width="12" Height="12" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="工具" FontSize="11" Foreground="{DynamicResource UiMuted}"/></StackPanel>
+    </Border>
     <!-- ============ Floating action dock ============ -->
     <Border x:Name="ActionDock" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,46"
             CornerRadius="{DynamicResource DockCorner}" Padding="8" ZIndex="100"
@@ -1168,7 +1244,7 @@
           <Setter Property="RenderTransform" Value="translateY(130px)"/>
           <Setter Property="Transitions">
             <Transitions>
-              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.32" Easing="CubicEaseOut"/>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
               <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
             </Transitions>
           </Setter>
@@ -1179,7 +1255,7 @@
           <Setter Property="RenderTransform" Value="translateY(0px)"/>
         </Style>
         <Style Selector="Button.dock">
-          <Setter Property="Padding" Value="20,9"/>
+          <Setter Property="Padding" Value="18,9"/>
           <Setter Property="CornerRadius" Value="10"/>
           <Setter Property="Background" Value="Transparent"/>
           <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
@@ -1204,38 +1280,25 @@
         </Style>
       </Border.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
-        <Button Classes="primary" Padding="20,9" CornerRadius="12"
-                Command="{Binding DockSelectCommand}" CommandParameter="0">
-          <Button.Styles>
-            <Style Selector="Button.primary">
-              <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
-              <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
-            </Style>
-          </Button.Styles>
-          <StackPanel>
-            <TextBlock Text="›_" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="New Session" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-          </StackPanel>
-        </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                 Command="{Binding DockSelectCommand}" CommandParameter="1">
           <StackPanel>
-            <TextBlock Text="▥" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="Monitor" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <PathIcon Data="{StaticResource ToolMonitor}" HorizontalAlignment="Center"/>
+            <TextBlock Text="监控" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
                 Command="{Binding DockSelectCommand}" CommandParameter="2">
           <StackPanel>
-            <TextBlock Text="⌁" FontSize="20" HorizontalAlignment="Center"/>
+            <PathIcon Data="{StaticResource ToolSsh}" HorizontalAlignment="Center"/>
             <TextBlock Text="SSH" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
                 Command="{Binding DockSelectCommand}" CommandParameter="3">
           <StackPanel>
-            <TextBlock Text="▤" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="Logs" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <PathIcon Data="{StaticResource ToolLogs}" HorizontalAlignment="Center"/>
+            <TextBlock Text="日志" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
         <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
@@ -1272,7 +1335,7 @@
             </MenuFlyout>
           </Button.ContextFlyout>
           <StackPanel>
-            <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
+            <PathIcon Data="{StaticResource ToolDeploy}" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding DeployDockCaption}" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
             <TextBlock Text="{Binding LastPublishBadge}" FontSize="9"
                        HorizontalAlignment="Center" Margin="0,1,0,0"
@@ -1285,13 +1348,7 @@
                        TextWrapping="NoWrap"/>
           </StackPanel>
         </Button>
-        <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"
-                Command="{Binding DockSelectCommand}" CommandParameter="5">
-          <StackPanel>
-            <TextBlock Text="⚙" FontFamily="Segoe UI Symbol" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="Settings" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-          </StackPanel>
-        </Button>
+
       </StackPanel>
     </Border>
 
@@ -1323,7 +1380,7 @@
       <Grid RowDefinitions="76,*,66">
         <Grid ColumnDefinitions="Auto,*,Auto" Margin="22,16">
           <Border Width="38" Height="38" Background="{DynamicResource UiAccentSoft}" CornerRadius="10">
-            <TextBlock Text="⚙" FontFamily="Segoe UI Symbol" FontSize="23" Foreground="{DynamicResource UiAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <PathIcon Data="{StaticResource ToolSettings}" Width="20" Height="20" Foreground="{DynamicResource UiAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <StackPanel Grid.Column="1" Spacing="3" Margin="12,0,0,0" VerticalAlignment="Center">
             <TextBlock Text="设置" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
@@ -1334,74 +1391,85 @@
                   Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
                   Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="关闭设置"/>
         </Grid>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-          <StackPanel Spacing="10" Margin="20,0,20,16">
-            <TextBlock Classes="settings-heading" Text="外观"/>
-            <Border Classes="settings-group">
-              <StackPanel Spacing="10">
-                <TextBlock Text="配色主题" FontSize="12" Foreground="{DynamicResource UiInk}"/>
-                <ComboBox x:Name="ThemePicker" SelectedIndex="{Binding ThemeIndex}">
-                  <ComboBoxItem>深蓝玻璃 · 悬浮层次</ComboBoxItem>
-                  <ComboBoxItem>深黑 · 克制高对比</ComboBoxItem>
-                  <ComboBoxItem>亮白 · 轻盈清晰</ComboBoxItem>
-                  <ComboBoxItem>纸张 · 暖色阅读</ComboBoxItem>
-                </ComboBox>
-                <TextBlock Text="窗口、缩略图与终端同步呈现主题。" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+        <TabControl x:Name="SettingsTabs" Grid.Row="1" Margin="16,0,16,12">
+          <TabItem Header="外观">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="12" Margin="4,12,4,4">
+                <Border Classes="settings-group">
+                  <StackPanel Spacing="10">
+                    <TextBlock Text="主题与终端文字" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                    <ComboBox x:Name="ThemePicker" SelectedIndex="{Binding ThemeIndex}">
+                      <ComboBoxItem>深蓝玻璃</ComboBoxItem><ComboBoxItem>深黑</ComboBoxItem>
+                      <ComboBoxItem>亮白</ComboBoxItem><ComboBoxItem>纸张</ComboBoxItem>
+                    </ComboBox>
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                      <Button Content="−" Classes="terminal-tool" Command="{Binding DecreaseFontSizeCommand}" ToolTip.Tip="缩小字体"/>
+                      <NumericUpDown Grid.Column="1" Value="{Binding FontSize}" Minimum="8" Maximum="32" Increment="1" FormatString="0"/>
+                      <Button Grid.Column="2" Content="＋" Classes="terminal-tool" Command="{Binding IncreaseFontSizeCommand}" ToolTip.Tip="放大字体"/>
+                      <Button Grid.Column="3" Content="重置" Classes="terminal-tool" Command="{Binding ResetTerminalFontSizeCommand}"/>
+                    </Grid>
+                    <TextBox Text="{Binding TerminalFontName}" Watermark="等宽字体：默认 Cascadia / Consolas"/>
+                    <TextBlock Text="Ctrl+= / Ctrl+− 调整字号 · Ctrl+0 重置" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+                  </StackPanel>
+                </Border>
+                <TextBlock Classes="settings-heading" Text="实时预览"/>
+                <Border Background="{DynamicResource UiInset}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" CornerRadius="8" Padding="16">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="PS C:\Projects&gt;" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiAccent}"/>
+                    <TextBlock Text="Terminal Hub · 中文与 English 012345" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiInk}" TextWrapping="Wrap"/>
+                    <TextBlock Text="✓ Build succeeded" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiGood}"/>
+                  </StackPanel>
+                </Border>
+                <TextBlock Text="主题、字体和字号立即应用，点击「完成」保存。" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
               </StackPanel>
-            </Border>
-            <TextBlock Classes="settings-heading" Text="工作空间"/>
-            <Border Classes="settings-group">
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="工作区">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <Border Classes="settings-group" Margin="4,12,4,4">
+                <StackPanel Spacing="14">
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="右侧工具栏" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding InspectorVisible}" OnContent="" OffContent="" MinWidth="0"/></Grid>
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="下方输出区" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding OutputVisible}" OnContent="" OffContent="" MinWidth="0"/></Grid>
+                  <TextBlock Text="Dock 显示方式" Foreground="{DynamicResource UiInk}"/>
+                  <ComboBox SelectedIndex="{Binding DockVisibilityMode}"><ComboBoxItem>自动隐藏 · 底部「工具」呼出</ComboBoxItem><ComboBoxItem>始终显示</ComboBoxItem><ComboBoxItem>隐藏</ComboBoxItem></ComboBox>
+                  <TextBlock Text="工作空间名称" Foreground="{DynamicResource UiInk}"/>
+                  <TextBox Text="{Binding WorkspaceNameLive}"/>
+                </StackPanel>
+              </Border>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="快捷键">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="12" Margin="4,12,4,4">
+                <TextBlock Text="点击右侧输入框，再按你想使用的快捷键。Backspace / Delete 清除；Tab 移到下一项。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="第 1–9 个终端按左侧当前顺序定位，排序后随之变化。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <ItemsControl ItemsSource="{Binding SessionShortcuts}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SessionShortcutViewModel">
+                      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,180" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                        <ctl:ShortcutEditor Grid.Column="1" Text="{Binding Gesture, Mode=TwoWay}" ToolTip.Tip="按快捷键录入；Backspace 清除"/>
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Foreground="{DynamicResource UiBad}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding Error, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="恢复默认快捷键" Command="{Binding ResetSessionShortcutsCommand}"/>
+                <TextBlock Text="空白表示不绑定；有冲突的快捷键不会生效。" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="启动">
+            <Border Classes="settings-group" Margin="4,12,4,4" VerticalAlignment="Top">
               <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="右侧工具栏" FontSize="12" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding InspectorVisible}" OnContent="" OffContent="" MinWidth="0"/>
-                </Grid>
-                <Border Height="1" Background="{DynamicResource UiBorder}" Opacity="0.5"/>
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="下方输出区" FontSize="12" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding OutputVisible}" OnContent="" OffContent="" MinWidth="0"/>
-                </Grid>
-                <Border Height="1" Background="{DynamicResource UiBorder}" Opacity="0.5"/>
-                <TextBlock Text="Dock 显示方式" FontSize="12" Foreground="{DynamicResource UiInk}"/>
-                <ComboBox SelectedIndex="{Binding DockVisibilityMode}">
-                  <ComboBoxItem>自动隐藏 · 靠近底部显示</ComboBoxItem>
-                  <ComboBoxItem>始终显示</ComboBoxItem>
-                  <ComboBoxItem>隐藏</ComboBoxItem>
-                </ComboBox>
-                <TextBlock Text="工作空间名称" FontSize="12" Foreground="{DynamicResource UiInk}"/>
-                <TextBox Text="{Binding WorkspaceNameLive}"/>
-              </StackPanel>
-            </Border>
-            <TextBlock Classes="settings-heading" Text="终端文字"/>
-            <Border Classes="settings-group">
-              <StackPanel Spacing="10">
-                <Grid ColumnDefinitions="*,90">
-                  <TextBlock Text="字体大小" FontSize="12" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-                  <TextBox Grid.Column="1" Text="{Binding FontSize, Mode=TwoWay}"/>
-                </Grid>
-                <TextBlock Text="Ctrl + = / − 调整大小 · Ctrl + 0 复位" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
-                <Border Height="1" Background="{DynamicResource UiBorder}" Opacity="0.5"/>
-                <TextBlock Text="等宽字体" FontSize="12" Foreground="{DynamicResource UiInk}"/>
-                <TextBox Text="{Binding TerminalFontName}" Watermark="默认 Cascadia / Consolas"/>
-              </StackPanel>
-            </Border>
-            <TextBlock Classes="settings-heading" Text="启动与 SHELL"/>
-            <Border Classes="settings-group">
-              <StackPanel Spacing="10">
-                <TextBlock Text="新终端使用" FontSize="12" Foreground="{DynamicResource UiInk}"/>
-                <ComboBox SelectedIndex="{Binding ShellIndex}">
-                  <ComboBoxItem>PowerShell (pwsh)</ComboBoxItem>
-                  <ComboBoxItem>cmd.exe</ComboBoxItem>
-                  <ComboBoxItem>WSL / bash</ComboBoxItem>
-                  <ComboBoxItem>bash</ComboBoxItem>
-                  <ComboBoxItem>自定义</ComboBoxItem>
-                </ComboBox>
-                <TextBlock Text="自定义 Shell 路径" FontSize="12" Foreground="{DynamicResource UiInk}"/>
+                <TextBlock Text="新终端使用" Foreground="{DynamicResource UiInk}"/>
+                <ComboBox SelectedIndex="{Binding ShellIndex}"><ComboBoxItem>PowerShell (pwsh)</ComboBoxItem><ComboBoxItem>cmd.exe</ComboBoxItem><ComboBoxItem>WSL / bash</ComboBoxItem><ComboBoxItem>bash</ComboBoxItem><ComboBoxItem>自定义</ComboBoxItem></ComboBox>
+                <TextBlock Text="自定义 Shell 路径" Foreground="{DynamicResource UiInk}"/>
                 <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="C:\…\pwsh.exe"/>
               </StackPanel>
             </Border>
-          </StackPanel>
-        </ScrollViewer>
+          </TabItem>
+        </TabControl>
         <Border Grid.Row="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,1,0,0" Padding="20,12">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Text="你的终端，你的工作空间" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>

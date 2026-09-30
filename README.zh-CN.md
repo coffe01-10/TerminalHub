@@ -103,13 +103,15 @@ Claude Code、Codex CLI 等工具可以在 Shell 内单独安装和运行。已�
   <img src="docs/readme/typing.svg" width="470" alt="逐字输入还原、构建与启动命令的终端示意动画">
 </p>
 
-> **v0.1.0 初版。** Windows 可[下载便携 ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.1.0)，或按下面步骤从源码运行。程序尚未签名；Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。详见[版本说明](docs/releases/v0.1.0.md)。
+> **v0.2.0。** Windows 可[下载便携 ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.2.0)，或按下面步骤从源码运行。程序尚未签名；Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。详见[版本说明](docs/releases/v0.2.0.md)。
 
 ### Windows 便携预览
 
 开发者运行 `pwsh -File scripts/publish-windows.ps1 -SkipInstaller`，即可生成 `artifacts/TerminalHub-windows-x64-preview.zip`。解压整个文件夹后启动 `TerminalHub.exe`，无需安装 .NET SDK；包内附使用说明和许可证。缺少默认 Shell 时，应用会直接列出本机可用的 Shell 供选择。
 
 会话卡会提示后台新输出，并显示终端进程的退出码；打开对应会话后清除新输出提示。分屏中可见的两侧均视为正在查看。
+
+顶部设置中的「外观」提供主题、字体、字号和实时预览；「快捷键」可按键录入终端切换组合并保存。默认 `Alt+1…9` 按侧栏顺序直达终端，`Ctrl+Tab` / `Ctrl+Shift+Tab` 循环切换。这些快捷键在主窗口内生效。
 
 ### Windows
 

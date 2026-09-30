@@ -65,6 +65,12 @@ public sealed class AppSettings
     /// <summary>Terminal font family list ("" = built-in monospace stack).</summary>
     public string FontFamily { get; set; } = "";
     public string Theme { get; set; } = "DarkGlass";
+    public List<SessionShortcutBinding> SessionShortcuts
+    {
+        get => _sessionShortcuts;
+        set => _sessionShortcuts = value ?? SessionShortcutBinding.Defaults();
+    }
+    private List<SessionShortcutBinding> _sessionShortcuts = SessionShortcutBinding.Defaults();
     public bool InspectorVisible { get; set; }
     public bool OutputVisible { get; set; }
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>

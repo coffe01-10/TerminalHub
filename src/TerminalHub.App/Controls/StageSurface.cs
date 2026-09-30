@@ -14,7 +14,7 @@ public sealed class StageSurface : Border
         AvaloniaProperty.Register<StageSurface, double>(nameof(Reveal), 1);
     private readonly Transitions _motion = new()
     {
-        new DoubleTransition { Property = RevealProperty, Duration = TimeSpan.FromMilliseconds(540), Easing = new CubicEaseInOut() }
+        new DoubleTransition { Property = RevealProperty, Duration = TimeSpan.FromMilliseconds(300), Easing = new CubicEaseOut() }
     };
     private readonly MatrixTransform _transform = new(Matrix.Identity);
     private Matrix _from = Matrix.Identity;

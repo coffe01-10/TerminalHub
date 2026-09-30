@@ -4,7 +4,7 @@
 
 #define AppName      "Terminal Hub"
 #define AppNameZh    "终端控制中心"
-#define AppVersion   "0.1.0"
+#define AppVersion   "0.2.0"
 #define AppPublisher "coffe01-10"
 #define AppExe       "TerminalHub.exe"
 
