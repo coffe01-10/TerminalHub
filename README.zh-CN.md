@@ -103,7 +103,7 @@ Claude Code、Codex CLI 等工具可以在 Shell 内单独安装和运行。已�
   <img src="docs/readme/typing.svg" width="470" alt="逐字输入还原、构建与启动命令的终端示意动画">
 </p>
 
-> **v0.2.0。** Windows 可[下载便携 ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.2.0)，或按下面步骤从源码运行。程序尚未签名；Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。详见[版本说明](docs/releases/v0.2.0.md)。
+> **v0.3.0。** Windows 可[下载安装包或便携 ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.0)，或按下面步骤从源码运行。程序尚未签名；Windows 是首要平台，Linux 日常验证相对较少，macOS 尚不是已验证目标。详见[版本说明](docs/releases/v0.3.0.md)。
 
 ### Windows 便携预览
 

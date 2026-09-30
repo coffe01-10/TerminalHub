@@ -11,7 +11,7 @@
 - [x] 项目内主程序、旧预览目录、构建产物、便携 ZIP 和安装包同步到当前修复版。
 - [x] 用户已提交并推送上一轮结果；当前提交为 `4d1cfb1`（`Ship v0.3.0 workspace, command, and terminal features`）。
 
-GitHub Release 发布尚未确认，继续保留为待办；提交、推送与版本发布分别记录。
+- [x] 已发布 [v0.3.0 GitHub Release](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.0)，上传最新 Windows 安装包及便携 ZIP。
 
 ## 当前已有能力
 
@@ -81,7 +81,7 @@ GitHub Release 发布尚未确认，继续保留为待办；提交、推送与�
 
 - [x] 提供版本信息与当前版本说明入口。
 - [x] 提供手动检查更新与新版下载入口，清楚展示当前版本和可用版本。
-- [ ] 发布 Windows 安装包，同时保留便携 ZIP（两种产物已生成，待发布）。
+- [x] 发布 Windows 安装包，同时保留便携 ZIP（已上传至 v0.3.0 Release）。
 - [x] 升级时保留主题、快捷键、工作区模板等用户配置，不擅自结束正在运行的终端。
 
 完成场景：用户从应用中找到新版并完成安装或便携版替换，重启后原有配置仍可用。
