@@ -597,7 +597,7 @@ public class DeployDockTests
                 l.Source == "deploy" && l.Message.Contains("publish cancelled") && l.Message.Contains("已取消打包")));
             Assert.False(vm.PublishBusy());
             Assert.False(vm.IsPublishRunning);
-            Assert.Equal("Deploy", vm.DeployDockCaption);
+            Assert.Equal("部署", vm.DeployDockCaption);
             Assert.DoesNotContain(vm.Dashboard.OutputLog, l => l.Message.Contains("publish failed"));
 
             vm.CancelPublishCommand.Execute(null);
@@ -646,7 +646,7 @@ public class DeployDockTests
             Assert.Contains("Cancel", cancel.Header?.ToString());
             Assert.False(cancel.IsEnabled);
             Assert.False(vm.IsPublishRunning);
-            Assert.Equal("Deploy", DockCaption(deploy));
+            Assert.Equal("部署", DockCaption(deploy));
 
             vm.DeployFromDock(forceRepublish: true, root);
             await WaitFor(() => vm.PublishBusy());
@@ -661,7 +661,7 @@ public class DeployDockTests
             window.RefreshDeployContextMenu();
             Assert.False(vm.IsPublishRunning);
             Assert.False(cancel.IsEnabled);
-            await WaitFor(() => DockCaption(deploy) == "Deploy");
+            await WaitFor(() => DockCaption(deploy) == "部署");
 
             republish.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             await WaitFor(() => vm.SessionCards.Any(c => c.Name == "Publish" && c.Model.IsRunning));
@@ -700,7 +700,7 @@ public class DeployDockTests
             Assert.False(vm.HasLastPublishBadge);
             Assert.False(vm.CanOpenLastSuccessfulArtifact);
             Assert.Contains("尚未打包", vm.DeployDockTip);
-            Assert.Equal("Deploy", vm.DeployDockCaption);
+            Assert.Equal("部署", vm.DeployDockCaption);
 
             window.RefreshDeployContextMenu();
             var deploy = window.FindControl<Button>("DeployDockButton");
@@ -738,7 +738,7 @@ public class DeployDockTests
             Assert.True(vm.HasLastPublishBadge);
             Assert.True(vm.CanOpenLastSuccessfulArtifact);
             Assert.Contains("exit 0", vm.DeployDockTip);
-            Assert.Equal("Deploy", vm.DeployDockCaption);
+            Assert.Equal("部署", vm.DeployDockCaption);
             await WaitFor(() => deploy.GetVisualDescendants().OfType<TextBlock>()
                 .Any(t => t.IsVisible && t.Text == vm.LastPublishBadge));
 
@@ -811,7 +811,7 @@ public class DeployDockTests
             Assert.StartsWith("失败", reloaded.LastPublishBadge);
             Assert.False(reloaded.CanOpenLastSuccessfulArtifact);
             Assert.Contains("exit -1", reloaded.DeployDockTip);
-            Assert.Equal("Deploy", reloaded.DeployDockCaption);
+            Assert.Equal("部署", reloaded.DeployDockCaption);
         }
         finally
         {
@@ -850,7 +850,7 @@ public class DeployDockTests
             await WaitFor(() => vm.Settings.LastPublishResult?.Outcome == LastPublishResults.Cancelled);
             Assert.False(vm.PublishBusy());
             Assert.False(vm.IsPublishRunning);
-            Assert.Equal("Deploy", vm.DeployDockCaption);
+            Assert.Equal("部署", vm.DeployDockCaption);
             Assert.Equal(-1, vm.Settings.LastPublishResult!.ExitCode);
             Assert.True(vm.Settings.LastPublishResult.DurationMs >= 0);
             Assert.NotEqual(default, vm.Settings.LastPublishResult.FinishedAt);
@@ -1022,7 +1022,7 @@ public class DeployDockTests
     private static string? DockCaption(Button deploy) =>
         deploy.GetVisualDescendants().OfType<TextBlock>()
             .Select(t => t.Text)
-            .FirstOrDefault(t => t is "Deploy" or "打包中");
+            .FirstOrDefault(t => t is "部署" or "打包中");
 
     private static MenuItem OnlyChild(MenuItem menu) =>
         Assert.Single(menu.Items.OfType<MenuItem>());

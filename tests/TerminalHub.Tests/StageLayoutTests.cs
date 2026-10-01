@@ -53,6 +53,7 @@ public class StageLayoutTests
         var window = fixture.Window;
         await Task.Delay(700);
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[2];
+        fixture.Vm.DockVisibilityMode = 0; // exercise the auto-hide path explicitly
         await Task.Delay(450);
         var stage = window.FindControl<StageSurface>("StageWindow")!;
         var dock = window.FindControl<DropletDock>("ActionDock")!;
@@ -248,8 +249,12 @@ public class StageLayoutTests
         using var fixture = new StageFixture();
         await Task.Delay(700);
         var window = fixture.Window;
+        fixture.Vm.DockVisibilityMode = 0; // the hint pill exists only in auto-hide
         var dock = window.FindControl<DropletDock>("ActionDock")!;
         var hint = window.FindControl<Border>("DockHint")!;
+        // Reveal eases back to 0 after the mode flip — wait until it settles.
+        for (var i = 0; i < 40 && dock.Reveal > 0; i++) await Task.Delay(100);
+        Assert.Equal(0, dock.Reveal);
         Assert.Equal(82, dock.SurfaceBounds.Width);
         Assert.Equal(30, dock.SurfaceBounds.Height);
         window.MouseMove(new Point(window.Bounds.Width / 2 - 180, window.Bounds.Height - 40));
@@ -275,6 +280,8 @@ public class StageLayoutTests
         using var fixture = new StageFixture();
         var window = fixture.Window;
         await Task.Delay(700);
+        fixture.Vm.DockVisibilityMode = 0; // auto-hide is the behavior under test
+        await Task.Delay(300);
         var dock = window.FindControl<DropletDock>("ActionDock")!;
         var hint = window.FindControl<Border>("DockHint")!;
         var bottom = hint.TranslatePoint(new Point(hint.Bounds.Width / 2, hint.Bounds.Height / 2), window)!.Value;

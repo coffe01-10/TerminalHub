@@ -106,8 +106,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Optional clock for tests; defaults to UTC now. Live elapsed uses the real attempt stamp.</summary>
     internal Func<DateTimeOffset> UtcNow { get; set; } = static () => DateTimeOffset.UtcNow;
 
-    /// <summary>Dock caption: idle reads Deploy; a running publish reads 打包中.</summary>
-    public string DeployDockCaption => IsPublishRunning ? "打包中" : "Deploy";
+    /// <summary>Dock caption: idle reads 部署; a running publish reads 打包中.</summary>
+    public string DeployDockCaption => IsPublishRunning ? "打包中" : "部署";
 
     /// <summary>
     /// Short last-outcome text from the real exit record. Empty until a publish has finished.

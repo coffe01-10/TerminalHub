@@ -217,6 +217,7 @@ public class ProductIterationTests
         fixture.Window.UpdateLayout();
         var labels = fixture.Window.GetVisualDescendants().OfType<TextBlock>()
             .Where(text => text.Text is "查找" or "输出" or "工具")
+            .Where(text => text.IsEffectivelyVisible) // collapsed DockHint reports (0,0)
             .Where(text => text.TranslatePoint(default, fixture.Window)!.Value.Y < 64).ToArray();
         Assert.Equal(3, labels.Length);
         var centers = labels.Select(text => text.TranslatePoint(

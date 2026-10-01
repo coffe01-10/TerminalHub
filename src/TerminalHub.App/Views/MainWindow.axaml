@@ -1345,6 +1345,14 @@
         </Style>
       </ctl:DropletDock.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
+        <Button x:Name="NewDockButton" Classes="dock"
+                Command="{Binding DockSelectCommand}" CommandParameter="0"
+                ToolTip.Tip="新建终端">
+          <StackPanel>
+            <PathIcon Data="{StaticResource ToolAdd}" HorizontalAlignment="Center"/>
+            <TextBlock Text="新建" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+          </StackPanel>
+        </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                 Command="{Binding DockSelectCommand}" CommandParameter="1">
           <StackPanel>
@@ -1411,6 +1419,15 @@
                        HorizontalAlignment="Center" Margin="0,1,0,0" Opacity="0.72"
                        IsVisible="{Binding HasActivePublishProfileLabel}"
                        TextWrapping="NoWrap"/>
+          </StackPanel>
+        </Button>
+        <Button x:Name="SettingsDockButton" Classes="dock"
+                Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"
+                Command="{Binding DockSelectCommand}" CommandParameter="5"
+                ToolTip.Tip="设置">
+          <StackPanel>
+            <PathIcon Data="{StaticResource ToolSettings}" HorizontalAlignment="Center"/>
+            <TextBlock Text="设置" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
 
