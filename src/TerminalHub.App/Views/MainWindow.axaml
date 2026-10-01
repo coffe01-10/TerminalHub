@@ -862,7 +862,7 @@
                   <Button Content="↑" Padding="8,2" CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           IsEnabled="{Binding Files.CanGoUp}"
-                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级 · Backspace"/>
+                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级 · Backspace / Alt+↑"/>
                   <ScrollViewer x:Name="CrumbScroll" Grid.Column="1" Margin="6,0" VerticalAlignment="Center"
                                 HorizontalScrollBarVisibility="Auto"
                                 VerticalScrollBarVisibility="Disabled">
@@ -900,7 +900,7 @@
                           ToolTip.Tip="复制路径"/>
                   <Button Grid.Column="4" Content="⟳" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
-                          Command="{Binding Files.RefreshCommand}" ToolTip.Tip="刷新"/>
+                          Command="{Binding Files.RefreshCommand}" ToolTip.Tip="刷新 (F5)"/>
                   <Button Grid.Column="5" Content="⌂" Padding="8,2" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="会话目录"/>
@@ -908,7 +908,7 @@
                                 Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiFaint}"
                                 BorderBrush="{DynamicResource UiBorder}" FontSize="10"
                                 IsChecked="{Binding Files.ShowHidden}"
-                                ToolTip.Tip="显示隐藏文件（.* 开头或系统隐藏属性）">
+                                ToolTip.Tip="显示隐藏文件（.* 开头或系统隐藏属性）· Ctrl+H">
                     <ToggleButton.Styles>
                       <Style Selector="ToggleButton:checked">
                         <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>

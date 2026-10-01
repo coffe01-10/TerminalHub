@@ -804,6 +804,16 @@ public partial class MainWindow : Window
             Vm.Files.CopyPathCommand.Execute(Vm.Files.SelectedEntry);
             e.Handled = true;
         }
+        else if (e.Key == Key.F5)
+        {
+            Vm.Files.RefreshCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.H && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            Vm.Files.ShowHidden = !Vm.Files.ShowHidden;
+            e.Handled = true;
+        }
     }
 
     // Drag-out gesture: press records the row, a >6px move starts the real
