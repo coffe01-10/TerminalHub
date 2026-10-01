@@ -96,17 +96,26 @@ public partial class MainWindowViewModel
         LocateCommand(CommandRecords[next]);
     }
 
-    [RelayCommand]
-    private void CopyCommandRecord(CommandRecordViewModel? item)
+    /// <summary>Command text + output of a record, or null (notice set). Shared by
+    /// the copy button and the save-as-text export.</summary>
+    public string? GetCommandRecordText(CommandRecordViewModel? item)
     {
         item ??= SelectedCommand;
-        if (item is null || ActiveSession is null) { CommandNotice = "没有选中的命令。"; return; }
+        if (item is null || ActiveSession is null) { CommandNotice = "没有选中的命令。"; return null; }
         string? text;
         lock (ActiveSession.Emulator.Buffer.SyncRoot)
             text = item.Record.CopyText(ActiveSession.Emulator.Buffer);
-        if (text is null) { CommandNotice = UnavailableNotice(item.Record, locate: false); return; }
-        _ = CopyTextToClipboardAsync(text);
-        CommandNotice = "已复制命令和输出。";
+        if (text is null) { CommandNotice = UnavailableNotice(item.Record, locate: false); return null; }
+        return text;
+    }
+
+    [RelayCommand]
+    private async Task CopyCommandRecord(CommandRecordViewModel? item)
+    {
+        if (GetCommandRecordText(item) is not { } text) return;
+        CommandNotice = await CopyTextToClipboardAsync(text)
+            ? "已复制命令和输出。"
+            : "复制失败：剪贴板暂时不可用，请重试。";
     }
 
     private bool OnOtherScreen(CommandRecord record)

@@ -792,6 +792,11 @@ public sealed class ScreenBuffer
             CursorX = _primaryX;
             CursorY = _primaryY;
             _pendingWrap = _primaryPendingWrap;
+            // The alternate grid is discarded — its anchors point at discarded
+            // cells and must die now, or they would "resolve" against whatever
+            // TUI opens the grid next. Primary anchors keep their history.
+            foreach (var anchor in Anchors)
+                if (anchor.Alternate) anchor.Alive = false;
         }
         TouchAll();
     }

@@ -515,7 +515,10 @@ public class ProductV04Tests
         Assert.Equal("", vm.CommandNotice);
         Assert.True(record.CanLocate);
         vm.CopyCommandRecordCommand.Execute(record);
-        Assert.Equal("已复制命令和输出。", vm.CommandNotice);
+        // Headless has no clipboard — the copy path must run to a notice, and
+        // that notice reports failure rather than a fake success.
+        await Until(() => vm.CommandNotice.Length > 0);
+        Assert.Contains("复制失败", vm.CommandNotice);
 
         for (var i = 0; i < 40; i++) session.Emulator.Parser.Feed("\r\n");
         lock (session.Emulator.Buffer.SyncRoot) session.Emulator.Buffer.ClearScrollback();
@@ -530,6 +533,8 @@ public class ProductV04Tests
         vm.CopyCommandRecordCommand.Execute(vm.CommandRecords.Single(item => item.Title == "echo hi"));
         Assert.Contains("没有复制", vm.CommandNotice);
         vm.CopyCommandRecordCommand.Execute(vm.CommandRecords.Single(item => item.Title == "other"));
-        Assert.Equal("已复制命令和输出。", vm.CommandNotice);
+        // Reachable record but headless has no clipboard: the failure notice,
+        // distinct from「没有复制」which marks unusable records.
+        Assert.Contains("复制失败", vm.CommandNotice);
     }
 }

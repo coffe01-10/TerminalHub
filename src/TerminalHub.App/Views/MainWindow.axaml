@@ -329,6 +329,14 @@
                     <MenuItem Header="{Binding PreviousSessionMenuText}" Command="{Binding CycleSessionPrevCommand}"/>
                     <Separator/>
                     <MenuItem Header="复制 CWD" Command="{Binding CopyActiveCwdCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="复制当前屏幕" Click="OnCopyScreen" ToolTip.Tip="复制当前可见的终端文字；浏览历史时复制当前视口"/>
+                    <MenuItem Header="复制全部输出" Click="OnCopyAllOutput" ToolTip.Tip="复制缓冲中仍保留的历史与屏幕；已裁剪的旧输出不在其中"/>
+                    <MenuItem x:Name="SaveSelectionItem" Header="保存选区为文本" Click="OnSaveSelection"/>
+                    <MenuItem Header="保存全部输出" Click="OnSaveAllOutput"/>
+                    <Separator/>
+                    <MenuItem Header="添加书签" Click="OnAddBookmark" ToolTip.Tip="有选区时保存选区文字并定位到选区起点；否则以视口首行定位并保存预览"/>
+                    <MenuItem Header="书签列表" Click="OnShowBookmarks"/>
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
@@ -1231,6 +1239,8 @@
                   <Button Content="下一条" Margin="0,0,6,6" Command="{Binding NextCommandCommand}"/>
                   <Button Content="定位" Margin="0,0,6,6" Command="{Binding LocateCommandCommand}"/>
                   <Button Content="复制命令和输出" Margin="0,0,6,6" Command="{Binding CopyCommandRecordCommand}"/>
+                  <Button Content="保存为文本" Margin="0,0,6,6" Click="OnSaveCommandRecord"
+                          ToolTip.Tip="把选中的命令和输出保存为 UTF-8 .txt"/>
                 </WrapPanel>
                 <ListBox Grid.Row="1" ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
                          Background="Transparent" BorderThickness="0" DoubleTapped="OnCommandDoubleTapped">
@@ -1660,6 +1670,82 @@
     </Border>
     <Border IsVisible="{Binding NotificationVisible}" ZIndex="220" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24,0,24,90" MaxWidth="380" Padding="16" CornerRadius="12" Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1">
       <StackPanel Spacing="10"><TextBlock Text="{Binding NotificationText}" TextWrapping="Wrap" Foreground="{DynamicResource UiInk}"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="查看终端" Command="{Binding ShowNotificationSessionCommand}"/><Button Content="关闭" Command="{Binding DismissNotificationCommand}"/></StackPanel></StackPanel>
+    </Border>
+    <Border ZIndex="290" Background="#66000000" IsVisible="{Binding #BookmarkPanel.IsVisible}" PointerPressed="OnBookmarkBackdrop"/>
+    <Border x:Name="BookmarkPanel" IsVisible="False" ZIndex="300" Width="760" MaxHeight="620"
+            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24,80,24,24" Padding="20"
+            Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+            BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="14">
+      <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="10">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="输出书签" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Button Content="当前会话" Classes="terminal-tool" Padding="10,3" FontSize="11"
+                    Classes.selected="{Binding !BookmarksAllSessions}" Click="OnBookmarkScopeSession"/>
+            <Button Content="全部" Classes="terminal-tool" Padding="10,3" FontSize="11"
+                    Classes.selected="{Binding BookmarksAllSessions}" Click="OnBookmarkScopeAll"/>
+          </StackPanel>
+        </Grid>
+        <TextBox x:Name="BookmarkSearch" Grid.Row="1" Watermark="按名称、会话或保存的文字筛选…" TextChanged="OnBookmarkSearchChanged"/>
+        <TextBlock Grid.Row="2" FontSize="10" Foreground="{DynamicResource UiFaint}" TextWrapping="Wrap"
+                   Text="书签保存的是文字快照。来源输出被裁剪、会话关闭或应用重启后，定位不可用，文字仍可查看复制。"/>
+        <ListBox x:Name="BookmarkResults" Grid.Row="3" MaxHeight="220" Background="Transparent" BorderThickness="0"
+                 ItemsSource="{Binding VisibleBookmarks}" SelectedItem="{Binding SelectedBookmark}" Tapped="OnBookmarkTapped">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
+            <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:BookmarkViewModel">
+              <Grid ColumnDefinitions="*,Auto" Margin="6,5">
+                <StackPanel Spacing="3" MinWidth="0">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding Meta}" FontSize="10" Foreground="{DynamicResource UiMuted}"/>
+                  <TextBlock Text="{Binding Preview}" FontSize="10" Foreground="{DynamicResource UiFaint}" TextTrimming="CharacterEllipsis" MaxWidth="440"/>
+                  <TextBlock Text="{Binding LocateText}" FontSize="10" Foreground="{DynamicResource UiAccent}"
+                             IsVisible="{Binding LocateText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                  <Button Content="查看" FontSize="10" Padding="8,2" CornerRadius="5" Click="OnViewBookmark"
+                          ToolTip.Tip="查看保存的完整文字"/>
+                  <Button Content="定位" FontSize="10" Padding="8,2" CornerRadius="5"
+                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).LocateBookmarkCommand}" CommandParameter="{Binding}"
+                          ToolTip.Tip="跳转到原输出位置"/>
+                  <Button Content="复制" FontSize="10" Padding="8,2" CornerRadius="5"
+                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyBookmarkCommand}" CommandParameter="{Binding}"
+                          ToolTip.Tip="复制保存的文字"/>
+                  <Button Content="改名" FontSize="10" Padding="8,2" CornerRadius="5" Click="OnRenameBookmark"
+                          ToolTip.Tip="重命名书签"/>
+                  <Button Content="删除" FontSize="10" Padding="8,2" CornerRadius="5"
+                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteBookmarkCommand}" CommandParameter="{Binding}"/>
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <Grid Grid.Row="4" RowDefinitions="Auto,Auto" RowSpacing="6"
+              IsVisible="{Binding SelectedBookmark, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="保存的完整文字" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" x:Name="SaveBookmarkButton" Content="保存书签为文本" FontSize="11" Padding="10,3" Click="OnSaveBookmark"/>
+          </Grid>
+          <TextBox x:Name="BookmarkSnapshotText" Grid.Row="1" Text="{Binding SelectedBookmark.Text}" IsReadOnly="True"
+                   AcceptsReturn="True" TextWrapping="NoWrap" Height="130"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        </Grid>
+        <StackPanel Grid.Row="5" Spacing="5">
+          <TextBlock Text="{Binding BookmarkNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"
+                     IsVisible="{Binding BookmarkNotice, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+          <TextBlock x:Name="BookmarkEmpty" Text="还没有书签" FontSize="11" Foreground="{DynamicResource UiMuted}" TextWrapping="Wrap"/>
+          <TextBlock Text="查看：阅读完整文字 · 点击条目或按 Enter 定位 · Esc 返回" FontSize="11" Foreground="{DynamicResource UiFaint}"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Border x:Name="ToastPanel" IsVisible="False" ZIndex="310" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+            Margin="24,0,24,96" Padding="14,8" CornerRadius="10" MaxWidth="620"
+            Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1">
+      <TextBlock x:Name="ToastText" FontSize="11" Foreground="{DynamicResource UiInk}" TextWrapping="Wrap"/>
     </Border>
   </Panel>
 </Window>

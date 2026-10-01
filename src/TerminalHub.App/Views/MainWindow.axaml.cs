@@ -38,6 +38,7 @@ public partial class MainWindow : Window
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
         Vm.PaletteRequested += OpenPalette;
         Vm.RevealCommandRequested += OnRevealCommand;
+        InitializeOutputTools();
         Vm.PropertyChanged += OnStageSelectionChanged;
         SessionShelf.SelectionChanged += OnShelfSelectionChanged;
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
@@ -616,6 +617,7 @@ public partial class MainWindow : Window
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
         if (PalettePanel.IsVisible) { HandlePaletteKey(e); return; }
+        if (BookmarkPanel.IsVisible) { HandleBookmarkKey(e); return; }
         if (e.Source is ShortcutEditor) return;
         if (Vm.HandleSessionShortcut(e)) { e.Handled = true; return; }
         // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
@@ -719,6 +721,8 @@ public partial class MainWindow : Window
     {
         if (PinSessionItem is not null)
             PinSessionItem.Header = Vm.ActiveCard?.Model.Pinned == true ? "取消置顶" : "置顶";
+        if (SaveSelectionItem is not null)
+            SaveSelectionItem.IsEnabled = ActiveTerminal()?.HasSelection == true;
         if (ToggleGroupItem is not null)
         {
             var group = Vm.SessionGroups.FirstOrDefault(item => item.Id == Vm.ActiveCard?.Model.GroupId);
@@ -853,6 +857,8 @@ public partial class MainWindow : Window
     {
         Vm.PaletteRequested -= OpenPalette;
         Vm.RevealCommandRequested -= OnRevealCommand;
+        Vm.RevealBookmarkRequested -= OnRevealBookmark;
+        _toastTimer.Stop();
         _stageReady = false;
         Vm.PropertyChanged -= OnStageSelectionChanged;
         ++_selectionGeneration;

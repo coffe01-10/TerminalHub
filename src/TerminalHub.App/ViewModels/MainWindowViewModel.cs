@@ -329,6 +329,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _settings.SessionShortcuts.Add(new() { Action = SessionShortcutAction.CommandPalette, Gesture = "Ctrl+Shift+P" });
         LoadGroups();
         LoadFavorites();
+        LoadBookmarks();
         LoadExplorerMenu();
         LoadSessionShortcuts();
         foreach (var template in _settings.WorkspaceTemplates.OrderByDescending(t => t.LastUsed).ThenBy(t => t.Name))
@@ -899,20 +900,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!_disposed) RebuildShelf();
     }
 
-    /// <summary>Best-effort clipboard copy (no-op when headless / clipboard locked).</summary>
-    private static async Task CopyTextToClipboardAsync(string text)
+    /// <summary>Best-effort clipboard copy. False when headless (no window) or
+    /// the clipboard is unavailable — callers use it to toast failure instead of
+    /// success. Avalonia's Win32 clipboard throws TimeoutException while another
+    /// process holds it open, so catch broadly like the window-level helper.</summary>
+    private static async Task<bool> CopyTextToClipboardAsync(string text)
     {
         try
         {
             if (Avalonia.Application.Current?.ApplicationLifetime
                     is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
                 && desktop.MainWindow is { Clipboard: { } clipboard })
+            {
                 await clipboard.SetTextAsync(text);
+                return true;
+            }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        catch (Exception ex)
         {
             // Clipboard unavailable (headless / locked desktop) — copy stays best-effort.
+            System.Diagnostics.Trace.WriteLine($"Clipboard copy failed: {ex.Message}");
         }
+        return false;
     }
 
     /// <summary>Save dialog for the Logs one-shot export. No window (headless/automation),
@@ -1951,6 +1960,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 // session's combo so a recycled name doesn't inherit it.
                 Logs.ForgetSessionFilter(s.Name);
                 _settings.LogsSessionFilters.Remove(s.Name);
+                OnBookmarkSessionClosed(s);
             }
             RefreshCounts();
         });

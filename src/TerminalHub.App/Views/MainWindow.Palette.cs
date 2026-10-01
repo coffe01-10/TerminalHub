@@ -32,6 +32,18 @@ public partial class MainWindow
             Vm.ShowCommandHistoryCommand.Execute(null);
             return Task.CompletedTask;
         });
+        Add("复制当前屏幕", "复制当前终端可见的文字；浏览历史时为当前视口", "",
+            () => CopyVisibleScreenAsync());
+        Add("复制全部输出", "复制缓冲中仍保留的历史与屏幕；已裁剪的旧输出不在其中", "",
+            () => CopyAllOutputAsync());
+        Add("保存选区为文本", "把终端选中的文字保存为 UTF-8 .txt", "",
+            () => { OnSaveSelection(null, null!); return Task.CompletedTask; });
+        Add("保存全部输出", "把当前会话保留的全部输出保存为 .txt", "",
+            () => { OnSaveAllOutput(null, null!); return Task.CompletedTask; });
+        Add("添加书签", "为选中文字或当前视口添加可回看的书签", "",
+            () => AddBookmarkAsync());
+        Add("打开书签列表", "搜索、定位、复制已保存的输出书签", "",
+            () => { OpenBookmarks(); return Task.CompletedTask; });
         Add("新建终端", "打开新的 Shell", "Ctrl+Shift+N", () => Vm.NewSessionCommand.ExecuteAsync(null));
         Add("切换分屏", "并排查看终端", "", () => { Vm.ToggleSplitCommand.Execute(null); return Task.CompletedTask; });
         Add("重命名当前终端", "修改终端名称", "F2", async () =>

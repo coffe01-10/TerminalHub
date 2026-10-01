@@ -119,6 +119,15 @@ public sealed class AppSettings
     }
     private Dictionary<string, LogsSessionFilterState> _logsSessionFilters = new();
 
+    /// <summary>Saved output bookmarks (name, session name, time, text snapshot).
+    /// Runtime buffer anchors are never persisted.</summary>
+    public List<OutputBookmark> OutputBookmarks
+    {
+        get => _outputBookmarks;
+        set => _outputBookmarks = value ?? [];
+    }
+    private List<OutputBookmark> _outputBookmarks = [];
+
     /// <summary>Saved SSH connections for the right-rail SSH tab.</summary>
     public List<TerminalHub.Core.Ssh.SshHost> SshHosts { get; set; } = [];
 
