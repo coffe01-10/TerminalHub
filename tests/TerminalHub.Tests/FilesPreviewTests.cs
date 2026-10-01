@@ -156,6 +156,48 @@ public class FilesPreviewTests : IDisposable
         Assert.Equal(Path.Combine(_root, "a.txt"), vm.PreviewPath);
     }
 
+    [AvaloniaFact]
+    public void NewFolder_AutoName_AndSelects()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.NewFolder(null);
+        vm.NewFolder(null);
+
+        Assert.True(Directory.Exists(Path.Combine(_root, "新建文件夹")));
+        Assert.True(Directory.Exists(Path.Combine(_root, "新建文件夹 2")));
+        Assert.Equal("新建文件夹 2", vm.SelectedEntry?.Name);
+        Assert.True(vm.SelectedEntry?.IsDirectory);
+        Assert.False(vm.StatusIsError);
+    }
+
+    [AvaloniaFact]
+    public void NewTextFile_Named_AutoExt_AndSelects()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.NewTextFile("notes");           // no ext → .txt
+        vm.NewTextFile("script.sh");       // explicit ext kept
+
+        Assert.True(File.Exists(Path.Combine(_root, "notes.txt")));
+        Assert.True(File.Exists(Path.Combine(_root, "script.sh")));
+        Assert.Equal("script.sh", vm.SelectedEntry?.Name);
+        Assert.False(vm.SelectedEntry?.IsDirectory);
+        Assert.False(vm.StatusIsError);
+        Assert.Contains("已创建", vm.StatusText);
+    }
+
+    [AvaloniaFact]
+    public void NewFolder_BadName_ReportsError()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.NewFolder("a/b\0c"); // invalid path chars → ArgumentException/IOException
+
+        Assert.True(vm.StatusIsError);
+        Assert.Contains("无法创建", vm.StatusText);
+    }
+
     [Fact]
     public void Refresh_RestoredSameFile_KeepsPreview()
     {

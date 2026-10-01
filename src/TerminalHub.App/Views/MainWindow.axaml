@@ -950,6 +950,12 @@
                            Background="Transparent" BorderThickness="0" Padding="4"
                            DoubleTapped="OnFileEntryDoubleTapped"
                            KeyDown="OnFilesListKeyDown">
+                    <ListBox.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="新建文件夹" Click="OnFilesNewFolderClick"/>
+                        <MenuItem Header="新建文本文件" Click="OnFilesNewTextFileClick"/>
+                      </ContextMenu>
+                    </ListBox.ContextMenu>
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,3"/>

@@ -424,6 +424,67 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private bool IsFileSelection(FileEntry? entry)
         => (entry ?? SelectedEntry) is { IsDirectory: false };
 
+    /// <summary>Create a folder under CurrentPath. Null/blank name → auto
+    /// 「新建文件夹」「新建文件夹 2」…; the new entry gets selected.</summary>
+    public void NewFolder(string? name)
+    {
+        try
+        {
+            var final = string.IsNullOrWhiteSpace(name) ? UniqueName("新建文件夹") : name.Trim();
+            var path = Path.Combine(CurrentPath, final);
+            Directory.CreateDirectory(path);
+            NavigateTo(CurrentPath);
+            var full = Path.GetFullPath(path);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == full);
+            StatusIsError = false;
+            StatusText = $"已创建 {final}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法创建文件夹: {ex.Message}";
+        }
+    }
+
+    /// <summary>Create an empty UTF-8 text file under CurrentPath; same
+    /// unique-naming and selection rules as <see cref="NewFolder"/>.</summary>
+    public void NewTextFile(string? name)
+    {
+        try
+        {
+            var baseName = string.IsNullOrWhiteSpace(name) ? "新建文本.txt" : name.Trim();
+            if (!baseName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
+                && !baseName.Contains('.')) baseName += ".txt";
+            var final = UniqueName(baseName);
+            var path = Path.Combine(CurrentPath, final);
+            File.WriteAllText(path, "");
+            NavigateTo(CurrentPath);
+            var full = Path.GetFullPath(path);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == full);
+            StatusIsError = false;
+            StatusText = $"已创建 {final}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法创建文件: {ex.Message}";
+        }
+    }
+
+    private string UniqueName(string baseName)
+    {
+        var stem = Path.GetFileNameWithoutExtension(baseName);
+        var ext = Path.GetExtension(baseName);
+        var name = baseName;
+        var i = 1;
+        while (Directory.Exists(Path.Combine(CurrentPath, name))
+               || File.Exists(Path.Combine(CurrentPath, name)))
+            name = $"{stem} {++i}{ext}";
+        return name;
+    }
+
     private bool HasSelection(FileEntry? entry) => (entry ?? SelectedEntry) is not null;
 
     [RelayCommand]

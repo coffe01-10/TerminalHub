@@ -826,6 +826,20 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Empty-area context menu: create folder/file in the current dir.
+    /// The prompt enforces non-empty; cancel → no-op.</summary>
+    private async void OnFilesNewFolderClick(object? sender, RoutedEventArgs e)
+    {
+        var name = await PromptTextAsync("新建文件夹", "文件夹名称", "");
+        if (name is not null) Vm.Files.NewFolder(name);
+    }
+
+    private async void OnFilesNewTextFileClick(object? sender, RoutedEventArgs e)
+    {
+        var name = await PromptTextAsync("新建文本文件", "文件名称", "");
+        if (name is not null) Vm.Files.NewTextFile(name);
+    }
+
     // Drag-out gesture: press records the row, a >6px move starts the real
     // drag. Single click stays a pure selection (and previews the file).
     private Point? _filesDragStart;
