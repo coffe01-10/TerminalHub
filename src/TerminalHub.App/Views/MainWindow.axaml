@@ -1318,7 +1318,7 @@
                                IsVisible="{Binding Ssh.Hosts.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
                            Background="Transparent" BorderThickness="0" Padding="4"
-                           Tapped="OnSshRowTapped">
+                           Tapped="OnSshRowTapped" DoubleTapped="OnSshRowDoubleTapped">
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,4"/>

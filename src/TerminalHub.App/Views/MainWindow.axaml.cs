@@ -304,6 +304,15 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Double-click a saved host = connect (single click loads the edit form).</summary>
+    private void OnSshRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
+        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>()?.DataContext is SshHost h
+            && Vm.Ssh.ConnectCommand.CanExecute(h))
+            Vm.Ssh.ConnectCommand.Execute(h);
+    }
+
     private async Task RenameSessionAsync(SessionCardViewModel card)
     {
         var name = new TextBox { Text = card.Name, Watermark = "终端名称", Name = "SessionNameInput" };
