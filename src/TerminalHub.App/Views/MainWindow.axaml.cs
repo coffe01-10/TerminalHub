@@ -304,6 +304,16 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Enter on the host list = connect the selected row.</summary>
+    private void OnSshListKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Vm.Ssh.Selected is { } h)
+        {
+            Vm.Ssh.ConnectCommand.Execute(h);
+            e.Handled = true;
+        }
+    }
+
     /// <summary>Enter anywhere in the SSH form = 添加/更新 (its own validation shows errors).</summary>
     private void OnSshFormKeyDown(object? sender, KeyEventArgs e)
     {

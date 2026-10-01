@@ -1329,7 +1329,8 @@
                                IsVisible="{Binding Ssh.Hosts.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
                            Background="Transparent" BorderThickness="0" Padding="4"
-                           Tapped="OnSshRowTapped" DoubleTapped="OnSshRowDoubleTapped">
+                           Tapped="OnSshRowTapped" DoubleTapped="OnSshRowDoubleTapped"
+                           KeyDown="OnSshListKeyDown">
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,4"/>
@@ -1353,6 +1354,7 @@
                                        FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                           </StackPanel>
                           <Button Grid.Column="1" Content="连接" Padding="8,2" Margin="6,0,0,0"
+                                  ToolTip.Tip="连接 (Enter / 双击)"
                                   CornerRadius="5" Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}"
                                   BorderBrush="{DynamicResource UiBorder}" FontSize="10" ClickMode="Press"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Ssh.ConnectCommand}"
