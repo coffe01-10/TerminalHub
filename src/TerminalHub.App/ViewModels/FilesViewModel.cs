@@ -47,11 +47,15 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         _hasActiveSession = hasActiveSession;
     }
 
-    /// <summary>Selection change arms/disarms the entry commands.</summary>
+    /// <summary>Selection change arms/disarms the entry commands and keeps the
+    /// preview pane tracking the selected file (single-click preview); a dir or
+    /// no selection clears it.</summary>
     partial void OnSelectedEntryChanged(FileEntry? value)
     {
         OpenInTerminalCommand.NotifyCanExecuteChanged();
         CopyPathCommand.NotifyCanExecuteChanged();
+        if (value is { IsDirectory: false }) PreviewFile(value.FullPath);
+        else HasPreview = false;
     }
 
     /// <summary>Active-session churn also gates 「在此打开终端」 — the shell VM
@@ -211,6 +215,9 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Selection-tracked preview: a failed read must not leave the
+            // previous file's preview on screen under the new selection.
+            HasPreview = false;
             StatusText = $"无法读取文件: {ex.Message}";
         }
     }

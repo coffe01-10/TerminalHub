@@ -885,8 +885,13 @@
                           </Grid.ContextMenu>
                           <TextBlock Text="▸" Foreground="{DynamicResource UiAccent}" IsVisible="{Binding IsDirectory}"/>
                           <TextBlock Text="·" Foreground="{DynamicResource UiFaint}" IsVisible="{Binding !IsDirectory}"/>
-                          <TextBlock Grid.Column="1" Margin="2,0,0,0" Text="{Binding Name}"
-                                     Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="2,0,0,0">
+                            <TextBlock Text="{Binding Name}"
+                                       Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
+                            <TextBlock Text="→" FontSize="9" Foreground="{DynamicResource UiFaint}"
+                                       VerticalAlignment="Center" IsVisible="{Binding IsSymlink}"
+                                       ToolTip.Tip="{Binding LinkTarget, StringFormat='符号链接 → {0}'}"/>
+                          </StackPanel>
                           <TextBlock Grid.Column="2" Text="{Binding SizeBytes, Converter={x:Static vm:BytesConverter.Instance}}"
                                      Foreground="{DynamicResource UiFaint}" FontSize="9.5" HorizontalAlignment="Right"
                                      IsVisible="{Binding !IsDirectory}"/>
@@ -919,7 +924,7 @@
                 <Border Grid.Row="4" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                         IsVisible="{Binding !Files.HasPreview}">
-                  <TextBlock Text="双击文件查看预览" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                  <TextBlock Text="选中文件即可预览" Foreground="{DynamicResource UiFaint}" FontSize="10"
                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
               </Grid>

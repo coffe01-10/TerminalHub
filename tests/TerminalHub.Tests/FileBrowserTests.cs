@@ -58,6 +58,23 @@ public class FileBrowserTests : IDisposable
     }
 
     [Fact]
+    public void ListDirectory_MarksSymlinks()
+    {
+        var link = Path.Combine(_root, "zeta-link.txt");
+        var target = Path.Combine(_root, "zeta.txt");
+        try { File.CreateSymbolicLink(link, target); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return; // Windows without dev-mode/symlink privilege cannot create one.
+        }
+
+        var entry = LocalFileBrowser.ListDirectory(_root).First(e => e.Name == "zeta-link.txt");
+        Assert.True(entry.IsSymlink);
+        Assert.False(entry.IsDirectory);
+        Assert.Equal(target, entry.LinkTarget);
+    }
+
+    [Fact]
     public void ReadPreview_TooLarge_Skipped()
     {
         var big = Path.Combine(_root, "big.dat");

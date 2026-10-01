@@ -9,6 +9,8 @@ public sealed record FileEntry
     public required string FullPath { get; init; }
     public bool IsDirectory { get; init; }
     public bool IsSymlink { get; init; }
+    /// <summary>Link target as stored (may be relative); null for non-links.</summary>
+    public string? LinkTarget { get; init; }
     public long SizeBytes { get; init; }
     public DateTimeOffset Modified { get; init; }
 }
@@ -76,6 +78,7 @@ public static class LocalFileBrowser
             FullPath = info.FullName,
             IsDirectory = isDirectory,
             IsSymlink = info.LinkTarget is not null,
+            LinkTarget = info.LinkTarget,
             SizeBytes = isDirectory ? 0 : ((FileInfo)info).Length,
             Modified = info.LastWriteTime,
         };
