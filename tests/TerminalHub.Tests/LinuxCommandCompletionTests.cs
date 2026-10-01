@@ -83,6 +83,56 @@ public class LinuxCommandCompletionTests
             => await completions.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15));
     }
 
+    /// <summary>Regression: \[ \] quoting in PS0 is wrong — bash expands the
+    /// markers to raw SOH/STX bytes on stdout (no readline strip), which the
+    /// terminal then paints as two box glyphs before every command's output.
+    /// The C mark must arrive as a bare OSC with no \x01/\x02 around it.</summary>
+    [Fact]
+    public async Task Bash_CommandStartMark_LeavesNoControlBytesInOutput()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var emulator = new TerminalEmulator(new LinuxPtySession());
+        var raw = System.Threading.Channels.Channel.CreateUnbounded<byte>();
+        emulator.Pty.OutputReceived += (_, data) =>
+        {
+            foreach (var b in data.Span) raw.Writer.TryWrite(b);
+        };
+
+        await emulator.StartAsync(new PtyOptions
+        {
+            Shell = "bash", Arguments = ShellIntegration.BashArguments,
+            WorkingDirectory = "/tmp"
+        });
+        emulator.SendText("echo RAWMARK\r");
+
+        var window = new List<byte>(capacity: 512);
+        var deadline = Environment.TickCount64 + 15_000;
+        var sawC = false;
+        while (Environment.TickCount64 < deadline)
+        {
+            window.Add(await raw.Reader.ReadAsync()
+                .AsTask().WaitAsync(TimeSpan.FromSeconds(15)));
+            if (window.Count > 1024) window.RemoveRange(0, 512);
+            if (!sawC && EndsWith(window, "\x1b]133;C\x07"u8)) { sawC = true; continue; }
+            if (sawC && EndsWith(window, "RAWMARK"u8)) break;
+        }
+        Assert.True(sawC, "no OSC 133;C mark within 15s");
+        Assert.True(EndsWith(window, "RAWMARK"u8), "command output never arrived");
+
+        // Everything between the C mark and the command's own output must be
+        // the command output itself — never stray prompt-quoting bytes.
+        var tail = window.Skip(Math.Max(0, window.Count - 32)).ToArray();
+        Assert.DoesNotContain(tail, b => b is 1 or 2);
+    }
+
+    private static bool EndsWith(List<byte> window, ReadOnlySpan<byte> suffix)
+    {
+        if (window.Count < suffix.Length) return false;
+        for (var i = 0; i < suffix.Length; i++)
+            if (window[window.Count - suffix.Length + i] != suffix[i]) return false;
+        return true;
+    }
+
     /// <summary>Command journal parity: C/D marks produce finished records with
     /// exit codes, the same data the session card's exit hint uses.</summary>
     [Fact]

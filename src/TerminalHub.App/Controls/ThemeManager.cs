@@ -98,7 +98,7 @@ public static class ThemeManager
             "Paper" => "0 2 3 0 #28816D50",
             "White" => "0 3 8 0 #20314766",
             "Black" => "0 1 4 0 #60000000",
-            _ => "0 3 12 0 #40258ED6"
+            _ => "0 0 16 1 #5965ACED, 0 4 14 0 #300A1524"
         });
         app.Resources["HeadingFont"] = new FontFamily(Current == "Paper" ? "Georgia, Noto Serif, Microsoft YaHei UI, serif" : "Segoe UI, Noto Sans, sans-serif");
         TerminalPalette.SetTheme(Current);
