@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
@@ -127,6 +128,40 @@ public class StageLayoutTests
         Assert.Equal(0, grouped.ShelfTopMargin.Top); // below the group header
         Assert.All(cards.Where(c => c != pinned && c != grouped),
             c => Assert.Equal(-SessionCardViewModel.ShelfOverlap, c.ShelfTopMargin.Top));
+    }
+
+    [AvaloniaFact]
+    public async Task CardMenu_PerCardActions_WithoutActivating()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var vm = fixture.Vm;
+        var window = fixture.Window;
+        var cards = window.GetVisualDescendants().OfType<StageCard>()
+            .Where(c => c.IsEffectivelyVisible).ToList();
+        Assert.True(cards.Count >= 2);
+        var target = cards.First(c => !ReferenceEquals(c.DataContext, vm.ActiveCard));
+        var targetVm = (SessionCardViewModel)target.DataContext!;
+        var button = target.GetVisualDescendants().OfType<Button>()
+            .First(b => ToolTip.GetTip(b) as string == "会话操作");
+
+        var before = vm.ActiveCard;
+        button.Flyout!.ShowAt(button);
+        await Task.Delay(200);
+        var flyout = Assert.IsType<MenuFlyout>(button.Flyout);
+        Assert.Same(before, vm.ActiveCard); // opening the menu must not activate the card
+        var items = flyout.Items.OfType<MenuItem>().ToList();
+        Assert.Contains(items, i => i.Header as string == "设为当前终端");
+        Assert.Contains(items, i => i.Header as string == "置顶");
+        Assert.Contains(items, i => i.Header as string == "移入分组");
+        Assert.Contains(items, i => i.Header as string == "关闭会话");
+        flyout.Hide();
+
+        items.First(i => i.Header as string == "置顶")
+            .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        await Task.Delay(300);
+        Assert.True(targetVm.Model.Pinned); // menu action applied to the pointed card
+        Assert.Same(before, vm.ActiveCard); // and still did not switch the stage
     }
 
     [AvaloniaFact]

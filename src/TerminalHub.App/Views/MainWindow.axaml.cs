@@ -119,11 +119,21 @@ public partial class MainWindow : Window
     {
         if (_dragCard is not null) return;
         // Keep enough height for the full terminal grid; overflow remains scrollable.
-        var visibleCards = Math.Clamp(Vm.SessionCards.Count, 1, 5);
-        // Cards tuck 16px under the previous one, so each extra card only needs
-        // height - overlap of vertical room.
+        // Cards tuck ShelfOverlap px under the previous one (except segment
+        // tops) and pin/group headers occupy their own ~29px row — count both
+        // from the actual shelf items, capped at the first visibleCards cards.
+        var visibleCards = Math.Clamp(Vm.ShelfItems.OfType<SessionCardViewModel>().Count(), 1, 5);
         var overlap = SessionCardViewModel.ShelfOverlap;
-        ThumbnailHeight = Math.Clamp((SessionShelf.Bounds.Height - 34 + (visibleCards - 1) * overlap) / visibleCards, 208, 268);
+        const double headerHeight = 29; // group/pin header template: 12 padding + ~15 text + border
+        var tucked = 0; var headerH = 0.0; var seen = 0;
+        foreach (var item in Vm.ShelfItems)
+        {
+            if (seen >= visibleCards) break;
+            if (item is SessionGroupHeader) headerH += headerHeight;
+            else if (item is SessionCardViewModel c) { seen++; if (!c.IsStackTop) tucked++; }
+        }
+        ThumbnailHeight = Math.Clamp(
+            (SessionShelf.Bounds.Height - 34 - headerH + tucked * overlap) / visibleCards, 208, 268);
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Bounds.Width < 1250 ? 232 : 280);
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? (Bounds.Width < 1250 ? 300 : 326) : 0);
@@ -456,6 +466,9 @@ public partial class MainWindow : Window
     {
         _activateHeader = IsGroupHeader(e.Source);
         if (!e.GetCurrentPoint(SessionShelf).Properties.IsLeftButtonPressed) return;
+        // Presses on a card's ⋯ menu button must not start a drag or activate
+        // the card — the button owns the click.
+        if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         _dragCard = (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
             ?.DataContext as SessionCardViewModel;
         if (_dragCard is null) return;
@@ -538,7 +551,11 @@ public partial class MainWindow : Window
     {
         _shelfDragTimer.Stop();
         if (_dragCard is null) return;
-        var painted = _dragSlots.ToDictionary(s => s.Model, s => s.Top + s.Card.SlotOffset);
+        // Painted tops, not slot tops: a tucked card renders ShelfOverlap px
+        // above its slot, and its IsStackTop may flip when the drop crosses a
+        // segment boundary — comparing slot tops alone jumps it by 16px.
+        var painted = _dragSlots.ToDictionary(s => s.Model,
+            s => s.Top - (s.Model.IsStackTop ? 0 : SessionCardViewModel.ShelfOverlap) + s.Card.SlotOffset);
         if (commit && _cardDragging) Vm.MoveSessionCard(_dragCard, _dragSlots[_dragTo].Model);
         SessionShelf.UpdateLayout();
         foreach (var card in SessionShelf.GetVisualDescendants().OfType<StageCard>())
@@ -546,7 +563,8 @@ public partial class MainWindow : Window
             card.SetDragging(false);
             if (card.DataContext is SessionCardViewModel model && painted.TryGetValue(model, out var top))
             {
-                var newTop = card.FindAncestorOfType<ListBoxItem>()!.TranslatePoint(default, SessionShelf)!.Value.Y;
+                var newTop = card.FindAncestorOfType<ListBoxItem>()!.TranslatePoint(default, SessionShelf)!.Value.Y
+                    - (model.IsStackTop ? 0 : SessionCardViewModel.ShelfOverlap);
                 card.SetSlotOffset(top - newTop - ((_shelfScroll?.Offset.Y ?? 0) - _dragScrollStart), immediate: true);
             }
             card.SetSlotOffset(0);
@@ -805,6 +823,41 @@ public partial class MainWindow : Window
         }
         if (MoveToGroupMenu.Items.Count == 0)
             MoveToGroupMenu.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
+    }
+
+    /// <summary>Per-card "⋯" menu on shelf cards (mockup): same session ops as
+    /// the stage menu but applied to the card under the pointer, without
+    /// switching the active session first.</summary>
+    private void OnCardMenuOpening(object? sender, EventArgs e)
+    {
+        if (sender is not MenuFlyout flyout ||
+            flyout.Target?.DataContext is not SessionCardViewModel card) return;
+        flyout.Items.Clear();
+        MenuItem Item(string header, Action action, bool enabled = true)
+        {
+            var item = new MenuItem { Header = header, IsEnabled = enabled };
+            item.Click += (_, _) => action();
+            return item;
+        }
+        flyout.Items.Add(Item("设为当前终端", () => Vm.ActivateCard(card)));
+        flyout.Items.Add(Item("重命名", () => _ = RenameSessionAsync(card)));
+        flyout.Items.Add(Item(card.Model.Pinned ? "取消置顶" : "置顶",
+            () => Vm.SetPinned(card, !card.Model.Pinned)));
+        var moveTo = new MenuItem { Header = "移入分组" };
+        foreach (var group in Vm.SessionGroups)
+            moveTo.Items.Add(Item(group.Name, () => Vm.MoveCardToGroup(card, group.Id)));
+        if (moveTo.Items.Count == 0)
+            moveTo.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
+        flyout.Items.Add(moveTo);
+        flyout.Items.Add(Item("移出分组", () => Vm.MoveCardToGroup(card, null),
+            !string.IsNullOrEmpty(card.Model.GroupId)));
+        flyout.Items.Add(Item("新建分组", async () =>
+        {
+            var name = await PromptTextAsync("新建分组", "分组名称", "");
+            if (!string.IsNullOrWhiteSpace(name)) Vm.CreateGroup(name, card);
+        }));
+        flyout.Items.Add(new Separator());
+        flyout.Items.Add(Item("关闭会话", () => Vm.CloseSessionCommand.Execute(card)));
     }
 
     private async void OnCreateGroupForActive(object? sender, RoutedEventArgs e)

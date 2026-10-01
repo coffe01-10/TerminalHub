@@ -226,7 +226,7 @@
                     </Transitions>
                   </Border.Transitions>
                   <Grid RowDefinitions="24,*,Auto">
-                    <Grid ColumnDefinitions="*,Auto" Margin="3,0,3,4">
+                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="3,0,3,4">
                       <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="0,0,7,0">
                         <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" Margin="0,0,7,0"/>
                         <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource UiInk}"/>
@@ -237,6 +237,14 @@
                       </Border>
                       <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
                                  IsVisible="{Binding !ShowTagPill}" FontSize="9" VerticalAlignment="Center"/>
+                      <Button Grid.Column="2" VerticalAlignment="Center" Padding="5,0" Margin="2,0,0,0"
+                              Background="Transparent" BorderThickness="0" Cursor="Hand"
+                              ToolTip.Tip="会话操作" AutomationProperties.Name="会话卡操作">
+                        <Button.Flyout>
+                          <MenuFlyout Opening="OnCardMenuOpening"/>
+                        </Button.Flyout>
+                        <TextBlock Text="⋯" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource UiMuted}"/>
+                      </Button>
                     </Grid>
                     <Border Grid.Row="1" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="3" ClipToBounds="True">
                       <ctl:StagePreview Emulator="{Binding Model.Emulator}"/>
