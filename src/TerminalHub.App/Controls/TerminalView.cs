@@ -1239,6 +1239,12 @@ public partial class TerminalView : Control
                     e.Handled = true;
                     return;
                 }
+                if (e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                {
+                    SelectAll();
+                    e.Handled = true;
+                    return;
+                }
                 if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)
                     && e.Key >= Key.A && e.Key <= Key.Z)
                 {
@@ -1590,6 +1596,22 @@ public partial class TerminalView : Control
             el = Math.Min(el, buf.TotalLines - 1);
             return sl > el ? null : buf.ExtractText(sl, sc, el, ec);
         }
+    }
+
+    /// <summary>Select the whole buffer — scrollback + screen (Ctrl+Shift+A).</summary>
+    public void SelectAll()
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return;
+        lock (buf.SyncRoot)
+        {
+            SynchronizeCoordinates();
+            if (buf.TotalLines == 0) return;
+            _selAnchor = (0, 0);
+            _selEnd = (buf.TotalLines - 1, buf.Columns - 1);
+            _wordSelection = false;
+        }
+        InvalidateVisual();
     }
 
     /// <summary>Copy the current selection to the clipboard (Ctrl+Shift+C).</summary>

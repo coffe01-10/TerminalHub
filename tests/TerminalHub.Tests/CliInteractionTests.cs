@@ -206,4 +206,20 @@ public class CliInteractionTests
         Assert.Equal("\x1b[O", f.Pty.Text);
         Assert.Equal("\x1b[I", otherPty.Text);
     }
+
+    [AvaloniaFact]
+    public void CtrlShiftA_SelectsScrollbackAndScreen()
+    {
+        using var f = new Fixture();
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < 60; i++) sb.Append($"line-{i:D2}\r\n"); // > viewport height → scrollback
+        f.Emulator.Parser.Feed(sb.ToString().TrimEnd('\r', '\n'));
+
+        f.View.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent,
+            Key = Key.A, KeyModifiers = KeyModifiers.Control | KeyModifiers.Shift });
+        var text = f.View.GetSelectedText();
+        Assert.StartsWith("line-00", text);
+        Assert.EndsWith("line-59", text);
+        Assert.Empty(f.Pty.Writes); // Ctrl+Shift+A is a UI gesture — never reaches the shell
+    }
 }
