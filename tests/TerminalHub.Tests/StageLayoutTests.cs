@@ -54,7 +54,7 @@ public class StageLayoutTests
         var cards = fixture.Window.GetVisualDescendants().OfType<StageCard>()
             .Where(c => c.IsEffectivelyVisible).ToList();
         Assert.NotEmpty(cards);
-        var active = Assert.Single(cards.Where(c => c.IsActive));
+        var active = Assert.Single(cards, c => c.IsActive);
         var accent = (SolidColorBrush)ThemeManager.Brush("Accent");
 
         var activeBorder = active.GetVisualChildren().OfType<Border>().First();

@@ -99,10 +99,30 @@ public class InspectorVisibilityTests
             var list = window.GetVisualDescendants().OfType<ListBox>()
                 .First(l => ReferenceEquals(l.ItemsSource, vm.Dashboard.Processes));
             Assert.True(list.IsEffectivelyVisible);
-            Assert.NotEmpty(list.GetVisualDescendants().OfType<TextBlock>()
-                .Where(t => int.TryParse(t.Text, out _))); // PID column realized
+            Assert.Contains(list.GetVisualDescendants().OfType<TextBlock>(),
+                t => int.TryParse(t.Text, out _)); // PID column realized
         }
         finally { window.Close(); PtySessionFactory.UseMock = false; }
+    }
+
+    [Fact]
+    public void InspectorVisible_Null_IsNotSerialized()
+    {
+        // Old builds typed InspectorVisible as plain bool: a written "null"
+        // would throw on their deserialize, failing their whole settings load
+        // and disabling persistence. "Never chosen" must stay an absent key.
+        var dir = Path.Combine(Path.GetTempPath(), "terminalhub-iv-" + Guid.NewGuid());
+        try
+        {
+            var path = Path.Combine(dir, "settings.json");
+            var store = new SettingsStore(path);
+            store.Save(new AppSettings());
+            Assert.DoesNotContain("InspectorVisible", File.ReadAllText(path));
+
+            var loaded = new SettingsStore(path).Load();
+            Assert.Null(loaded.InspectorVisible); // absent key still loads as null → default on
+        }
+        finally { Directory.Delete(dir, true); }
     }
 
     private sealed class IdleMonitor : ISystemMonitor

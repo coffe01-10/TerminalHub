@@ -152,9 +152,9 @@ public partial class MainWindow : Window
         var scroll = SessionShelf.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (card is null || scroll is null) return;
         if (card.TranslatePoint(default, SessionShelf) is not { } top) return;
-        const double topPad = 14, bottomPad = 16; // SessionShelf padding
+        var topPad = SessionShelf.Padding.Top;
         var bottom = top.Y + card.Bounds.Height;
-        var viewBottom = SessionShelf.Bounds.Height - bottomPad;
+        var viewBottom = SessionShelf.Bounds.Height - SessionShelf.Padding.Bottom;
         var dy = top.Y < topPad ? top.Y - topPad
             : bottom > viewBottom ? Math.Min(bottom - viewBottom, top.Y - topPad)
             : 0;
@@ -506,8 +506,8 @@ public partial class MainWindow : Window
         double CardCenter(int i) => _dragSlots[i].Top + ThumbnailHeight / 2
             - (_dragSlots[i].Model.IsStackTop ? 0 : SessionCardViewModel.ShelfOverlap);
         var center = CardCenter(_dragFrom) + delta;
-        // Compare against fixed slot centers, with a small hysteresis for hand
-        // jitter. Never hit-test the animated cards to decide the next order.
+        // Compare against painted card centers, with a small hysteresis for
+        // hand jitter. Never hit-test the animated cards to decide the order.
         while (_dragTo < _dragSlots.Length - 1 && center > (CardCenter(_dragTo) + CardCenter(_dragTo + 1)) / 2 + 8) _dragTo++;
         while (_dragTo > 0 && center < (CardCenter(_dragTo) + CardCenter(_dragTo - 1)) / 2 - 8) _dragTo--;
         for (var i = 0; i < _dragSlots.Length; i++)

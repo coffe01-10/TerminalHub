@@ -79,7 +79,12 @@ public sealed class AppSettings
     }
     private List<SessionShortcutBinding> _sessionShortcuts = SessionShortcutBinding.Defaults();
     /// <summary>Right inspector visibility. null = never chosen → default visible
-    /// (mockup parity); an explicit persisted false keeps the panel closed.</summary>
+    /// (mockup parity); an explicit persisted false keeps the panel closed.
+    /// Null must never be serialized: old builds typed this as plain bool and a
+    /// written "null" would throw on deserialize, failing their whole settings
+    /// load and disabling persistence.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(
+        Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public bool? InspectorVisible { get; set; }
     public bool OutputVisible { get; set; } = true;
     /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
