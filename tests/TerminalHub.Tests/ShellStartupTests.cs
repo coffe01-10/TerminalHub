@@ -11,6 +11,11 @@ namespace TerminalHub.Tests;
 
 public class ShellStartupTests
 {
+    /// <summary>The fake "installed" shell must be a candidate ShellDiscovery
+    /// would offer on this OS — cmd.exe on Windows, bash on Linux.</summary>
+    private static readonly string FakeShell = OperatingSystem.IsWindows() ? "cmd.exe" : "bash";
+    private static readonly ShellKind FakeShellKind = OperatingSystem.IsWindows() ? ShellKind.Cmd : ShellKind.Bash;
+
     [AvaloniaFact]
     public async Task WorkspaceUsingInstalledShell_DoesNotRequireUnusedDefault()
     {
@@ -22,9 +27,9 @@ public class ShellStartupTests
             var store = new SettingsStore(Path.Combine(directory, "settings.json"));
             store.Save(new AppSettings { Workspace = new WorkspaceState
             {
-                Sessions = [new WorkspaceSession { Name = "cmd work", Shell = "cmd.exe" }]
+                Sessions = [new WorkspaceSession { Name = "cmd work", Shell = FakeShell }]
             } });
-            using var vm = new MainWindowViewModel(settingsStore: store, shellAvailable: command => command == "cmd.exe");
+            using var vm = new MainWindowViewModel(settingsStore: store, shellAvailable: command => command == FakeShell);
             await vm.SpawnStartupSessionsAsync();
             await Task.Delay(30);
             Assert.False(vm.ShellSetupOpen);
@@ -49,7 +54,7 @@ public class ShellStartupTests
             {
                 Sessions = [new WorkspaceSession { Name = "saved work", Shell = "pwsh" }]
             } });
-            var window = new MainWindow(store, shellAvailable: command => command == "cmd.exe") { Width = 1100, Height = 680 };
+            var window = new MainWindow(store, shellAvailable: command => command == FakeShell) { Width = 1100, Height = 680 };
             try
             {
                 window.Show();
@@ -82,18 +87,18 @@ public class ShellStartupTests
                 Sessions = [new WorkspaceSession { Name = "my work", Shell = "pwsh", WorkingDirectory = Environment.CurrentDirectory }],
                 ActiveIndex = 0
             } });
-            using var vm = new MainWindowViewModel(settingsStore: store, shellAvailable: command => command == "cmd.exe");
+            using var vm = new MainWindowViewModel(settingsStore: store, shellAvailable: command => command == FakeShell);
             await vm.SpawnStartupSessionsAsync();
             Assert.True(vm.ShellSetupOpen);
             Assert.Empty(vm.SessionCards);
-            Assert.Equal("cmd.exe", Assert.Single(vm.AvailableStartupShells).Command);
+            Assert.Equal(FakeShell, Assert.Single(vm.AvailableStartupShells).Command);
             await vm.ContinueShellSetupCommand.ExecuteAsync(null);
             await Task.Delay(30); // SessionAdded adds cards on the UI dispatcher.
             Assert.False(vm.ShellSetupOpen);
             var session = Assert.Single(vm.SessionCards).Model;
             Assert.Equal("my work", session.Name);
-            Assert.Equal("cmd.exe", session.Shell);
-            Assert.Equal(ShellKind.Cmd, store.Load().Shell);
+            Assert.Equal(FakeShell, session.Shell);
+            Assert.Equal(FakeShellKind, store.Load().Shell);
         }
         finally
         {

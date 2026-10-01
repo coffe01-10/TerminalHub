@@ -983,8 +983,21 @@ public class LogsPanelTests
         if (!OperatingSystem.IsLinux()) return; // spawns a real PTY session
 
         var dir = Path.Combine(Path.GetTempPath(), "th-logs-" + Guid.NewGuid().ToString("N"));
-        var vm = new MainWindowViewModel(new FakeMonitor(),
-            new SettingsStore(Path.Combine(dir, "settings.json")));
+        // Default shell kind resolves to pwsh — absent here, the setup picker
+        // would intercept startup and no session would spawn. Provision bash,
+        // the installed shell a Linux user would pick in that dialog.
+        var store = new SettingsStore(Path.Combine(dir, "settings.json"));
+        store.Save(new AppSettings
+        {
+            Shell = ShellKind.Bash,
+            StartupSessions =
+            [
+                new StartupSession { Name = "Terminal 01", Tag = "开发环境", Shell = ShellKind.Bash },
+                new StartupSession { Name = "Terminal 02", Tag = "测试环境", Shell = ShellKind.Bash },
+                new StartupSession { Name = "Terminal 03", Tag = "部署控制", Shell = ShellKind.Bash },
+            ]
+        });
+        var vm = new MainWindowViewModel(new FakeMonitor(), store);
         try
         {
             await vm.SpawnStartupSessionsAsync(); // default settings spawn 3 startup sessions

@@ -150,7 +150,10 @@ public class ToolbarCwdNavTests
         MainWindowViewModel? vm = null;
         try
         {
-            vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath));
+            // The session is a MockPty — the Connect gate only needs the ssh
+            // binary to LOOK installed; CI/dev boxes may not have openssh-client.
+            vm = new MainWindowViewModel(new FakeMonitor(), new SettingsStore(settingsPath),
+                sshAvailable: () => true);
             await vm.SpawnStartupSessionsAsync();
             await Until(() => vm.SessionCards.Count > 0);
 

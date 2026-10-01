@@ -40,3 +40,15 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj --filter FullyQuali
 ## 2026-09-30 v0.4 未重复实机
 
 v0.4 工作区功能没有重跑 Claude、Codex 或 Grok 的实机编辑。新增的 Headless 用例只确认两个终端视图在字号 13 和 20 下仍对到同一格；已有用例继续覆盖字体变化后、绘制前的输入法坐标。真实 PowerShell 用更新后的 OSC 133 回车处理仍能报告成功和非零退出码。系统输入法候选窗、多显示器和登录后的 Codex / Grok 仍然没有验证。
+
+## 2026-10-01 Linux 与 Windows 对齐
+
+Linux 侧补齐了与 Windows 同档的 PTY 能力和回归：
+
+- **bash Shell 集成**：Linux 上交互式 bash 会话注入 `ShellIntegration.BashArguments`（`--rcfile <settings>/bash-integration.sh`，脚本先加载 `/etc/bash.bashrc` 与 `~/.bashrc` 再挂钩子，不改动用户配置文件）。PROMPT_COMMAND 发出 `OSC 133;D;<退出码>`、`OSC 7;file://host/path`（cwd）、`133;A`；PS1 尾部附 `133;B`；PS0 发 `133;C`。此前 Linux 只能靠 `/proc` 轮询 cwd，命令完成事件和退出码提示完全缺失。bash < 5.0 没有 PS0，退化为只有 cwd/prompt 标记。
+- **PowerShell 集成不再限 Windows**：Linux 上选 pwsh 同样注入 OSC 133/9;9 参数。
+- **环境变量**：`PtyEnvironment` 在非 Windows 且父环境没有 `LANG`/`LC_ALL` 时补 `LANG=C.UTF-8`，避免子进程落到 POSIX/C 使 UTF-8/CJK 工具退化。
+- **新增 Linux 对等测试**（`dotnet test` 本机全绿）：`LinuxStreamingTests`（退出前流式输出 + COLORTERM/自定义环境变量、订阅者异常不阻断后续输出、退出码上报、`stty size` 验证 resize 生效）对照 `WindowsStreamingTests`；`LinuxCommandCompletionTests`（OSC 133 退出码序列 0→7→0→1、OSC 7 cwd 跟踪 cd、CommandJournal 记录）对照 `WindowsCommandCompletionTests`；`PtyEnvironmentTests` 覆盖环境合成。
+- **实机 CLI**：`LocalClaudeFact`/`LocalGrokFact` 现同时在 Windows/Linux 生效，按平台选 ConPTY/forkpty；仍需 `TERMINALHUB_CLAUDE_PATH`/`TERMINALHUB_GROK_PATH` + 已信任目录（`TERMINALHUB_CLI_CWD`），不设则明确 Skip。Windows 专属的标准句柄重定向只在 Windows 分支执行。
+
+仍不对等项：zsh/sh 无集成（zsh 需要 ZDOTDIR 方案，另立项）；交互式 bash 中 `sleep &` 这类作业控制子进程有独立进程组，Kill 只负责 shell 所在组（与 Windows 的整树杀法有差异，属有意保留的 Linux 语义）。
