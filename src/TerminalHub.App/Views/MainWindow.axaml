@@ -709,12 +709,15 @@
                         <Setter Property="Padding" Value="6,3"/>
                         <Setter Property="Margin" Value="0,1"/>
                         <Setter Property="CornerRadius" Value="6"/>
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                         <Setter Property="FontSize" Value="10.5"/>
                       </Style>
+                      <Style Selector="ListBoxItem:pointerover">
+                        <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
+                      </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
@@ -864,10 +867,10 @@
                         <Setter Property="FontSize" Value="10.5"/>
                       </Style>
                       <Style Selector="ListBoxItem:pointerover">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
@@ -1245,10 +1248,10 @@
                         <Setter Property="Background" Value="Transparent"/>
                       </Style>
                       <Style Selector="ListBoxItem:pointerover">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
