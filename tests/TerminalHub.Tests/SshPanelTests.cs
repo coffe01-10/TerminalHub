@@ -217,4 +217,52 @@ public class SshPanelTests
         vm.ToggleEditingCommand.Execute(null);
         Assert.False(vm.Editing);
     }
+
+    [Fact]
+    public void Remove_LastSelectedHost_ReopensForm_NoDeadEnd()
+    {
+        // Selected row + collapsed form + delete → the empty panel must still
+        // offer the form (the ＋ header hides when no hosts exist).
+        var store = new List<SshHost> { new SshHost { Host = "h1" } };
+        var vm = new SshViewModel(store, _ => { }, () => { });
+        vm.Selected = vm.Hosts[0];
+        vm.ToggleEditingCommand.Execute(null);
+        Assert.False(vm.Editing);
+
+        vm.RemoveCommand.Execute(vm.Hosts[0]);
+        Assert.Empty(vm.Hosts);
+        Assert.True(vm.Editing);
+        Assert.Equal("", vm.EditHost);
+    }
+
+    [Fact]
+    public void Remove_SelectedHost_ClearsForm()
+    {
+        var store = new List<SshHost> { new SshHost { Host = "h1" }, new SshHost { Host = "h2" } };
+        var vm = new SshViewModel(store, _ => { }, () => { });
+        vm.Selected = vm.Hosts[0];
+        vm.RemoveCommand.Execute(vm.Hosts[0]);
+        Assert.Single(vm.Hosts);
+        Assert.Null(vm.Selected);
+        Assert.Equal("", vm.EditHost);
+        Assert.False(vm.Editing);
+    }
+
+    [Fact]
+    public void ToggleEditing_OpensBlankNewEntry_NotSelectedHost()
+    {
+        var store = new List<SshHost> { new SshHost { Host = "h1", Port = 2201 } };
+        var vm = new SshViewModel(store, _ => { }, () => { });
+        vm.Selected = vm.Hosts[0]; // form filled with h1
+        vm.ToggleEditingCommand.Execute(null);  // close
+        vm.ToggleEditingCommand.Execute(null);  // ＋ = new connection
+
+        Assert.True(vm.Editing);
+        Assert.Null(vm.Selected);
+        Assert.Equal("", vm.EditHost);
+
+        vm.EditHost = "h2";
+        vm.AddOrUpdateCommand.Execute(null);
+        Assert.Equal(2, store.Count); // adds — must not overwrite h1
+    }
 }

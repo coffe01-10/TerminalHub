@@ -55,10 +55,23 @@ public partial class SshViewModel : ViewModelBase
         Editing = true; // selecting a row means the user wants to edit it
     }
 
-    /// <summary>Host list is the default view once hosts exist — the form
-    /// opens on demand via ＋ or by selecting a host row.</summary>
+    /// <summary>Host list is the default view once hosts exist — ＋ opens a
+    /// blank form for a new connection (never pre-filled with the selected
+    /// host, or 添加/更新 would overwrite that row instead of adding).</summary>
     [RelayCommand]
-    private void ToggleEditing() => Editing = !Editing;
+    private void ToggleEditing()
+    {
+        if (Editing) { Editing = false; return; }
+        Selected = null;
+        ClearEdit();
+        Editing = true;
+    }
+
+    private void ClearEdit()
+    {
+        EditName = EditUser = EditHost = "";
+        EditPort = "22";
+    }
 
     /// <summary>Add a new host, or update the row whose Name/Target matches.</summary>
     [RelayCommand]
@@ -113,13 +126,20 @@ public partial class SshViewModel : ViewModelBase
     {
         if (host is null) return;
         var idx = Hosts.IndexOf(host);
-        if (idx >= 0)
+        if (idx < 0) return;
+        var wasSelected = ReferenceEquals(Selected, host);
+        Hosts.RemoveAt(idx);
+        _hosts.RemoveAt(idx);
+        _persist();
+        if (wasSelected)
         {
-            Hosts.RemoveAt(idx);
-            _hosts.RemoveAt(idx);
-            _persist();
+            // The deleted host's values must not linger in the form.
+            Selected = null;
+            ClearEdit();
         }
-        if (ReferenceEquals(Selected, host)) Selected = null;
+        // The empty list always offers the form — it is the only way to add.
+        if (Hosts.Count == 0) Editing = true;
+        else if (wasSelected) Editing = false;
     }
 
     /// <summary>Spawn a new terminal session running `ssh -p port user@host`.</summary>
