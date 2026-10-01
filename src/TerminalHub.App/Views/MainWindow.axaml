@@ -929,7 +929,8 @@
                 <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="2,6,2,2"
                       IsVisible="{Binding Files.HasPreview}">
                   <TextBlock Text="{Binding Files.PreviewTitle}" FontSize="10.5" FontWeight="SemiBold"
-                             Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                             Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"
+                             ToolTip.Tip="{Binding Files.PreviewPath}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Files.PreviewMeta}" FontSize="9"
                              Foreground="{DynamicResource UiFaint}" VerticalAlignment="Center"/>
                 </Grid>

@@ -31,6 +31,8 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// <summary>true → status line paints as an error (UiBad); false → info (UiMuted).</summary>
     [ObservableProperty] private bool _statusIsError;
     [ObservableProperty] private string _previewTitle = "";
+    /// <summary>Absolute path of the previewed file (title tooltip).</summary>
+    [ObservableProperty] private string _previewPath = "";
     [ObservableProperty] private string _previewMeta = "";
     [ObservableProperty] private string _previewText = "";
     [ObservableProperty] private bool _hasPreview;
@@ -120,7 +122,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             WatchDirectory();
             RebuildCrumbs();
             StatusIsError = false;
-            StatusText = entries.Count == 0 ? "空目录" : "";
+            StatusText = entries.Count == 0 ? "空目录" : $"{entries.Count} 项";
             CanGoUp = Directory.GetParent(CurrentPath) is not null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -220,6 +222,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         {
             var p = LocalFileBrowser.ReadPreview(path);
             PreviewTitle = Path.GetFileName(path);
+            PreviewPath = Path.GetFullPath(path);
             var meta = $"{MainWindowViewModel.FmtBytes(p.SizeBytes)} · {p.Modified:yyyy-MM-dd HH:mm}";
             switch (p.Kind)
             {

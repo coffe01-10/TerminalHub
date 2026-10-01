@@ -114,6 +114,18 @@ public class FilesPreviewTests : IDisposable
     }
 
     [Fact]
+    public void NavigateTo_ShowsItemCount_AndPreviewPath()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root); // 3 entries: sub/, a.txt, blob.bin
+        Assert.Equal("3 项", vm.StatusText);
+        Assert.False(vm.StatusIsError);
+
+        vm.SelectedEntry = vm.Entries.First(e => e.Name == "a.txt");
+        Assert.Equal(Path.Combine(_root, "a.txt"), vm.PreviewPath);
+    }
+
+    [Fact]
     public void Refresh_RestoredSameFile_KeepsPreview()
     {
         using var vm = new FilesViewModel();
