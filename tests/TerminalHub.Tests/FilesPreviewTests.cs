@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using TerminalHub.App.ViewModels;
 using TerminalHub.Core.Files;
 using Xunit;
@@ -111,6 +112,36 @@ public class FilesPreviewTests : IDisposable
 
         vm.ShowHidden = false;
         Assert.DoesNotContain(vm.Entries, e => e.Name == ".hideme");
+    }
+
+    [AvaloniaFact]
+    public void SelectingPng_ShowsImage_NotBinaryNotice()
+    {
+        // Smallest valid 1×1 PNG — Bitmap must actually decode it.
+        File.WriteAllBytes(Path.Combine(_root, "px.png"),
+            Convert.FromBase64String(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="));
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.SelectedEntry = vm.Entries.First(e => e.Name == "px.png");
+
+        Assert.True(vm.HasPreview);
+        Assert.True(vm.PreviewIsImage);
+        Assert.NotNull(vm.PreviewImage);
+        Assert.Contains("图片", vm.PreviewMeta);
+    }
+
+    [AvaloniaFact]
+    public void CorruptPng_FallsBackToBinaryNotice()
+    {
+        File.WriteAllBytes(Path.Combine(_root, "bad.png"), [0x89, 0x50, 0x00, 0x01]);
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.SelectedEntry = vm.Entries.First(e => e.Name == "bad.png");
+
+        Assert.True(vm.HasPreview);
+        Assert.False(vm.PreviewIsImage);
+        Assert.Contains("二进制", vm.PreviewText);
     }
 
     [Fact]

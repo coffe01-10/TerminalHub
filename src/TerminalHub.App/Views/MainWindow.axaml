@@ -939,12 +939,17 @@
                 <Border Grid.Row="4" CornerRadius="8" Background="{DynamicResource UiCanvas}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Padding="4"
                         IsVisible="{Binding Files.HasPreview}">
-                  <TextBox Text="{Binding Files.PreviewText}" IsReadOnly="True"
-                           AcceptsReturn="True" TextWrapping="NoWrap" BorderThickness="0"
-                           Background="Transparent" Foreground="{DynamicResource UiMuted}" FontSize="9.5"
-                           FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
-                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                           ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                  <Panel>
+                    <Image Source="{Binding Files.PreviewImage}" Stretch="Uniform"
+                           IsVisible="{Binding Files.PreviewIsImage}"/>
+                    <TextBox Text="{Binding Files.PreviewText}" IsReadOnly="True"
+                             AcceptsReturn="True" TextWrapping="NoWrap" BorderThickness="0"
+                             Background="Transparent" Foreground="{DynamicResource UiMuted}" FontSize="9.5"
+                             FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
+                             IsVisible="{Binding !Files.PreviewIsImage}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                  </Panel>
                 </Border>
                 <Border Grid.Row="4" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"

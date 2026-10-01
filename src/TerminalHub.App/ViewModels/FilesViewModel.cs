@@ -35,6 +35,9 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _previewPath = "";
     [ObservableProperty] private string _previewMeta = "";
     [ObservableProperty] private string _previewText = "";
+    /// <summary>Decoded image for raster previews; null for text/binary.</summary>
+    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _previewImage;
+    [ObservableProperty] private bool _previewIsImage;
     [ObservableProperty] private bool _hasPreview;
     [ObservableProperty] private bool _canGoUp;
     [ObservableProperty] private bool _showHidden;
@@ -216,10 +219,50 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// <summary>Open the currently selected entry (keyboard).</summary>
     public void OpenSelected() => Open(SelectedEntry);
 
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+        { ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico" };
+
+    /// <summary>Bitmaps beyond this size fall through to the binary notice.</summary>
+    public const long MaxImagePreviewBytes = 16 * 1024 * 1024;
+
     private void PreviewFile(string path)
     {
+        // Release the previous bitmap before replacing: keeping it alive would
+        // hold the source file open (a real file lock on Windows).
+        PreviewImage?.Dispose();
+        PreviewImage = null;
+        PreviewIsImage = false;
         try
         {
+            // Images bypass ReadPreview: its 2 MB text cap would classify even
+            // a modest PNG as TooLarge before the bitmap decode is attempted.
+            if (ImageExtensions.Contains(Path.GetExtension(path)))
+            {
+                var info = new FileInfo(path);
+                var imeta = $"{MainWindowViewModel.FmtBytes(info.Length)} · {info.LastWriteTime:yyyy-MM-dd HH:mm}";
+                PreviewTitle = Path.GetFileName(path);
+                PreviewPath = Path.GetFullPath(path);
+                if (info.Length <= MaxImagePreviewBytes && TryLoadImage(path))
+                {
+                    PreviewMeta = $"{imeta} · 图片";
+                    PreviewText = "";
+                    PreviewIsImage = true;
+                }
+                else if (PreviewImage is null && info.Length > MaxImagePreviewBytes)
+                {
+                    PreviewMeta = $"{imeta} · 超过 {MainWindowViewModel.FmtBytes(MaxImagePreviewBytes)}";
+                    PreviewText = "〔图片过大 — 不提供预览〕";
+                }
+                else
+                {
+                    // Decode failed (corrupt/mislabeled) — honest binary notice.
+                    PreviewMeta = $"{imeta} · 二进制文件";
+                    PreviewText = "〔二进制文件 — 不提供文本预览〕";
+                }
+                HasPreview = true;
+                return;
+            }
+
             var p = LocalFileBrowser.ReadPreview(path);
             PreviewTitle = Path.GetFileName(path);
             PreviewPath = Path.GetFullPath(path);
@@ -248,6 +291,20 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             HasPreview = false;
             StatusIsError = true;
             StatusText = $"无法读取文件: {ex.Message}";
+        }
+    }
+
+    private bool TryLoadImage(string path)
+    {
+        try
+        {
+            PreviewImage = new Avalonia.Media.Imaging.Bitmap(path);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or InvalidOperationException)
+        {
+            return false;
         }
     }
 
