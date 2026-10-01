@@ -702,10 +702,46 @@
                     RowDefinitions="*,Auto">
                 <Grid RowDefinitions="Auto,*">
                   <Grid ColumnDefinitions="50,*,70,70" Margin="6,4">
-                    <TextBlock Text="PID" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="1" Text="NAME" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="2" Text="CPU" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-                    <TextBlock Grid.Column="3" Text="MEM" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                    <Button Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="pid"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="PID"/>
+                        <TextBlock Text="{Binding Dashboard.PidMark}" Foreground="{DynamicResource UiAccent}"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="name"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="NAME"/>
+                        <TextBlock Text="{Binding Dashboard.NameMark}" Foreground="{DynamicResource UiAccent}"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="cpu"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="{Binding Dashboard.CpuMark}" Foreground="{DynamicResource UiAccent}"/>
+                        <TextBlock Text="CPU"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="mem"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="{Binding Dashboard.MemMark}" Foreground="{DynamicResource UiAccent}"/>
+                        <TextBlock Text="MEM"/>
+                      </StackPanel>
+                    </Button>
                   </Grid>
                   <ListBox Grid.Row="1" ItemsSource="{Binding Dashboard.Processes}"
                            Background="Transparent" BorderThickness="0">

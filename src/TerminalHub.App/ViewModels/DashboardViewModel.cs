@@ -29,6 +29,13 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Search hits over the active session's scrollback+screen.</summary>
     public ObservableCollection<TerminalHub.Core.Terminal.ScreenBuffer.SearchHit> SearchHits { get; } = [];
 
+    /// <summary>Process table sort keys (column headers cycle asc/desc).</summary>
+    public enum ProcSort { Pid, Name, Cpu, Mem }
+
+    [ObservableProperty] private ProcSort _processSort = ProcSort.Cpu;
+    [ObservableProperty] private bool _processSortAsc;      // cpu/mem desc, pid/name asc by default
+    private IReadOnlyList<ProcessInfo> _lastProcesses = [];
+
     [ObservableProperty] private int _selectedRightTab;       // 0 Proc 1 Files 2 Logs 3 Ssh
     [ObservableProperty] private int _selectedBottomTab;      // 0 Output 1 Debug 2 Problems 3 Search
     /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
@@ -111,9 +118,57 @@ public partial class DashboardViewModel : ViewModelBase
             NetDownSpark = _netRx.ToArray();
             NetUpSpark = _netTx.ToArray();
 
-            Processes.Clear();
-            foreach (var p in m.Processes) Processes.Add(p);
+            _lastProcesses = m.Processes;
+            ResortProcesses();
         });
+    }
+
+    /// <summary>Sort indicator for the active column header ("" elsewhere).</summary>
+    public string PidMark => SortMark(ProcSort.Pid);
+    public string NameMark => SortMark(ProcSort.Name);
+    public string CpuMark => SortMark(ProcSort.Cpu);
+    public string MemMark => SortMark(ProcSort.Mem);
+    private string SortMark(ProcSort k) => ProcessSort == k ? (ProcessSortAsc ? "▲" : "▼") : "";
+
+    partial void OnProcessSortChanged(ProcSort value) { ResortProcesses(); RefreshSortMarks(); }
+    partial void OnProcessSortAscChanged(bool value) { ResortProcesses(); RefreshSortMarks(); }
+
+    private void RefreshSortMarks()
+    {
+        OnPropertyChanged(nameof(PidMark));
+        OnPropertyChanged(nameof(NameMark));
+        OnPropertyChanged(nameof(CpuMark));
+        OnPropertyChanged(nameof(MemMark));
+    }
+
+    /// <summary>Header click: same key flips direction; pid/name default asc, cpu/mem desc.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void SortProcesses(string key)
+    {
+        var k = key switch
+        {
+            "pid" => ProcSort.Pid,
+            "name" => ProcSort.Name,
+            "mem" => ProcSort.Mem,
+            _ => ProcSort.Cpu,
+        };
+        if (ProcessSort == k) ProcessSortAsc = !ProcessSortAsc;
+        else { ProcessSort = k; ProcessSortAsc = k is ProcSort.Pid or ProcSort.Name; }
+    }
+
+    private void ResortProcesses()
+    {
+        var list = _lastProcesses.ToList();
+        int Cmp(ProcessInfo a, ProcessInfo b) => ProcessSort switch
+        {
+            ProcSort.Pid => a.Pid.CompareTo(b.Pid),
+            ProcSort.Name => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            ProcSort.Mem => a.MemoryBytes.CompareTo(b.MemoryBytes),
+            _ => a.CpuPercent.CompareTo(b.CpuPercent),
+        };
+        list.Sort((a, b) => ProcessSortAsc ? Cmp(a, b) : Cmp(b, a));
+        Processes.Clear();
+        foreach (var p in list) Processes.Add(p);
     }
 
     private const int MaxOutputLines = 500;
