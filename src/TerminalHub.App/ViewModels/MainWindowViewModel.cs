@@ -349,6 +349,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Dashboard = new DashboardViewModel(_monitor);
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
+        Dashboard.OutputLevelFilter = _settings.OutputLevelFilter;
+        Dashboard.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DashboardViewModel.OutputLevelFilter))
+                _settings.OutputLevelFilter = Dashboard.OutputLevelFilter;
+        };
         Files = new FilesViewModel(
             // Files browses the LOCAL filesystem — an ssh session's remote cwd
             // must never reach it, and "open terminal here" on a local dir is

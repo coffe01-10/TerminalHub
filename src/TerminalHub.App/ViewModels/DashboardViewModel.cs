@@ -20,6 +20,9 @@ public partial class DashboardViewModel : ViewModelBase
 
     public ObservableCollection<ProcessInfo> Processes { get; } = [];
     public ObservableCollection<LogEntry> OutputLog { get; } = [];
+    /// <summary>Rows the Output tab actually shows — <see cref="OutputLog"/>
+    /// filtered by <see cref="OutputLevelFilter"/>. Entries are never dropped.</summary>
+    public ObservableCollection<LogEntry> VisibleOutput { get; } = [];
     public ObservableCollection<LogEntry> Problems { get; } = [];
     /// <summary>Raw (pre-ANSI-strip, escaped) session lines for the Debug tab.</summary>
     public ObservableCollection<LogEntry> DebugLog { get; } = [];
@@ -28,6 +31,8 @@ public partial class DashboardViewModel : ViewModelBase
 
     [ObservableProperty] private int _selectedRightTab;       // 0 Proc 1 Files 2 Logs 3 Ssh
     [ObservableProperty] private int _selectedBottomTab;      // 0 Output 1 Debug 2 Problems 3 Search
+    /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
+    [ObservableProperty] private int _outputLevelFilter;
     [ObservableProperty] private int _problemCount;
     [ObservableProperty] private string _searchQuery = "";
     [ObservableProperty] private string _searchStatus = "";
@@ -158,19 +163,40 @@ public partial class DashboardViewModel : ViewModelBase
         var now = DateTime.Now;
         while (_pendingOutput.TryDequeue(out var e))
         {
-            OutputLog.Add(new LogEntry(now, e.level, e.message, e.source));
+            var entry = new LogEntry(now, e.level, e.message, e.source);
+            OutputLog.Add(entry);
+            if (PassesOutputFilter(entry)) VisibleOutput.Add(entry);
             if (e.level == "error")
                 Problems.Add(new LogEntry(now, e.level, e.message, e.source));
         }
-        while (OutputLog.Count > MaxOutputLines) OutputLog.RemoveAt(0);
+        while (OutputLog.Count > MaxOutputLines)
+        {
+            var dropped = OutputLog[0];
+            OutputLog.RemoveAt(0);
+            VisibleOutput.Remove(dropped);
+        }
+        while (VisibleOutput.Count > MaxOutputLines) VisibleOutput.RemoveAt(0);
         while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
         ProblemCount = Problems.Count;
+    }
+
+    private static readonly string[] OutputLevelNames = ["", "info", "warn", "error"];
+
+    private bool PassesOutputFilter(LogEntry e)
+        => OutputLevelFilter is < 1 or > 3 || e.Level == OutputLevelNames[OutputLevelFilter];
+
+    partial void OnOutputLevelFilterChanged(int value)
+    {
+        VisibleOutput.Clear();
+        foreach (var e in OutputLog)
+            if (PassesOutputFilter(e)) VisibleOutput.Add(e);
     }
 
     [CommunityToolkit.Mvvm.Input.RelayCommand]
     public void ClearOutput()
     {
         OutputLog.Clear();
+        VisibleOutput.Clear();
         ClearProblems();
     }
 
