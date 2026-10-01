@@ -192,4 +192,29 @@ public class SshPanelTests
         Assert.Equal("h", vm.EditHost);
         Assert.Equal("2201", vm.EditPort);
     }
+
+    [Fact]
+    public void Editing_ListFirst_WhenHostsExist_FormOpenWhenEmpty()
+    {
+        // With saved hosts the panel is a connection list, not a form.
+        var store = new List<SshHost> { new SshHost { Host = "h1" } };
+        var vm = new SshViewModel(store, _ => { }, () => { });
+        Assert.False(vm.Editing);
+
+        var (empty, _, _) = MakeVm();
+        Assert.True(empty.Editing);
+    }
+
+    [Fact]
+    public void SelectingHost_ReopensForm()
+    {
+        var store = new List<SshHost> { new SshHost { Host = "h1", Port = 2201 } };
+        var vm = new SshViewModel(store, _ => { }, () => { });
+        Assert.False(vm.Editing);
+        vm.Selected = vm.Hosts[0];
+        Assert.True(vm.Editing);
+        Assert.Equal("2201", vm.EditPort);
+        vm.ToggleEditingCommand.Execute(null);
+        Assert.False(vm.Editing);
+    }
 }

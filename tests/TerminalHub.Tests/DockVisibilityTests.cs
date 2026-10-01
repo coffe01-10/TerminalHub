@@ -64,7 +64,7 @@ public class DockVisibilityTests
             .Where(b => b.Classes.Contains("dock")).ToList();
         var labels = buttons
             .Select(b => b.GetVisualDescendants().OfType<TextBlock>().First().Text).ToList();
-        Assert.Equal(new[] { "新建", "监控", "SSH", "日志", "部署", "设置" }, labels);
+        Assert.Equal(new[] { "新建会话", "监控", "SSH", "日志", "部署", "设置" }, labels);
 
         // Every key is bound to the dock command and accepts its parameter.
         Assert.All(buttons, b => Assert.NotNull(b.Command));

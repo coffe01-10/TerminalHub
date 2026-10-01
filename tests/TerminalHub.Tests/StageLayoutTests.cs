@@ -131,6 +131,18 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
+    public async Task NewSessionDock_IsPrimaryAccentPill()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(400);
+        var btn = fixture.Window.FindControl<Button>("NewDockButton")!;
+        Assert.Contains("dock-primary", btn.Classes);
+        var accent = Assert.IsAssignableFrom<ISolidColorBrush>(
+            fixture.Window.FindResource("UiAccent")).Color;
+        Assert.Equal(accent, Assert.IsAssignableFrom<ISolidColorBrush>(btn.Background).Color);
+    }
+
+    [AvaloniaFact]
     public async Task CardMenu_PerCardActions_WithoutActivating()
     {
         using var fixture = new StageFixture();

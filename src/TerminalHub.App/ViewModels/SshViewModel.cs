@@ -24,6 +24,9 @@ public partial class SshViewModel : ViewModelBase
     [ObservableProperty] private string _editPort = "22";
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private SshHost? _selected;
+    /// <summary>Whether the edit form is expanded. Saved hosts get a list-first
+    /// view; the form opens on demand (or automatically while no host exists).</summary>
+    [ObservableProperty] private bool _editing;
 
     public SshViewModel(
         List<SshHost> hosts,
@@ -36,6 +39,7 @@ public partial class SshViewModel : ViewModelBase
         _persist = persist;
         _sshAvailable = sshAvailable ?? SshLocator.Available;
         foreach (var h in _hosts) Hosts.Add(h);
+        _editing = Hosts.Count == 0;
     }
 
     /// <summary>Selecting a row fills the edit form (edit → 添加/更新 to save).</summary>
@@ -46,7 +50,13 @@ public partial class SshViewModel : ViewModelBase
         EditUser = value.User;
         EditHost = value.Host;
         EditPort = value.Port.ToString();
+        Editing = true; // selecting a row means the user wants to edit it
     }
+
+    /// <summary>Host list is the default view once hosts exist — the form
+    /// opens on demand and closes again after use.</summary>
+    [RelayCommand]
+    private void ToggleEditing() => Editing = !Editing;
 
     /// <summary>Add a new host, or update the row whose Name/Target matches.</summary>
     [RelayCommand]
