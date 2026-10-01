@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Linux bash CLI 编辑 / 多行粘贴 / 布局切换光标回归**（多行粘贴+方向键编辑断言 · 分屏/弹出/缩放后光标选区不漂）— **Devin** · `feat/linux-bash-cli-editing` · `/workspace/TerminalHub`
+- [ ] **Linux bash CLI 编辑 / 多行粘贴 / 布局切换光标回归**（多行粘贴+方向键编辑断言 · 分屏/弹出/缩放后光标选区不漂）— **Devin** · PR #46 · `feat/linux-bash-cli-editing` · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
