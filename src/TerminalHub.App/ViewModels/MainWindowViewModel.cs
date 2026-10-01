@@ -362,7 +362,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             () => ActiveSession is { Tag: not SessionTag.Ssh } ? ActiveSession.WorkingDirectory : null,
             openTerminalAt: CdActiveSessionTo,
             copyTextAsync: CopyTextToClipboardAsync,
-            hasActiveSession: () => ActiveSession is { Tag: not SessionTag.Ssh });
+            hasActiveSession: () => ActiveSession is { Tag: not SessionTag.Ssh },
+            showHidden: _settings.FilesShowHidden);
+        Files.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FilesViewModel.ShowHidden))
+                _settings.FilesShowHidden = Files.ShowHidden;
+        };
         Logs = new LogsViewModel(Dashboard, _sessionLog,
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,

@@ -120,6 +120,9 @@ public sealed class AppSettings
     /// <summary>Logs panel: ring-buffer capacity (UI presets 500 / 2000 / 5000; default 2000). Survives restarts.</summary>
     public int LogsBufferCapacity { get; set; } = 2000;
 
+    /// <summary>Files panel: show dot-prefixed / OS-hidden entries (default off, Explorer/Finder convention).</summary>
+    public bool FilesShowHidden { get; set; }
+
     /// <summary>Logs panel: per-session filter memory keyed by session name — each named
     /// session's last filter combo. 「全部会话」(dropdown index 0) is NOT in the map;
     /// it uses the global <see cref="LogsFilterText"/>-family fields above as its slot.</summary>

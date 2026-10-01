@@ -799,7 +799,7 @@
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                     RowDefinitions="Auto,Auto,5*,Auto,4*">
                 <!-- toolbar: up + breadcrumb + open-in-terminal + copy-path + refresh + session dir -->
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,2,0,4">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="0,2,0,4">
                   <Button Content="↑" Padding="8,2" CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           IsEnabled="{Binding Files.CanGoUp}"
@@ -845,6 +845,18 @@
                   <Button Grid.Column="5" Content="⌂" Padding="8,2" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="会话目录"/>
+                  <ToggleButton Grid.Column="6" Content=".*" Padding="7,2" Margin="6,0,0,0" CornerRadius="6"
+                                Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiFaint}"
+                                BorderBrush="{DynamicResource UiBorder}" FontSize="10"
+                                IsChecked="{Binding Files.ShowHidden}"
+                                ToolTip.Tip="显示隐藏文件（.* 开头或系统隐藏属性）">
+                    <ToggleButton.Styles>
+                      <Style Selector="ToggleButton:checked">
+                        <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
+                      </Style>
+                    </ToggleButton.Styles>
+                  </ToggleButton>
                 </Grid>
                 <TextBlock Grid.Row="1" Text="{Binding Files.StatusText}"
                            Foreground="{Binding Files.StatusIsError, Converter={x:Static vm:BoolToErrorBrushConverter.Instance}}"
@@ -892,13 +904,14 @@
                           </Grid.ContextMenu>
                           <TextBlock Text="▸" Foreground="{DynamicResource UiAccent}" IsVisible="{Binding IsDirectory}"/>
                           <TextBlock Text="·" Foreground="{DynamicResource UiFaint}" IsVisible="{Binding !IsDirectory}"/>
-                          <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="2,0,0,0">
-                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
-                                       Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
-                            <TextBlock Grid.Column="1" Text="→" FontSize="9" Foreground="{DynamicResource UiFaint}"
-                                       VerticalAlignment="Center" Margin="5,0,0,0" IsVisible="{Binding IsSymlink}"
-                                       ToolTip.Tip="{Binding LinkTarget, StringFormat='符号链接 → {0}'}"/>
-                          </Grid>
+                          <TextBlock Grid.Column="1" Margin="2,0,0,0" TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource UiInk}"
+                                     ToolTip.Tip="{Binding LinkTarget}">
+                            <Run Text="{Binding Name}"
+                                 Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
+                            <Run Text="{Binding IsSymlink, Converter={x:Static vm:BoolToSymlinkMarkConverter.Instance}}"
+                                 FontSize="9" Foreground="{DynamicResource UiFaint}"/>
+                          </TextBlock>
                           <TextBlock Grid.Column="2" Text="{Binding SizeBytes, Converter={x:Static vm:BytesConverter.Instance}}"
                                      Foreground="{DynamicResource UiFaint}" FontSize="9.5" HorizontalAlignment="Right"
                                      IsVisible="{Binding !IsDirectory}"/>

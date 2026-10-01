@@ -34,6 +34,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _previewText = "";
     [ObservableProperty] private bool _hasPreview;
     [ObservableProperty] private bool _canGoUp;
+    [ObservableProperty] private bool _showHidden;
 
     /// <param name="sessionCwd">Returns the active session's working dir (may be null/empty).</param>
     /// <param name="openTerminalAt">Sends a real `cd` into the active terminal session.</param>
@@ -41,18 +42,25 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// <param name="hasActiveSession">Whether a live session exists to receive `cd`.</param>
     /// <param name="revealInFileManager">Opens the OS file manager at a path
     /// (tests inject a capture; null → platform default).</param>
+    /// <param name="showHidden">Include dot-prefixed/OS-hidden entries; off by
+    /// default like Explorer/Finder.</param>
     public FilesViewModel(Func<string?>? sessionCwd = null,
                           Action<string>? openTerminalAt = null,
                           Func<string, Task>? copyTextAsync = null,
                           Func<bool>? hasActiveSession = null,
-                          Action<string>? revealInFileManager = null)
+                          Action<string>? revealInFileManager = null,
+                          bool showHidden = false)
     {
         _sessionCwd = sessionCwd ?? (() => null);
         _openTerminalAt = openTerminalAt;
         _copyTextAsync = copyTextAsync;
         _hasActiveSession = hasActiveSession;
         _revealInFileManager = revealInFileManager ?? RevealDefault;
+        _showHidden = showHidden;
     }
+
+    /// <summary>Toggling dotfile visibility refilters the current directory.</summary>
+    partial void OnShowHiddenChanged(bool value) => NavigateTo(CurrentPath);
 
     /// <summary>Selection change arms/disarms the entry commands and keeps the
     /// preview pane tracking the selected file (single-click preview); a dir or
@@ -97,7 +105,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(path)) path = Home();
         try
         {
-            var entries = LocalFileBrowser.ListDirectory(path);
+            var entries = LocalFileBrowser.ListDirectory(path, ShowHidden);
             var selection = SelectedEntry?.FullPath;
             Entries.Clear();
             foreach (var e in entries) Entries.Add(e);

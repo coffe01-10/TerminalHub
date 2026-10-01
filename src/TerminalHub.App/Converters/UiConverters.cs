@@ -90,6 +90,15 @@ public sealed class BoolBrushConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>IsSymlink → " →" tail run text or "" (kept inline so long names ellipsize).</summary>
+public sealed class BoolToSymlinkMarkConverter : IValueConverter
+{
+    public static readonly BoolToSymlinkMarkConverter Instance = new();
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? " →" : "";
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
 /// <summary>bool → error brush when true, muted when false (status lines mixing info + errors).</summary>
 public sealed class BoolToErrorBrushConverter : IValueConverter
 {

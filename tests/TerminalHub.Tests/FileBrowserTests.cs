@@ -58,6 +58,20 @@ public class FileBrowserTests : IDisposable
     }
 
     [Fact]
+    public void ListDirectory_DotfilesHidden_UnlessIncluded()
+    {
+        File.WriteAllText(Path.Combine(_root, ".secret"), "x");
+        Directory.CreateDirectory(Path.Combine(_root, ".hiddendir"));
+
+        var all = LocalFileBrowser.ListDirectory(_root);
+        Assert.Contains(all, e => e.Name == ".secret" && e.IsHidden);
+        Assert.Contains(all, e => e.Name == ".hiddendir" && e.IsHidden);
+
+        var visible = LocalFileBrowser.ListDirectory(_root, includeHidden: false);
+        Assert.DoesNotContain(visible, e => e.IsHidden);
+    }
+
+    [Fact]
     public void ListDirectory_MarksSymlinks()
     {
         var link = Path.Combine(_root, "zeta-link.txt");

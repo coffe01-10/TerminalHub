@@ -99,6 +99,21 @@ public class FilesPreviewTests : IDisposable
     }
 
     [Fact]
+    public void ShowHidden_Toggle_RefiltersListing()
+    {
+        File.WriteAllText(Path.Combine(_root, ".hideme"), "x");
+        using var vm = new FilesViewModel(showHidden: false);
+        vm.NavigateTo(_root);
+        Assert.DoesNotContain(vm.Entries, e => e.Name == ".hideme");
+
+        vm.ShowHidden = true;
+        Assert.Contains(vm.Entries, e => e.Name == ".hideme");
+
+        vm.ShowHidden = false;
+        Assert.DoesNotContain(vm.Entries, e => e.Name == ".hideme");
+    }
+
+    [Fact]
     public void Refresh_RestoredSameFile_KeepsPreview()
     {
         using var vm = new FilesViewModel();

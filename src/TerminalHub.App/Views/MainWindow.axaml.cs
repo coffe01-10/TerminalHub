@@ -779,6 +779,11 @@ public partial class MainWindow : Window
             Vm.Files.UpCommand.Execute(null);
             e.Handled = true;
         }
+        else if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            Vm.Files.CopyPathCommand.Execute(Vm.Files.SelectedEntry);
+            e.Handled = true;
+        }
     }
 
     // Drag-out gesture: press records the row, a >6px move starts the real
