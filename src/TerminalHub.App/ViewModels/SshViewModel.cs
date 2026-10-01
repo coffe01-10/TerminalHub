@@ -127,7 +127,10 @@ public partial class SshViewModel : ViewModelBase
         if (host is null) return;
         var idx = Hosts.IndexOf(host);
         if (idx < 0) return;
-        var wasSelected = ReferenceEquals(Selected, host);
+        // SshHost is a record (value equality): after AddOrUpdate replaces the
+        // row instance, Selected still holds the stale-but-equal record, so a
+        // reference compare would miss. Value compare is what we need.
+        var wasSelected = Selected is { } s && s == host;
         Hosts.RemoveAt(idx);
         _hosts.RemoveAt(idx);
         _persist();

@@ -276,7 +276,7 @@
                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding NewSessionCommand}">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <TextBlock Text="＋" Foreground="{DynamicResource UiAccent}" FontSize="17"/>
-              <TextBlock Grid.Column="1" Text="新建终端" Foreground="{DynamicResource UiInk}" Margin="8,2,0,0" FontSize="12"/>
+              <TextBlock Grid.Column="1" Text="新建会话" Foreground="{DynamicResource UiInk}" Margin="8,2,0,0" FontSize="12"/>
               <TextBlock Grid.Column="2" Text="Ctrl ⇧ N" Foreground="{DynamicResource UiMuted}" FontSize="10" VerticalAlignment="Center"/>
             </Grid>
           </Button>
@@ -329,7 +329,7 @@
                       ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）" AutomationProperties.Name="弹出">
                 <PathIcon Data="{StaticResource ToolPopout}"/>
               </Button>
-              <Button Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N" AutomationProperties.Name="新建终端">
+              <Button Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建会话 · Ctrl+Shift+N" AutomationProperties.Name="新建会话">
                 <PathIcon Data="{StaticResource ToolAdd}"/>
               </Button>
               <Button x:Name="SessionMenuButton" Grid.Column="9" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
@@ -376,7 +376,7 @@
                              HorizontalAlignment="Center"/>
                   <TextBlock Text="没有活动终端" FontSize="13" Foreground="{DynamicResource UiMuted}"
                              HorizontalAlignment="Center"/>
-                  <TextBlock Text="Ctrl+Shift+N 或点击左侧「新建终端」" FontSize="11" Foreground="{DynamicResource UiFaint}"
+                  <TextBlock Text="Ctrl+Shift+N 或点击左侧「新建会话」" FontSize="11" Foreground="{DynamicResource UiFaint}"
                              HorizontalAlignment="Center"/>
                 </StackPanel>
                 <!-- single view -->
@@ -1230,7 +1230,8 @@
                 <Border Grid.Row="2" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
                   <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
-                           Background="Transparent" BorderThickness="0" Padding="4">
+                           Background="Transparent" BorderThickness="0" Padding="4"
+                           Tapped="OnSshRowTapped">
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,4"/>
@@ -1383,22 +1384,15 @@
           <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
           <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
         </Style>
-        <!-- The window-level Button.dock(.dock-active) PathIcon rules outrank the
-             local ancestor-Foreground binding — pin the pill icon to OnAccent in
-             both states or it is muted at rest and invisible when dock-active. -->
-        <Style Selector="Button.dock.dock-primary PathIcon">
-          <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
-        </Style>
-        <Style Selector="Button.dock.dock-primary.dock-active PathIcon">
-          <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
-        </Style>
       </ctl:DropletDock.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
         <Button x:Name="NewDockButton" Classes="dock dock-primary" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                 Command="{Binding DockSelectCommand}" CommandParameter="0"
                 ToolTip.Tip="新建会话" AutomationProperties.Name="新建会话">
           <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-            <PathIcon Data="{StaticResource ToolAdd}"/>
+            <!-- Local Foreground outranks every style, including the window-level
+                 dock rules (UiMuted at rest / UiAccent in dock-active → invisible). -->
+            <PathIcon Data="{StaticResource ToolAdd}" Foreground="{DynamicResource UiOnAccent}"/>
             <TextBlock Text="新建会话" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
           </StackPanel>
         </Button>

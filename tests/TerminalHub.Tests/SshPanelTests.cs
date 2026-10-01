@@ -236,6 +236,25 @@ public class SshPanelTests
     }
 
     [Fact]
+    public void Remove_AfterNoOpSave_StillClearsForm()
+    {
+        // SshHost is a record: a no-op 添加/更新 swaps in a value-equal new
+        // instance; [ObservableProperty] skips assigning an "equal" Selected, so
+        // a reference compare would miss the stale selection.
+        var store = new List<SshHost> { new SshHost { Host = "h1", User = "u" } };
+        var vm = new SshViewModel(store, _ => { }, () => { });
+        vm.Selected = vm.Hosts[0];              // form fills with u@h1
+        vm.AddOrUpdateCommand.Execute(null);     // no-op save replaces the instance
+        Assert.NotSame(store[0], vm.Selected);   // stale equal instance retained
+
+        vm.RemoveCommand.Execute(vm.Hosts[0]);
+        Assert.Empty(vm.Hosts);
+        Assert.Null(vm.Selected);
+        Assert.Equal("", vm.EditHost);           // deleted host must not linger
+        Assert.True(vm.Editing);
+    }
+
+    [Fact]
     public void Remove_SelectedHost_ClearsForm()
     {
         var store = new List<SshHost> { new SshHost { Host = "h1" }, new SshHost { Host = "h2" } };

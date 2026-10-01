@@ -10,6 +10,7 @@ using TerminalHub.App.ViewModels;
 using TerminalHub.App.Controls;
 using TerminalHub.Core.Deploy;
 using TerminalHub.Core.Settings;
+using TerminalHub.Core.Ssh;
 using TerminalHub.Core.Terminal;
 
 namespace TerminalHub.App.Views;
@@ -279,6 +280,20 @@ public partial class MainWindow : Window
     {
         if (Vm.ActiveCard is { } card) _ = RenameSessionAsync(card);
         e.Handled = true;
+    }
+
+    // Clicking the already-selected SSH row fires no SelectionChanged, so with
+    // the form collapsed the row looked dead. Re-drive the select → fill path.
+    private void OnSshRowTapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
+        var ssh = Vm.Ssh;
+        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>()?.DataContext is SshHost h
+            && ssh.Selected == h && !ssh.Editing)
+        {
+            ssh.Selected = null;
+            ssh.Selected = h;
+        }
     }
 
     private async Task RenameSessionAsync(SessionCardViewModel card)
