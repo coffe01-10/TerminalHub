@@ -202,12 +202,13 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Open an entry (double-click / Enter): dir → navigate, file → preview.</summary>
+    /// <summary>Open an entry (double-click / Enter): dir → navigate,
+    /// file → default app (single-click already previews).</summary>
     public void Open(FileEntry? entry)
     {
         if (entry is null) return;
         if (entry.IsDirectory) NavigateTo(entry.FullPath);
-        else PreviewFile(entry.FullPath);
+        else OpenExternally(entry);
     }
 
     /// <summary>Open the currently selected entry (keyboard).</summary>

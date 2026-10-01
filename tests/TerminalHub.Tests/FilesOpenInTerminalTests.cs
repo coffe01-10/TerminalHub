@@ -151,6 +151,17 @@ public class FilesOpenInTerminalTests
     }
 
     [Fact]
+    public void Open_File_OpensExternally_Dir_Navigates()
+    {
+        var opened = new List<string>();
+        var vm = new TerminalHub.App.ViewModels.FilesViewModel(openExternal: opened.Add);
+        // Double-click/Enter on a file escalates to the default app; single
+        // click already previews, so re-previewing would be a no-op.
+        vm.Open(new FileEntry { Name = "note.txt", FullPath = FileInDir });
+        Assert.Equal(new[] { FileInDir }, opened);
+    }
+
+    [Fact]
     public async Task DragData_File_PackagesLocalPath()
     {
         var provider = DispatchProxy.Create<IStorageProvider, FileResolveProxy>();
