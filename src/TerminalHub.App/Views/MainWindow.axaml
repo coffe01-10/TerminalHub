@@ -497,7 +497,7 @@
                     </ListBoxItem>
                     <ListBoxItem>Search</ListBoxItem>
                   </ListBox>
-                  <Button Grid.Column="1" Content="⧉ Clear" FontSize="10" Padding="8,2"
+                  <Button Grid.Column="1" Content="⎘ Clear" FontSize="10" Padding="8,2"
                           Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                           Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"
                           Command="{Binding Dashboard.ClearOutputCommand}"/>
@@ -814,7 +814,7 @@
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.OpenInTerminalCommand}"
                           ToolTip.Tip="在此打开终端：目录→活动终端 cd 进入；文件→cd 所在目录"/>
-                  <Button Grid.Column="3" Content="⧉" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
+                  <Button Grid.Column="3" Content="⎘" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.CopyPathCommand}"
                           ToolTip.Tip="复制路径"/>
@@ -1054,11 +1054,11 @@
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.JumpToSessionCommand}"
                           ToolTip.Tip="激活选中日志行来源对应的终端会话（Logs 页保持打开；也可双击该行）"/>
-                  <Button Content="⧉ 复制可见行" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                  <Button Content="⎘ 复制可见行" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.CopyVisibleCommand}"
                           ToolTip.Tip="复制当前过滤结果到剪贴板"/>
-                  <Button Content="⧉ 复制选中" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                  <Button Content="⎘ 复制选中" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.CopySelectedCommand}"
                           IsEnabled="{Binding Logs.HasSelectedEntry}"
