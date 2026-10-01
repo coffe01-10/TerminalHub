@@ -80,7 +80,7 @@ public sealed class AppSettings
     public bool InspectorVisible { get; set; }
     public bool OutputVisible { get; set; }
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
-    public int DockVisibilityMode { get; set; }
+    public int DockVisibilityMode { get; set; } = 1;
     public string WorkspaceName { get; set; } = "MangaFlow";
     public List<WorkspaceTemplate> WorkspaceTemplates { get; set; } = [];
     public List<SessionGroup> SessionGroups { get; set; } = [];
