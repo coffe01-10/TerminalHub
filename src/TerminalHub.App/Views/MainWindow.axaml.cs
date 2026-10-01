@@ -134,21 +134,39 @@ public partial class MainWindow : Window
         }, DispatcherPriority.Loaded);
     }
 
-    /// <summary>ScrollIntoView aligns the item slot, but a tucked card renders
-    /// <see cref="SessionCardViewModel.ShelfOverlap"/> px above its slot — nudge
-    /// the scroll so the card header is not clipped at the viewport top.</summary>
+    /// <summary>Scroll the shelf so the card's painted bounds are fully inside
+    /// the viewport. ScrollIntoView only aligns the item slot, while a tucked
+    /// card renders <see cref="SessionCardViewModel.ShelfOverlap"/> px above it
+    /// — so measure the card itself and scroll by the exact delta. Measuring
+    /// before any scroll keeps the geometry self-consistent; only an
+    /// unrealized card needs a ScrollIntoView + layout first.</summary>
     private void RevealShelfCard(SessionCardViewModel active)
     {
-        SessionShelf.ScrollIntoView(active);
-        var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
-            .FirstOrDefault(c => ReferenceEquals(c.DataContext, active));
+        var card = FindShelfCard(active);
+        if (card is null)
+        {
+            SessionShelf.ScrollIntoView(active);
+            SessionShelf.UpdateLayout();
+            card = FindShelfCard(active);
+        }
         var scroll = SessionShelf.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (card is null || scroll is null) return;
-        var top = card.TranslatePoint(default, SessionShelf);
-        const double viewportTop = 14; // SessionShelf top padding
-        if (top is { } p && p.Y < viewportTop)
-            scroll.Offset = new Vector(scroll.Offset.X, Math.Max(0, scroll.Offset.Y + p.Y - viewportTop));
+        if (card.TranslatePoint(default, SessionShelf) is not { } top) return;
+        const double topPad = 14, bottomPad = 16; // SessionShelf padding
+        var bottom = top.Y + card.Bounds.Height;
+        var viewBottom = SessionShelf.Bounds.Height - bottomPad;
+        var dy = top.Y < topPad ? top.Y - topPad
+            : bottom > viewBottom ? Math.Min(bottom - viewBottom, top.Y - topPad)
+            : 0;
+        if (dy != 0)
+            scroll.Offset = new Vector(scroll.Offset.X,
+                Math.Clamp(scroll.Offset.Y + dy, 0,
+                    Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height)));
     }
+
+    private StageCard? FindShelfCard(SessionCardViewModel active)
+        => SessionShelf.GetVisualDescendants().OfType<StageCard>()
+            .FirstOrDefault(c => ReferenceEquals(c.DataContext, active));
 
     private void OnStageSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -483,11 +501,15 @@ public partial class MainWindow : Window
                 Math.Max(0, _shelfScroll.Extent.Height - _shelfScroll.Viewport.Height)));
         }
         var delta = _dragPosition.Y - _dragOrigin.Y + _shelfScroll.Offset.Y - _dragScrollStart;
-        var center = _dragSlots[_dragFrom].Top + ThumbnailHeight / 2 + delta;
+        // Compare painted card centers: a tucked card renders ShelfOverlap px
+        // above its slot, so slot tops alone are off by the overlap.
+        double CardCenter(int i) => _dragSlots[i].Top + ThumbnailHeight / 2
+            - (_dragSlots[i].Model.IsStackTop ? 0 : SessionCardViewModel.ShelfOverlap);
+        var center = CardCenter(_dragFrom) + delta;
         // Compare against fixed slot centers, with a small hysteresis for hand
         // jitter. Never hit-test the animated cards to decide the next order.
-        while (_dragTo < _dragSlots.Length - 1 && center > (_dragSlots[_dragTo].Top + _dragSlots[_dragTo + 1].Top + ThumbnailHeight) / 2 + 8) _dragTo++;
-        while (_dragTo > 0 && center < (_dragSlots[_dragTo].Top + _dragSlots[_dragTo - 1].Top + ThumbnailHeight) / 2 - 8) _dragTo--;
+        while (_dragTo < _dragSlots.Length - 1 && center > (CardCenter(_dragTo) + CardCenter(_dragTo + 1)) / 2 + 8) _dragTo++;
+        while (_dragTo > 0 && center < (CardCenter(_dragTo) + CardCenter(_dragTo - 1)) / 2 - 8) _dragTo--;
         for (var i = 0; i < _dragSlots.Length; i++)
         {
             var slot = _dragSlots[i];

@@ -107,14 +107,38 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
-    public async Task ShelfStack_FirstCardNoOverlap_OthersTuck()
+    public async Task ShelfStack_SegmentTopsNoOverlap_OthersTuck()
     {
         using var fixture = new StageFixture();
         await Task.Delay(600);
-        var cards = fixture.Vm.SessionCards;
+        var vm = fixture.Vm;
+        var cards = vm.SessionCards;
         Assert.NotEmpty(cards);
         Assert.Equal(0, cards[0].ShelfTopMargin.Top); // topmost card must not bleed into the title row
         Assert.All(cards.Skip(1), c => Assert.Equal(-SessionCardViewModel.ShelfOverlap, c.ShelfTopMargin.Top));
+
+        // A card right below a pin/group header tops its own segment — tucking
+        // it would paint over the header's bottom half.
+        var pinned = cards[0];
+        var grouped = cards[2];
+        vm.SetPinned(pinned, true);
+        vm.CreateGroup("组", grouped);
+        Assert.Equal(0, pinned.ShelfTopMargin.Top); // below the pin header
+        Assert.Equal(0, grouped.ShelfTopMargin.Top); // below the group header
+        Assert.All(cards.Where(c => c != pinned && c != grouped),
+            c => Assert.Equal(-SessionCardViewModel.ShelfOverlap, c.ShelfTopMargin.Top));
+    }
+
+    [AvaloniaFact]
+    public async Task TagPill_YieldsToUnreadOrExitStatus()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var card = fixture.Vm.SessionCards[0];
+        Assert.True(card.HasTag);
+        Assert.True(card.ShowTagPill); // running + no unread: pill replaces plain 运行中
+        card.HasUnreadOutput = true;
+        Assert.False(card.ShowTagPill); // 有新输出 must not hide behind the pill
     }
 
     [AvaloniaTheory]

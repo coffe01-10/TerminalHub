@@ -188,9 +188,12 @@ public partial class MainWindowViewModel
             if (next.OfType<SessionGroupHeader>().Any(header => ReferenceEquals(header.Group, group))) continue;
             next.Add(Header(group.Id, group));
         }
-        // Only the topmost item is exempt from the stack overlap margin.
-        var top = next.FirstOrDefault();
-        foreach (var card in SessionCards) card.IsFirstOnShelf = ReferenceEquals(card, top);
+        // A card is exempt from the overlap margin when it tops a stack
+        // segment: the first shelf item, or the card right below a header —
+        // overlapping there would cover the header's bottom half.
+        for (var i = 0; i < next.Count; i++)
+            if (next[i] is SessionCardViewModel card)
+                card.IsStackTop = i == 0 || next[i - 1] is not SessionCardViewModel;
         var keep = ActiveCard;
         _rebuildingShelf = true;
         try
