@@ -372,7 +372,13 @@
             </Grid>
 
             <!-- Terminal viewport -->
-            <Border Grid.Row="1" x:Name="TerminalViewport" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="10,8" Margin="2,6" ClipToBounds="True">
+            <Border Grid.Row="1" x:Name="TerminalViewport" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="10,8" Margin="2,6" ClipToBounds="True"
+                    BorderBrush="Transparent" BorderThickness="1">
+              <Border.Styles>
+                <Style Selector="Border:focus-within">
+                  <Setter Property="BorderBrush" Value="{DynamicResource UiAccentSoft}"/>
+                </Style>
+              </Border.Styles>
               <Panel>
                 <!-- empty stage: no sessions left -->
                 <StackPanel IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNull}}"

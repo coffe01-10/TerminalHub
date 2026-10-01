@@ -793,7 +793,8 @@ public partial class MainWindow : Window
             Vm.Files.OpenSelected();
             e.Handled = true;
         }
-        else if (e.Key == Key.Back)
+        else if (e.Key == Key.Back
+                 || (e.Key == Key.Up && e.KeyModifiers.HasFlag(KeyModifiers.Alt)))
         {
             Vm.Files.UpCommand.Execute(null);
             e.Handled = true;
