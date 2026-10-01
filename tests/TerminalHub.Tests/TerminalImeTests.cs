@@ -185,6 +185,50 @@ public class TerminalImeTests
     }
 
     [AvaloniaTheory]
+    [InlineData("a中b", 1, 0, 7)]
+    [InlineData("a中b", 2, 2, 7)]
+    [InlineData("ab", 2, 0, 7)]
+    [InlineData("😀", 1, 58, 6)]
+    [InlineData("a\r\nb", 3, 0, 7)]
+    public void ClaudeComposition_RightEdge_UsesWrappedCaretBeforeRender(string text, int caret, int col, int row)
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 12);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("\x1b[?25l\x1b[6;1H" + new string('─', 60)
+            + "\x1b[7;1H❯ " + new string('x', 56) + "\x1b[7m \x1b[27m"
+            + "\x1b[10;1H" + new string('─', 60));
+        var client = Client(view);
+        client.SetPreeditText(text, caret);
+        var rect = client.CursorRectangle;
+        Assert.Equal(col * CellWidth(view), rect.X, 6);
+        Assert.Equal(row * rect.Height, rect.Y, 6);
+        Draw(view);
+        Assert.Equal(rect, client.CursorRectangle);
+    }
+
+    [AvaloniaFact]
+    public void ClaudeComposition_WideGlyphWraps_AndDoesNotPaintFooter()
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 12);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("\x1b[?25l\x1b[6;1H" + new string('─', 60)
+            + "\x1b[7;1H❯ " + new string('x', 56) + "\x1b[7m \x1b[27m"
+            + "\x1b[9;1H" + new string('─', 60) + "\x1b[10;1Hfooter");
+        Client(view).SetPreeditText("a中" + new string('文', 40), 42);
+        var group = new DrawingGroup();
+        using (var context = group.Open()) view.Render(context);
+        var glyphs = Glyphs(group, Matrix.Identity).ToArray();
+        var chinese = Assert.Single(glyphs, g => g.Text == "中");
+        Assert.Equal(0, chinese.X, 6);
+        var height = Client(view).CursorRectangle.Height;
+        Assert.InRange(chinese.Y, 7 * height, 8 * height);
+        var visibleTail = glyphs.Where(g => g.Text == "文").ToArray();
+        Assert.Equal(29, visibleTail.Length);
+        Assert.All(visibleTail, g => Assert.InRange(g.Y, 7 * height, 8 * height));
+        Assert.Equal(7 * height, Client(view).CursorRectangle.Y, 6);
+    }
+
+    [AvaloniaTheory]
     [InlineData("Paper", " ")]
     [InlineData("Paper", "文")]
     [InlineData("Black", " ")]
@@ -242,7 +286,7 @@ public class TerminalImeTests
             Assert.Equal((2 + i * 2) * cellW, glyphs[i].X, 6);
     }
 
-    private static IEnumerable<(string Text, double X)> Glyphs(Drawing drawing, Matrix transform)
+    private static IEnumerable<(string Text, double X, double Y)> Glyphs(Drawing drawing, Matrix transform)
     {
         if (drawing is DrawingGroup group)
         {
@@ -251,6 +295,7 @@ public class TerminalImeTests
                 foreach (var glyph in Glyphs(child, matrix)) yield return glyph;
         }
         else if (drawing is GlyphRunDrawing { GlyphRun: { } run })
-            yield return (run.Characters.ToString(), run.BaselineOrigin.Transform(transform).X);
+            yield return (run.Characters.ToString(), run.BaselineOrigin.Transform(transform).X,
+                run.BaselineOrigin.Transform(transform).Y);
     }
 }

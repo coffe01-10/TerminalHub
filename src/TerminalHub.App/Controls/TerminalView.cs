@@ -498,19 +498,22 @@ public partial class TerminalView : Control
             var cc = TerminalPalette.CursorColor;
             var accent = Brush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B));
             var accentFill = Brush(Color.FromArgb(40, cc.R, cc.G, cc.B));
-            var startCol = PreeditStartCol(anchorCol, preedit, b.Columns);
-            var px = startCol * _cellW;
-            var py = anchorRow * _cellH;
-            var pw = PreeditCells(preedit, preedit.Length) * _cellW;
-            ctx.DrawRectangle(accentFill, null, new Rect(px, py, pw, _cellH));
+            var composition = LayoutPreedit(b, anchorCol, anchorRow, preedit, _preeditCaret);
             var fgC = TerminalPalette.Resolve(TerminalColor.Default, true);
-            DrawRun(ctx, preedit, startCol, anchorRow,
-                Brush(fgC), CellAttrs.None, fgC);
-            ctx.DrawLine(new Pen(accent, 1),
-                new Point(px, py + _cellH - 1.5), new Point(px + pw, py + _cellH - 1.5));
+            foreach (var glyph in composition.Glyphs)
+            {
+                var px = glyph.Col * _cellW;
+                var py = glyph.Row * _cellH;
+                var pw = glyph.Width * _cellW;
+                ctx.DrawRectangle(accentFill, null, new Rect(px, py, pw, _cellH));
+                DrawRun(ctx, glyph.Text, glyph.Col, glyph.Row, Brush(fgC), CellAttrs.None, fgC);
+                ctx.DrawLine(new Pen(accent, 1),
+                    new Point(px, py + _cellH - 1.5), new Point(px + pw, py + _cellH - 1.5));
+            }
             if (_cursorOn)
             {
-                var caretX = px + PreeditCells(preedit, Math.Clamp(_preeditCaret, 0, preedit.Length)) * _cellW;
+                var caretX = composition.CaretCol * _cellW;
+                var py = composition.CaretRow * _cellH;
                 ctx.DrawLine(new Pen(accent, 2),
                     new Point(caretX, py + 2), new Point(caretX, py + _cellH - 3));
             }
@@ -642,15 +645,67 @@ public partial class TerminalView : Control
         return GlyphColumns(cells.AsSpan(index - col, columns), col);
     }
 
-    /// <summary>Cell width of the first <paramref name="len"/> chars of a preedit
-    /// string (CJK/emoji take two cells; combining marks join their cluster).</summary>
-    private static int PreeditCells(string text, int len)
-        => GraphemeWidth.OfText(text[..Math.Min(len, text.Length)]);
+    private sealed record PreeditGlyph(string Text, int Col, int Row, int Width);
+    private sealed record PreeditLayout(List<PreeditGlyph> Glyphs, int CaretCol, int CaretRow);
 
-    /// <summary>Column where the preedit overlay starts: the cursor column, shifted
-    /// left when the composition would overflow the right edge.</summary>
-    private int PreeditStartCol(int cursorCol, string preedit, int cols)
-        => Math.Max(0, Math.Min(cursorCol, cols - PreeditCells(preedit, preedit.Length)));
+    // Keep composition at the actual insertion cell, wrapping whole clusters.
+    // A bordered Claude prompt must not paint over its lower rule or footer.
+    private PreeditLayout LayoutPreedit(TerminalFrame frame, int col, int row, string text, int caret)
+    {
+        var endRow = frame.Rows;
+        if (!frame.CursorVisible)
+            for (var first = row; first > 0; first--)
+            {
+                var c = 0;
+                while (c < frame.Columns && frame.Cells[first * frame.Columns + c].Char is ' ' or '\0') c++;
+                if (c == frame.Columns || frame.Cells[first * frame.Columns + c].Char is not ('>' or '❯' or '›')
+                    || !IsInputRule(frame, first - 1)) continue;
+                for (var end = first + 1; end < frame.Rows; end++)
+                    if (IsInputRule(frame, end))
+                    {
+                        if (end > row) endRow = end;
+                        break;
+                    }
+                break;
+            }
+
+        var glyphs = new List<PreeditGlyph>();
+        caret = Math.Clamp(caret, 0, text.Length);
+        var caretCol = col;
+        var caretRow = row;
+        for (var i = 0; i < text.Length;)
+        {
+            var len = text[i] == '\r' && i + 1 < text.Length && text[i + 1] == '\n'
+                ? 2 : ClusterLength(text, i);
+            var cluster = text.Substring(i, len);
+            var width = Math.Max(1, GraphemeWidth.OfCluster(cluster));
+            if (cluster is "\r" or "\n" or "\r\n")
+            {
+                if (caret >= i && caret < i + len) { caretCol = col; caretRow = row; }
+                col = 0;
+                row++;
+            }
+            else
+            {
+                if (col + width > frame.Columns) { col = 0; row++; }
+                if (row >= endRow) break;
+                if (caret >= i && caret < i + len) { caretCol = col; caretRow = row; }
+                glyphs.Add(new PreeditGlyph(cluster, col, row, width));
+                col += width;
+            }
+            i += len;
+            // Positions inside a UTF-16 cluster snap to its leading cell.
+            if (caret >= i)
+            {
+                caretCol = col;
+                caretRow = row;
+                if (caretCol == frame.Columns && caretRow + 1 < endRow)
+                { caretCol = 0; caretRow++; }
+            }
+        }
+        return new PreeditLayout(glyphs, Math.Clamp(caretCol, 0, frame.Columns - 1),
+            Math.Clamp(caretRow, 0, endRow - 1));
+    }
 
     /// <summary>A cell carries no preview information when it is an unstyled
     /// blank — no glyph and no painted background (a colored bar still counts).</summary>
@@ -1543,7 +1598,8 @@ public partial class TerminalView : Control
                 // The IME can query this before the next Render, immediately
                 // after output or composition starts. Do not use a stale anchor.
                 // CaptureFrame is version-cached — this stays cheap.
-                var (baseCol, baseRow, _) = view.ResolveImeAnchor(buf.CaptureFrame());
+                var frame = buf.CaptureFrame();
+                var (baseCol, baseRow, _) = view.ResolveImeAnchor(frame);
                 // While scrolled into history the anchor row shifts down by the
                 // view offset (screen row r shows at visual row r + offset).
                 var row = Math.Clamp(baseRow + view._viewOffset, 0, buf.Rows - 1);
@@ -1551,9 +1607,9 @@ public partial class TerminalView : Control
                 // so the candidate window tracks it.
                 if (view._preedit is { Length: > 0 } p)
                 {
-                    var startCol = view.PreeditStartCol(baseCol, p, buf.Columns);
-                    var caret = PreeditCells(p, Math.Clamp(view._preeditCaret, 0, p.Length));
-                    return new Rect((startCol + caret) * view._cellW, row * view._cellH,
+                    var composition = view.LayoutPreedit(frame, baseCol, baseRow, p, view._preeditCaret);
+                    row = Math.Clamp(composition.CaretRow + view._viewOffset, 0, frame.Rows - 1);
+                    return new Rect(composition.CaretCol * view._cellW, row * view._cellH,
                         Math.Max(2, view._cellW * 0.15), view._cellH);
                 }
                 return new Rect(Math.Clamp(baseCol, 0, buf.Columns - 1) * view._cellW,
