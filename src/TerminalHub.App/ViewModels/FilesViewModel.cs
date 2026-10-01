@@ -16,6 +16,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private readonly Func<string, Task>? _copyTextAsync;
     private readonly Func<bool>? _hasActiveSession;
     private readonly Action<string> _revealInFileManager;
+    private readonly Action<string> _openExternal;
     private bool _initialized;
 
     /// <summary>One clickable breadcrumb segment.</summary>
@@ -44,11 +45,14 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// (tests inject a capture; null → platform default).</param>
     /// <param name="showHidden">Include dot-prefixed/OS-hidden entries; off by
     /// default like Explorer/Finder.</param>
+    /// <param name="openExternal">Launches a file with the OS default app
+    /// (tests inject a capture; null → platform default).</param>
     public FilesViewModel(Func<string?>? sessionCwd = null,
                           Action<string>? openTerminalAt = null,
                           Func<string, Task>? copyTextAsync = null,
                           Func<bool>? hasActiveSession = null,
                           Action<string>? revealInFileManager = null,
+                          Action<string>? openExternal = null,
                           bool showHidden = false)
     {
         _sessionCwd = sessionCwd ?? (() => null);
@@ -56,6 +60,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         _copyTextAsync = copyTextAsync;
         _hasActiveSession = hasActiveSession;
         _revealInFileManager = revealInFileManager ?? RevealDefault;
+        _openExternal = openExternal ?? OpenDefault;
         _showHidden = showHidden;
     }
 
@@ -70,6 +75,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         OpenInTerminalCommand.NotifyCanExecuteChanged();
         CopyPathCommand.NotifyCanExecuteChanged();
         RevealInFileManagerCommand.NotifyCanExecuteChanged();
+        OpenExternallyCommand.NotifyCanExecuteChanged();
         if (value is { IsDirectory: false }) PreviewFile(value.FullPath);
         else HasPreview = false;
     }
@@ -320,6 +326,42 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
                 { UseShellExecute = false });
         }
     }
+
+    /// <summary>「用默认应用打开」: shell-associated handler for the file
+    /// (preview stays the in-app double-click path). Files only.</summary>
+    [RelayCommand(CanExecute = nameof(IsFileSelection))]
+    private void OpenExternally(FileEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e is null || e.IsDirectory) return;
+        try
+        {
+            _openExternal(e.FullPath);
+            StatusIsError = false;
+            StatusText = $"已打开 {e.Name}";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException
+                                     or System.ComponentModel.Win32Exception
+                                     or IOException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法打开文件: {ex.Message}";
+        }
+    }
+
+    private static void OpenDefault(string path)
+    {
+        if (OperatingSystem.IsWindows())
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        else
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{path}\"")
+                { UseShellExecute = false });
+    }
+
+    private bool IsFileSelection(FileEntry? entry)
+        => (entry ?? SelectedEntry) is { IsDirectory: false };
 
     private bool HasSelection(FileEntry? entry) => (entry ?? SelectedEntry) is not null;
 

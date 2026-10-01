@@ -891,6 +891,10 @@
                         <Grid ColumnDefinitions="14,*,Auto">
                           <Grid.ContextMenu>
                             <ContextMenu>
+                              <MenuItem Header="用默认应用打开"
+                                        IsVisible="{Binding !IsDirectory}"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenExternallyCommand}"
+                                        CommandParameter="{Binding}"/>
                               <MenuItem Header="在此打开终端"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenInTerminalCommand}"
                                         CommandParameter="{Binding}"/>

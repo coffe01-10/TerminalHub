@@ -136,6 +136,21 @@ public class FilesOpenInTerminalTests
     }
 
     [Fact]
+    public void OpenExternally_FileOnly_PassesPath()
+    {
+        var opened = new List<string>();
+        var vm = new TerminalHub.App.ViewModels.FilesViewModel(openExternal: opened.Add);
+        var file = new FileEntry { Name = "note.txt", FullPath = FileInDir };
+        var dir = new FileEntry { Name = "sub dir", FullPath = DirA, IsDirectory = true };
+
+        Assert.False(vm.OpenExternallyCommand.CanExecute(dir));
+        vm.OpenExternallyCommand.Execute(file);
+
+        Assert.Equal(new[] { FileInDir }, opened);
+        Assert.False(vm.StatusIsError);
+    }
+
+    [Fact]
     public async Task DragData_File_PackagesLocalPath()
     {
         var provider = DispatchProxy.Create<IStorageProvider, FileResolveProxy>();
