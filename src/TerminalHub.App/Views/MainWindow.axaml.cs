@@ -88,6 +88,14 @@ public partial class MainWindow : Window
             RoutingStrategies.Tunnel, handledEventsToo: true);
         SessionShelf.PointerCaptureLost += (_, _) => EndShelfDrag(commit: false);
         _shelfDragTimer.Tick += (_, _) => UpdateShelfDrag(autoScroll: true);
+        // Files → terminal drag-out: a held row dragged far enough starts an
+        // OS-level Files payload; the terminal treats it like an Explorer drop.
+        FilesList.AddHandler(InputElement.PointerPressedEvent, OnFilesDragPointerPressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        FilesList.AddHandler(InputElement.PointerMovedEvent, OnFilesDragPointerMoved,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        FilesList.AddHandler(InputElement.PointerReleasedEvent, OnFilesDragPointerReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += async (_, _) =>
         {
             try
@@ -771,6 +779,46 @@ public partial class MainWindow : Window
             Vm.Files.UpCommand.Execute(null);
             e.Handled = true;
         }
+    }
+
+    // Drag-out gesture: press records the row, a >6px move starts the real
+    // drag. Single click stays a pure selection (and previews the file).
+    private Point? _filesDragStart;
+    private TerminalHub.Core.Files.FileEntry? _filesDragEntry;
+
+    private void OnFilesDragPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        _filesDragStart = null;
+        _filesDragEntry = null;
+        if (!e.GetCurrentPoint(FilesList).Properties.IsLeftButtonPressed) return;
+        if (e.Source is Control { DataContext: TerminalHub.Core.Files.FileEntry entry })
+        {
+            _filesDragStart = e.GetPosition(FilesList);
+            _filesDragEntry = entry;
+        }
+    }
+
+    private void OnFilesDragPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _filesDragStart = null;
+        _filesDragEntry = null;
+    }
+
+    private async void OnFilesDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_filesDragStart is not { } start || _filesDragEntry is not { } entry) return;
+        if (!e.GetCurrentPoint(FilesList).Properties.IsLeftButtonPressed)
+        {
+            _filesDragStart = null;
+            _filesDragEntry = null;
+            return;
+        }
+        var delta = e.GetPosition(FilesList) - start;
+        if (delta.X * delta.X + delta.Y * delta.Y < 36) return;
+        _filesDragStart = null;
+        _filesDragEntry = null;
+        var data = await FilesDragData.CreateAsync(StorageProvider, entry);
+        if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
     }
 
 
