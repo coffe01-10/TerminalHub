@@ -981,7 +981,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!int.TryParse(parameter?.ToString(), out var index)) return;
         switch (index)
         {
-            case 0: _ = NewSession(); break;
+            case 0: DockHighlight = 0; _ = NewSession(); break;
             case 1: InspectorVisible = true; DockHighlight = 1; SelectedRightTab = 0; break;
             case 2: InspectorVisible = true; DockHighlight = 2; SelectedRightTab = 3; break;
             case 3: InspectorVisible = true; DockHighlight = 3; SelectedRightTab = 2; break;

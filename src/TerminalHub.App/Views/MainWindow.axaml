@@ -1345,7 +1345,7 @@
         </Style>
       </ctl:DropletDock.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
-        <Button x:Name="NewDockButton" Classes="dock"
+        <Button x:Name="NewDockButton" Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                 Command="{Binding DockSelectCommand}" CommandParameter="0"
                 ToolTip.Tip="新建终端">
           <StackPanel>
