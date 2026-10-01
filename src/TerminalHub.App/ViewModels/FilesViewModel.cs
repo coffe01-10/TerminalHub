@@ -15,6 +15,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private readonly Action<string>? _openTerminalAt;
     private readonly Func<string, Task>? _copyTextAsync;
     private readonly Func<bool>? _hasActiveSession;
+    private readonly Action<string> _revealInFileManager;
     private bool _initialized;
 
     /// <summary>One clickable breadcrumb segment.</summary>
@@ -38,15 +39,19 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// <param name="openTerminalAt">Sends a real `cd` into the active terminal session.</param>
     /// <param name="copyTextAsync">Best-effort clipboard copy (owned by the shell VM).</param>
     /// <param name="hasActiveSession">Whether a live session exists to receive `cd`.</param>
+    /// <param name="revealInFileManager">Opens the OS file manager at a path
+    /// (tests inject a capture; null → platform default).</param>
     public FilesViewModel(Func<string?>? sessionCwd = null,
                           Action<string>? openTerminalAt = null,
                           Func<string, Task>? copyTextAsync = null,
-                          Func<bool>? hasActiveSession = null)
+                          Func<bool>? hasActiveSession = null,
+                          Action<string>? revealInFileManager = null)
     {
         _sessionCwd = sessionCwd ?? (() => null);
         _openTerminalAt = openTerminalAt;
         _copyTextAsync = copyTextAsync;
         _hasActiveSession = hasActiveSession;
+        _revealInFileManager = revealInFileManager ?? RevealDefault;
     }
 
     /// <summary>Selection change arms/disarms the entry commands and keeps the
@@ -56,6 +61,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     {
         OpenInTerminalCommand.NotifyCanExecuteChanged();
         CopyPathCommand.NotifyCanExecuteChanged();
+        RevealInFileManagerCommand.NotifyCanExecuteChanged();
         if (value is { IsDirectory: false }) PreviewFile(value.FullPath);
         else HasPreview = false;
     }
@@ -266,6 +272,45 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         if (_copyTextAsync is not null) await _copyTextAsync(e.FullPath);
         StatusIsError = false;
         StatusText = $"已复制 {e.FullPath}";
+    }
+
+    /// <summary>「在文件管理器中显示」: Windows Explorer selects the file / opens
+    /// the dir; elsewhere xdg-open on the dir (a file resolves to its parent).</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void RevealInFileManager(FileEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e is null) return;
+        try
+        {
+            _revealInFileManager(e.FullPath);
+            StatusIsError = false;
+            StatusText = $"已在文件管理器中显示 {e.FullPath}";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException
+                                     or System.ComponentModel.Win32Exception
+                                     or IOException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法打开文件管理器: {ex.Message}";
+        }
+    }
+
+    private static void RevealDefault(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var arg = Directory.Exists(path) ? $"\"{path}\"" : $"/select,\"{path}\"";
+            System.Diagnostics.Process.Start("explorer.exe", arg);
+        }
+        else
+        {
+            var dir = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
+            if (dir is null) return;
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{dir}\"")
+                { UseShellExecute = false });
+        }
     }
 
     private bool HasSelection(FileEntry? entry) => (entry ?? SelectedEntry) is not null;

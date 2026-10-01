@@ -76,6 +76,34 @@ public class FilesOpenInTerminalTests
         Assert.False(vm.StatusIsError); // info copy, not a failure
     }
 
+    [Fact]
+    public void RevealInFileManager_PassesSelectedPath()
+    {
+        var shown = new List<string>();
+        var vm = new TerminalHub.App.ViewModels.FilesViewModel(revealInFileManager: shown.Add);
+        var file = new FileEntry { Name = "note.txt", FullPath = FileInDir };
+
+        Assert.False(vm.RevealInFileManagerCommand.CanExecute(null));
+        vm.RevealInFileManagerCommand.Execute(file);
+
+        Assert.Equal(new[] { FileInDir }, shown);
+        Assert.False(vm.StatusIsError);
+        Assert.Contains("文件管理器", vm.StatusText);
+    }
+
+    [Fact]
+    public void RevealInFileManager_Failure_MarksError()
+    {
+        var vm = new TerminalHub.App.ViewModels.FilesViewModel(
+            revealInFileManager: _ => throw new InvalidOperationException("no fm"));
+        var file = new FileEntry { Name = "note.txt", FullPath = FileInDir };
+
+        vm.RevealInFileManagerCommand.Execute(file);
+
+        Assert.True(vm.StatusIsError);
+        Assert.Contains("无法打开文件管理器", vm.StatusText);
+    }
+
     // ---------- end-to-end through the real window ----------
 
     [AvaloniaFact]

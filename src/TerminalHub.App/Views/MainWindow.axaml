@@ -882,6 +882,9 @@
                               <MenuItem Header="在此打开终端"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenInTerminalCommand}"
                                         CommandParameter="{Binding}"/>
+                              <MenuItem Header="在文件管理器中显示"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.RevealInFileManagerCommand}"
+                                        CommandParameter="{Binding}"/>
                               <MenuItem Header="复制路径"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.CopyPathCommand}"
                                         CommandParameter="{Binding}"/>
