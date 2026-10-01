@@ -133,6 +133,66 @@ public class LinuxCommandCompletionTests
         return true;
     }
 
+    /// <summary>OSC 7 regression: the rc script used to emit
+    /// file://host/$PWD with the path unencoded, so a cwd containing '#'
+    /// (URI fragment), '?' (query) or '%' (escape) was truncated/corrupted by
+    /// TryParseOsc7. Bare-path emission keeps e.g. "C#proj" intact.</summary>
+    [Fact]
+    public async Task Bash_Osc7_SpecialCharsInPath_ReportedIntact()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var emulator = new TerminalEmulator(new LinuxPtySession());
+        var cwdSeen = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        emulator.CwdChanged += path => cwdSeen.TrySetResult(path);
+
+        var root = Path.Combine(Path.GetTempPath(), "th-osc7-" + Guid.NewGuid().ToString("N"));
+        var specials = new[] { "C#proj", "a%20b", "q?mark", "space dir" }
+            .Select(n => Path.Combine(root, n)).ToArray();
+        Directory.CreateDirectory(root);
+        foreach (var d in specials) Directory.CreateDirectory(d);
+        try
+        {
+            await emulator.StartAsync(new PtyOptions
+            {
+                Shell = "bash",
+                Arguments = ShellIntegration.BashArguments,
+                WorkingDirectory = root
+            });
+            Assert.Equal(root, await cwdSeen.Task.WaitAsync(TimeSpan.FromSeconds(15)));
+            await Task.Delay(300); // rc hookup settles after the first prompt.
+
+            foreach (var target in specials)
+            {
+                var hit = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnCwd(string path) { if (path == target) hit.TrySetResult(path); }
+                emulator.CwdChanged += OnCwd;
+                emulator.SendText($"cd {EscapeForBash(target)}\r");
+                Assert.Equal(target, await hit.Task.WaitAsync(TimeSpan.FromSeconds(15)));
+                emulator.CwdChanged -= OnCwd;
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(root, true); } catch { /* best effort */ }
+        }
+
+        static string EscapeForBash(string path) => "'" + path.Replace("'", "'\\''") + "'";
+    }
+
+    /// <summary>Args persisted by older builds point bash --rcfile at our
+    /// integration script; restore paths must recognize them and re-inject the
+    /// current rc file (which also refreshes it if deleted). User rcfiles with
+    /// other filenames are untouched.</summary>
+    [Theory]
+    [InlineData("--rcfile \"/home/u/.config/terminalhub/bash-integration.sh\"", true)]
+    [InlineData("--rcfile /tmp/bash-integration.sh", true)]
+    [InlineData("--rcfile ~/.bashrc", false)]
+    [InlineData("--norc", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsBashRcArguments_MatchesOnlyOurRcfile(string? args, bool expected)
+        => Assert.Equal(expected, ShellIntegration.IsBashRcArguments(args));
+
     /// <summary>Command journal parity: C/D marks produce finished records with
     /// exit codes, the same data the session card's exit hint uses.</summary>
     [Fact]
