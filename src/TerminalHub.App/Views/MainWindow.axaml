@@ -1497,7 +1497,7 @@
                 <TextBlock Classes="settings-heading" Text="实时预览"/>
                 <Border Background="{DynamicResource UiInset}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" CornerRadius="8" Padding="16">
                   <StackPanel Spacing="8">
-                    <TextBlock Text="PS C:\Projects&gt;" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiAccent}"/>
+                    <TextBlock Text="{Binding TerminalPreviewPrompt}" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiAccent}"/>
                     <TextBlock Text="Terminal Hub · 中文与 English 012345" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiInk}" TextWrapping="Wrap"/>
                     <TextBlock Text="✓ Build succeeded" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiGood}"/>
                   </StackPanel>
@@ -1594,10 +1594,10 @@
             <Border Classes="settings-group" Margin="4,12,4,4" VerticalAlignment="Top">
               <StackPanel Spacing="12">
                 <TextBlock Text="新终端使用" Foreground="{DynamicResource UiInk}"/>
-                <ComboBox SelectedIndex="{Binding ShellIndex}"><ComboBoxItem>PowerShell (pwsh)</ComboBoxItem><ComboBoxItem>cmd.exe</ComboBoxItem><ComboBoxItem>WSL / bash</ComboBoxItem><ComboBoxItem>bash</ComboBoxItem><ComboBoxItem>自定义</ComboBoxItem></ComboBox>
+                <ComboBox ItemsSource="{Binding SettingsShellLabels}" SelectedIndex="{Binding SettingsShellIndex}"/>
                 <TextBlock Text="自定义 Shell 路径" Foreground="{DynamicResource UiInk}"/>
-                <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="C:\…\pwsh.exe"/>
-                <CheckBox Content="在资源管理器文件夹右键中显示 Terminal Hub" IsChecked="{Binding ExplorerMenuEnabled}"/>
+                <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="{Binding CustomShellWatermark}"/>
+                <CheckBox Content="{Binding FileManagerMenuLabel}" IsChecked="{Binding ExplorerMenuEnabled}" IsEnabled="{Binding FileManagerMenuAvailable}"/>
                 <TextBlock Text="{Binding ExplorerMenuMessage}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
                 <TextBlock Text="勾选后，文件夹或其空白处的右键菜单会出现“在 Terminal Hub 中打开”。取消勾选即移除。带空格或中文的路径会传给已打开的窗口。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
               </StackPanel>

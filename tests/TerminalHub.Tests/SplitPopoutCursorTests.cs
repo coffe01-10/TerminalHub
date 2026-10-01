@@ -20,8 +20,10 @@ public class SplitPopoutCursorTests
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1440, Height = 900 };
         window.Show();
-        await Task.Delay(500); // startup sessions spawn
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        var deadline = Environment.TickCount64 + 5000;
+        while (vm.SessionCards.Count < 3 && Environment.TickCount64 < deadline)
+            await Task.Delay(20);
         Assert.True(vm.SessionCards.Count >= 3);
         return (window, vm);
     }

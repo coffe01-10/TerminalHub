@@ -134,6 +134,77 @@ public class LinuxPtyTests
         }
     }
 
+    [Fact]
+    public async Task Arguments_PreserveEmptyValuesBackslashesAndSpacedShellPath()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var dir = Path.Combine(Path.GetTempPath(), "th-args-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var shell = Path.Combine(dir, "shell with 中文 spaces");
+        File.CreateSymbolicLink(shell, "/bin/bash");
+        using var pty = new LinuxPtySession();
+        var output = new StringBuilder();
+        var exited = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        pty.OutputReceived += (_, data) => { lock (output) output.Append(Encoding.UTF8.GetString(data.Span)); };
+        pty.Exited += (_, code) => exited.TrySetResult(code);
+        try
+        {
+            await pty.StartAsync(new PtyOptions
+            {
+                Shell = shell,
+                Arguments = "-c 'printf \"COUNT:%s|\" \"$#\"; printf \"<%s>\" \"$@\"' marker \"\" \"C:\\tools\" '中文 space'"
+            });
+            Assert.Equal(0, await exited.Task.WaitAsync(TimeSpan.FromSeconds(8)));
+            var deadline = Environment.TickCount64 + 3000;
+            while (Environment.TickCount64 < deadline)
+            {
+                lock (output) if (output.ToString().Contains("COUNT:3|<><C:\\tools><中文 space>")) return;
+                await Task.Delay(20);
+            }
+            lock (output) Assert.Contains("COUNT:3|<><C:\\tools><中文 space>", output.ToString());
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public async Task Kill_StopsBackgroundJobsInSeparateProcessGroups()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var dir = Path.Combine(Path.GetTempPath(), "th-jobs-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var script = Path.Combine(dir, "jobs.sh");
+        File.WriteAllText(script, "set -m\n(trap '' HUP; exec sleep 120) &\necho JOB:$!\nwait\n");
+        var child = 0;
+        using var pty = new LinuxPtySession();
+        var output = new StringBuilder();
+        pty.OutputReceived += (_, data) => { lock (output) output.Append(Encoding.UTF8.GetString(data.Span)); };
+        try
+        {
+            await pty.StartAsync(new PtyOptions { Shell = "/bin/bash", Arguments = script });
+            var deadline = Environment.TickCount64 + 8000;
+            while (child == 0 && Environment.TickCount64 < deadline)
+            {
+                lock (output)
+                {
+                    var match = Regex.Match(output.ToString(), @"JOB:(\d+)");
+                    if (match.Success) child = int.Parse(match.Groups[1].Value);
+                }
+                if (child == 0) await Task.Delay(20);
+            }
+            Assert.True(child > 0, "Background job did not start.");
+            Assert.NotEqual(pty.ProcessId, ProcessGroupOf(child));
+            pty.Kill();
+            deadline = Environment.TickCount64 + 3000;
+            while (ProcessAlive(child) && Environment.TickCount64 < deadline) await Task.Delay(20);
+            Assert.False(ProcessAlive(child), "Closing a terminal must stop its background job too.");
+        }
+        finally
+        {
+            if (child > 0) Native.kill(child, 9);
+            Directory.Delete(dir, true);
+        }
+    }
+
     private static bool ProcessAlive(int pid)
     {
         if (pid <= 0) return false;

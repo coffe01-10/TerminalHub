@@ -145,7 +145,7 @@ public sealed class SingleInstanceActivation : IDisposable
                 try { await Task.Delay(50, timeout.Token); }
                 catch (OperationCanceledException) { return false; }
             }
-            catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or TimeoutException)
             { return false; }
         }
     }

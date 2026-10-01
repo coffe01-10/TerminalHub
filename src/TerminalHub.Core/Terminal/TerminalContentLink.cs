@@ -8,7 +8,7 @@ public static partial class TerminalContentLinks
 {
     [GeneratedRegex(@"https?://[^\s<>""']+", RegexOptions.IgnoreCase)]
     private static partial Regex UrlPattern();
-    [GeneratedRegex("(?<path>(?:[A-Za-z]:[\\\\/]|/|\\.{0,2}[/\\\\]|(?:[\\w.-]+[/\\\\])+)[^\\r\\n<>\"|]*?\\.[A-Za-z0-9]{1,10}|[\\w.-]+\\.[A-Za-z0-9]{1,10})(?::(?<line>\\d+)(?::(?<column>\\d+))?|\\((?<line>\\d+)(?:,(?<column>\\d+))?\\))?")]
+    [GeneratedRegex("(?<path>(?:[A-Za-z]:[\\\\/]|/|\\.{0,2}[/\\\\]|(?:[\\w.-]+[/\\\\])+)[^\\r\\n<>\"|]*?\\.[A-Za-z0-9]{1,10}|[\\w.-]+\\.[A-Za-z0-9]{1,10})(?![\\w./\\\\-])(?::(?<line>\\d+)(?::(?<column>\\d+))?|\\((?<line>\\d+)(?:,(?<column>\\d+))?\\))?")]
     private static partial Regex PathPattern();
 
     public static TerminalContentLink? Resolve(string text, int index, string cwd, bool remote, string? hyperlink = null)

@@ -184,6 +184,23 @@ public class CodeReviewFixTests
         finally { Directory.Delete(directory, true); }
     }
 
+    [Fact]
+    public void DottedParentDirectory_DoesNotHideTheActualFileLink()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "th.links." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "source file.cs");
+        File.WriteAllText(path, "source");
+        try
+        {
+            var link = TerminalContentLinks.Resolve(path + ":12:3", 2, directory, false);
+            Assert.Equal(path, link!.Target);
+            Assert.Equal(12, link.Line);
+            Assert.Equal(3, link.Column);
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
     [AvaloniaFact]
     public void OrphanWideGlyph_RendersWithoutReadingTheNextRow()
     {

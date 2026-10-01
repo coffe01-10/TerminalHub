@@ -45,10 +45,24 @@ v0.4 工作区功能没有重跑 Claude、Codex 或 Grok 的实机编辑。新�
 
 Linux 侧补齐了与 Windows 同档的 PTY 能力和回归：
 
-- **bash Shell 集成**：Linux 上交互式 bash 会话注入 `ShellIntegration.BashArguments`（`--rcfile <settings>/bash-integration.sh`，脚本先加载 `/etc/bash.bashrc` 与 `~/.bashrc` 再挂钩子，不改动用户配置文件）。PROMPT_COMMAND 发出 `OSC 133;D;<退出码>`、`OSC 7;file://host/path`（cwd）、`133;A`；PS1 尾部附 `133;B`；PS0 发 `133;C`。此前 Linux 只能靠 `/proc` 轮询 cwd，命令完成事件和退出码提示完全缺失。bash < 5.0 没有 PS0，退化为只有 cwd/prompt 标记。
+- **bash Shell 集成**：Linux 上交互式 bash 会话注入 `ShellIntegration.BashArguments`（`--rcfile <settings>/bash-integration.sh`，脚本先加载 `/etc/bash.bashrc` 与 `~/.bashrc` 再挂钩子，不改动用户配置文件）。PROMPT_COMMAND 发出 `OSC 133;D;<退出码>`、`OSC 7;<绝对路径>`（cwd，不用 URI，保留路径中的 `#`、`?`、`%`）、`133;A`；PS1 尾部附 `133;B`；PS0 发 `133;C`。此前 Linux 只能靠 `/proc` 轮询 cwd，命令完成事件和退出码提示完全缺失。
 - **PowerShell 集成不再限 Windows**：Linux 上选 pwsh 同样注入 OSC 133/9;9 参数。
 - **环境变量**：`PtyEnvironment` 在非 Windows 且父环境没有 `LANG`/`LC_ALL` 时补 `LANG=C.UTF-8`，避免子进程落到 POSIX/C 使 UTF-8/CJK 工具退化。
 - **新增 Linux 对等测试**（`dotnet test` 本机全绿）：`LinuxStreamingTests`（退出前流式输出 + COLORTERM/自定义环境变量、订阅者异常不阻断后续输出、退出码上报、`stty size` 验证 resize 生效）对照 `WindowsStreamingTests`；`LinuxCommandCompletionTests`（OSC 133 退出码序列 0→7→0→1、OSC 7 cwd 跟踪 cd、CommandJournal 记录）对照 `WindowsCommandCompletionTests`；`PtyEnvironmentTests` 覆盖环境合成。
 - **实机 CLI**：`LocalClaudeFact`/`LocalGrokFact` 现同时在 Windows/Linux 生效，按平台选 ConPTY/forkpty；仍需 `TERMINALHUB_CLAUDE_PATH`/`TERMINALHUB_GROK_PATH` + 已信任目录（`TERMINALHUB_CLI_CWD`），不设则明确 Skip。Windows 专属的标准句柄重定向只在 Windows 分支执行。
 
-仍不对等项：zsh/sh 无集成（zsh 需要 ZDOTDIR 方案，另立项）；交互式 bash 中 `sleep &` 这类作业控制子进程有独立进程组，Kill 只负责 shell 所在组（与 Windows 的整树杀法有差异，属有意保留的 Linux 语义）。
+zsh/sh 仍可作为自定义终端运行，但没有 OSC 命令完成集成。2026-10-01 后续修复已让 Linux 会话关闭时结束 Shell 的进程树；真实 PTY 回归覆盖独立进程组中忽略 HUP 的后台作业，避免关闭标签后留下进程。
+
+## 2026-10-01 UI 与功能对齐收口
+
+基于远端 main `0a34ce0` 的同一份代码，在 Windows 和 Linux 两端验证。
+
+- Linux 首次启动默认使用 Bash，保留用户明确保存的 Shell；启动设置不再显示 Linux 上不能直接使用的 cmd.exe/WSL 选项，路径示例和字体预览提示也使用对应平台的样式。Windows 默认值及选择保持原样。
+- Linux 设置中的文件夹右键入口现在实现 Thunar 自定义操作，安装/更新/删除只处理 Terminal Hub 自身条目，保留用户其他操作；Windows 保留原有资源管理器入口。Thunar 的字段码用法依据 [Xfce 官方文档](https://docs.xfce.org/xfce/thunar/custom-actions)。
+- 修复 Linux PTY 对空参数、带空格的 Shell 文件名以及双引号内反斜杠的传递；修复文件链接在带点号的父目录中提前结束的问题。
+- 深蓝玻璃、深黑、亮白、纸张四主题均在 1440×900 和 1100×680 绘制核对。Linux 自包含发布程序已在隔离 X11 显示中启动并捕获原生窗口。
+- Linux 完整回归 519 通过、3 跳过；单独设置 CLI 路径后，Claude 中文光标/缩放/多行编辑及 Grok 启动颜色回归 2 项通过，没有发送模型请求。Windows 完整回归中 518 通过，注册表测试因沙箱权限失败后单独提权重跑通过；3 项按配置跳过。
+
+这些验证未覆盖系统输入法的真实候选窗、Wayland、多显示器，也未人工点击 Thunar 右键菜单。SSH 面板的命令构建/配置逻辑由回归覆盖，未连接额外真实 SSH 服务。用户已有设置未修改，Windows 安装版未替换。
+
+末次补测中，Linux 原生终端的普通键盘输入正常，但从 GTK 系统剪贴板通过快捷键和右键粘贴均得到空文本。尚未确认是隔离 X11 环境还是产品问题；随后 Linux 主机 SSH 连接中断，未能继续诊断。此项未修复，也未验证通过，不能据此宣称所有功能已完全对齐。

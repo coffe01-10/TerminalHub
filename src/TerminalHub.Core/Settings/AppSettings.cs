@@ -15,7 +15,7 @@ public sealed record StartupSession
     public string Name { get; init; } = "Terminal 01";
     public string Tag { get; init; } = "";
     public string WorkingDirectory { get; init; } = "";
-    public ShellKind Shell { get; init; } = ShellKind.PowerShell;
+    public ShellKind Shell { get; init; } = AppSettings.DefaultShell;
 }
 
 /// <summary>One session in the saved workspace layout. Recreated as a NEW
@@ -65,7 +65,8 @@ public sealed class AppSettings
     public const string AppName = "Terminal Hub";
     public const string AppNameZh = "终端控制中心";
 
-    public ShellKind Shell { get; set; } = ShellKind.PowerShell;
+    public static ShellKind DefaultShell => OperatingSystem.IsWindows() ? ShellKind.PowerShell : ShellKind.Bash;
+    public ShellKind Shell { get; set; } = DefaultShell;
     public string CustomShellPath { get; set; } = "";
     public double FontSize { get; set; } = 13;
     /// <summary>Terminal font family list ("" = built-in monospace stack).</summary>
