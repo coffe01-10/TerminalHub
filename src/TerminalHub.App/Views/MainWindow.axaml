@@ -462,7 +462,7 @@
                     IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
               <Grid RowDefinitions="30,*">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="4,0">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="4,0">
                   <ListBox SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                            ScrollViewer.VerticalScrollBarVisibility="Disabled"
@@ -497,7 +497,15 @@
                     </ListBoxItem>
                     <ListBoxItem>Search</ListBoxItem>
                   </ListBox>
-                  <Button Grid.Column="1" Content="⎘ Clear" FontSize="10" Padding="8,2"
+                  <ComboBox x:Name="OutputLevelCombo" Grid.Column="1" FontSize="10" Padding="8,1" MinWidth="76"
+                            VerticalAlignment="Center" SelectedIndex="{Binding Dashboard.OutputLevelFilter}"
+                            ToolTip.Tip="按级别筛选 Output 行">
+                    <ComboBoxItem>全部</ComboBoxItem>
+                    <ComboBoxItem>info</ComboBoxItem>
+                    <ComboBoxItem>warn</ComboBoxItem>
+                    <ComboBoxItem>error</ComboBoxItem>
+                  </ComboBox>
+                  <Button Grid.Column="2" Content="⎘ Clear" FontSize="10" Padding="8,2"
                           Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                           Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"
                           Command="{Binding Dashboard.ClearOutputCommand}"/>
@@ -506,8 +514,8 @@
                 <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource UiBorder}">
                   <Panel>
                     <!-- Output -->
-                    <ListBox IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
-                             ItemsSource="{Binding Dashboard.OutputLog}"
+                    <ListBox x:Name="OutputList" IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
+                             ItemsSource="{Binding Dashboard.VisibleOutput}"
                              Background="Transparent" BorderThickness="0" Padding="6">
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">

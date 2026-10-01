@@ -80,6 +80,8 @@ public sealed class AppSettings
     private List<SessionShortcutBinding> _sessionShortcuts = SessionShortcutBinding.Defaults();
     public bool InspectorVisible { get; set; }
     public bool OutputVisible { get; set; } = true;
+    /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
+    public int OutputLevelFilter { get; set; }
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
     public int DockVisibilityMode { get; set; } = 1;
     public string WorkspaceName { get; set; } = "MangaFlow";
