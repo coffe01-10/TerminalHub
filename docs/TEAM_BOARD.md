@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **分屏/弹出收回后光标与选区不漂**（分屏焦点切换 · 弹出独立窗收回 · 断言+截图）— **Devin** · `feat/linux-split-popout-cursor` · `/workspace/TerminalHub`
+- [ ] **分屏/弹出收回后光标与选区不漂**（分屏焦点切换 · 弹出独立窗收回 · 断言+截图）— **Devin** · PR #47 · `feat/linux-split-popout-cursor` · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
