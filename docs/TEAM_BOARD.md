@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-01 20:02 CST（PR #48 已合 · Devin 开 Output 默认展开刀） · 维护：Devin（PO）
+最后更新：2026-10-02 00:37 CST（PR #53 已合 · Devin 开 UI 对照 mockup 刀） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Output 级别筛选**（全部/info/warn/error + 持久化）— Devin · `feat/output-level-filter-mockup` · PR #53 等审 · `/workspace/TerminalHub`
+- [ ] **UI 对照 ui-ref-dashboard/ai-assistant mockup**（挑一个最大可辨差距切片：玻璃面/霓虹态/缩略图/右栏实用性）— Devin · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -28,6 +28,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #53 Output 底栏级别筛选（全部/info/warn/error + VisibleOutput + 持久化 · 实机截图两档）— Devin · `feat/output-level-filter-mockup` · `main@75cc0c7`
 - [x] PR #52 Linux 平台对齐（默认 Bash · 隐藏 cmd/WSL · Thunar 右键 · PTY 参数/整树关闭 · 剪贴板=X11 环境结论）— Codex/Devin · `codex/linux-windows-parity` · `main@cadefdd`
 
 - [x] PR #51 OSC7 cwd 修复（裸路径发射 · legacy --rcfile 重注入 · 特殊字符目录真 PTY 回归）— Devin · `feat/linux-osc7-cwd-encoding` · `main@7a674f7`
