@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-01 18:45 CST（PR #45 已合 · Devin 开 Linux bash 编辑回归刀） · 维护：Devin（PO）
+最后更新：2026-10-01 19:05 CST（PR #46 已合 · Devin 开分屏/弹出光标回归刀） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Linux bash CLI 编辑 / 多行粘贴 / 布局切换光标回归**（多行粘贴+方向键编辑断言 · 分屏/弹出/缩放后光标选区不漂）— **Devin** · PR #46 · `feat/linux-bash-cli-editing` · `/workspace/TerminalHub`
+- [ ] **分屏/弹出收回后光标与选区不漂**（分屏焦点切换 · 弹出独立窗收回 · 断言+截图）— **Devin** · `feat/linux-split-popout-cursor` · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -28,6 +28,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #46 Linux bash 编辑回归（Backspace 宽字符续格修复 · 5 例真 PTY + 缓冲级 reflow）— Devin · `feat/linux-bash-cli-editing` · `main@2f149fd`
 - [x] PR #45 缩略图收口（PS0 \x01\x02 泄漏修复 · 像素级活性回归 · 选中态贴近 mockup）— Devin · `feat/session-thumb-live` · `main@1d54437`
 - [x] PR #43 Logs ▲/▼ error 跳转 — Grok · `feat/logs-jump-level` · `main@51c69e0`
 - [x] PR #44 Linux 对齐（bash OSC 133/7 集成 · LANG 回退 · LinuxStreaming/CommandCompletion/PtyEnvironment · SingleInstance ECONNRESET 重试）— Devin · `feat/linux-parity-tests` · `main@f789dd5`

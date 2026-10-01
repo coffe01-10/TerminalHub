@@ -702,3 +702,4 @@
 
 ## 2026-10-01
 - PR #45（`main@1d54437`）会话缩略图收口：确认 StagePreview 即真缓冲下采样并补像素级活性回归；修 #44 引入的 bash PS0 `\[ \]` → `\x01\x02` 字节泄漏（命令输出前的 □□）；active 卡片描边/光晕贴近 mockup。Linux 冒烟截图 `docs/screenshots/session-thumb-live.png`。
+- PR #46（`main@2f149fd`）Linux bash 编辑回归：修 `Backspace` 宽字符续格多退一格（readline 按显示列发 \b，终端二次吸附导致中文编辑光标偏一格）；新增 LinuxCliEditingTests 真 PTY 五例 + 缓冲级 ResizeReflow。
