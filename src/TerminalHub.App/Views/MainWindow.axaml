@@ -197,6 +197,7 @@
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
                                Classes.active="{Binding IsActive}" Height="{Binding #Root.ThumbnailHeight}"
+                               Margin="0,-16,0,0"
                                ToolTip.Tip="{Binding WorkingDirectory}" DoubleTapped="OnRenameCard">
                   <ctl:StageCard.Styles>
                     <Style Selector="ctl|StageCard > Border">
