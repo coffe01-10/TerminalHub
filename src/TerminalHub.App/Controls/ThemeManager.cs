@@ -95,10 +95,12 @@ public static class ThemeManager
         });
         app.Resources["ActiveCardShadow"] = BoxShadows.Parse(Current switch
         {
-            "Paper" => "0 2 3 0 #28816D50",
-            "White" => "0 3 8 0 #20314766",
-            "Black" => "0 1 4 0 #60000000",
-            _ => "0 0 16 1 #5965ACED, 0 4 14 0 #300A1524"
+            // Active shelf card: bright accent ring + soft halo + drop, so the
+            // live session reads at a glance like the ui-ref mockups.
+            "Paper" => "0 0 12 1 #598C5132, 0 4 10 0 #388C5132",
+            "White" => "0 0 16 1 #55245AB5, 0 4 14 -1 #2E314766",
+            "Black" => "0 0 18 2 #8FA9C8F5, 0 0 42 0 #38A9C8F5, 0 6 14 0 #80000000",
+            _ => "0 0 20 2 #A365ACED, 0 0 48 0 #3D65ACED, 0 6 16 0 #3D0A1524"
         });
         app.Resources["HeadingFont"] = new FontFamily(Current == "Paper" ? "Georgia, Noto Serif, Microsoft YaHei UI, serif" : "Segoe UI, Noto Sans, sans-serif");
         TerminalPalette.SetTheme(Current);

@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-02 00:37 CST（PR #53 已合 · Devin 开 UI 对照 mockup 刀） · 维护：Devin（PO）
+最后更新：2026-10-02 01:05 CST（PR #54 缩略卡霓虹活动态已开 · 等 PO 验收） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **UI 对照 ui-ref-dashboard/ai-assistant mockup**（挑一个最大可辨差距切片：玻璃面/霓虹态/缩略图/右栏实用性）— Devin · `/workspace/TerminalHub`
+- [ ] **UI 对照 mockup 刀：缩略卡活动态霓虹**（`feat/thumb-neon-active` · PR #54 等审：accent 光晕四主题 + 2px accent 边框 + 实机前后截图）— Devin · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
