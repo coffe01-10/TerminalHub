@@ -198,6 +198,36 @@ public class FilesPreviewTests : IDisposable
         Assert.Contains("无法创建", vm.StatusText);
     }
 
+    [AvaloniaFact]
+    public void Rename_File_AndDir_MoveAndReselect()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        var file = vm.Entries.First(e => e.Name == "a.txt");
+        vm.Rename(file, "renamed.txt");
+        Assert.True(File.Exists(Path.Combine(_root, "renamed.txt")));
+        Assert.Equal("renamed.txt", vm.SelectedEntry?.Name);
+
+        var dir = vm.Entries.First(e => e.Name == "sub");
+        vm.Rename(dir, "sub-renamed");
+        Assert.True(Directory.Exists(Path.Combine(_root, "sub-renamed")));
+        Assert.Equal("sub-renamed", vm.SelectedEntry?.Name);
+        Assert.False(vm.StatusIsError);
+    }
+
+    [AvaloniaFact]
+    public void Rename_ToExisting_ReportsError()
+    {
+        File.WriteAllText(Path.Combine(_root, "taken.txt"), "x");
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.Rename(vm.Entries.First(e => e.Name == "a.txt"), "taken.txt");
+
+        Assert.True(vm.StatusIsError);
+        Assert.Contains("无法重命名", vm.StatusText);
+        Assert.True(File.Exists(Path.Combine(_root, "a.txt")));
+    }
+
     [Fact]
     public void Refresh_RestoredSameFile_KeepsPreview()
     {

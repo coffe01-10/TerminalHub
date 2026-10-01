@@ -473,6 +473,32 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Rename <paramref name="entry"/> to <paramref name="newName"/>
+    /// in place; the renamed entry stays selected. Null/blank → no-op.</summary>
+    public void Rename(FileEntry? entry, string? newName)
+    {
+        if (entry is null || string.IsNullOrWhiteSpace(newName)) return;
+        newName = newName.Trim();
+        if (newName == entry.Name) return;
+        try
+        {
+            var dest = Path.Combine(CurrentPath, newName);
+            if (entry.IsDirectory) Directory.Move(entry.FullPath, dest);
+            else File.Move(entry.FullPath, dest);
+            NavigateTo(CurrentPath);
+            var full = Path.GetFullPath(dest);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == full);
+            StatusIsError = false;
+            StatusText = $"已重命名 → {newName}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法重命名: {ex.Message}";
+        }
+    }
+
     private string UniqueName(string baseName)
     {
         var stem = Path.GetFileNameWithoutExtension(baseName);

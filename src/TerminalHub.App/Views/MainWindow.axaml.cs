@@ -824,6 +824,11 @@ public partial class MainWindow : Window
             Vm.Files.ShowHidden = !Vm.Files.ShowHidden;
             e.Handled = true;
         }
+        else if (e.Key == Key.F2)
+        {
+            _ = RenameFileEntryAsync(Vm.Files.SelectedEntry);
+            e.Handled = true;
+        }
     }
 
     /// <summary>Empty-area context menu: create folder/file in the current dir.
@@ -838,6 +843,20 @@ public partial class MainWindow : Window
     {
         var name = await PromptTextAsync("新建文本文件", "文件名称", "");
         if (name is not null) Vm.Files.NewTextFile(name);
+    }
+
+    /// <summary>Row context 重命名 / F2: prompt prefilled with the current name.</summary>
+    private async void OnFilesRenameClick(object? sender, RoutedEventArgs e)
+    {
+        var entry = (sender as MenuItem)?.DataContext as TerminalHub.Core.Files.FileEntry;
+        await RenameFileEntryAsync(entry);
+    }
+
+    private async Task RenameFileEntryAsync(TerminalHub.Core.Files.FileEntry? entry)
+    {
+        if (entry is null) return;
+        var name = await PromptTextAsync("重命名", "新名称", entry.Name);
+        if (name is not null) Vm.Files.Rename(entry, name);
     }
 
     // Drag-out gesture: press records the row, a >6px move starts the real

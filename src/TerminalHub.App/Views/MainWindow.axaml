@@ -986,6 +986,7 @@
                               <MenuItem Header="在文件管理器中显示"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.RevealInFileManagerCommand}"
                                         CommandParameter="{Binding}"/>
+                              <MenuItem Header="重命名 (F2)" Click="OnFilesRenameClick"/>
                               <MenuItem Header="复制路径"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.CopyPathCommand}"
                                         CommandParameter="{Binding}"/>
