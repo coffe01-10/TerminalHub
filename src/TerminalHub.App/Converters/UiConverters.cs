@@ -73,6 +73,17 @@ public sealed class BytesConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>DateTimeOffset → short "MM-dd HH:mm" for Files row metadata.</summary>
+public sealed class ModifiedConverter : IValueConverter
+{
+    public static readonly ModifiedConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is DateTimeOffset d ? d.ToLocalTime().ToString("MM-dd HH:mm") : "";
+
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
 /// <summary>IsDirectory → dir names get a blue tint, files stay near-white.</summary>
 public sealed class DirNameConverter : IValueConverter
 {

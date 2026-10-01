@@ -973,7 +973,7 @@
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="files:FileEntry">
-                        <Grid ColumnDefinitions="14,*,Auto">
+                        <Grid ColumnDefinitions="14,*,Auto,Auto">
                           <Grid.ContextMenu>
                             <ContextMenu>
                               <MenuItem Header="用默认应用打开"
@@ -1005,6 +1005,9 @@
                           <TextBlock Grid.Column="2" Text="{Binding SizeBytes, Converter={x:Static vm:BytesConverter.Instance}}"
                                      Foreground="{DynamicResource UiFaint}" FontSize="9.5" HorizontalAlignment="Right"
                                      IsVisible="{Binding !IsDirectory}"/>
+                          <TextBlock Grid.Column="3" Text="{Binding Modified, Converter={x:Static vm:ModifiedConverter.Instance}}"
+                                     Foreground="{DynamicResource UiFaint}" FontSize="9.5" Margin="8,0,0,0"
+                                     HorizontalAlignment="Right"/>
                         </Grid>
                       </DataTemplate>
                     </ListBox.ItemTemplate>
