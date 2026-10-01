@@ -1033,8 +1033,12 @@
                 <Border Grid.Row="4" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                         IsVisible="{Binding !Files.HasPreview}">
-                  <TextBlock Text="选中文件即可预览" Foreground="{DynamicResource UiFaint}" FontSize="10"
-                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="选中文件即可预览" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="拖到终端可粘贴路径" Foreground="{DynamicResource UiFaint}" FontSize="9"
+                               HorizontalAlignment="Center" Margin="0,3,0,0" Opacity="0.7"/>
+                  </StackPanel>
                 </Border>
               </Grid>
 
