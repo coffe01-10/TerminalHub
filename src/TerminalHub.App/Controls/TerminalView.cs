@@ -65,6 +65,13 @@ public partial class TerminalView : Control
     private string _typedTail = "";   // fallback for hidden-cursor TUIs without a bordered prompt
     private int _imeAnchorCol, _imeAnchorRow;
     private bool _imeAnchorValid;     // _imeAnchorCol/Row resolved against the latest frame
+    private readonly record struct InputRegion(int FirstRow, int EndRow, int FirstCol);
+    private readonly record struct InputPosition(int Col, int Row, bool Valid, InputRegion? Region = null);
+    private TerminalFrame? _inputFrame;
+    private string? _inputTail;
+    private InputPosition _inputPosition;
+    private (TerminalFrame? Frame, InputPosition Input, string? Text, int Caret) _compositionKey;
+    private PreeditLayout? _compositionLayout;
 
     // Mouse selection — absolute buffer lines (scrollback indexes stay stable).
     private (int line, int col)? _selAnchor, _selEnd;
@@ -90,6 +97,9 @@ public partial class TerminalView : Control
     // Text-layout caches (FormattedText is costly; terminal rows repeat heavily).
     private readonly Dictionary<(string text, bool bold, Color fg), FormattedText> _textCache = new();
     private readonly System.Text.StringBuilder _runText = new();
+    private sealed record PaintedRow(TerminalCell[] Cells, DrawingGroup Drawing);
+    private readonly List<PaintedRow> _paintedRows = new();
+    private bool _cacheRows;
 
     public TerminalEmulator? Emulator
     {
@@ -118,6 +128,7 @@ public partial class TerminalView : Control
         _imeClient = new TerminalImeClient(this);
         _blink = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _blink.Tick += OnRefreshTick;
+        MeasureGlyphs();
     }
 
     private void OnRefreshTick(object? sender, EventArgs e)
@@ -202,6 +213,11 @@ public partial class TerminalView : Control
         _typedTail = "";
         _preedit = null;
         _preeditCaret = 0;
+        _inputFrame = null;
+        _compositionLayout = null;
+        _compositionKey = default;
+        _paintedRows.Clear();
+        _cacheRows = false;
         _imeAnchorValid = false;
         _selAnchor = _selEnd = null;
         _wordSelection = false;
@@ -216,7 +232,8 @@ public partial class TerminalView : Control
             if (_attached) next.Buffer.ScrollbackChanged += OnScrollbackChanged;
         }
         ResetScroll();
-        MeasureGlyphs();
+        TryResizeEmulator();
+        NotifyImePositionChanged();
         InvalidateVisual();
     }
 
@@ -271,6 +288,7 @@ public partial class TerminalView : Control
     {
         base.OnAttachedToVisualTree(e);
         _attached = true;
+        OnThemeChanged(); // A detached pane may have missed a theme change.
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
         ThemeManager.Changed += OnThemeChanged;
@@ -286,6 +304,9 @@ public partial class TerminalView : Control
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _attached = false;
+        ClearComposition();
+        _inputFrame = null;
+        _paintedRows.Clear();
         _blink.Stop();
         LayoutUpdated -= OnLayoutUpdated;
         if (_emulator is not null) _emulator.Changed -= OnBufferChanged;
@@ -297,11 +318,42 @@ public partial class TerminalView : Control
         base.OnDetachedFromVisualTree(e);
     }
 
-    private void OnLayoutUpdated(object? sender, EventArgs e) => TryResizeEmulator();
+    private Matrix? _lastImeTransform;
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        TryResizeEmulator();
+        if (IsPreview) return;
+        var root = TopLevel.GetTopLevel(this);
+        var transform = root is null ? null : this.TransformToVisual(root);
+        if (transform != _lastImeTransform)
+        {
+            _lastImeTransform = transform;
+            NotifyImePositionChanged();
+        }
+    }
+
+    private void NotifyImePositionChanged()
+    {
+        if (IsPreview) return;
+        _imeRefreshPending = true;
+        _imeClient.NotifyCursorRectangleChanged();
+    }
+
+    private void ClearComposition()
+    {
+        if (_preedit is null) return;
+        _preedit = null;
+        _preeditCaret = 0;
+        _compositionLayout = null;
+        _compositionKey = default;
+        NotifyImePositionChanged();
+        InvalidateVisual();
+    }
 
     private void OnThemeChanged()
     {
         _textCache.Clear();   // cached runs carry resolved theme colors
+        _paintedRows.Clear();
         Interlocked.Exchange(ref _dirty, 1);
     }
 
@@ -314,7 +366,9 @@ public partial class TerminalView : Control
         _cellW = Math.Max(4, probe.Width);
         _cellH = Math.Max(8, probe.Height * 1.0 + 2);
         _textCache.Clear();   // typeface/size changed — cached layouts are stale
+        _paintedRows.Clear();
         TryResizeEmulator();
+        NotifyImePositionChanged();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -333,7 +387,10 @@ public partial class TerminalView : Control
         // share the same emulator, so a cached "last size" would go stale whenever
         // another view resized it while this one was hidden.
         if (cols != _emulator.Buffer.Columns || rows != _emulator.Buffer.Rows)
+        {
             _emulator.Resize(cols, rows);
+            NotifyImePositionChanged();
+        }
     }
 
     // ---------- rendering ----------
@@ -393,8 +450,13 @@ public partial class TerminalView : Control
         var x = IsPreview ? (Bounds.Width - cols * _cellW * scale) / 2 - col0 * _cellW * scale : 0;
         var y = IsPreview ? (Bounds.Height - rows * _cellH * scale) / 2 - row0 * _cellH * scale : 0;
         using var transform = ctx.PushTransform(new Matrix(scale, 0, 0, scale, x, y));
+        var cacheRows = _cacheRows;
+        _cacheRows = true;
         for (var r = row0; r < row0 + rows; r++)
-            RenderRow(ctx, b.Cells, r, b.Columns);
+            // A quick switch needs its first image immediately. Build retained
+            // row drawings only when the same session is rendered again.
+            if (cacheRows) RenderCachedRow(ctx, b, r);
+            else RenderRow(ctx, b.Cells, r, b.Columns);
 
         // Mouse selection — translucent overlay on top of the glyphs.
         if (!IsPreview && _selAnchor is { } sa && _selEnd is { } se && (sa != se || _wordSelection))
@@ -464,13 +526,10 @@ public partial class TerminalView : Control
 
         // Use the same anchor resolver for the inline composition and the OS
         // candidate window, including TUIs that park a hidden cursor in a footer.
-        var anchorFound = false;
-        int anchorCol, anchorRow;
-        if (IsPreview) { anchorCol = b.CursorX; anchorRow = b.CursorY; }
-        else
-        {
-            (anchorCol, anchorRow, anchorFound) = ResolveImeAnchor(b);
-        }
+        var input = IsPreview ? new InputPosition(b.CursorX, b.CursorY, false) : ResolveInputPosition(b);
+        var anchorCol = input.Col;
+        var anchorRow = input.Row;
+        var anchorFound = input.Valid;
         _imeAnchorCol = anchorCol; _imeAnchorRow = anchorRow; _imeAnchorValid = anchorFound;
 
         // Blinking caret at the input position — the typing indicator a hidden-
@@ -498,14 +557,18 @@ public partial class TerminalView : Control
             var cc = TerminalPalette.CursorColor;
             var accent = Brush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B));
             var accentFill = Brush(Color.FromArgb(40, cc.R, cc.G, cc.B));
-            var composition = LayoutPreedit(b, anchorCol, anchorRow, preedit, _preeditCaret);
+            var composition = GetPreeditLayout(b, input, preedit, _preeditCaret);
             var fgC = TerminalPalette.Resolve(TerminalColor.Default, true);
             foreach (var glyph in composition.Glyphs)
             {
                 var px = glyph.Col * _cellW;
                 var py = glyph.Row * _cellH;
                 var pw = glyph.Width * _cellW;
-                ctx.DrawRectangle(accentFill, null, new Rect(px, py, pw, _cellH));
+                var glyphRect = new Rect(px, py, pw, _cellH);
+                // Preedit replaces the underlying cell temporarily; a tint alone
+                // leaves the CLI's old glyph visible underneath the new text.
+                ctx.DrawRectangle(Brush(bg), null, glyphRect);
+                ctx.DrawRectangle(accentFill, null, glyphRect);
                 DrawRun(ctx, glyph.Text, glyph.Col, glyph.Row, Brush(fgC), CellAttrs.None, fgC);
                 ctx.DrawLine(new Pen(accent, 1),
                     new Point(px, py + _cellH - 1.5), new Point(px + pw, py + _cellH - 1.5));
@@ -525,35 +588,34 @@ public partial class TerminalView : Control
     /// cursor apps, falls back to matching recently committed text, then the last
     /// output position. Hidden hardware cursors can be parked on a status bar.
     /// </summary>
-    private (int col, int row, bool ok) ResolveImeAnchor(TerminalFrame f)
+    private InputPosition ResolveInputPosition(TerminalFrame frame)
+    {
+        if (ReferenceEquals(_inputFrame, frame) && _inputTail == _typedTail) return _inputPosition;
+        _inputFrame = frame;
+        _inputTail = _typedTail;
+        return _inputPosition = FindInputPosition(frame);
+    }
+
+    private InputPosition FindInputPosition(TerminalFrame f)
     {
         // An application-provided caret is authoritative, including after moving
         // left into previously typed text. Echo matching would jump to its end.
-        if (f.CursorVisible) return (f.CursorX, f.CursorY, true);
+        if (f.CursorVisible) return new(f.CursorX, f.CursorY, true);
 
         // Claude Code hides the terminal cursor and parks it on its footer. Its
         // input is the prompt between two horizontal rules, even before any text
         // has been committed (or after Enter/Backspace clears the typed trail).
-        for (var r = f.Rows - 2; r > 0; r--)
+        var region = FindInputRegion(f);
+        if (region is { } prompt)
         {
-            var c = 0;
-            while (c < f.Columns && f.Cells[r * f.Columns + c].Char is ' ' or '\0') c++;
-            if (c >= f.Columns || f.Cells[r * f.Columns + c].Char is not ('>' or '❯' or '›')
-                || !IsInputRule(f, r - 1)) continue;
-            for (var end = r + 1; end < f.Rows; end++)
-            {
-                if (!IsInputRule(f, end)) continue;
-                // Claude paints its editing cursor with SGR 7, including a blank
-                // at end-of-input and two cells for a CJK glyph. The parked VT
-                // cursor and the last nonblank cell do not track Left/Home/etc.
-                var softwareCursor = FindSoftwareCursor(f, r, end, c + 2);
-                if (softwareCursor is { } position)
-                    return (position.col, position.row, true);
-                var lastRow = end - 1;
-                while (lastRow > r && RowInkEnd(f, lastRow) == 0) lastRow--;
-                var col = Math.Max(lastRow == r ? c + 2 : 0, RowInkEnd(f, lastRow));
-                return (Math.Min(col, f.Columns - 1), lastRow, true);
-            }
+            // One reversed glyph marks the caret; multiple glyphs mark selection.
+            var softwareCursor = FindSoftwareCursor(f, prompt.FirstRow, prompt.EndRow, prompt.FirstCol);
+            if (softwareCursor is { } position)
+                return new(position.col, position.row, true, prompt);
+            var lastRow = prompt.EndRow - 1;
+            while (lastRow > prompt.FirstRow && RowInkEnd(f, lastRow) == 0) lastRow--;
+            var col = Math.Max(lastRow == prompt.FirstRow ? prompt.FirstCol : 0, RowInkEnd(f, lastRow));
+            return new(Math.Min(col, f.Columns - 1), lastRow, true, prompt);
         }
 
         var tail = _typedTail;
@@ -587,11 +649,25 @@ public partial class TerminalView : Control
                 }
             }
             if (!f.CursorVisible && offCol >= 0)
-                return (Math.Min(offCol, f.Columns - 1), offRow, true);
+                return new(Math.Min(offCol, f.Columns - 1), offRow, true);
             if (anyCol >= 0)
-                return (Math.Min(anyCol, f.Columns - 1), anyRow, true);
+                return new(Math.Min(anyCol, f.Columns - 1), anyRow, true);
         }
-        return (Math.Min(f.CursorX, RowInkEnd(f, f.CursorY)), f.CursorY, false);
+        return new(Math.Min(f.CursorX, RowInkEnd(f, f.CursorY)), f.CursorY, false);
+    }
+
+    private static InputRegion? FindInputRegion(TerminalFrame frame)
+    {
+        for (var row = frame.Rows - 2; row > 0; row--)
+        {
+            var col = 0;
+            while (col < frame.Columns && frame.Cells[row * frame.Columns + col].Char is ' ' or '\0') col++;
+            if (col == frame.Columns || frame.Cells[row * frame.Columns + col].Char is not ('>' or '❯' or '›')
+                || !IsInputRule(frame, row - 1)) continue;
+            for (var end = row + 1; end < frame.Rows; end++)
+                if (IsInputRule(frame, end)) return new(row, end, Math.Min(col + 2, frame.Columns - 1));
+        }
+        return null;
     }
 
     private static (int col, int row)? FindSoftwareCursor(TerminalFrame frame, int firstRow, int endRow, int firstCol)
@@ -650,25 +726,19 @@ public partial class TerminalView : Control
 
     // Keep composition at the actual insertion cell, wrapping whole clusters.
     // A bordered Claude prompt must not paint over its lower rule or footer.
-    private PreeditLayout LayoutPreedit(TerminalFrame frame, int col, int row, string text, int caret)
+    private PreeditLayout GetPreeditLayout(TerminalFrame frame, InputPosition input, string text, int caret)
     {
-        var endRow = frame.Rows;
-        if (!frame.CursorVisible)
-            for (var first = row; first > 0; first--)
-            {
-                var c = 0;
-                while (c < frame.Columns && frame.Cells[first * frame.Columns + c].Char is ' ' or '\0') c++;
-                if (c == frame.Columns || frame.Cells[first * frame.Columns + c].Char is not ('>' or '❯' or '›')
-                    || !IsInputRule(frame, first - 1)) continue;
-                for (var end = first + 1; end < frame.Rows; end++)
-                    if (IsInputRule(frame, end))
-                    {
-                        if (end > row) endRow = end;
-                        break;
-                    }
-                break;
-            }
+        var key = (frame, input, text, caret);
+        if (_compositionLayout is not null && _compositionKey == key) return _compositionLayout;
+        _compositionKey = key;
+        return _compositionLayout = LayoutPreedit(frame, input, text, caret);
+    }
 
+    private static PreeditLayout LayoutPreedit(TerminalFrame frame, InputPosition input, string text, int caret)
+    {
+        var col = input.Col;
+        var row = input.Row;
+        var endRow = input.Region?.EndRow ?? frame.Rows;
         var glyphs = new List<PreeditGlyph>();
         caret = Math.Clamp(caret, 0, text.Length);
         var caretCol = col;
@@ -688,7 +758,6 @@ public partial class TerminalView : Control
             else
             {
                 if (col + width > frame.Columns) { col = 0; row++; }
-                if (row >= endRow) break;
                 if (caret >= i && caret < i + len) { caretCol = col; caretRow = row; }
                 glyphs.Add(new PreeditGlyph(cluster, col, row, width));
                 col += width;
@@ -699,12 +768,19 @@ public partial class TerminalView : Control
             {
                 caretCol = col;
                 caretRow = row;
-                if (caretCol == frame.Columns && caretRow + 1 < endRow)
+                if (caretCol == frame.Columns)
                 { caretCol = 0; caretRow++; }
             }
         }
-        return new PreeditLayout(glyphs, Math.Clamp(caretCol, 0, frame.Columns - 1),
-            Math.Clamp(caretRow, 0, endRow - 1));
+        // Scroll the local composition viewport, never the PTY. Keep the caret's
+        // logical row visible even when the CLI has only allocated one input row.
+        var scroll = Math.Max(0, caretRow - endRow + 1);
+        var visible = new List<PreeditGlyph>();
+        var firstRow = input.Region?.FirstRow ?? input.Row;
+        foreach (var glyph in glyphs)
+            if (glyph.Row - scroll >= firstRow && glyph.Row - scroll < endRow)
+                visible.Add(glyph with { Row = glyph.Row - scroll });
+        return new PreeditLayout(visible, Math.Clamp(caretCol, 0, frame.Columns - 1), caretRow - scroll);
     }
 
     /// <summary>A cell carries no preview information when it is an unstyled
@@ -720,9 +796,49 @@ public partial class TerminalView : Control
     }
 
     /// <summary>Render one frame row: batch contiguous same-styled cells into runs.</summary>
-    private void RenderRow(DrawingContext ctx, TerminalCell[] cells, int row, int cols)
+    private void RenderCachedRow(DrawingContext ctx, TerminalFrame frame, int row)
     {
-        var rowBase = row * cols;
+        var cells = frame.Cells.AsSpan(row * frame.Columns, frame.Columns);
+        PaintedRow? painted = null;
+        for (var index = _paintedRows.Count - 1; index >= 0; index--)
+        {
+            var candidate = _paintedRows[index];
+            if (!SamePaintedCells(cells, candidate.Cells)) continue;
+            painted = candidate;
+            _paintedRows.RemoveAt(index);
+            break;
+        }
+        if (painted is null)
+        {
+            var drawing = new DrawingGroup();
+            using (var context = drawing.Open()) RenderRow(context, frame.Cells, 0, frame.Columns, row);
+            painted = new(cells.ToArray(), drawing);
+        }
+        _paintedRows.Add(painted);
+        // One screen plus a screen's recently scrolled rows; no scrollback drawings.
+        if (_paintedRows.Count > frame.Rows * 2)
+            _paintedRows.RemoveRange(0, _paintedRows.Count - frame.Rows * 2);
+        using var translation = ctx.PushTransform(Matrix.CreateTranslation(0, row * _cellH));
+        painted.Drawing.Draw(ctx);
+    }
+
+    private static bool SamePaintedCells(ReadOnlySpan<TerminalCell> cells, TerminalCell[] other)
+    {
+        if (cells.Length != other.Length) return false;
+        for (var col = 0; col < cells.Length; col++)
+        {
+            ref readonly var a = ref cells[col];
+            ref readonly var b = ref other[col];
+            if (a.Char != b.Char || a.Tail != b.Tail || a.Attrs != b.Attrs
+                || a.Fg != b.Fg || a.Bg != b.Bg || a.IsWide != b.IsWide
+                || a.IsWideContinuation != b.IsWideContinuation) return false;
+        }
+        return true;
+    }
+
+    private void RenderRow(DrawingContext ctx, TerminalCell[] cells, int row, int cols, int? sourceRow = null)
+    {
+        var rowBase = (sourceRow ?? row) * cols;
         var runStart = -1;
         var runLen = 0;
         var curFg = default(TerminalColor);
@@ -946,7 +1062,7 @@ public partial class TerminalView : Control
     {
         base.OnLostFocus(e);
         if (!IsPreview) _emulator?.SendFocus(false);
-        if (_preedit is not null) { _preedit = null; InvalidateVisual(); }
+        ClearComposition();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -1599,7 +1715,9 @@ public partial class TerminalView : Control
                 // after output or composition starts. Do not use a stale anchor.
                 // CaptureFrame is version-cached — this stays cheap.
                 var frame = buf.CaptureFrame();
-                var (baseCol, baseRow, _) = view.ResolveImeAnchor(frame);
+                var input = view.ResolveInputPosition(frame);
+                var baseCol = input.Col;
+                var baseRow = input.Row;
                 // While scrolled into history the anchor row shifts down by the
                 // view offset (screen row r shows at visual row r + offset).
                 var row = Math.Clamp(baseRow + view._viewOffset, 0, buf.Rows - 1);
@@ -1607,7 +1725,7 @@ public partial class TerminalView : Control
                 // so the candidate window tracks it.
                 if (view._preedit is { Length: > 0 } p)
                 {
-                    var composition = view.LayoutPreedit(frame, baseCol, baseRow, p, view._preeditCaret);
+                    var composition = view.GetPreeditLayout(frame, input, p, view._preeditCaret);
                     row = Math.Clamp(composition.CaretRow + view._viewOffset, 0, frame.Rows - 1);
                     return new Rect(composition.CaretCol * view._cellW, row * view._cellH,
                         Math.Max(2, view._cellW * 0.15), view._cellH);
@@ -1626,6 +1744,8 @@ public partial class TerminalView : Control
         {
             view._preedit = string.IsNullOrEmpty(preeditText) ? null : preeditText;
             view._preeditCaret = Math.Clamp(cursorPos ?? view._preedit?.Length ?? 0, 0, view._preedit?.Length ?? 0);
+            view._compositionLayout = null;
+            view._compositionKey = default;
             NotifyCursorRectangleChanged();
             view.InvalidateVisual();
         }

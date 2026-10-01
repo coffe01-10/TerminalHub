@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Input.TextInput;
@@ -214,7 +215,7 @@ public class TerminalImeTests
         emulator.Parser.Feed("\x1b[?25l\x1b[6;1H" + new string('─', 60)
             + "\x1b[7;1H❯ " + new string('x', 56) + "\x1b[7m \x1b[27m"
             + "\x1b[9;1H" + new string('─', 60) + "\x1b[10;1Hfooter");
-        Client(view).SetPreeditText("a中" + new string('文', 40), 42);
+        Client(view).SetPreeditText("a中" + new string('文', 40), 3);
         var group = new DrawingGroup();
         using (var context = group.Open()) view.Render(context);
         var glyphs = Glyphs(group, Matrix.Identity).ToArray();
@@ -226,6 +227,84 @@ public class TerminalImeTests
         Assert.Equal(29, visibleTail.Length);
         Assert.All(visibleTail, g => Assert.InRange(g.Y, 7 * height, 8 * height));
         Assert.Equal(7 * height, Client(view).CursorRectangle.Y, 6);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void ClaudeComposition_LongTextScrollsToCaret_AndHomeShowsBeginning(int inputRows)
+    {
+        using var emulator = new TerminalEmulator(columns: 60, rows: 12);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("\x1b[?25l\x1b[6;1H" + new string('─', 60)
+            + "\x1b[7;1H❯ \x1b[7m \x1b[27m"
+            + $"\x1b[{7 + inputRows};1H" + new string('─', 60));
+        var text = "始" + new string('文', 100) + "终";
+        var client = Client(view);
+        client.SetPreeditText(text, text.Length);
+        var rect = client.CursorRectangle;
+        Assert.Equal(26 * CellWidth(view), rect.X, 6);
+        Assert.Equal((5 + inputRows) * rect.Height, rect.Y, 6);
+        var group = new DrawingGroup();
+        using (var context = group.Open()) view.Render(context);
+        var glyphs = Glyphs(group, Matrix.Identity).ToArray();
+        var last = Assert.Single(glyphs, g => g.Text == "终");
+        Assert.Equal(24 * CellWidth(view), last.X, 6);
+        Assert.InRange(last.Y, rect.Y, rect.Y + rect.Height);
+        Assert.DoesNotContain(glyphs, g => g.Text == "始");
+        client.SetPreeditText(text, 0);
+        Assert.Equal(2 * CellWidth(view), client.CursorRectangle.X, 6);
+        Assert.Equal(6 * rect.Height, client.CursorRectangle.Y, 6);
+        group = new DrawingGroup();
+        using (var context = group.Open()) view.Render(context);
+        Assert.Single(Glyphs(group, Matrix.Identity), g => g.Text == "始");
+    }
+
+    [AvaloniaFact]
+    public void Composing_ResizeAndFontChange_NotifyAndUseCurrentGridBeforeRender()
+    {
+        using var emulator = new TerminalEmulator(columns: 20, rows: 6);
+        var view = new TerminalView { Emulator = emulator };
+        emulator.Parser.Feed("\x1b[3;19H");
+        var client = Client(view);
+        client.SetPreeditText("中ab", 3);
+        emulator.Resize(10, 6);
+        var notifications = 0;
+        client.CursorRectangleChanged += (_, _) => notifications++;
+        view.TerminalFontSize = 20;
+        Assert.True(notifications > 0);
+        var rect = client.CursorRectangle;
+        Assert.InRange(rect.X, 0, 9 * CellWidth(view));
+        Assert.InRange(rect.Y, 0, 5 * rect.Height);
+        Draw(view);
+        Assert.Equal(rect, client.CursorRectangle);
+    }
+
+    [AvaloniaFact]
+    public void SplitFocusAndDetach_ClearPreviousComposition()
+    {
+        using var leftEmulator = new TerminalEmulator();
+        using var rightEmulator = new TerminalEmulator();
+        var left = new TerminalView { Emulator = leftEmulator };
+        var right = new TerminalView { Emulator = rightEmulator };
+        var panel = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
+        panel.Children.Add(left);
+        panel.Children.Add(right);
+        Grid.SetColumn(right, 1);
+        var window = new Window { Width = 800, Height = 400, Content = panel };
+        window.Show();
+        try
+        {
+            left.Focus();
+            Client(left).SetPreeditText("中文", 1);
+            right.Focus();
+            Assert.Null(typeof(TerminalView).GetField("_preedit", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(left));
+            Client(right).SetPreeditText("组合", 2);
+            panel.Children.Remove(right);
+            Assert.Null(typeof(TerminalView).GetField("_preedit", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(right));
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaTheory]
