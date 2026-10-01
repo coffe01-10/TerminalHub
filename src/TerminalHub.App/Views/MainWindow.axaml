@@ -290,10 +290,15 @@
 
             <!-- Single-row chrome like the mockup: icon · name · status · cwd | nav · actions -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
-              <Border Width="27" Height="27" CornerRadius="7" Background="{DynamicResource UiRaised}" Margin="0,0,10,0">
-                <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Ellipse Width="9" Height="9" Fill="#FF5F57" Margin="0,0,5,0"/>
+                <Ellipse Width="9" Height="9" Fill="#FEBC2E" Margin="0,0,5,0"/>
+                <Ellipse Width="9" Height="9" Fill="#28C840" Margin="0,0,10,0"/>
+                <Border Width="27" Height="27" CornerRadius="7" Background="{DynamicResource UiRaised}">
+                  <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+              </StackPanel>
               <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0" MaxWidth="360">
                 <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
