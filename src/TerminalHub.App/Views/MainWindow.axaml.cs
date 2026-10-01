@@ -304,6 +304,16 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Enter anywhere in the SSH form = 添加/更新 (its own validation shows errors).</summary>
+    private void OnSshFormKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            Vm.Ssh.AddOrUpdateCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     /// <summary>Double-click a saved host = connect (single click loads the edit form).</summary>
     private void OnSshRowDoubleTapped(object? sender, TappedEventArgs e)
     {

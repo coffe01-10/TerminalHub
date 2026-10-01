@@ -743,7 +743,11 @@
                       </StackPanel>
                     </Button>
                   </Grid>
-                  <ListBox Grid.Row="1" ItemsSource="{Binding Dashboard.Processes}"
+                  <Panel Grid.Row="1">
+                    <TextBlock Text="采样中…" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding Dashboard.Processes.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                    <ListBox ItemsSource="{Binding Dashboard.Processes}"
                            Background="Transparent" BorderThickness="0">
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
@@ -780,7 +784,8 @@
                         </Grid>
                       </DataTemplate>
                     </ListBox.ItemTemplate>
-                  </ListBox>
+                    </ListBox>
+                  </Panel>
                 </Grid>
 
                 <!-- System Monitor widgets -->
@@ -1278,7 +1283,7 @@
                           ToolTip.Tip="新建 / 收起连接表单" Command="{Binding Ssh.ToggleEditingCommand}"/>
                 </Grid>
                 <!-- edit form -->
-                <Border Grid.Row="1" IsVisible="{Binding Ssh.Editing}"
+                <Border Grid.Row="1" IsVisible="{Binding Ssh.Editing}" KeyDown="OnSshFormKeyDown"
                         CornerRadius="8" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}"
                         BorderThickness="1" Padding="8" Margin="0,2,0,6">
                   <StackPanel Spacing="6">
@@ -1373,7 +1378,11 @@
                   <Button Content="保存为文本" Margin="0,0,6,6" Click="OnSaveCommandRecord"
                           ToolTip.Tip="把选中的命令和输出保存为 UTF-8 .txt"/>
                 </WrapPanel>
-                <ListBox Grid.Row="1" ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
+                <Panel Grid.Row="1">
+                  <TextBlock Text="暂无命令记录 · 需终端输出带命令标记" Foreground="{DynamicResource UiFaint}"
+                             FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                             IsVisible="{Binding CommandRecords.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                  <ListBox ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
                          Background="Transparent" BorderThickness="0" DoubleTapped="OnCommandDoubleTapped">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:CommandRecordViewModel">
@@ -1384,7 +1393,8 @@
                       </StackPanel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
-                </ListBox>
+                  </ListBox>
+                </Panel>
                 <StackPanel Grid.Row="2" Spacing="4" Margin="2,6,2,0">
                   <TextBlock Text="{Binding CommandNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
                   <TextBlock Text="只记录带命令开始/完成标记的终端。历史被裁掉后不能定位，也不会复制到别的命令。" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiFaint}"/>
