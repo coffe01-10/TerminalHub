@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
@@ -42,6 +43,70 @@ public class StageLayoutTests
             Window.Close();
             Directory.Delete(_directory, true);
         }
+    }
+
+    [AvaloniaFact]
+    public async Task ActiveThumb_ShowsNeonAccentGlow_InactiveDoesNot()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var cards = fixture.Window.GetVisualDescendants().OfType<StageCard>()
+            .Where(c => c.IsEffectivelyVisible).ToList();
+        Assert.NotEmpty(cards);
+        var active = Assert.Single(cards.Where(c => c.IsActive));
+        var accent = (SolidColorBrush)ThemeManager.Brush("Accent");
+
+        var activeBorder = active.GetVisualChildren().OfType<Border>().First();
+        Assert.Equal(2, activeBorder.BorderThickness.Left);
+        Assert.Equal(accent.Color, ((ISolidColorBrush)activeBorder.BorderBrush!).Color);
+        // Neon halo: a visible glow shadow tinted with the theme accent.
+        bool Glows(BoxShadows shadows)
+        {
+            for (var i = 0; i < shadows.Count; i++)
+            {
+                var s = shadows[i];
+                if (s.Blur >= 12 && s.Color.A > 0x30
+                    && Math.Abs(s.Color.R - accent.Color.R) < 0x40
+                    && Math.Abs(s.Color.G - accent.Color.G) < 0x40
+                    && Math.Abs(s.Color.B - accent.Color.B) < 0x40)
+                    return true;
+            }
+            return false;
+        }
+        Assert.True(Glows(activeBorder.BoxShadow));
+
+        var inactive = cards.First(c => !c.IsActive);
+        var inactiveBorder = inactive.GetVisualChildren().OfType<Border>().First();
+        Assert.False(Glows(inactiveBorder.BoxShadow)); // idle card keeps its plain shadow
+        Assert.NotEqual(accent.Color, ((ISolidColorBrush?)inactiveBorder.BorderBrush)?.Color);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("DarkGlass", "#65ACED")]
+    [InlineData("Black", "#A9C8F5")]
+    [InlineData("White", "#245AB5")]
+    [InlineData("Paper", "#8C5132")]
+    public void ActiveCardShadow_GlowsWithThemeAccent(string theme, string accentHex)
+    {
+        var previous = ThemeManager.Current;
+        try
+        {
+            ThemeManager.Apply(theme);
+            var shadows = (BoxShadows)Application.Current!.Resources["ActiveCardShadow"]!;
+            var accent = Color.Parse(accentHex);
+            var glows = false;
+            for (var i = 0; i < shadows.Count; i++)
+            {
+                var s = shadows[i];
+                if (s.Blur >= 12 && s.Color.A > 0x30
+                    && Math.Abs(s.Color.R - accent.R) < 0x40
+                    && Math.Abs(s.Color.G - accent.G) < 0x40
+                    && Math.Abs(s.Color.B - accent.B) < 0x40)
+                    glows = true;
+            }
+            Assert.True(glows, $"{theme}: ActiveCardShadow lacks an accent-tinted glow");
+        }
+        finally { ThemeManager.Apply(previous); }
     }
 
     [AvaloniaTheory]

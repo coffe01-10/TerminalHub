@@ -202,6 +202,7 @@
                     <Style Selector="ctl|StageCard > Border">
                       <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
                       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
+                      <Setter Property="BorderThickness" Value="1"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}"/>
                     </Style>
                     <Style Selector="ctl|StageCard:pointerover > Border">
@@ -211,12 +212,12 @@
                     </Style>
                     <Style Selector="ctl|StageCard.active > Border">
                       <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
-                      <Setter Property="BorderThickness" Value="1.5"/>
+                      <Setter Property="BorderThickness" Value="2"/>
                       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
                     </Style>
                   </ctl:StageCard.Styles>
-                  <Border CornerRadius="{DynamicResource CardCorner}" Padding="9" BorderThickness="1">
+                  <Border CornerRadius="{DynamicResource CardCorner}" Padding="9">
                   <Border.Transitions>
                     <Transitions>
                       <BrushTransition Property="Background" Duration="0:0:0.22"/>
