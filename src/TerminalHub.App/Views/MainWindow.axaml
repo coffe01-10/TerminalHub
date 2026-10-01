@@ -211,6 +211,7 @@
                     </Style>
                     <Style Selector="ctl|StageCard.active > Border">
                       <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
+                      <Setter Property="BorderThickness" Value="1.5"/>
                       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
                     </Style>

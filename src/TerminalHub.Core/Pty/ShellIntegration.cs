@@ -40,7 +40,9 @@ public static class ShellIntegration
         }
         PROMPT_COMMAND="__terminalhub_prompt_command${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
         PS1="${PS1}\[\e]133;B\a\]"
-        PS0="${PS0}\[\e]133;C\a\]"
+        # PS0 output bypasses readline: \[ \] would expand to literal \x01/\x02
+        # bytes and paint two box glyphs before every command's output.
+        PS0="${PS0}\e]133;C\a"
         """;
 
     /// <summary>Arguments that make an interactive bash emit OSC 133 command

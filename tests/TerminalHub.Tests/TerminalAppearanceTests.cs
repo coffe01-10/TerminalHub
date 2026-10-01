@@ -69,6 +69,53 @@ public class TerminalAppearanceTests
         finally { ThemeManager.Apply(previous); }
     }
 
+    /// <summary>Shelf thumbnails must be a live downsample of the real buffer —
+    /// not a static placeholder. Render a StagePreview to pixels: the frame has
+    /// the fed colored text; feeding more output changes the pixels.</summary>
+    [AvaloniaFact]
+    public void StagePreview_RendersRealBufferContent_AndFollowsNewOutput()
+    {
+        var previous = ThemeManager.Current;
+        try
+        {
+            ThemeManager.Apply("DarkGlass");
+            using var terminal = new TerminalEmulator(columns: 80, rows: 24);
+            var preview = new StagePreview { Emulator = terminal };
+            preview.Measure(new Size(200, 140));
+            preview.Arrange(new Rect(0, 0, 200, 140));
+
+            terminal.Parser.Feed("\x1b[32mLIVE_GREEN_ROW\x1b[0m");
+            var first = Pixels(preview);
+            Assert.True(CountHue(first, c => c.Green > c.Red + 40 && c.Green > c.Blue + 40) > 20,
+                "green text must be visible in the thumbnail");
+
+            terminal.Parser.Feed("\r\n\x1b[31mUPDATED_RED_ROW\x1b[0m");
+            var second = Pixels(preview);
+            Assert.True(CountHue(second, c => c.Red > c.Green + 40 && c.Red > c.Blue + 40) > 20,
+                "newly written red row must appear — the thumbnail is live");
+        }
+        finally { ThemeManager.Apply(previous); }
+    }
+
+    private static SKBitmap Pixels(StagePreview preview)
+    {
+        using var target = new RenderTargetBitmap(
+            new PixelSize((int)preview.Bounds.Width, (int)preview.Bounds.Height), new Vector(96, 96));
+        target.Render(preview);
+        using var bytes = new MemoryStream();
+        target.Save(bytes);
+        return SKBitmap.Decode(bytes.ToArray());
+    }
+
+    private static int CountHue(SKBitmap bitmap, Func<SKColor, bool> match)
+    {
+        var count = 0;
+        for (var y = 0; y < bitmap.Height; y += 2)
+            for (var x = 0; x < bitmap.Width; x += 2)
+                if (match(bitmap.GetPixel(x, y))) count++;
+        return count;
+    }
+
     [AvaloniaFact]
     public void OneColoredPrompt_DoesNotChangeSessionDefaults()
     {
