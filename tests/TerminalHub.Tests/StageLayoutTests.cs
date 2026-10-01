@@ -54,6 +54,7 @@ public class StageLayoutTests
         await Task.Delay(700);
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[2];
         fixture.Vm.DockVisibilityMode = 0; // exercise the auto-hide path explicitly
+        fixture.Vm.OutputVisible = false;    // this test asserts the toggle reveals the panel
         await Task.Delay(450);
         var stage = window.FindControl<StageSurface>("StageWindow")!;
         var dock = window.FindControl<DropletDock>("ActionDock")!;

@@ -706,3 +706,4 @@
 - 分屏/弹出光标回归（无产品改动，纯测试+实机冒烟）：分屏进出 reflow 后光标守输入尾、焦点切换不影响邻窗格选区/光标、弹出→收回全程光标不漂且换绑不搬旧选区 — `SplitPopoutCursorTests` 3 例；实机截图 linux-split-popout-*.png。
 - PR #47（`main@6a25b7e`）分屏/弹出光标选区回归：进出分屏 reflow、焦点切换、弹出→收回全程光标守输入尾且视图换绑不搬旧选区；无产品改动，行为锁成回归。
 - 底栏六键坞常显：默认 `DockVisibilityMode=1`（自动隐藏/隐藏仍在设置可选并持久化）；坞补「新建」「设置」两键成六键（新建/监控/SSH/日志/部署/设置），部署键标签归一为「部署」；`DockVisibilityTests` 3 例。
+- Output 底栏默认展开：`OutputVisible` 默认 true（关可持久化）；面板只挂真实应用/会话事件（时间戳+level），无 demo 行；`OutputVisibilityTests` 3 例。
