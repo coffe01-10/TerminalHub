@@ -34,7 +34,11 @@ public static class ShellIntegration
         __terminalhub_prompt_command() {
             local __th_ec=$?
             printf '\e]133;D;%s\a' "$__th_ec"
-            printf '\e]7;file://%s%s\a' "${HOSTNAME:-localhost}" "$PWD"
+            # Bare absolute path, not file://$PWD: '#' would parse as a URI
+            # fragment, '?' as a query, '%' as a broken escape — dirs like
+            # "C#proj" or "a%20b" reported a truncated cwd. The parser accepts
+            # a bare path (TryParseOsc7) and treats it as local.
+            printf '\e]7;%s\a' "$PWD"
             printf '\e]133;A\a'
             return "$__th_ec"
         }
@@ -50,6 +54,16 @@ public static class ShellIntegration
     /// for PS0 (the C mark); older bash still gets cwd + prompt marks.
     /// The rc file lives next to the app settings — a user-owned path.</summary>
     public static string BashArguments => $"--rcfile \"{EnsureBashRcFile()}\"";
+
+    /// <summary>True when <paramref name="arguments"/> is a bash `--rcfile`
+    /// pointing at our integration script — i.e. args persisted by an earlier
+    /// build (workspace restore). Those must be re-injected so the rc file is
+    /// refreshed even if it was deleted meanwhile; a user's own rcfile with a
+    /// different filename does not match.</summary>
+    public static bool IsBashRcArguments(string? arguments)
+        => !string.IsNullOrWhiteSpace(arguments)
+           && arguments.Contains("--rcfile", StringComparison.OrdinalIgnoreCase)
+           && arguments.Contains("bash-integration.sh");
 
     /// <summary>Writes (or refreshes) the bash rc file and returns its path.
     /// Write-temp-then-move so a concurrent session spawn never reads a torn file.</summary>

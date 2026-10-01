@@ -526,7 +526,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // non-interactive/script run — marks would be noise there. An unwritable
         // config dir must not block spawning — plain bash still works.
         else if (OperatingSystem.IsLinux() && ShellIntegration.IsBash(shellCmd)
-            && string.IsNullOrWhiteSpace(arguments))
+            && (string.IsNullOrWhiteSpace(arguments)
+                || ShellIntegration.IsBashRcArguments(arguments)))
         {
             try { arguments = ShellIntegration.BashArguments; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
