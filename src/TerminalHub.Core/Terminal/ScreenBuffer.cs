@@ -508,10 +508,10 @@ public sealed class ScreenBuffer
     public void Backspace()
     {
         _pendingWrap = false;
+        // BS moves exactly one column. Apps like readline already count display
+        // columns and emit one \b per column — snapping to a wide glyph's lead
+        // cell here would step twice and land the cursor one char too far left.
         if (CursorX > 0) CursorX--;
-        // stepping back over a wide-char continuation: land on glyph start
-        ref var cell = ref CellAt(CursorY, CursorX);
-        if (cell.IsWideContinuation && CursorX > 0) CursorX--;
     }
 
     public void Tab()
