@@ -699,3 +699,6 @@
   需实现 IAiAssistant 并替换构造处（MainWindowViewModel）。
 - Window bottom may clip ~80px under compositor-less X11/Xvfb at 800px screen
   height (status bar row hidden); dock remains usable, normal desktops unaffected.
+
+## 2026-10-01
+- PR #45（`main@1d54437`）会话缩略图收口：确认 StagePreview 即真缓冲下采样并补像素级活性回归；修 #44 引入的 bash PS0 `\[ \]` → `\x01\x02` 字节泄漏（命令输出前的 □□）；active 卡片描边/光晕贴近 mockup。Linux 冒烟截图 `docs/screenshots/session-thumb-live.png`。

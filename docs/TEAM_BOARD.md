@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-01 18:20 CST（缩略图收口 PR #45 已开 · 修 PS0 控制字节泄漏） · 维护：Devin（PO）
+最后更新：2026-10-01 18:45 CST（PR #45 已合 · Devin 开 Linux bash 编辑回归刀） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,8 +18,7 @@
 
 ## 进行中
 
-- [ ] **会话缩略图真实下采样**（StagePreview 出真缓冲内容 · 节流刷新 · 卡片贴近 ui-ref-dashboard）— **Devin** · PR #45 · `feat/session-thumb-live` · `/workspace/TerminalHub`
-- [ ] **Logs ▲/▼ error 跳转**（`FindAdjacentLevel` · 当前 Entries 内上/下一条 error · 暂停跟随）— **Grok** · PR #43 · `feat/logs-jump-level` · worktree `/workspace/TerminalHub-logs2`
+- [ ] **Linux bash CLI 编辑 / 多行粘贴 / 布局切换光标回归**（多行粘贴+方向键编辑断言 · 分屏/弹出/缩放后光标选区不漂）— **Devin** · `feat/linux-bash-cli-editing` · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -29,6 +28,8 @@
 
 ## 已完成（近期）
 
+- [x] PR #45 缩略图收口（PS0 \x01\x02 泄漏修复 · 像素级活性回归 · 选中态贴近 mockup）— Devin · `feat/session-thumb-live` · `main@1d54437`
+- [x] PR #43 Logs ▲/▼ error 跳转 — Grok · `feat/logs-jump-level` · `main@51c69e0`
 - [x] PR #44 Linux 对齐（bash OSC 133/7 集成 · LANG 回退 · LinuxStreaming/CommandCompletion/PtyEnvironment · SingleInstance ECONNRESET 重试）— Devin · `feat/linux-parity-tests` · `main@f789dd5`
 - [x] PR #41 Deploy 坞显示当前配置档 + 清除上次发布结果 — Grok · `feat/deploy-active-profile-clear-result` · `main@a06dd9e`
 - [x] PR #42 Logs 级别 chip 活计数（环形缓冲 `全部 N`/`info N`/`warn N`/`error N`）— Grok · `feat/logs-level-counts` · `main@2c6998c`
