@@ -22,7 +22,7 @@ public class StageLayoutTests
         public MainWindow Window { get; }
         public MainWindowViewModel Vm => (MainWindowViewModel)Window.DataContext!;
 
-        public StageFixture(int width = 1440, int height = 900)
+        public StageFixture(int width = 1440, int height = 900, string? firstSessionName = null)
         {
             PtySessionFactory.UseMock = true;
             var store = new SettingsStore(Path.Combine(_directory, "settings.json"));
@@ -30,7 +30,8 @@ public class StageLayoutTests
             {
                 StartupSessions = Enumerable.Range(1, 5).Select(i => new StartupSession
                 {
-                    Name = $"Terminal {i:00}", Tag = i == 2 ? "测试环境" : "开发环境",
+                    Name = firstSessionName is not null && i == 1 ? firstSessionName : $"Terminal {i:00}",
+                    Tag = i == 2 ? "测试环境" : "开发环境",
                     WorkingDirectory = Environment.CurrentDirectory
                 }).ToList()
             });
@@ -79,6 +80,41 @@ public class StageLayoutTests
         var inactiveBorder = inactive.GetVisualChildren().OfType<Border>().First();
         Assert.False(Glows(inactiveBorder.BoxShadow)); // idle card keeps its plain shadow
         Assert.NotEqual(accent.Color, ((ISolidColorBrush?)inactiveBorder.BorderBrush)?.Color);
+    }
+
+    [AvaloniaFact]
+    public async Task LongSessionName_ChromeButtonsStayReachable()
+    {
+        var longName = "VeryLongSessionName-" + new string('长', 40) + "-tail";
+        using var fixture = new StageFixture(width: 1100, height: 700, firstSessionName: longName);
+        await Task.Delay(700);
+        var window = fixture.Window;
+        fixture.Vm.ActiveCard = fixture.Vm.SessionCards[0];
+        await Task.Delay(300);
+
+        var stage = window.FindControl<StageSurface>("StageWindow")!;
+        var menu = window.FindControl<Button>("SessionMenuButton")!;
+        var close = window.GetVisualDescendants().OfType<Button>()
+            .First(b => ToolTip.GetTip(b) as string == "关闭当前终端 · Ctrl+Shift+W");
+        Assert.True(menu.IsEffectivelyVisible);
+        Assert.True(close.IsEffectivelyVisible);
+
+        // The star-sized name column must shrink so the trailing Auto columns
+        // (menu, close) stay inside the stage card's right edge.
+        var stageRight = stage.TranslatePoint(new Point(stage.Bounds.Width, 0), window)!.Value.X;
+        Assert.True(close.TranslatePoint(new Point(close.Bounds.Width, 0), window)!.Value.X <= stageRight + 1);
+        Assert.True(menu.TranslatePoint(new Point(menu.Bounds.Width, 0), window)!.Value.X <= stageRight + 1);
+    }
+
+    [AvaloniaFact]
+    public async Task ShelfStack_FirstCardNoOverlap_OthersTuck()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var cards = fixture.Vm.SessionCards;
+        Assert.NotEmpty(cards);
+        Assert.Equal(0, cards[0].ShelfTopMargin.Top); // topmost card must not bleed into the title row
+        Assert.All(cards.Skip(1), c => Assert.Equal(-SessionCardViewModel.ShelfOverlap, c.ShelfTopMargin.Top));
     }
 
     [AvaloniaTheory]

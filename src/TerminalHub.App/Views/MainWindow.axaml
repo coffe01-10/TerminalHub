@@ -173,7 +173,7 @@
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                    ScrollViewer.VerticalScrollBarVisibility="Auto">
             <ListBox.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="16"/></ItemsPanelTemplate>
+              <ItemsPanelTemplate><StackPanel Spacing="0"/></ItemsPanelTemplate>
             </ListBox.ItemsPanel>
             <ListBox.ItemContainerTheme>
               <!-- A complete theme: no Fluent pointer/selection rectangle behind the tilted card. -->
@@ -197,7 +197,7 @@
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
                                Classes.active="{Binding IsActive}" Height="{Binding #Root.ThumbnailHeight}"
-                               Margin="0,-16,0,0"
+                               Margin="{Binding ShelfTopMargin}"
                                ToolTip.Tip="{Binding WorkingDirectory}" DoubleTapped="OnRenameCard">
                   <ctl:StageCard.Styles>
                     <Style Selector="ctl|StageCard > Border">
@@ -281,12 +281,12 @@
           <Grid RowDefinitions="46,*,Auto" Margin="8">
 
             <!-- Single-row chrome like the mockup: icon · name · status · cwd | nav · actions -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
               <Border Width="27" Height="27" CornerRadius="7" Background="{DynamicResource UiRaised}" Margin="0,0,10,0">
                 <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
-              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0">
+              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0" MaxWidth="360">
                 <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">

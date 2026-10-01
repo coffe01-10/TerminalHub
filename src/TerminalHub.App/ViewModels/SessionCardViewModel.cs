@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using TerminalHub.Core.Sessions;
@@ -23,6 +24,28 @@ public partial class SessionCardViewModel : ViewModelBase
     private bool _isDisplayed;
     private long _seenOutputVersion;
     private int _previewVersion = -1;
+    private bool _isFirstOnShelf;
+
+    /// <summary>Pixels each card tucks under the previous one on the shelf
+    /// (mockup stack look). Keep in sync with the shelf margin binding.</summary>
+    public const double ShelfOverlap = 16;
+
+    /// <summary>True for the topmost shelf item — it must not pull up, or its
+    /// header would bleed past the list padding into the shelf title row.</summary>
+    public bool IsFirstOnShelf
+    {
+        get => _isFirstOnShelf;
+        set
+        {
+            if (_isFirstOnShelf == value) return;
+            _isFirstOnShelf = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShelfTopMargin));
+        }
+    }
+
+    /// <summary>Negative top margin producing the tucked stack; zero on the first card.</summary>
+    public Thickness ShelfTopMargin => _isFirstOnShelf ? default : new Thickness(0, -ShelfOverlap, 0, 0);
 
     public string Name => Model.Name;
     public string WorkingDirectory => Model.WorkingDirectory;

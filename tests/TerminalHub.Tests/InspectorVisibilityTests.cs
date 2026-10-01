@@ -21,7 +21,7 @@ public class InspectorVisibilityTests
         Assert.Null(new AppSettings().InspectorVisible); // unset = default-on
 
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(Path.Combine(dir, "settings.json")));
+        using var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(Path.Combine(dir, "settings.json")));
         Assert.True(vm.InspectorVisible); // fresh install → inspector expanded
         Assert.Equal(0, vm.SelectedRightTab); // Processes tab first, like the mockup
     }
@@ -34,7 +34,7 @@ public class InspectorVisibilityTests
         try
         {
             new SettingsStore(path).Save(new AppSettings { InspectorVisible = false });
-            var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
+            using var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
             Assert.False(vm.InspectorVisible); // explicit user choice wins
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
@@ -47,13 +47,13 @@ public class InspectorVisibilityTests
         var path = Path.Combine(dir, "settings.json");
         try
         {
-            var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
+            using var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
             vm.ToggleInspectorCommand.Execute(null); // user hides it
             Assert.False(vm.InspectorVisible);
             vm.PersistSettings();
             Assert.Equal(false, new SettingsStore(path).Load().InspectorVisible);
 
-            var vm2 = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
+            using var vm2 = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
             Assert.False(vm2.InspectorVisible); // choice survives restart
             vm2.ToggleInspectorCommand.Execute(null);
             vm2.PersistSettings();
@@ -67,7 +67,7 @@ public class InspectorVisibilityTests
     {
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         using var monitor = new SystemMonitor();
-        var vm = new MainWindowViewModel(monitor, new SettingsStore(Path.Combine(dir, "settings.json")));
+        using var vm = new MainWindowViewModel(monitor, new SettingsStore(Path.Combine(dir, "settings.json")));
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(6);
         while (vm.Dashboard.Processes.Count == 0 && DateTime.UtcNow < deadline)
             await Task.Delay(150);
@@ -84,10 +84,10 @@ public class InspectorVisibilityTests
     {
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1440, Height = 900 };
-        window.Show();
-        var vm = (MainWindowViewModel)window.DataContext!;
         try
         {
+            window.Show();
+            var vm = (MainWindowViewModel)window.DataContext!;
             Assert.True(vm.InspectorVisible);
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(6);
@@ -102,7 +102,7 @@ public class InspectorVisibilityTests
             Assert.NotEmpty(list.GetVisualDescendants().OfType<TextBlock>()
                 .Where(t => int.TryParse(t.Text, out _))); // PID column realized
         }
-        finally { window.Close(); }
+        finally { window.Close(); PtySessionFactory.UseMock = false; }
     }
 
     private sealed class IdleMonitor : ISystemMonitor

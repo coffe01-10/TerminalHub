@@ -120,15 +120,34 @@ public partial class MainWindow : Window
         if (_dragCard is not null) return;
         // Keep enough height for the full terminal grid; overflow remains scrollable.
         var visibleCards = Math.Clamp(Vm.SessionCards.Count, 1, 5);
-        ThumbnailHeight = Math.Clamp((SessionShelf.Bounds.Height - 34 - (visibleCards - 1) * 16) / visibleCards, 208, 268);
+        // Cards tuck 16px under the previous one, so each extra card only needs
+        // height - overlap of vertical room.
+        var overlap = SessionCardViewModel.ShelfOverlap;
+        ThumbnailHeight = Math.Clamp((SessionShelf.Bounds.Height - 34 + (visibleCards - 1) * overlap) / visibleCards, 208, 268);
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Bounds.Width < 1250 ? 232 : 280);
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? (Bounds.Width < 1250 ? 300 : 326) : 0);
         Dispatcher.UIThread.Post(() =>
         {
             if (_stageReady && IsVisible && Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
-                SessionShelf.ScrollIntoView(active);
+                RevealShelfCard(active);
         }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>ScrollIntoView aligns the item slot, but a tucked card renders
+    /// <see cref="SessionCardViewModel.ShelfOverlap"/> px above its slot — nudge
+    /// the scroll so the card header is not clipped at the viewport top.</summary>
+    private void RevealShelfCard(SessionCardViewModel active)
+    {
+        SessionShelf.ScrollIntoView(active);
+        var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
+            .FirstOrDefault(c => ReferenceEquals(c.DataContext, active));
+        var scroll = SessionShelf.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (card is null || scroll is null) return;
+        var top = card.TranslatePoint(default, SessionShelf);
+        const double viewportTop = 14; // SessionShelf top padding
+        if (top is { } p && p.Y < viewportTop)
+            scroll.Offset = new Vector(scroll.Offset.X, Math.Max(0, scroll.Offset.Y + p.Y - viewportTop));
     }
 
     private void OnStageSelectionChanged(object? sender, PropertyChangedEventArgs e)
@@ -146,7 +165,7 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             if (!_stageReady || generation != _selectionGeneration || !IsVisible || _dragCard is not null) return;
-            if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active)) SessionShelf.ScrollIntoView(active);
+            if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active)) RevealShelfCard(active);
             // Apply a shelf scroll before reading the card's visible origin.
             SessionShelf.UpdateLayout();
             var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()

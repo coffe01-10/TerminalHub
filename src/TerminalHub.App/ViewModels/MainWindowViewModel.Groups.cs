@@ -188,6 +188,9 @@ public partial class MainWindowViewModel
             if (next.OfType<SessionGroupHeader>().Any(header => ReferenceEquals(header.Group, group))) continue;
             next.Add(Header(group.Id, group));
         }
+        // Only the topmost item is exempt from the stack overlap margin.
+        var top = next.FirstOrDefault();
+        foreach (var card in SessionCards) card.IsFirstOnShelf = ReferenceEquals(card, top);
         var keep = ActiveCard;
         _rebuildingShelf = true;
         try
