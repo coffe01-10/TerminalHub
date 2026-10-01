@@ -78,7 +78,7 @@ public sealed class AppSettings
     }
     private List<SessionShortcutBinding> _sessionShortcuts = SessionShortcutBinding.Defaults();
     public bool InspectorVisible { get; set; }
-    public bool OutputVisible { get; set; }
+    public bool OutputVisible { get; set; } = true;
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
     public int DockVisibilityMode { get; set; } = 1;
     public string WorkspaceName { get; set; } = "MangaFlow";
