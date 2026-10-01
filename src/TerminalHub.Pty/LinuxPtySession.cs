@@ -38,8 +38,9 @@ public sealed class LinuxPtySession : IPtySession
 
     public unsafe Task StartAsync(PtyOptions options, CancellationToken cancellationToken = default)
     {
-        var parts = SplitCommandLine(options.Shell + " " + options.Arguments);
-        if (parts.Length == 0) throw new ArgumentException("Empty shell command");
+        if (string.IsNullOrWhiteSpace(options.Shell)) throw new ArgumentException("Empty shell command");
+        var shellParts = File.Exists(options.Shell) ? new[] { options.Shell } : SplitCommandLine(options.Shell);
+        var parts = shellParts.Concat(SplitCommandLine(options.Arguments)).ToArray();
         // Calling _exit to warm its P/Invoke stub would terminate the parent.
         // Resolve it before fork and use a direct unmanaged call in the child.
         var exit = (delegate* unmanaged[Cdecl]<int, void>)WarmChildPath();
@@ -114,21 +115,32 @@ public sealed class LinuxPtySession : IPtySession
         var sb = new StringBuilder();
         var quote = '\0';
         var esc = false;
-        foreach (var c in cmdline)
+        var tokenStarted = false;
+        for (var i = 0; i < cmdline.Length; i++)
         {
-            if (esc) { sb.Append(c); esc = false; continue; }
-            if (c == '\\' && quote != '\'') { esc = true; continue; }
-            if (quote == '\0' && (c == '"' || c == '\'')) { quote = c; continue; }
+            var c = cmdline[i];
+            if (esc) { if (c != '\n') sb.Append(c); esc = false; continue; }
+            if (c == '\\' && quote != '\'')
+            {
+                tokenStarted = true;
+                // Inside double quotes, POSIX preserves backslashes before ordinary letters.
+                if (quote == '"' && i + 1 < cmdline.Length && cmdline[i + 1] is not ('\\' or '"' or '$' or '`' or '\n'))
+                    sb.Append(c);
+                else esc = true;
+                continue;
+            }
+            if (quote == '\0' && (c == '"' || c == '\'')) { quote = c; tokenStarted = true; continue; }
             if (c == quote) { quote = '\0'; continue; }
             if (quote == '\0' && char.IsWhiteSpace(c))
             {
-                if (sb.Length > 0) { parts.Add(sb.ToString()); sb.Clear(); }
+                if (tokenStarted) { parts.Add(sb.ToString()); sb.Clear(); tokenStarted = false; }
                 continue;
             }
             sb.Append(c);
+            tokenStarted = true;
         }
         if (esc) sb.Append('\\'); // trailing backslash kept verbatim
-        if (sb.Length > 0) parts.Add(sb.ToString());
+        if (tokenStarted) parts.Add(sb.ToString());
         return parts.ToArray();
     }
 
@@ -326,6 +338,15 @@ public sealed class LinuxPtySession : IPtySession
         // shell. Never signal pgid 0/-1 (our group, or every process we can reach).
         // If the child is not a leader, or still shares our group, fall back to its pid.
         var child = _childPid;
+        // Interactive job control gives background jobs their own process groups.
+        // Kill the session's descendants before the shell can orphan them.
+        try
+        {
+            using var process = Process.GetProcessById(child);
+            process.Kill(entireProcessTree: true);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        { /* The child already exited. */ }
         var pgid = Native.getpgid(child);
         var mine = Native.getpgid(0);
         if (pgid > 1 && pgid == child && pgid != mine)

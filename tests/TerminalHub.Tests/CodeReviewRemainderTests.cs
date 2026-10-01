@@ -78,7 +78,7 @@ public class CodeReviewRemainderTests
         Assert.NotSame(live, buffer.CaptureFrame());
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void CardPreview_IsReusedWhenIdle_AndRefreshedAfterOutputOrResize()
     {
         using var terminal = new TerminalEmulator(columns: 10, rows: 3);

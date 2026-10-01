@@ -65,6 +65,44 @@ public class ProductV04Tests
         await Until(() => calls == 2);
     }
 
+    [Fact]
+    public async Task Activation_UnavailableListenerReturnsFalse()
+    {
+        var name = "TerminalHub.Review." + Guid.NewGuid().ToString("N");
+        Assert.False(await SingleInstanceActivation.RequestAsync(name));
+    }
+
+    [Fact]
+    public async Task Activation_RepeatedBrokenHandshakesReturnFalse()
+    {
+        var name = "TerminalHub.Review." + Guid.NewGuid().ToString("N");
+        using var stop = new CancellationTokenSource();
+        var server = new System.IO.Pipes.NamedPipeServerStream(name,
+            System.IO.Pipes.PipeDirection.InOut, 1,
+            System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+        var listener = Task.Run(async () =>
+        {
+            try
+            {
+                while (!stop.IsCancellationRequested)
+                {
+                    using (server)
+                    {
+                        await server.WaitForConnectionAsync(stop.Token);
+                        // Disconnect before sending the required four-byte process ID.
+                    }
+                    server = new System.IO.Pipes.NamedPipeServerStream(name,
+                        System.IO.Pipes.PipeDirection.InOut, 1,
+                        System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally { server.Dispose(); }
+        });
+        try { Assert.False(await SingleInstanceActivation.RequestAsync(name)); }
+        finally { stop.Cancel(); await listener; }
+    }
+
     private static async Task Until(Func<bool> condition)
     {
         var start = DateTime.UtcNow;

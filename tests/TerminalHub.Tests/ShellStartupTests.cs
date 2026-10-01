@@ -25,7 +25,7 @@ public class ShellStartupTests
         try
         {
             var store = new SettingsStore(Path.Combine(directory, "settings.json"));
-            store.Save(new AppSettings { Workspace = new WorkspaceState
+            store.Save(new AppSettings { Shell = ShellKind.PowerShell, Workspace = new WorkspaceState
             {
                 Sessions = [new WorkspaceSession { Name = "cmd work", Shell = FakeShell }]
             } });
@@ -50,7 +50,7 @@ public class ShellStartupTests
         try
         {
             var store = new SettingsStore(Path.Combine(directory, "settings.json"));
-            store.Save(new AppSettings { Workspace = new WorkspaceState
+            store.Save(new AppSettings { Shell = ShellKind.PowerShell, Workspace = new WorkspaceState
             {
                 Sessions = [new WorkspaceSession { Name = "saved work", Shell = "pwsh" }]
             } });
@@ -82,7 +82,7 @@ public class ShellStartupTests
         try
         {
             var store = new SettingsStore(Path.Combine(directory, "settings.json"));
-            store.Save(new AppSettings { Workspace = new WorkspaceState
+            store.Save(new AppSettings { Shell = ShellKind.PowerShell, Workspace = new WorkspaceState
             {
                 Sessions = [new WorkspaceSession { Name = "my work", Shell = "pwsh", WorkingDirectory = Environment.CurrentDirectory }],
                 ActiveIndex = 0

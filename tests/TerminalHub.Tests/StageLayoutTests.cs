@@ -314,6 +314,7 @@ public class StageLayoutTests
         var emulator = fixture.Vm.ActiveSession!.Emulator;
         var gridSize = (emulator.Buffer.Columns, emulator.Buffer.Rows);
         var source = new Rect(-260, 70, 220, 180);
+        surface.FinishActivation(); // Start a fresh flight after any startup animation.
         surface.ActivateFrom(source);
         surface.Transitions = null;
         surface.Reveal = 0;

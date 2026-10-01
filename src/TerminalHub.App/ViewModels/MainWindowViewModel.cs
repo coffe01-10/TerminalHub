@@ -435,6 +435,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settings.Shell = kind;
         if (kind == ShellKind.Custom) _settings.CustomShellPath = command;
         OnPropertyChanged(nameof(ShellIndex));
+        OnPropertyChanged(nameof(SettingsShellIndex));
         OnPropertyChanged(nameof(Settings));
         // Do not snapshot an empty stage over the workspace we are about to restore.
         _settingsStore.Save(_settings);
@@ -1562,7 +1563,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         else ui.Post(action);
     }
 
-    /// <summary>Shell ComboBox index ⇄ ShellKind.</summary>
+    private static readonly int[] SettingsShellIndices = OperatingSystem.IsWindows() ? [0, 1, 2, 3, 4] : [0, 3, 4];
+    public IReadOnlyList<string> SettingsShellLabels { get; } = OperatingSystem.IsWindows()
+        ? ["PowerShell (pwsh)", "cmd.exe", "WSL / bash", "bash", "自定义"]
+        : ["PowerShell (pwsh)", "bash", "自定义"];
+    public string CustomShellWatermark => OperatingSystem.IsWindows() ? @"C:\…\pwsh.exe" : "/usr/bin/bash";
+    public string TerminalPreviewPrompt => OperatingSystem.IsWindows() ? @"PS C:\Projects>" : "~/Projects $";
+    public int SettingsShellIndex
+    {
+        get
+        {
+            var index = Array.IndexOf(SettingsShellIndices, ShellIndex);
+            return index >= 0 ? index : 1; // Windows-only saved kinds resolve to bash on Linux.
+        }
+        set { if (value >= 0 && value < SettingsShellIndices.Length) ShellIndex = SettingsShellIndices[value]; }
+    }
+
+    /// <summary>Persisted ShellKind indices, independent of the platform's UI choices.</summary>
     public int ShellIndex
     {
         get => _settings.Shell switch
@@ -1585,6 +1602,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _ => ShellKind.PowerShell,
             };
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SettingsShellIndex));
         }
     }
 

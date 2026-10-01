@@ -11,18 +11,27 @@ public partial class MainWindowViewModel
     [ObservableProperty] private string _explorerMenuMessage = "";
     private bool _explorerReady;
 
+    public string FileManagerMenuLabel => OperatingSystem.IsWindows()
+        ? "在资源管理器文件夹右键中显示 Terminal Hub"
+        : "在 Thunar 文件夹右键中显示 Terminal Hub";
+    public bool FileManagerMenuAvailable => OperatingSystem.IsWindows()
+        || OperatingSystem.IsLinux() && TerminalHub.Core.Pty.ShellDiscovery.Exists("thunar");
+    private static bool IsFileManagerMenuInstalled() => OperatingSystem.IsWindows()
+        ? ExplorerContextMenu.IsInstalled() : LinuxFileManagerMenu.IsInstalled();
+
     private void LoadExplorerMenu()
     {
-        if (OperatingSystem.IsWindows())
-            ExplorerMenuEnabled = ExplorerContextMenu.IsInstalled();
+        if (FileManagerMenuAvailable)
+            ExplorerMenuEnabled = IsFileManagerMenuInstalled();
         _explorerReady = true;
-        ExplorerMenuMessage = ExplorerMenuEnabled ? "资源管理器文件夹右键里已有 Terminal Hub。" : "右键菜单未添加。";
+        ExplorerMenuMessage = !FileManagerMenuAvailable ? "本机未安装 Thunar；仍可用 --cwd 指定启动目录。"
+            : ExplorerMenuEnabled ? "文件夹右键里已有 Terminal Hub。" : "右键菜单未添加。";
     }
 
     partial void OnExplorerMenuEnabledChanged(bool value)
     {
-        if (!_explorerReady || !OperatingSystem.IsWindows()) return;
-        if (value == ExplorerContextMenu.IsInstalled()) return;
+        if (!_explorerReady || !FileManagerMenuAvailable) return;
+        if (value == IsFileManagerMenuInstalled()) return;
         if (value)
         {
             var exe = Environment.ProcessPath;
@@ -32,17 +41,37 @@ public partial class MainWindowViewModel
                 ExplorerMenuEnabled = false;
                 return;
             }
-            try { ExplorerContextMenu.Install(exe); }
+            try
+            {
+                if (OperatingSystem.IsWindows()) ExplorerContextMenu.Install(exe);
+                else LinuxFileManagerMenu.Install(exe);
+            }
             catch (Exception ex)
             {
                 ExplorerMenuMessage = "添加右键菜单失败：" + ex.Message;
-                ExplorerMenuEnabled = ExplorerContextMenu.IsInstalled();
+                ExplorerMenuEnabled = IsFileManagerMenuInstalled();
                 return;
             }
         }
-        else ExplorerContextMenu.Remove();
-        var installed = ExplorerContextMenu.IsInstalled();
-        ExplorerMenuMessage = installed ? "已添加右键菜单。取消勾选即可移除。" : "已移除右键菜单。";
+        else
+        {
+            try
+            {
+                if (OperatingSystem.IsWindows()) ExplorerContextMenu.Remove();
+                else LinuxFileManagerMenu.Remove();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Xml.XmlException)
+            {
+                ExplorerMenuMessage = "移除右键菜单失败：" + ex.Message;
+                ExplorerMenuEnabled = IsFileManagerMenuInstalled();
+                return;
+            }
+        }
+        var installed = IsFileManagerMenuInstalled();
+        ExplorerMenuMessage = installed
+            ? OperatingSystem.IsWindows() ? "已添加右键菜单。取消勾选即可移除。"
+                : "已添加右键菜单。取消勾选即可移除；Thunar 需重新打开窗口。"
+            : "已移除右键菜单。";
         if (ExplorerMenuEnabled != installed) ExplorerMenuEnabled = installed;
     }
 
