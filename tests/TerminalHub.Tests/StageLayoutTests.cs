@@ -185,6 +185,7 @@ public class StageLayoutTests
         window.FindControl<ListBox>("SessionShelf")!.ScrollIntoView(vm.SessionCards[0]);
         await Task.Delay(100);
         var thumbnail = window.GetVisualDescendants().OfType<StageCard>().First();
+        var restingPose = thumbnail.Child!.RenderTransform!.Value;
         var point = thumbnail.TranslatePoint(new Point(80, 45), window)!.Value;
         window.MouseMove(point);
         await Task.Delay(40);
@@ -195,6 +196,22 @@ public class StageLayoutTests
         if (output is not null)
             window.CaptureRenderedFrame()!.Save(Path.Combine(output, "stage-hover.png"));
         await Task.Delay(400);
+        Assert.True(thumbnail.IsPointerOver);
+        Assert.NotEqual(restingPose, thumbnail.Child.RenderTransform!.Value);
+        Assert.True(thumbnail.RenderTransform!.Value.IsIdentity);
+        var hoverPose = thumbnail.Child.RenderTransform.Value;
+        // This fixed slot edge used to enter/exit repeatedly as the card tilted.
+        var edge = thumbnail.TranslatePoint(new Point(2, 45), window)!.Value;
+        window.MouseMove(edge);
+        await Task.Delay(400);
+        Assert.True(thumbnail.IsPointerOver);
+        Assert.Equal(hoverPose, thumbnail.Child.RenderTransform.Value);
+        window.MouseMove(new Point(500, 100));
+        await Task.Delay(400);
+        Assert.False(thumbnail.IsPointerOver);
+        Assert.Equal(restingPose, thumbnail.Child.RenderTransform.Value);
+        window.MouseMove(point);
+        await Task.Delay(150);
         window.MouseDown(point, MouseButton.Left);
         window.MouseUp(point, MouseButton.Left);
         await Task.Delay(400);

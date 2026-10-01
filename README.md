@@ -103,7 +103,7 @@ Claude Code, Codex CLI, and other tools install and run inside your shell. See [
   <img src="docs/readme/typing.svg" width="470" alt="Illustrated terminal typing the restore, build, and run commands">
 </p>
 
-> **v0.3.0.** [Download the Windows installer or portable ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.0) or start from source below. The app is unsigned. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target. See the [release notes](docs/releases/v0.3.0.md).
+> **v0.3.1.** [Download the Windows installer or portable ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.1) or start from source below. The app is unsigned. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target. See the [release notes](docs/releases/v0.3.1.md).
 
 Settings now offers a live appearance preview and configurable session shortcuts. Record a key combination in the Shortcuts tab and save it. Defaults: `Alt+1…9` selects a terminal in shelf order; `Ctrl+Tab` / `Ctrl+Shift+Tab` cycles sessions. These shortcuts work inside the main window.
 

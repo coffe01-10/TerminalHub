@@ -196,21 +196,32 @@
             <ListBox.DataTemplates>
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
-                               Classes.active="{Binding IsActive}" CornerRadius="{DynamicResource CardCorner}" Padding="9"
-                               BorderThickness="1" Height="{Binding #Root.ThumbnailHeight}"
+                               Classes.active="{Binding IsActive}" Height="{Binding #Root.ThumbnailHeight}"
                                ToolTip.Tip="{Binding WorkingDirectory}" DoubleTapped="OnRenameCard">
                   <ctl:StageCard.Styles>
-                    <Style Selector="ctl|StageCard">
+                    <Style Selector="ctl|StageCard > Border">
                       <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
                       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}"/>
                     </Style>
-                    <Style Selector="ctl|StageCard.active">
+                    <Style Selector="ctl|StageCard:pointerover > Border">
+                      <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
+                      <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
+                      <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
+                    </Style>
+                    <Style Selector="ctl|StageCard.active > Border">
                       <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
                       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
                     </Style>
                   </ctl:StageCard.Styles>
+                  <Border CornerRadius="{DynamicResource CardCorner}" Padding="9" BorderThickness="1">
+                  <Border.Transitions>
+                    <Transitions>
+                      <BrushTransition Property="Background" Duration="0:0:0.22"/>
+                      <BrushTransition Property="BorderBrush" Duration="0:0:0.22"/>
+                    </Transitions>
+                  </Border.Transitions>
                   <Grid RowDefinitions="24,*,Auto">
                     <Grid ColumnDefinitions="*,Auto" Margin="3,0,3,4">
                       <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="0,0,7,0">
@@ -230,6 +241,7 @@
                     </Grid>
                     <ctl:StageCardFinish Grid.RowSpan="3" Margin="-9" IsVisible="{Binding !IsActive}" IsHitTestVisible="False"/>
                   </Grid>
+                  </Border>
                 </ctl:StageCard>
               </DataTemplate>
               <DataTemplate x:DataType="vm:SessionGroupHeader">
@@ -324,6 +336,7 @@
                     <MenuItem Header="重命名当前分组" Click="OnRenameActiveGroup"/>
                     <MenuItem x:Name="ToggleGroupItem" Header="折叠当前分组" Command="{Binding ToggleActiveGroupCommand}"/>
                     <MenuItem Header="查看当前工作区" Command="{Binding ShowWorkspaceCommand}"/>
+                    <MenuItem x:Name="TerminalColorsMenu" Header="终端配色"/>
                     <MenuItem Header="关闭会话        Ctrl+Shift+W" Command="{Binding CloseActiveSessionCommand}"/>
                     <MenuItem Header="{Binding NextSessionMenuText}" Command="{Binding CycleSessionNextCommand}"/>
                     <MenuItem Header="{Binding PreviousSessionMenuText}" Command="{Binding CycleSessionPrevCommand}"/>
@@ -359,7 +372,7 @@
                 <Panel IsVisible="{Binding !IsSplit}">
                   <ctl:TerminalView x:Name="MainTerminal"
                                     Emulator="{Binding ActiveSession.Emulator}"
-                                    WorkingDirectory="{Binding ActiveWorkingDirectory}" ShellCommand="{Binding ActiveSession.Shell}" IsRemote="{Binding ActiveSession.IsRemote}" ToolTip.Tip="Ctrl+点击打开网址或文件；拖入文件插入路径"
+                                    WorkingDirectory="{Binding ActiveWorkingDirectory}" ShellCommand="{Binding ActiveSession.Shell}" IsRemote="{Binding ActiveSession.IsRemote}"
                                     TerminalFontSize="{Binding FontSize}"
                                     TerminalFontFamily="{Binding TerminalFont}"
                                     SearchQuery="{Binding Dashboard.SearchQuery}"/>

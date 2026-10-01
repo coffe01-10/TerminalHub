@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Fixtures\grok-build-1.0.46-startup.vt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\TerminalHub.Core\TerminalHub.Core.csproj" />
     <ProjectReference Include="..\..\src\TerminalHub.Pty\TerminalHub.Pty.csproj" />
     <ProjectReference Include="..\..\src\TerminalHub.App\TerminalHub.App.csproj" />

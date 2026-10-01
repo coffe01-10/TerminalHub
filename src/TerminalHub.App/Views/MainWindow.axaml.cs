@@ -149,9 +149,10 @@ public partial class MainWindow : Window
             // during a flight, so translating into it would distort the origin.
             if (!Vm.IsSplit && card is not null && Vm.ActiveSession is not null)
             {
-                var corners = new[] { new Point(), new Point(card.Bounds.Width, 0),
-                    new Point(0, card.Bounds.Height), new Point(card.Bounds.Width, card.Bounds.Height) }
-                    .Select(p => card.TranslatePoint(p, StageLayout)!.Value).ToArray();
+                var body = card.Child ?? card;
+                var corners = new[] { new Point(), new Point(body.Bounds.Width, 0),
+                    new Point(0, body.Bounds.Height), new Point(body.Bounds.Width, body.Bounds.Height) }
+                    .Select(p => body.TranslatePoint(p, StageLayout)!.Value).ToArray();
                 var left = corners.Min(p => p.X);
                 var top = corners.Min(p => p.Y);
                 StageWindow.ActivateFrom(new Rect(left - StageWindow.Bounds.X, top - StageWindow.Bounds.Y,
@@ -719,6 +720,25 @@ public partial class MainWindow : Window
 
     private void OnSessionMenuOpening(object? sender, EventArgs e)
     {
+        TerminalColorsMenu.Items.Clear();
+        foreach (var (label, scheme) in new[]
+        {
+            ("自动（适应应用背景）", TerminalHub.Core.Terminal.TerminalColorScheme.Automatic),
+            ("跟随界面", TerminalHub.Core.Terminal.TerminalColorScheme.FollowTheme),
+            ("深色", TerminalHub.Core.Terminal.TerminalColorScheme.Dark),
+            ("浅色", TerminalHub.Core.Terminal.TerminalColorScheme.Light)
+        })
+        {
+            var item = new MenuItem { Header = label, ToggleType = MenuItemToggleType.Radio,
+                IsChecked = Vm.ActiveSession?.Emulator.ColorScheme == scheme };
+            item.Click += (_, _) =>
+            {
+                if (Vm.ActiveSession is not { } session) return;
+                session.Emulator.ColorScheme = scheme;
+                Vm.PersistSettings();
+            };
+            TerminalColorsMenu.Items.Add(item);
+        }
         if (PinSessionItem is not null)
             PinSessionItem.Header = Vm.ActiveCard?.Model.Pinned == true ? "取消置顶" : "置顶";
         if (SaveSelectionItem is not null)

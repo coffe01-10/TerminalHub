@@ -33,6 +33,7 @@ public sealed record WorkspaceSession
     public string GroupId { get; init; } = "";
     public string GroupName { get; init; } = "";
     public bool Pinned { get; init; }
+    public TerminalHub.Core.Terminal.TerminalColorScheme ColorScheme { get; init; }
 }
 
 /// <summary>Saved workspace layout: session order + active session + split panes.

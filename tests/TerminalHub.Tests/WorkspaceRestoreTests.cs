@@ -48,6 +48,7 @@ public class WorkspaceRestoreTests
             await vm.SpawnStartupSessionsAsync();          // default profile: 3 sessions
             await Until(() => vm.SessionCards.Count == 3);
             vm.RenameSession((vm.SessionCards[0], "Alpha"));
+            vm.SessionCards[0].Model.Emulator.ColorScheme = TerminalHub.Core.Terminal.TerminalColorScheme.Dark;
             vm.MoveSessionCard(vm.SessionCards[2], vm.SessionCards[0]); // drag last → front
             vm.Dispose();                                   // snapshot runs inside save
 
@@ -55,6 +56,7 @@ public class WorkspaceRestoreTests
             Assert.Equal(3, saved.Workspace.Sessions.Count);
             Assert.Equal("Terminal 03", saved.Workspace.Sessions[0].Name); // moved to front
             Assert.Equal("Alpha", saved.Workspace.Sessions[1].Name);
+            Assert.Equal(TerminalHub.Core.Terminal.TerminalColorScheme.Dark, saved.Workspace.Sessions[1].ColorScheme);
             Assert.Equal(0, saved.Workspace.ActiveIndex);   // Terminal 03 stayed active → index 0
             Assert.False(saved.Workspace.IsSplit);
 
@@ -63,6 +65,8 @@ public class WorkspaceRestoreTests
             await Until(() => vm2.SessionCards.Count == 3);
             Assert.Equal(new[] { "Terminal 03", "Alpha", "Terminal 02" },
                 vm2.SessionCards.Select(c => c.Name).ToArray());
+            Assert.Equal(TerminalHub.Core.Terminal.TerminalColorScheme.Dark,
+                vm2.SessionCards[1].Model.Emulator.ColorScheme);
             vm2.Dispose();
         }
         finally

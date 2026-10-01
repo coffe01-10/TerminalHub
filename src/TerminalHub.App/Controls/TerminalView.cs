@@ -100,6 +100,9 @@ public partial class TerminalView : Control
     private sealed record PaintedRow(TerminalCell[] Cells, DrawingGroup Drawing);
     private readonly List<PaintedRow> _paintedRows = new();
     private bool _cacheRows;
+    private TerminalColors _colors = TerminalPalette.ThemeColors;
+    private TerminalFrame? _colorsFrame;
+    private TerminalColorScheme _colorsScheme;
 
     public TerminalEmulator? Emulator
     {
@@ -226,7 +229,10 @@ public partial class TerminalView : Control
         if (next is not null && _attached) next.Changed += OnBufferChanged;
         if (next is not null)
         {
-            next.Parser.DefaultColorQuery = TerminalPalette.QueryDefaultColor;
+            // The PTY belongs to the session, so previews and split/popout views
+            // must answer color queries with the same session appearance.
+            next.Parser.DefaultColorQuery = foreground => TerminalPalette.QueryDefaultColor(foreground,
+                TerminalPalette.ForFrame(next.Buffer.CaptureFrame(), next.ColorScheme));
             // Conditional like Changed above — a detached StagePreview must not
             // stay in the buffer's delegate list after it leaves the tree.
             if (_attached) next.Buffer.ScrollbackChanged += OnScrollbackChanged;
@@ -352,6 +358,7 @@ public partial class TerminalView : Control
 
     private void OnThemeChanged()
     {
+        _colorsFrame = null;
         _textCache.Clear();   // cached runs carry resolved theme colors
         _paintedRows.Clear();
         Interlocked.Exchange(ref _dirty, 1);
@@ -406,7 +413,15 @@ public partial class TerminalView : Control
             return;
         }
 
-        var bg = TerminalPalette.Resolve(TerminalColor.Default, false);
+        if (!ReferenceEquals(_colorsFrame, b) || _colorsScheme != _emulator!.ColorScheme)
+        {
+            var colors = TerminalPalette.ForFrame(b, _emulator!.ColorScheme);
+            if (colors != _colors) { _paintedRows.Clear(); _textCache.Clear(); }
+            _colors = colors;
+            _colorsFrame = b;
+            _colorsScheme = _emulator.ColorScheme;
+        }
+        var bg = _colors.Background;
         ctx.DrawRectangle(Brush(bg), null, new Rect(Bounds.Size));
 
         // Preview mirrors the live terminal grid without resizing it. The frame
@@ -463,7 +478,7 @@ public partial class TerminalView : Control
         {
             var (sl, sc0) = sa.CompareTo(se) <= 0 ? sa : se;
             var (el, ec1) = sa.CompareTo(se) <= 0 ? se : sa;
-            var selBrush = Brush(TerminalPalette.SelectionColor);
+            var selBrush = Brush(_colors.Selection);
             for (var v = row0; v < row0 + rows; v++)
             {
                 var abs = b.BaseLine + v;
@@ -482,8 +497,8 @@ public partial class TerminalView : Control
         // Search matches — flat highlight per hit, current match stronger.
         if (!IsPreview && SearchQuery is { Length: > 0 } query)
         {
-            var matchBrush = Brush(TerminalPalette.MatchColor);
-            var currentBrush = Brush(TerminalPalette.MatchCurrentColor);
+            var matchBrush = Brush(_colors.Match);
+            var currentBrush = Brush(_colors.CurrentMatch);
             for (var v = row0; v < row0 + rows; v++)
             {
                 var span = b.Cells.AsSpan(v * b.Columns, b.Columns);
@@ -515,7 +530,7 @@ public partial class TerminalView : Control
             var cy = b.CursorY * _cellH;
             var cursorIndex = b.CursorY * b.Columns + b.CursorX;
             ctx.DrawRectangle(
-                Brush(TerminalPalette.CursorColor),
+                Brush(_colors.Cursor),
                 null, new Rect(cx, cy, _cellW * GlyphColumns(b.Cells, b.Columns, cursorIndex), _cellH));
             // repaint glyph under cursor in dark
             var cell = b.Cells[b.CursorY * b.Columns + b.CursorX];
@@ -544,7 +559,7 @@ public partial class TerminalView : Control
         {
             var ax = _imeAnchorCol * _cellW;
             var ay = _imeAnchorRow * _cellH;
-            var cc = TerminalPalette.CursorColor;
+            var cc = _colors.Cursor;
             ctx.DrawLine(new Pen(Brush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B)), 2),
                 new Point(ax + 1, ay + 2), new Point(ax + 1, ay + _cellH - 3));
         }
@@ -554,11 +569,11 @@ public partial class TerminalView : Control
         if (!IsPreview && _preedit is { Length: > 0 } preedit && _viewOffset == 0
             && anchorRow >= row0 && anchorRow < row0 + rows)
         {
-            var cc = TerminalPalette.CursorColor;
+            var cc = _colors.Cursor;
             var accent = Brush(Color.FromArgb(0xFF, cc.R, cc.G, cc.B));
             var accentFill = Brush(Color.FromArgb(40, cc.R, cc.G, cc.B));
             var composition = GetPreeditLayout(b, input, preedit, _preeditCaret);
-            var fgC = TerminalPalette.Resolve(TerminalColor.Default, true);
+            var fgC = _colors.Foreground;
             foreach (var glyph in composition.Glyphs)
             {
                 var px = glyph.Col * _cellW;
@@ -875,12 +890,17 @@ public partial class TerminalView : Control
             // the Default tokens first loses the foreground/background distinction
             // and used to omit the background of Claude's reverse-video cursor.
             var inverse = attrs.HasFlag(CellAttrs.Inverse);
-            var fgC = TerminalPalette.Resolve(fg, true);
-            var bgC = TerminalPalette.Resolve(bg, false);
+            var fgC = TerminalPalette.Resolve(fg, true, _colors);
+            var bgC = TerminalPalette.Resolve(bg, false, _colors);
             if (inverse) (fgC, bgC) = (bgC, fgC);
             var rect = new Rect(startCol * _cellW, row2 * _cellH, cellCount * _cellW, _cellH);
             if (inverse || !bg.IsDefault)
+            {
+                // Cell backgrounds are solid tiles. Antialiasing their fractional
+                // edges leaks the base canvas between rows and styled runs.
+                using var edges = c2.PushRenderOptions(new RenderOptions { EdgeMode = EdgeMode.Aliased });
                 c2.DrawRectangle(Brush(bgC), null, rect);
+            }
 
             if (attrs.HasFlag(CellAttrs.Dim))
                 fgC = Color.FromArgb((byte)(fgC.A * 0.6), fgC.R, fgC.G, fgC.B);

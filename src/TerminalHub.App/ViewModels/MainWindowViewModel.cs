@@ -1682,6 +1682,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             GroupId = m.GroupId,
             GroupName = SessionGroups.FirstOrDefault(group => group.Id == m.GroupId)?.Name ?? "",
             Pinned = m.Pinned,
+            ColorScheme = m.Emulator.ColorScheme,
         }).ToList();
         ws.ActiveIndex = IndexOf(_sessions.Active);
         ws.IsSplit = IsSplit;

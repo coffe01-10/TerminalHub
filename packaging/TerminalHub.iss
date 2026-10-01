@@ -1,10 +1,10 @@
 ﻿; Terminal Hub / 终端控制中心 — Inno Setup installer script
 ; Build:   scripts\publish-windows.ps1   (or: iscc packaging\TerminalHub.iss)
-; Expects: artifacts\publish\win-x64\TerminalHub.exe + payload
+; Expects: app\TerminalHub.exe + payload
 
 #define AppName      "Terminal Hub"
 #define AppNameZh    "终端控制中心"
-#define AppVersion   "0.3.0"
+#define AppVersion   "0.3.1"
 #define AppPublisher "coffe01-10"
 #define AppExe       "TerminalHub.exe"
 
@@ -39,7 +39,7 @@ Name: "chinesesimp"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut / 创建桌面快捷方式"; GroupDescription: "Shortcuts:"
 
 [Files]
-Source: "..\artifacts\publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}";      Filename: "{app}\{#AppExe}"

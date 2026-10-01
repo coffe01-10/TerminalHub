@@ -15,7 +15,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
-$out  = Join-Path $repo 'artifacts\publish\win-x64'
+$out  = Join-Path $repo 'app'
 
 Write-Host "==> dotnet publish (win-x64, self-contained single file)" -ForegroundColor Cyan
 dotnet publish "$repo\src\TerminalHub.App\TerminalHub.App.csproj" `

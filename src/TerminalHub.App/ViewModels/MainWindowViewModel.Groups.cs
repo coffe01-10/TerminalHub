@@ -230,6 +230,7 @@ public partial class MainWindowViewModel
     {
         model.GroupId = session.GroupId ?? "";
         model.Pinned = session.Pinned;
+        model.Emulator.ColorScheme = session.ColorScheme;
         if (string.IsNullOrEmpty(model.GroupId) || SessionGroups.Any(group => group.Id == model.GroupId)) return;
         if (string.IsNullOrWhiteSpace(session.GroupName)) { model.GroupId = ""; return; }
         var group = new SessionGroup { Id = model.GroupId, Name = session.GroupName };

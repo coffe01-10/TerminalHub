@@ -3,9 +3,44 @@ using TerminalHub.Core.Terminal;
 
 namespace TerminalHub.App.Controls;
 
+public sealed record TerminalColors(Color Foreground, Color Background, Color Cursor,
+    Color Selection, Color Match, Color CurrentMatch, bool IsLight);
+
 /// <summary>Campbell-style palette + 256-color cube resolution for terminal cells.</summary>
 public static class TerminalPalette
 {
+    public static TerminalColors ThemeColors => new(DefaultFg, DefaultBg, CursorColor,
+        SelectionColor, MatchColor, MatchCurrentColor, Brightness(DefaultBg) >= 128);
+    private static readonly TerminalColors DarkColors = new(Color.Parse("#D8DDE7"), Color.Parse("#0C1018"),
+        Color.FromArgb(0xB4, 0x38, 0xBD, 0xF8), Color.FromArgb(0x48, 0x38, 0xBD, 0xF8),
+        Color.FromArgb(0x50, 0xF5, 0x9E, 0x0B), Color.FromArgb(0xA0, 0xF5, 0x9E, 0x0B), false);
+    private static readonly TerminalColors LightColors = new(Color.Parse("#1E2D41"), Color.Parse("#FAFCFF"),
+        Color.FromArgb(0xDC, 0x1D, 0x4E, 0xD8), Color.FromArgb(0x55, 0x1D, 0x4E, 0xD8),
+        Color.FromArgb(0x60, 0xD9, 0x77, 0x06), Color.FromArgb(0xB0, 0xB4, 0x53, 0x09), true);
+
+    public static TerminalColors ForFrame(TerminalFrame frame, TerminalColorScheme scheme)
+    {
+        if (scheme == TerminalColorScheme.Dark) return DarkColors;
+        if (scheme == TerminalColorScheme.Light) return LightColors;
+        if (scheme == TerminalColorScheme.FollowTheme) return ThemeColors;
+        // Grok's actual ConPTY output paints #141414 over the full screen.
+        // A single colored prompt/log line must not change the whole session.
+        var backgrounds = new Dictionary<TerminalColor, int>();
+        foreach (var cell in frame.Cells)
+        {
+            if (cell.Bg.IsDefault || cell.Attrs.HasFlag(CellAttrs.Inverse)) continue;
+            backgrounds[cell.Bg] = backgrounds.GetValueOrDefault(cell.Bg) + 1;
+        }
+        foreach (var (background, count) in backgrounds)
+            if (count > frame.Cells.Length * 3 / 4)
+            {
+                var color = Resolve(background, false, DarkColors);
+                return (Brightness(color) < 128 ? DarkColors : LightColors) with { Background = color };
+            }
+        return ThemeColors;
+    }
+
+    private static int Brightness(Color color) => (color.R * 3 + color.G * 6 + color.B) / 10;
     public static Color DefaultFg = Color.FromRgb(0xCC, 0xCC, 0xCC);
     public static Color DefaultBg = Color.FromRgb(0x0C, 0x0C, 0x0C);
 
@@ -30,9 +65,11 @@ public static class TerminalPalette
         MatchCurrentColor = light ? Color.FromArgb(0xB0, 0xB4, 0x53, 0x09) : Color.FromArgb(0xA0, 0xF5, 0x9E, 0x0B);
     }
 
-    public static string QueryDefaultColor(bool foreground)
+    public static string QueryDefaultColor(bool foreground) => QueryDefaultColor(foreground, ThemeColors);
+
+    public static string QueryDefaultColor(bool foreground, TerminalColors colors)
     {
-        var color = foreground ? DefaultFg : DefaultBg;
+        var color = foreground ? colors.Foreground : colors.Background;
         return $"{color.R * 257:x4}/{color.G * 257:x4}/{color.B * 257:x4}";
     }
 
@@ -53,23 +90,24 @@ public static class TerminalPalette
         Color.FromRgb(0x61, 0xD6, 0xD6), Color.FromRgb(0xF2, 0xF2, 0xF2),
     ];
 
-    public static Color Resolve(TerminalColor color, bool isForeground)
+    public static Color Resolve(TerminalColor color, bool isForeground, TerminalColors? colors = null)
     {
+        colors ??= ThemeColors;
         return color.Kind switch
         {
-            TerminalColor.ColorKind.Indexed => ResolveIndexed(color.Value),
+            TerminalColor.ColorKind.Indexed => ResolveIndexed(color.Value, colors.IsLight),
             TerminalColor.ColorKind.Rgb => Color.FromRgb(
                 (byte)(color.Value >> 16), (byte)(color.Value >> 8), (byte)color.Value),
-            _ => isForeground ? DefaultFg : DefaultBg,
+            _ => isForeground ? colors.Foreground : colors.Background,
         };
     }
 
-    private static Color ResolveIndexed(int i)
+    private static Color ResolveIndexed(int i, bool light)
     {
         // Malformed SGR (e.g. "38;5;" with an empty color slot → -1) or
         // out-of-range values must never index past the tables.
         i = Math.Clamp(i, 0, 255);
-        if (i < 16) return ThemeManager.IsLight ? Light16[i] : First16[i];
+        if (i < 16) return light ? Light16[i] : First16[i];
         if (i < 232)
         {
             var v = i - 16;

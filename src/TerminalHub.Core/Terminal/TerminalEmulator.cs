@@ -13,6 +13,17 @@ public sealed class TerminalEmulator : IDisposable
 
     public ScreenBuffer Buffer { get; }
     public VtParser Parser { get; }
+    private TerminalColorScheme _colorScheme;
+    public TerminalColorScheme ColorScheme
+    {
+        get => _colorScheme;
+        set
+        {
+            if (_colorScheme == value) return;
+            _colorScheme = value;
+            Changed?.Invoke();
+        }
+    }
     private long _outputVersion;
     /// <summary>PTY output only; resizing or theme changes are not unread output.</summary>
     public long OutputVersion => Interlocked.Read(ref _outputVersion);

@@ -23,10 +23,12 @@ public sealed class StageCard : Border
         AvaloniaProperty.Register<StageCard, double>(nameof(Lift));
     private bool _pressed;
     private bool _dragging;
+    private bool _hovered;
     public static readonly StyledProperty<double> SlotOffsetProperty =
         AvaloniaProperty.Register<StageCard, double>(nameof(SlotOffset));
     public double SlotOffset { get => GetValue(SlotOffsetProperty); set => SetValue(SlotOffsetProperty, value); }
     private readonly MatrixTransform _pose = new(Matrix.Identity);
+    private readonly TranslateTransform _slotPose = new();
     private readonly DoubleTransition _slotMotion = new()
     {
         Property = SlotOffsetProperty, Duration = TimeSpan.FromMilliseconds(240), Easing = new CubicEaseOut()
@@ -40,13 +42,13 @@ public sealed class StageCard : Border
 
     public StageCard()
     {
-        RenderTransformOrigin = new RelativePoint(.5, .5, RelativeUnit.Relative);
-        RenderTransform = _pose;
+        Background = Brushes.Transparent;
+        RenderTransform = _slotPose;
         Transitions = new Transitions
         {
-            new DoubleTransition { Property = DepthProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new StageSpringEase() },
-            new DoubleTransition { Property = TiltProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new StageSpringEase() },
-            new DoubleTransition { Property = LiftProperty, Duration = TimeSpan.FromMilliseconds(520), Easing = new StageSpringEase() },
+            new DoubleTransition { Property = DepthProperty, Duration = TimeSpan.FromMilliseconds(300), Easing = new StageSpringEase() },
+            new DoubleTransition { Property = TiltProperty, Duration = TimeSpan.FromMilliseconds(300), Easing = new StageSpringEase() },
+            new DoubleTransition { Property = LiftProperty, Duration = TimeSpan.FromMilliseconds(300), Easing = new StageSpringEase() },
             new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(220) },
             new BrushTransition { Property = BackgroundProperty, Duration = TimeSpan.FromMilliseconds(220) },
             new BrushTransition { Property = BorderBrushProperty, Duration = TimeSpan.FromMilliseconds(220) },
@@ -59,6 +61,11 @@ public sealed class StageCard : Border
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        if (change.Property == ChildProperty && Child is { } body)
+        {
+            body.RenderTransformOrigin = new RelativePoint(.5, .5, RelativeUnit.Relative);
+            body.RenderTransform = _pose;
+        }
         if (change.Property == IsActiveProperty || change.Property == StageDistanceProperty)
             UpdatePose();
         if (change.Property == DepthProperty || change.Property == TiltProperty || change.Property == LiftProperty || change.Property == SlotOffsetProperty)
@@ -69,12 +76,14 @@ public sealed class StageCard : Border
     {
         // Hover must not change hit-test geometry: the old tilted edge could
         // repeatedly enter/exit under a stationary pointer.
-        Depth = _dragging ? 0 : IsActive ? .08 : 1;
+        Depth = _dragging ? 0 : IsActive ? .08 : _hovered ? .4 : 1;
         var tilt = ThemeManager.Current == "Paper" ? 1.2 : ThemeManager.Current == "Black" ? .35 : 1.8;
-        Tilt = _dragging || IsActive ? 0 : -Math.Clamp(StageDistance, -2, 2) * tilt;
-        Lift = _dragging ? 1.6 : _pressed ? -.3 : IsActive ? .6 : 0;
-        Opacity = IsActive || _dragging ? 1 : .92;
-        ZIndex = _dragging ? 30 : IsActive ? 10 : 0;
+        Tilt = _dragging || IsActive ? 0 : -Math.Clamp(StageDistance, -2, 2) * tilt * (_hovered ? .35 : 1);
+        Lift = _dragging ? 1.6 : _pressed ? -.3 : _hovered ? IsActive ? .9 : 1.2 : IsActive ? .6 : 0;
+        Opacity = IsActive || _dragging || _hovered ? 1 : .92;
+        ZIndex = _dragging ? 30 : _hovered ? 20 : IsActive ? 10 : 0;
+        if (this.FindAncestorOfType<ListBoxItem>() is { } container)
+            container.ZIndex = ZIndex;
         InvalidateVisual();
     }
 
@@ -84,7 +93,8 @@ public sealed class StageCard : Border
         _pose.Matrix = new Matrix(
             1 - .08 * Depth + .025 * Lift, Math.Tan(Tilt * Math.PI / 180), .00075 * Depth,
             0, 1 - .035 * Depth + .025 * Lift, 0,
-            -8 * Depth + 5 * Lift, -2 * Lift + SlotOffset, 1);
+            -8 * Depth + 5 * Lift, -2 * Lift, 1);
+        _slotPose.Y = SlotOffset;
     }
 
     public void SetSlotOffset(double offset, bool immediate = false)
@@ -98,10 +108,6 @@ public sealed class StageCard : Border
     {
         _dragging = dragging;
         _pressed = false;
-        // Cards are nested in ListBoxItems: raise that sibling too, otherwise
-        // the dragged preview disappears underneath the next item's terminal.
-        if (this.FindAncestorOfType<ListBoxItem>() is { } container)
-            container.ZIndex = dragging ? 30 : 0;
         UpdatePose();
     }
 
@@ -115,6 +121,7 @@ public sealed class StageCard : Border
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ThemeManager.Changed -= UpdatePose;
+        _hovered = _pressed = _dragging = false;
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -135,6 +142,20 @@ public sealed class StageCard : Border
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
+        _hovered = _pressed = false;
+        UpdatePose();
+    }
+
+    protected override void OnPointerEntered(PointerEventArgs e)
+    {
+        base.OnPointerEntered(e);
+        _hovered = true;
+        UpdatePose();
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
         _pressed = false;
         UpdatePose();
     }
