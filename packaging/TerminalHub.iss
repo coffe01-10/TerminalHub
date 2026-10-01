@@ -39,7 +39,7 @@ Name: "chinesesimp"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut / 创建桌面快捷方式"; GroupDescription: "Shortcuts:"
 
 [Files]
-Source: "..\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\app\*"; DestDir: "{app}"; Excludes: "settings.json,settings-*.json,.ssh\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}";      Filename: "{app}\{#AppExe}"

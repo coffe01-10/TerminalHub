@@ -31,7 +31,20 @@ Write-Host "==> Published to $out" -ForegroundColor Green
 Copy-Item -LiteralPath (Join-Path $repo 'packaging\QUICKSTART.zh-CN.txt') -Destination $out
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $out
 $previewZip = Join-Path $repo 'artifacts\TerminalHub-windows-x64-preview.zip'
-Compress-Archive -LiteralPath $out -DestinationPath $previewZip -Force
+# Package the program payload explicitly; personal settings and SSH records
+# placed beside a portable executable must never enter a release archive.
+$portableNames = @('TerminalHub.exe', 'TerminalHub.Core.pdb', 'TerminalHub.Pty.pdb',
+  'TerminalHub.pdb', 'LICENSE', 'QUICKSTART.zh-CN.txt', 'CHANGES-2026-10-01.md', 'PERFORMANCE-2026-10-01.md')
+$portableStream = [System.IO.File]::Open($previewZip, [System.IO.FileMode]::Create)
+$portableArchive = [System.IO.Compression.ZipArchive]::new($portableStream, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+  foreach ($portableName in $portableNames) {
+    $portablePath = Join-Path $out $portableName
+    if (Test-Path -LiteralPath $portablePath) {
+      [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($portableArchive, $portablePath, "app/$portableName") | Out-Null
+    }
+  }
+} finally { $portableArchive.Dispose(); $portableStream.Dispose() }
 Write-Host "==> Portable preview: $previewZip" -ForegroundColor Green
 
 if ($SkipInstaller) { exit 0 }

@@ -72,6 +72,10 @@ coverage/
 .env.*
 !.env.example
 appsettings.*.local.json
+# Terminal Hub personal workspace / SSH connection records
+settings.json
+settings-*.json
+.ssh/
 
 # Devin / agent scratch
 .devin/
