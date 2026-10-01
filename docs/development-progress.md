@@ -710,3 +710,4 @@
 - Linux UI 视觉对齐审计（`feat/linux-ui-visual-parity`）：四主题（DarkGlass/Black/White/Paper）Linux 实机整窗截图齐——结构与 Windows 实机 Paper 参照同构（共享 XAML）；修 `NewDockButton` 缺 `dock-active`（DockHighlight=0）；补 NewDockButton 高亮类绑定。`docs/screenshots/linux-visual-parity-{dashboard,DarkGlass,Black,White,Paper}.png`。
 - OSC7 cwd 修复（`feat/linux-osc7-cwd-encoding`）：bash 集成改发裸绝对路径（原 file://$PWD 未编码被 '#'/'?'/'%' 截断）；恢复会话识别 legacy --rcfile 重注入刷新 rc；真 PTY 特殊字符目录回归 + 实机截图。
 - PR #51 合入 `main@7a674f7`：OSC7 裸路径 + IsBashRcArguments 重注入；502/0/3 绿；实机截图 C#proj %test 完整。
+- PR #52 合入 `main@cadefdd`（Linux 平台对齐）；恢复 Output 级别筛选刀 `feat/output-level-filter-mockup` → PR #53（全部/info/warn/error + 持久化，522 绿）。

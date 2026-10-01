@@ -18,8 +18,7 @@
 
 ## 进行中
 
-- [ ] **Output 级别筛选（等 PO 点头恢复）** — Devin · `feat/output-level-filter-mockup`（代码+测试+截图已在分支）
-- [ ] **Output 级别筛选（暂停等审）** — Devin · `feat/output-level-filter-mockup`（代码+测试+截图已推分支，PO 纠偏暂缓）
+- [ ] **Output 级别筛选**（全部/info/warn/error + 持久化）— Devin · `feat/output-level-filter-mockup` · PR #53 等审 · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -28,6 +27,8 @@
 
 
 ## 已完成（近期）
+
+- [x] PR #52 Linux 平台对齐（默认 Bash · 隐藏 cmd/WSL · Thunar 右键 · PTY 参数/整树关闭 · 剪贴板=X11 环境结论）— Codex/Devin · `codex/linux-windows-parity` · `main@cadefdd`
 
 - [x] PR #51 OSC7 cwd 修复（裸路径发射 · legacy --rcfile 重注入 · 特殊字符目录真 PTY 回归）— Devin · `feat/linux-osc7-cwd-encoding` · `main@7a674f7`
 - [x] PR #50 Linux UI 视觉对齐审计（四主题实机截图 · NewDockButton dock-active · ⧉→⎘ 豆腐字修）— Devin · `feat/linux-ui-visual-parity` · `main@ff2e139`
