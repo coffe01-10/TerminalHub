@@ -661,6 +661,26 @@
                         </ListBox.ItemTemplate>
                       </ListBox>
                     </Grid>
+
+                    <!-- empty states: Output / Debug (Problems + Search carry their own hints) -->
+                    <TextBlock Text="暂无输出" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static vm:TabEmptyConverter.Instance}" ConverterParameter="0">
+                          <Binding Path="Dashboard.SelectedBottomTab"/>
+                          <Binding Path="Dashboard.VisibleOutput.Count"/>
+                        </MultiBinding>
+                      </TextBlock.IsVisible>
+                    </TextBlock>
+                    <TextBlock Text="暂无调试行" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static vm:TabEmptyConverter.Instance}" ConverterParameter="1">
+                          <Binding Path="Dashboard.SelectedBottomTab"/>
+                          <Binding Path="Dashboard.DebugLog.Count"/>
+                        </MultiBinding>
+                      </TextBlock.IsVisible>
+                    </TextBlock>
                   </Panel>
                 </Border>
               </Grid>

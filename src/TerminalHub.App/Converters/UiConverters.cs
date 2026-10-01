@@ -25,6 +25,18 @@ public sealed class LogLevelConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>[int selectedTab, int itemCount] + int param → true when that tab is active AND empty.</summary>
+public sealed class TabEmptyConverter : IMultiValueConverter
+{
+    public static readonly TabEmptyConverter Instance = new();
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+        => values is [int tab, int count]
+           && int.TryParse(parameter?.ToString(), out var want)
+           && tab == want && count == 0;
+    public object?[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>int equality for tab/visibility — handles string parameters.</summary>
 public sealed class IntEqualConverter : IValueConverter
 {
