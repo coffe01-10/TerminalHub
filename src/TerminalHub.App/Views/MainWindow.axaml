@@ -724,7 +724,7 @@
                       <DataTemplate x:DataType="mon:ProcessInfo">
                         <Grid ColumnDefinitions="50,*,70,70">
                           <TextBlock Text="{Binding Pid}" Foreground="{DynamicResource UiMuted}"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource UiInk}"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource UiInk}"/>
                           <TextBlock Grid.Column="2" Text="{Binding CpuPercent, StringFormat='{}{0:0.0}%'}"
                                      Foreground="{DynamicResource UiGood}" HorizontalAlignment="Right"/>
                           <TextBlock Grid.Column="3" Text="{Binding MemoryBytes, Converter={x:Static vm:BytesConverter.Instance}}"
@@ -892,13 +892,13 @@
                           </Grid.ContextMenu>
                           <TextBlock Text="▸" Foreground="{DynamicResource UiAccent}" IsVisible="{Binding IsDirectory}"/>
                           <TextBlock Text="·" Foreground="{DynamicResource UiFaint}" IsVisible="{Binding !IsDirectory}"/>
-                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="2,0,0,0">
-                            <TextBlock Text="{Binding Name}"
+                          <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="2,0,0,0">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
                                        Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
-                            <TextBlock Text="→" FontSize="9" Foreground="{DynamicResource UiFaint}"
-                                       VerticalAlignment="Center" IsVisible="{Binding IsSymlink}"
+                            <TextBlock Grid.Column="1" Text="→" FontSize="9" Foreground="{DynamicResource UiFaint}"
+                                       VerticalAlignment="Center" Margin="5,0,0,0" IsVisible="{Binding IsSymlink}"
                                        ToolTip.Tip="{Binding LinkTarget, StringFormat='符号链接 → {0}'}"/>
-                          </StackPanel>
+                          </Grid>
                           <TextBlock Grid.Column="2" Text="{Binding SizeBytes, Converter={x:Static vm:BytesConverter.Instance}}"
                                      Foreground="{DynamicResource UiFaint}" FontSize="9.5" HorizontalAlignment="Right"
                                      IsVisible="{Binding !IsDirectory}"/>
@@ -1241,7 +1241,11 @@
                 <!-- saved hosts -->
                 <Border Grid.Row="2" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
-                  <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
+                  <Panel>
+                    <TextBlock Text="暂无保存的连接 · 点上方 ＋ 添加" Foreground="{DynamicResource UiFaint}"
+                               FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding Ssh.Hosts.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                    <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
                            Background="Transparent" BorderThickness="0" Padding="4"
                            Tapped="OnSshRowTapped">
                     <ListBox.Styles>
@@ -1262,8 +1266,8 @@
                       <DataTemplate x:DataType="ssh:SshHost">
                         <Grid ColumnDefinitions="*,Auto,Auto">
                           <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding DisplayName}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                            <TextBlock Text="{Binding CommandLine}" FontSize="9" Foreground="{DynamicResource UiFaint}"
+                            <TextBlock Text="{Binding DisplayName}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding CommandLine}" FontSize="9" Foreground="{DynamicResource UiFaint}" TextTrimming="CharacterEllipsis"
                                        FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                           </StackPanel>
                           <Button Grid.Column="1" Content="连接" Padding="8,2" Margin="6,0,0,0"
@@ -1280,6 +1284,7 @@
                       </DataTemplate>
                     </ListBox.ItemTemplate>
                   </ListBox>
+                  </Panel>
                 </Border>
 
                 <TextBlock Grid.Row="3" FontSize="9" Foreground="{DynamicResource UiFaint}" Margin="2,6,2,0"
