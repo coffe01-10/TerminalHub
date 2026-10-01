@@ -55,7 +55,7 @@ public class StageLayoutTests
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[2];
         await Task.Delay(450);
         var stage = window.FindControl<StageSurface>("StageWindow")!;
-        var dock = window.FindControl<Border>("ActionDock")!;
+        var dock = window.FindControl<DropletDock>("ActionDock")!;
         Assert.False(dock.IsHitTestVisible);
         Assert.False(fixture.Vm.InspectorVisible);
         Assert.False(window.FindControl<Border>("OutputPanel")!.IsVisible);
@@ -243,13 +243,41 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
+    public async Task Dock_GrowsFromHint_WithoutBottomBlankAreaTriggeringIt()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(700);
+        var window = fixture.Window;
+        var dock = window.FindControl<DropletDock>("ActionDock")!;
+        var hint = window.FindControl<Border>("DockHint")!;
+        Assert.Equal(82, dock.SurfaceBounds.Width);
+        Assert.Equal(30, dock.SurfaceBounds.Height);
+        window.MouseMove(new Point(window.Bounds.Width / 2 - 180, window.Bounds.Height - 40));
+        await Task.Delay(100);
+        Assert.Equal(0, dock.Reveal);
+        var point = hint.TranslatePoint(new Point(41, 15), window)!.Value;
+        window.MouseMove(point);
+        await Task.Delay(80);
+        Assert.InRange(dock.Reveal, .01, .99);
+        Assert.InRange(dock.SurfaceBounds.Width, 83, dock.Bounds.Width - 1);
+        Assert.Equal(dock.Bounds.Height, dock.SurfaceBounds.Bottom, 5);
+        Assert.True(hint.Opacity < 1);
+        await Task.Delay(450);
+        Assert.Equal(dock.Bounds.Width, dock.SurfaceBounds.Width, 5);
+        Assert.Equal(1, dock.Child!.Opacity);
+        Assert.False(hint.IsHitTestVisible);
+        Assert.True(dock.IsHitTestVisible);
+    }
+
+    [AvaloniaFact]
     public async Task AutoHideDock_RevealsAndHides_AndHiddenModeIgnoresPointer()
     {
         using var fixture = new StageFixture();
         var window = fixture.Window;
         await Task.Delay(700);
-        var dock = window.FindControl<Border>("ActionDock")!;
-        var bottom = new Point(window.Bounds.Width / 2, window.Bounds.Height - 40);
+        var dock = window.FindControl<DropletDock>("ActionDock")!;
+        var hint = window.FindControl<Border>("DockHint")!;
+        var bottom = hint.TranslatePoint(new Point(hint.Bounds.Width / 2, hint.Bounds.Height / 2), window)!.Value;
         window.MouseMove(bottom);
         await Task.Delay(400);
         Assert.True(dock.IsHitTestVisible);
@@ -340,4 +368,5 @@ public class StageLayoutTests
         Assert.Equal(2, vm.Settings.DockVisibilityMode);
     }
 }
+
 

@@ -35,6 +35,12 @@ public partial class MainWindow : Window
         Func<string, bool>? shellAvailable = null)
     {
         InitializeComponent();
+        ActionDock.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != DropletDock.RevealProperty) return;
+            DockHint.Opacity = Math.Clamp(1 - ActionDock.Reveal * 4, 0, 1);
+            DockHint.IsHitTestVisible = ActionDock.Reveal < .65;
+        };
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
         Vm.PaletteRequested += OpenPalette;
         Vm.RevealCommandRequested += OnRevealCommand;
@@ -165,10 +171,7 @@ public partial class MainWindow : Window
     private void OnDockPointerMoved(object? sender, PointerEventArgs e)
     {
         if (!_stageReady || Vm.DockVisibilityMode != 0) return;
-        var point = e.GetPosition(this);
-        var inBottomZone = point.Y >= Bounds.Height - 72 &&
-            Math.Abs(point.X - Bounds.Width / 2) < Math.Max(280, ActionDock.Bounds.Width / 2 + 32);
-        if (inBottomZone || ActionDock.IsPointerOver)
+        if (DockHint.IsPointerOver || (ActionDock.IsHitTestVisible && ActionDock.IsPointerOver))
         {
             _dockHideTimer.Stop();
             SetDockRevealed(true);
@@ -185,20 +188,19 @@ public partial class MainWindow : Window
     private void UpdateDockMode()
     {
         _dockHideTimer.Stop();
+        ActionDock.IsVisible = Vm.DockVisibilityMode != 2;
         SetDockRevealed(Vm.DockVisibilityMode == 1);
     }
 
     private void SetDockRevealed(bool revealed)
     {
-        ActionDock.Classes.Set("revealed", revealed);
-        DockHint.Opacity = revealed ? 0 : 1;
-        DockHint.IsHitTestVisible = !revealed;
+        ActionDock.Reveal = revealed ? 1 : 0;
     }
 
     private void OnDockHintEntered(object? sender, PointerEventArgs e)
     {
         _dockHideTimer.Stop();
-        SetDockRevealed(true);
+        if (Vm.DockVisibilityMode == 0) SetDockRevealed(true);
     }
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)

@@ -30,7 +30,7 @@
     <StreamGeometry x:Key="ToolMore">M2,7 H4 V9 H2 Z M7,7 H9 V9 H7 Z M12,7 H14 V9 H12 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolOutput">M1,2 H15 V14 H1 Z M3,4 V9 H13 V4 Z M3,11 V12 H13 V11 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolSearch">M7,1 A6,6 0 1 0 7,13 A6,6 0 1 0 7,1 M7,3 A4,4 0 1 1 7,11 A4,4 0 1 1 7,3 M11,10 L16,15 L14.5,16.5 L9.5,11.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="ToolTools">M1,2 H15 V14 H1 Z M3,4 V12 H10 V4 Z M12,4 V12 H13 V4 Z</StreamGeometry>
+    <StreamGeometry x:Key="ToolTools">M5,1 H11 V4 H15 V14 H1 V4 H5 Z M6.5,2.5 V4 H9.5 V2.5 Z M2.5,5.5 V8 H6.5 V7 H9.5 V8 H13.5 V5.5 Z M2.5,9.5 V12.5 H13.5 V9.5 H9.5 V11 H6.5 V9.5 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolSettings">M6,1 H10 V3 L12,4 L14,3 L16,6 L14,8 L14,10 L16,12 L14,15 L12,14 L10,15 H6 L4,14 L2,15 L0,12 L2,10 V8 L0,6 L2,3 L4,4 L6,3 Z M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolWindow">M1,2 H15 V14 H1 Z M3,4 V12 H13 V4 Z</StreamGeometry>
     <StreamGeometry x:Key="ToolMinimize">M2,7 H14 V9 H2 Z</StreamGeometry>
@@ -1307,36 +1307,20 @@
     </Grid>
 
     <Border x:Name="DockHint" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-            CornerRadius="9" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Margin="0,0,0,34" Padding="12,4" ZIndex="99"
+            Width="82" Height="30" CornerRadius="15" Background="Transparent" Margin="0,0,0,11" ZIndex="101"
             PointerEntered="OnDockHintEntered"
             IsVisible="{Binding DockVisibilityMode, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
-      <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}" Width="12" Height="12" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="工具" FontSize="11" Foreground="{DynamicResource UiMuted}"/></StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center" VerticalAlignment="Center"><PathIcon Data="{StaticResource ToolTools}" Width="14" Height="14" Foreground="{DynamicResource UiInk}"/><TextBlock Text="工具" FontSize="11" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/></StackPanel>
     </Border>
     <!-- ============ Floating action dock ============ -->
-    <Border x:Name="ActionDock" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,46"
-            CornerRadius="{DynamicResource DockCorner}" Padding="8" ZIndex="100"
-            Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
-            BoxShadow="{DynamicResource SurfaceShadow}">
-      <Border.Styles>
-        <Style Selector="Border#ActionDock">
-          <Setter Property="Opacity" Value="0"/>
-          <Setter Property="IsHitTestVisible" Value="False"/>
-          <Setter Property="RenderTransform" Value="translateY(130px)"/>
-          <Setter Property="Transitions">
-            <Transitions>
-              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
-              <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
-            </Transitions>
-          </Setter>
-        </Style>
-        <Style Selector="Border#ActionDock.revealed">
-          <Setter Property="Opacity" Value="1"/>
-          <Setter Property="IsHitTestVisible" Value="True"/>
-          <Setter Property="RenderTransform" Value="translateY(0px)"/>
-        </Style>
+    <ctl:DropletDock x:Name="ActionDock" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,11"
+            Padding="8" ZIndex="100"
+            Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}">
+      <ctl:DropletDock.Styles>
+        <Style Selector="PathIcon"><Setter Property="Width" Value="20"/><Setter Property="Height" Value="20"/><Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Style>
         <Style Selector="Button.dock">
-          <Setter Property="Padding" Value="18,9"/>
-          <Setter Property="CornerRadius" Value="10"/>
+          <Setter Property="Padding" Value="16,10"/>
+          <Setter Property="CornerRadius" Value="12"/><Setter Property="MinWidth" Value="72"/><Setter Property="VerticalContentAlignment" Value="Top"/>
           <Setter Property="Background" Value="Transparent"/>
           <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
           <Setter Property="BorderThickness" Value="1"/>
@@ -1344,12 +1328,12 @@
           <Setter Property="RenderTransform" Value="translateY(0px)"/>
           <Setter Property="Transitions">
             <Transitions>
-              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2"/>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut"/><BrushTransition Property="Background" Duration="0:0:0.18"/><BrushTransition Property="Foreground" Duration="0:0:0.18"/>
             </Transitions>
           </Setter>
         </Style>
         <Style Selector="Button.dock:pointerover">
-          <Setter Property="RenderTransform" Value="translateY(-4px)"/>
+          <Setter Property="RenderTransform" Value="translateY(-2px)"/>
           <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
           <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
         </Style>
@@ -1358,7 +1342,7 @@
           <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
           <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
         </Style>
-      </Border.Styles>
+      </ctl:DropletDock.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                 Command="{Binding DockSelectCommand}" CommandParameter="1">
@@ -1430,7 +1414,7 @@
         </Button>
 
       </StackPanel>
-    </Border>
+    </ctl:DropletDock>
 
     <Border x:Name="ShellSetupPanel" IsVisible="{Binding ShellSetupOpen}" ZIndex="210"
             HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="480" Margin="24"
