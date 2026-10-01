@@ -231,8 +231,12 @@
                         <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" Margin="0,0,7,0"/>
                         <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource UiInk}"/>
                       </Grid>
+                      <Border Grid.Column="1" IsVisible="{Binding HasTag}" Background="{Binding TagPillBrush}"
+                              CornerRadius="5" Padding="6,1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TagText}" FontSize="9" Foreground="{Binding TagBrush}"/>
+                      </Border>
                       <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
-                                 FontSize="9" VerticalAlignment="Center"/>
+                                 IsVisible="{Binding !HasTag}" FontSize="9" VerticalAlignment="Center"/>
                     </Grid>
                     <Border Grid.Row="1" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="3" ClipToBounds="True">
                       <ctl:StagePreview Emulator="{Binding Model.Emulator}"/>
