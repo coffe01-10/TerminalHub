@@ -13,6 +13,8 @@ public sealed record LogEntry(DateTime Time, string Level, string Message, strin
 public partial class DashboardViewModel : ViewModelBase
 {
     private readonly ISystemMonitor _monitor;
+    /// <summary>Process kill entry point (tests inject a capture).</summary>
+    private readonly Action<int> _killPid;
     private readonly SparklineBuffer _cpu = new(60);
     private readonly SparklineBuffer _mem = new(60);
     private readonly SparklineBuffer _netRx = new(60);
@@ -89,10 +91,30 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private double[] _netDownSpark = [];
     [ObservableProperty] private double[] _netUpSpark = [];
 
-    public DashboardViewModel(ISystemMonitor monitor)
+    public DashboardViewModel(ISystemMonitor monitor, Action<int>? killPid = null)
     {
         _monitor = monitor;
+        _killPid = killPid ?? KillPid;
         _monitor.Sampled += OnSampled;
+    }
+
+    private static void KillPid(int pid) => System.Diagnostics.Process.GetProcessById(pid).Kill();
+
+    /// <summary>Right-click → 结束进程 (Task Manager parity for the table).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void KillProcess(ProcessInfo? p)
+    {
+        if (p is null) return;
+        try
+        {
+            _killPid(p.Pid);
+            AppendOutput("info", $"已结束进程 {p.Name} (pid {p.Pid})", "proc");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException
+                                     or System.ComponentModel.Win32Exception)
+        {
+            AppendOutput("error", $"无法结束 {p.Name} (pid {p.Pid}): {ex.Message}", "proc");
+        }
     }
 
     private void OnSampled(ISystemMonitor m)

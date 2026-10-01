@@ -764,6 +764,13 @@
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="mon:ProcessInfo">
                         <Grid ColumnDefinitions="50,*,70,70">
+                          <Grid.ContextMenu>
+                            <ContextMenu>
+                              <MenuItem Header="结束进程"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Dashboard.KillProcessCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </ContextMenu>
+                          </Grid.ContextMenu>
                           <TextBlock Text="{Binding Pid}" Foreground="{DynamicResource UiMuted}"/>
                           <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource UiInk}"/>
                           <TextBlock Grid.Column="2" Text="{Binding CpuPercent, StringFormat='{}{0:0.0}%'}"

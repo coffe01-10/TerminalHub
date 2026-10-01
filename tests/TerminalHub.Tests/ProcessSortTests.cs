@@ -61,4 +61,29 @@ public class ProcessSortTests
         vm.SortProcessesCommand.Execute("mem");
         Assert.Equal([30, 20, 10], vm.Processes.Select(p => p.MemoryBytes)); // mem → desc
     }
+
+    [AvaloniaFact]
+    public async Task KillProcess_InvokesKiller_AndLogs()
+    {
+        var killed = new List<int>();
+        var vm = new DashboardViewModel(new FakeMonitor(), killPid: killed.Add);
+        var row = Proc(42, "victim", 1, 10);
+
+        vm.KillProcessCommand.Execute(row);
+        Assert.Equal([42], killed);
+
+        await Until(() => vm.OutputLog.Any(l => l.Message.Contains("已结束进程 victim")));
+        Assert.Contains(vm.OutputLog, l => l.Source == "proc");
+    }
+
+    [AvaloniaFact]
+    public async Task KillProcess_Failure_LogsError()
+    {
+        var vm = new DashboardViewModel(new FakeMonitor(),
+            killPid: _ => throw new InvalidOperationException("denied"));
+        vm.KillProcessCommand.Execute(Proc(9, "stubborn", 0, 0));
+
+        await Until(() => vm.OutputLog.Any());
+        Assert.Contains(vm.OutputLog, l => l.Level == "error" && l.Message.Contains("无法结束 stubborn"));
+    }
 }
