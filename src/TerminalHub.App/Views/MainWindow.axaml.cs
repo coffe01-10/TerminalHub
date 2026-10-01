@@ -766,6 +766,11 @@ public partial class MainWindow : Window
             Vm.Files.OpenSelected();
             e.Handled = true;
         }
+        else if (e.Key == Key.Back)
+        {
+            Vm.Files.UpCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 
 

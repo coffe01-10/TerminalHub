@@ -84,7 +84,18 @@ public class FilesPreviewTests : IDisposable
         };
 
         Assert.False(vm.HasPreview);
+        Assert.True(vm.StatusIsError);
         Assert.Contains("无法读取", vm.StatusText);
+    }
+
+    [Fact]
+    public void MissingDir_MarksStatusAsError()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(Path.Combine(_root, "nope"));
+
+        Assert.True(vm.StatusIsError);
+        Assert.Contains("无法打开目录", vm.StatusText);
     }
 
     [Fact]

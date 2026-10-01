@@ -90,6 +90,15 @@ public sealed class BoolBrushConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>bool → error brush when true, muted when false (status lines mixing info + errors).</summary>
+public sealed class BoolToErrorBrushConverter : IValueConverter
+{
+    public static readonly BoolToErrorBrushConverter Instance = new();
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? ThemeManager.Brush("Bad") : ThemeManager.Brush("Muted");
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
 /// <summary>bool wrap → TextWrapping.Wrap (true) or NoWrap (false). Logs message lines.</summary>
 public sealed class BoolToTextWrappingConverter : IValueConverter
 {

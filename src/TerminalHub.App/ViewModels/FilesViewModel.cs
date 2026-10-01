@@ -26,6 +26,8 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _currentPath = "";
     [ObservableProperty] private FileEntry? _selectedEntry;
     [ObservableProperty] private string _statusText = "";
+    /// <summary>true → status line paints as an error (UiBad); false → info (UiMuted).</summary>
+    [ObservableProperty] private bool _statusIsError;
     [ObservableProperty] private string _previewTitle = "";
     [ObservableProperty] private string _previewMeta = "";
     [ObservableProperty] private string _previewText = "";
@@ -97,11 +99,13 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             CurrentPath = Path.GetFullPath(path);
             WatchDirectory();
             RebuildCrumbs();
+            StatusIsError = false;
             StatusText = entries.Count == 0 ? "空目录" : "";
             CanGoUp = Directory.GetParent(CurrentPath) is not null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
+            StatusIsError = true;
             StatusText = $"无法打开目录: {ex.Message}";
         }
     }
@@ -218,6 +222,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             // Selection-tracked preview: a failed read must not leave the
             // previous file's preview on screen under the new selection.
             HasPreview = false;
+            StatusIsError = true;
             StatusText = $"无法读取文件: {ex.Message}";
         }
     }
@@ -245,6 +250,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         var dir = e.IsDirectory ? e.FullPath : Path.GetDirectoryName(e.FullPath);
         if (string.IsNullOrEmpty(dir)) return;
         _openTerminalAt(dir);
+        StatusIsError = false;
         StatusText = $"终端已 cd → {dir}";
     }
 
@@ -258,6 +264,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         var e = entry ?? SelectedEntry;
         if (e is null) return;
         if (_copyTextAsync is not null) await _copyTextAsync(e.FullPath);
+        StatusIsError = false;
         StatusText = $"已复制 {e.FullPath}";
     }
 

@@ -73,6 +73,7 @@ public class FilesOpenInTerminalTests
 
         Assert.Equal(new[] { FileInDir }, copied);
         Assert.Contains("已复制", vm.StatusText);
+        Assert.False(vm.StatusIsError); // info copy, not a failure
     }
 
     // ---------- end-to-end through the real window ----------

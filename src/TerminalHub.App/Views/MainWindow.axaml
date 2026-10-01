@@ -803,7 +803,7 @@
                   <Button Content="↑" Padding="8,2" CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           IsEnabled="{Binding Files.CanGoUp}"
-                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级"/>
+                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级 · Backspace"/>
                   <ScrollViewer x:Name="CrumbScroll" Grid.Column="1" Margin="6,0" VerticalAlignment="Center"
                                 HorizontalScrollBarVisibility="Auto"
                                 VerticalScrollBarVisibility="Disabled">
@@ -846,7 +846,8 @@
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="会话目录"/>
                 </Grid>
-                <TextBlock Grid.Row="1" Text="{Binding Files.StatusText}" Foreground="{DynamicResource UiBad}"
+                <TextBlock Grid.Row="1" Text="{Binding Files.StatusText}"
+                           Foreground="{Binding Files.StatusIsError, Converter={x:Static vm:BoolToErrorBrushConverter.Instance}}"
                            FontSize="9.5" Margin="2,0,0,2"
                            IsVisible="{Binding Files.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
 
