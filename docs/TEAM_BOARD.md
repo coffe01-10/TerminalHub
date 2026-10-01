@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-01 18:13 CST（PR #44 Linux 对齐已合 · Devin 开缩略图下一刀） · 维护：Devin（PO）
+最后更新：2026-10-01 18:3x CST（缩略图收口 PR #45 已开 · 修 PS0 \x01\x02 泄漏） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **会话缩略图真实下采样**（StagePreview 出真缓冲内容 · 节流刷新 · 卡片贴近 ui-ref-dashboard）— **Devin** · `feat/session-thumb-live` · `/workspace/TerminalHub`
+- [ ] **会话缩略图真实下采样**（StagePreview 出真缓冲内容 · 节流刷新 · 卡片贴近 ui-ref-dashboard）— **Devin** · PR #45 · `feat/session-thumb-live` · `/workspace/TerminalHub`
 - [ ] **Logs ▲/▼ error 跳转**（`FindAdjacentLevel` · 当前 Entries 内上/下一条 error · 暂停跟随）— **Grok** · PR #43 · `feat/logs-jump-level` · worktree `/workspace/TerminalHub-logs2`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
