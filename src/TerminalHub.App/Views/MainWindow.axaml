@@ -273,60 +273,53 @@
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                 BoxShadow="{DynamicResource SurfaceShadow}">
-          <Grid RowDefinitions="44,40,*,Auto" Margin="8">
+          <Grid RowDefinitions="46,*,Auto" Margin="8">
 
-            <!-- The active window has one title; other sessions live on the shelf. -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,0,4,4">
+            <!-- Single-row chrome like the mockup: icon · name · status · cwd | nav · actions -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
               <Border Width="27" Height="27" CornerRadius="7" Background="{DynamicResource UiRaised}" Margin="0,0,10,0">
                 <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
-              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,12,0">
+              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0">
                 <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
                   <StackPanel Spacing="2"><TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/><TextBlock Text="{Binding ActiveCard.CommandStatusText}" FontSize="9" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding ActiveCard.CommandStatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/></StackPanel>
                 </Border>
               </Grid>
-              <Button Grid.Column="2" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N" AutomationProperties.Name="新建终端">
-                <PathIcon Data="{StaticResource ToolAdd}"/>
+              <Button Grid.Column="2" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
+                      HorizontalContentAlignment="Left" Margin="6,0,10,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
+                <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" FontSize="11"/>
               </Button>
-              <Button Grid.Column="3" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
-                <PathIcon Data="{StaticResource ToolClose}"/>
-              </Button>
-            </Grid>
-
-            <!-- Toolbar: ← back / ⟳ refresh CWD / → forward + path -->
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="4,0">
-              <Button Classes="terminal-tool"
+              <Button Grid.Column="3" Classes="terminal-tool"
                       Command="{Binding CwdBackCommand}" IsEnabled="{Binding CanCwdBack}"
                       ToolTip.Tip="后退目录历史" AutomationProperties.Name="后退目录历史">
                 <PathIcon Data="{StaticResource ToolBack}"/>
               </Button>
-              <Button Grid.Column="1" Classes="terminal-tool"
+              <Button Grid.Column="4" Classes="terminal-tool"
                       Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新当前目录" AutomationProperties.Name="刷新当前目录">
                 <PathIcon Data="{StaticResource ToolRefresh}"/>
               </Button>
-              <Button Grid.Column="2" Classes="terminal-tool"
+              <Button Grid.Column="5" Classes="terminal-tool"
                       Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
                       ToolTip.Tip="前进目录历史" AutomationProperties.Name="前进目录历史">
                 <PathIcon Data="{StaticResource ToolForward}"/>
               </Button>
-              <Button Grid.Column="3" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
-                      HorizontalContentAlignment="Left" Margin="6,0,10,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
-                <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" FontSize="11"/>
-              </Button>
-              <Button Grid.Column="4" Classes="terminal-tool" Classes.selected="{Binding IsSplit}" Margin="0,0,4,0"
+              <Button Grid.Column="6" Classes="terminal-tool" Classes.selected="{Binding IsSplit}"
                       Command="{Binding ToggleSplitCommand}"
-                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。">
-                <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSplit}"/><TextBlock Text="分屏" VerticalAlignment="Center"/></StackPanel>
+                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。" AutomationProperties.Name="分屏">
+                <PathIcon Data="{StaticResource ToolSplit}"/>
               </Button>
-              <Button Grid.Column="5" Classes="terminal-tool" Margin="0,0,4,0"
+              <Button Grid.Column="7" Classes="terminal-tool"
                       Command="{Binding OpenInNewWindowCommand}"
-                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）">
-                <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolPopout}"/><TextBlock Text="弹出" VerticalAlignment="Center"/></StackPanel>
+                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）" AutomationProperties.Name="弹出">
+                <PathIcon Data="{StaticResource ToolPopout}"/>
               </Button>
-              <Button x:Name="SessionMenuButton" Grid.Column="6" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
+              <Button Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N" AutomationProperties.Name="新建终端">
+                <PathIcon Data="{StaticResource ToolAdd}"/>
+              </Button>
+              <Button x:Name="SessionMenuButton" Grid.Column="9" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
                 <PathIcon Data="{StaticResource ToolMore}"/>
                 <Button.Flyout>
                   <MenuFlyout Opening="OnSessionMenuOpening">
@@ -355,10 +348,13 @@
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
+              <Button Grid.Column="10" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
+                <PathIcon Data="{StaticResource ToolClose}"/>
+              </Button>
             </Grid>
 
             <!-- Terminal viewport -->
-            <Border Grid.Row="2" x:Name="TerminalViewport" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="10,8" Margin="2,6" ClipToBounds="True">
+            <Border Grid.Row="1" x:Name="TerminalViewport" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="10,8" Margin="2,6" ClipToBounds="True">
               <Panel>
                 <!-- empty stage: no sessions left -->
                 <StackPanel IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNull}}"
@@ -459,7 +455,7 @@
             </Border>
 
             <!-- Bottom panel: Output / Debug / Problems / Search -->
-            <Border x:Name="OutputPanel" Grid.Row="3" Height="170" Margin="0,6,0,0"
+            <Border x:Name="OutputPanel" Grid.Row="2" Height="170" Margin="0,6,0,0"
                     IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
               <Grid RowDefinitions="30,*">
