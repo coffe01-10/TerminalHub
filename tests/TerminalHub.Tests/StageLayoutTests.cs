@@ -119,6 +119,7 @@ public class StageLayoutTests
         await Task.Delay(700);
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[2];
         fixture.Vm.DockVisibilityMode = 0; // exercise the auto-hide path explicitly
+        fixture.Vm.InspectorVisible = false; // default-on; this test asserts the toggle reveals it
         fixture.Vm.OutputVisible = false;    // this test asserts the toggle reveals the panel
         await Task.Delay(450);
         var stage = window.FindControl<StageSurface>("StageWindow")!;
@@ -434,6 +435,7 @@ public class StageLayoutTests
         await Task.Delay(650);
         Assert.Equal(expectedColumns, next.Model.Emulator.Buffer.Columns);
         Assert.Equal(expectedRows, next.Model.Emulator.Buffer.Rows);
+        vm.InspectorVisible = false; // default-on now; flip to write an explicit value
         vm.InspectorVisible = true;
         vm.OutputVisible = true;
         vm.DockVisibilityMode = 2;

@@ -337,7 +337,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             WorkspaceTemplates.Add(template);
         ThemeManager.Apply(_settings.Theme);
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
-        _inspectorVisible = _settings.InspectorVisible;
+        _inspectorVisible = _settings.InspectorVisible ?? true;
         _outputVisible = _settings.OutputVisible;
         _dockVisibilityMode = _settings.DockVisibilityMode;
         DeployDockTip = ComposeDeployDockTip();

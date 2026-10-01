@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-02 01:05 CST（PR #54 缩略卡霓虹活动态已开 · 等 PO 验收） · 维护：Devin（PO）
+最后更新：2026-10-02 01:40 CST（PR #54 已合 main@fb8d9e5 · Devin 开 Inspector 默认展开刀） · 维护：Devin（PO）
 
 ## 分工
 
@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **UI 对照 mockup 刀：缩略卡活动态霓虹**（`feat/thumb-neon-active` · PR #54 等审：accent 光晕四主题 + 2px accent 边框 + 实机前后截图）— Devin · `/workspace/TerminalHub`
+- [ ] **Inspector 右栏默认展开对齐 mockup**（`feat/inspector-default-visible-mockup`：冷启动默认开 · 显式关闭仍保留 · Processes 真实数据 · 实机截图两张）— Devin · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
@@ -28,6 +28,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #54 会话缩略卡活动态霓虹（accent 光晕四主题 + 2px 边框修复 + 实机前后截图）— Devin · `feat/thumb-neon-active` · `main@fb8d9e5`
 - [x] PR #53 Output 底栏级别筛选（全部/info/warn/error + VisibleOutput + 持久化 · 实机截图两档）— Devin · `feat/output-level-filter-mockup` · `main@75cc0c7`
 - [x] PR #52 Linux 平台对齐（默认 Bash · 隐藏 cmd/WSL · Thunar 右键 · PTY 参数/整树关闭 · 剪贴板=X11 环境结论）— Codex/Devin · `codex/linux-windows-parity` · `main@cadefdd`
 

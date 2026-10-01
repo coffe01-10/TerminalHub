@@ -125,6 +125,8 @@ public class SplitPopoutCursorTests
     public async Task Popout_Reattach_CursorHolds_NoStaleSelection()
     {
         var (window, vm) = await Boot();
+        vm.InspectorVisible = false; // main view must stay wider than the popout
+        await Task.Delay(400);
         var target = vm.ActiveSession!;
         var emu = target.Emulator;
         emu.Parser.Feed("$ run POP_MARKER42\r\n$ POP_ED1T");

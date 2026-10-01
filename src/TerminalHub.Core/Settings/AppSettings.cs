@@ -78,7 +78,9 @@ public sealed class AppSettings
         set => _sessionShortcuts = value ?? SessionShortcutBinding.Defaults();
     }
     private List<SessionShortcutBinding> _sessionShortcuts = SessionShortcutBinding.Defaults();
-    public bool InspectorVisible { get; set; }
+    /// <summary>Right inspector visibility. null = never chosen → default visible
+    /// (mockup parity); an explicit persisted false keeps the panel closed.</summary>
+    public bool? InspectorVisible { get; set; }
     public bool OutputVisible { get; set; } = true;
     /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
     public int OutputLevelFilter { get; set; }
