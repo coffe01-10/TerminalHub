@@ -1186,7 +1186,7 @@
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
                     RowDefinitions="Auto,Auto,*,Auto">
                 <!-- list-first header: the edit form only opens on demand once hosts exist -->
-                <Grid ColumnDefinitions="*,Auto" Margin="2,0,0,4">
+                <Grid ColumnDefinitions="*,Auto" Margin="2,0,0,4" IsVisible="{Binding Ssh.HasHosts}">
                   <TextBlock Text="已保存连接" FontSize="10.5" FontWeight="SemiBold"
                              Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
                   <Button Grid.Column="1" Content="＋" Padding="8,1" FontSize="12"
@@ -1383,11 +1383,20 @@
           <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
           <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
         </Style>
+        <!-- The window-level Button.dock(.dock-active) PathIcon rules outrank the
+             local ancestor-Foreground binding — pin the pill icon to OnAccent in
+             both states or it is muted at rest and invisible when dock-active. -->
+        <Style Selector="Button.dock.dock-primary PathIcon">
+          <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
+        </Style>
+        <Style Selector="Button.dock.dock-primary.dock-active PathIcon">
+          <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
+        </Style>
       </ctl:DropletDock.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
         <Button x:Name="NewDockButton" Classes="dock dock-primary" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                 Command="{Binding DockSelectCommand}" CommandParameter="0"
-                ToolTip.Tip="新建终端" AutomationProperties.Name="新建终端">
+                ToolTip.Tip="新建会话" AutomationProperties.Name="新建会话">
           <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
             <PathIcon Data="{StaticResource ToolAdd}"/>
             <TextBlock Text="新建会话" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>

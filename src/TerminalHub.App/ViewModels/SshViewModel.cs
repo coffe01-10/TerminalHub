@@ -27,6 +27,7 @@ public partial class SshViewModel : ViewModelBase
     /// <summary>Whether the edit form is expanded. Saved hosts get a list-first
     /// view; the form opens on demand (or automatically while no host exists).</summary>
     [ObservableProperty] private bool _editing;
+    public bool HasHosts => Hosts.Count > 0;
 
     public SshViewModel(
         List<SshHost> hosts,
@@ -39,6 +40,7 @@ public partial class SshViewModel : ViewModelBase
         _persist = persist;
         _sshAvailable = sshAvailable ?? SshLocator.Available;
         foreach (var h in _hosts) Hosts.Add(h);
+        Hosts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasHosts));
         _editing = Hosts.Count == 0;
     }
 
@@ -54,7 +56,7 @@ public partial class SshViewModel : ViewModelBase
     }
 
     /// <summary>Host list is the default view once hosts exist — the form
-    /// opens on demand and closes again after use.</summary>
+    /// opens on demand via ＋ or by selecting a host row.</summary>
     [RelayCommand]
     private void ToggleEditing() => Editing = !Editing;
 

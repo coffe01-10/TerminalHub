@@ -135,11 +135,22 @@ public class StageLayoutTests
     {
         using var fixture = new StageFixture();
         await Task.Delay(400);
-        var btn = fixture.Window.FindControl<Button>("NewDockButton")!;
+        var vm = fixture.Vm;
+        var window = fixture.Window;
+        var btn = window.FindControl<Button>("NewDockButton")!;
         Assert.Contains("dock-primary", btn.Classes);
-        var accent = Assert.IsAssignableFrom<ISolidColorBrush>(
-            fixture.Window.FindResource("UiAccent")).Color;
+        var accent = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindResource("UiAccent")).Color;
+        var onAccent = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindResource("UiOnAccent")).Color;
         Assert.Equal(accent, Assert.IsAssignableFrom<ISolidColorBrush>(btn.Background).Color);
+        var icon = btn.GetVisualDescendants().OfType<PathIcon>().First();
+        Assert.Equal(onAccent, Assert.IsAssignableFrom<ISolidColorBrush>(icon.Foreground).Color);
+
+        // dock-active persists after the click — the icon must stay OnAccent
+        // instead of sinking into the accent fill.
+        vm.DockSelectCommand.Execute("0");
+        await Task.Delay(300);
+        Assert.Equal(accent, Assert.IsAssignableFrom<ISolidColorBrush>(btn.Background).Color);
+        Assert.Equal(onAccent, Assert.IsAssignableFrom<ISolidColorBrush>(icon.Foreground).Color);
     }
 
     [AvaloniaFact]
