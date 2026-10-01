@@ -49,6 +49,10 @@ public partial class MainWindow : Window
         SessionShelf.SelectionChanged += OnShelfSelectionChanged;
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
         Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
+        // Group collapse/pin/reorder change header composition without touching
+        // SessionCards — ThumbnailHeight accounts for headers, so recompute on
+        // every shelf rebuild.
+        Vm.ShelfItems.CollectionChanged += (_, _) => UpdateStageLayout();
         SizeChanged += (_, _) => UpdateStageLayout();
         AddHandler(InputElement.PointerMovedEvent, OnDockPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         PointerExited += (_, _) => ScheduleDockHide();
@@ -124,7 +128,10 @@ public partial class MainWindow : Window
         // from the actual shelf items, capped at the first visibleCards cards.
         var visibleCards = Math.Clamp(Vm.ShelfItems.OfType<SessionCardViewModel>().Count(), 1, 5);
         var overlap = SessionCardViewModel.ShelfOverlap;
-        const double headerHeight = 29; // group/pin header template: 12 padding + ~15 text + border
+        // Measure a realized group header when one is on screen; fall back to
+        // the template's ~29px (12 padding + ~15 text + border) pre-layout.
+        var headerHeight = SessionShelf.GetVisualDescendants().OfType<Border>()
+            .FirstOrDefault(b => b.DataContext is SessionGroupHeader)?.Bounds.Height ?? 29;
         var tucked = 0; var headerH = 0.0; var seen = 0;
         foreach (var item in Vm.ShelfItems)
         {
@@ -261,6 +268,9 @@ public partial class MainWindow : Window
 
     private void OnRenameCard(object? sender, RoutedEventArgs e)
     {
+        // DoubleTapped bubbles from the deepest element: a double-click on the
+        // card's ⋯ button would toggle the flyout AND open rename — skip it.
+        if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         if (sender is Control { DataContext: SessionCardViewModel card }) _ = RenameSessionAsync(card);
         e.Handled = true;
     }
@@ -572,6 +582,9 @@ public partial class MainWindow : Window
         _dragCard = null;
         _cardDragging = false;
         _dragSlots = [];
+        // SessionCards.CollectionChanged fired mid-drag was skipped by the
+        // _dragCard guard — header composition may have changed on the drop.
+        UpdateStageLayout();
     }
 
     private void OnDeployMenuOpening(object? sender, EventArgs e) => RefreshDeployContextMenu();
@@ -845,7 +858,8 @@ public partial class MainWindow : Window
             () => Vm.SetPinned(card, !card.Model.Pinned)));
         var moveTo = new MenuItem { Header = "移入分组" };
         foreach (var group in Vm.SessionGroups)
-            moveTo.Items.Add(Item(group.Name, () => Vm.MoveCardToGroup(card, group.Id)));
+            moveTo.Items.Add(Item(group.Name, () => Vm.MoveCardToGroup(card, group.Id),
+                group.Id != card.Model.GroupId));
         if (moveTo.Items.Count == 0)
             moveTo.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
         flyout.Items.Add(moveTo);
