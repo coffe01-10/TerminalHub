@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Linux UI 视觉对齐**（真源=Windows 提交 d64e58c/976fd32 + README 四主题 + 用户 Paper 实机图；四主题 Linux 整窗截图 + NewDockButton dock-active）— **Devin** · `feat/linux-ui-visual-parity` · `/workspace/TerminalHub`
+- [ ] **OSC7 cwd 编码修复**（裸路径发射 + legacy --rcfile 重注入 + 特殊字符目录回归）— **Devin** · `feat/linux-osc7-cwd-encoding` · `/workspace/TerminalHub`
 - [ ] **Output 级别筛选（暂停等审）** — Devin · `feat/output-level-filter-mockup`（代码+测试+截图已推分支，PO 纠偏暂缓）
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
@@ -29,6 +29,7 @@
 
 ## 已完成（近期）
 
+- [x] PR #50 Linux UI 视觉对齐审计（四主题实机截图 · NewDockButton dock-active · ⧉→⎘ 豆腐字修）— Devin · `feat/linux-ui-visual-parity` · `main@ff2e139`
 - [x] PR #49 Output 底栏默认展开（OutputVisible 默认 true · 真实事件流 · OutputVisibilityTests 3 例 · 实机截图）— Devin · `feat/output-default-visible-mockup` · `main@7d1a1ac`
 - [x] PR #48 底栏六键坞默认常显（DockVisibilityMode 默认 1 · 补新建/设置键 · 部署中文标签）— Devin · `feat/dock-always-visible-mockup` · `main@fdaa814`
 - [x] PR #47 分屏/弹出收回光标与选区不漂（3 例回归 · 实机 3 截图）— Devin · `feat/linux-split-popout-cursor` · `main@6a25b7e`
