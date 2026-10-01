@@ -11,8 +11,10 @@ public sealed class LocalGrokFactAttribute : FactAttribute
 {
     public LocalGrokFactAttribute()
     {
-        if (!OperatingSystem.IsWindows() || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TERMINALHUB_GROK_PATH")))
-            Skip = "Set TERMINALHUB_GROK_PATH for local ConPTY color capture; no trust or model requests are submitted.";
+        // Windows uses ConPTY, Linux forkpty; the std-handle workaround below is Windows-only.
+        if ((!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
+            || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TERMINALHUB_GROK_PATH")))
+            Skip = "Set TERMINALHUB_GROK_PATH for local PTY color capture; no trust or model requests are submitted.";
     }
 }
 
@@ -22,18 +24,19 @@ public class WindowsGrokAppearanceTests
     [LocalGrokFact]
     public async Task GrokStartup_CapturesColorsWithoutSubmittingInput()
     {
-        using var pty = new ConPtySession();
+        using var pty = OperatingSystem.IsWindows() ? new ConPtySession() : (IPtySession)new LinuxPtySession();
         using var terminal = new TerminalEmulator(pty, 100, 28);
         using var output = new MemoryStream();
         pty.OutputReceived += (_, data) => { lock (output) output.Write(data.Span); };
         terminal.Parser.DefaultColorQuery = foreground => foreground ? "3c3c/3535/2b2b" : "fcfc/f8f8/eeee";
         var ids = new[] { -10, -11, -12 };
-        var handles = ids.Select(GetStdHandle).ToArray();
+        var handles = OperatingSystem.IsWindows() ? ids.Select(GetStdHandle).ToArray() : [];
         var noColor = Environment.GetEnvironmentVariable("NO_COLOR");
         try
         {
             Environment.SetEnvironmentVariable("NO_COLOR", null);
-            foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
+            if (OperatingSystem.IsWindows())
+                foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
             await terminal.StartAsync(new PtyOptions
             {
                 Shell = Environment.GetEnvironmentVariable("TERMINALHUB_GROK_PATH")!,
@@ -43,7 +46,8 @@ public class WindowsGrokAppearanceTests
         finally
         {
             Environment.SetEnvironmentVariable("NO_COLOR", noColor);
-            for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]);
+            if (OperatingSystem.IsWindows())
+                for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]);
         }
         var deadline = Environment.TickCount64 + 10000;
         while (terminal.Buffer.Version == 0 && Environment.TickCount64 < deadline) await Task.Delay(100);

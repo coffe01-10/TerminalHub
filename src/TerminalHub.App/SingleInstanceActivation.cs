@@ -125,18 +125,29 @@ public sealed class SingleInstanceActivation : IDisposable
     {
         // Bound the second process lifetime when an older instance has no listener.
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        try
+        while (true)
         {
-            using var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
-            await pipe.ConnectAsync(timeout.Token);
-            var process = new byte[4];
-            await pipe.ReadExactlyAsync(process, timeout.Token);
-            if (OperatingSystem.IsWindows()) AllowSetForegroundWindow(BitConverter.ToInt32(process));
-            await pipe.WriteAsync(payload, timeout.Token);
-            return true;
+            try
+            {
+                using var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+                await pipe.ConnectAsync(timeout.Token);
+                var process = new byte[4];
+                await pipe.ReadExactlyAsync(process, timeout.Token);
+                if (OperatingSystem.IsWindows()) AllowSetForegroundWindow(BitConverter.ToInt32(process));
+                await pipe.WriteAsync(payload, timeout.Token);
+                return true;
+            }
+            // On Linux (unix sockets) a client that lands in the backlog while the
+            // server recycles its instance gets ECONNRESET instead of queueing like
+            // WaitNamedPipe — retry inside the same 2s budget.
+            catch (IOException) when (!timeout.IsCancellationRequested)
+            {
+                try { await Task.Delay(50, timeout.Token); }
+                catch (OperationCanceledException) { return false; }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
+            { return false; }
         }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or TimeoutException)
-        { return false; }
     }
 
     public void Dispose() { _stop.Cancel(); }

@@ -319,7 +319,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly Action<string> _openFolder;
 
     public MainWindowViewModel(ISystemMonitor? monitor = null, SettingsStore? settingsStore = null,
-        Action<string>? openFolder = null, Func<string, bool>? shellAvailable = null)
+        Action<string>? openFolder = null, Func<string, bool>? shellAvailable = null,
+        Func<bool>? sshAvailable = null)
     {
         _shellAvailable = shellAvailable ?? (command => PtySessionFactory.UseMock || ShellDiscovery.Exists(command));
         _openFolder = openFolder ?? OpenFolderInFileManager;
@@ -372,7 +373,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _settings.LogsUseRelativeTimestamps, _settings.LogsWrapLines,
             _settings.LogsCompactDensity);
         Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
-        Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal);
+        Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal, sshAvailable);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
         SessionCards.CollectionChanged += OnSessionCardsChanged;
@@ -517,9 +518,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrEmpty(cwd))
             cwd = OperatingSystem.IsWindows() ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        if (OperatingSystem.IsWindows() && ShellIntegration.IsPowerShell(shellCmd)
+        if (ShellIntegration.IsPowerShell(shellCmd)
             && (string.IsNullOrWhiteSpace(arguments) || arguments == ShellIntegration.LegacyPowerShellArguments))
             arguments = ShellIntegration.PowerShellArguments;
+        // Same idea on Linux: bash gets OSC 133 (command + exit code) and OSC 7
+        // (cwd) via a session-only --rcfile. Custom arguments mean a
+        // non-interactive/script run — marks would be noise there. An unwritable
+        // config dir must not block spawning — plain bash still works.
+        else if (OperatingSystem.IsLinux() && ShellIntegration.IsBash(shellCmd)
+            && string.IsNullOrWhiteSpace(arguments))
+        {
+            try { arguments = ShellIntegration.BashArguments; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
 
         try
         {

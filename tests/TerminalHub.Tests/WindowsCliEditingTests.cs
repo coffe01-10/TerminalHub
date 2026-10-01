@@ -14,8 +14,12 @@ public sealed class LocalClaudeFactAttribute : FactAttribute
 {
     public LocalClaudeFactAttribute()
     {
-        if (!OperatingSystem.IsWindows() || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TERMINALHUB_CLAUDE_PATH")))
-            Skip = "Set TERMINALHUB_CLAUDE_PATH to run local ConPTY editing; no prompts are submitted.";
+        // Windows uses ConPTY, Linux uses forkpty — the injected std-handle
+        // workaround is Windows-only. TERMINALHUB_CLI_CWD must point at an
+        // already-trusted directory or the run parks on the trust prompt.
+        if ((!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
+            || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TERMINALHUB_CLAUDE_PATH")))
+            Skip = "Set TERMINALHUB_CLAUDE_PATH to run local PTY editing; no prompts are submitted.";
     }
 }
 
@@ -23,21 +27,25 @@ public sealed class LocalClaudeFactAttribute : FactAttribute
 [Collection("ProcessWide")]
 public class WindowsCliEditingTests
 {
+    private static IPtySession CreatePty() =>
+        OperatingSystem.IsWindows() ? new ConPtySession() : new LinuxPtySession();
+
     [LocalClaudeFact]
-    public Task Claude_RealConPty_CjkCursorAndResize() =>
+    public Task Claude_RealPty_CjkCursorAndResize() =>
         HeadlessUnitTestSession.GetOrStartForAssembly(typeof(WindowsCliEditingTests).Assembly)
             .Dispatch(async () => { await RunClaudeEditing(); return true; }, CancellationToken.None);
 
     private static async Task RunClaudeEditing()
     {
-        using var pty = new ConPtySession();
+        using var pty = CreatePty();
         using var terminal = new TerminalEmulator(pty, 100, 28);
         var view = new TerminalView { Emulator = terminal };
         var ids = new[] { -10, -11, -12 };
-        var handles = ids.Select(GetStdHandle).ToArray();
+        var handles = OperatingSystem.IsWindows() ? ids.Select(GetStdHandle).ToArray() : [];
         try
         {
-            foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
+            if (OperatingSystem.IsWindows())
+                foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
             await terminal.StartAsync(new PtyOptions
             {
                 Shell = Environment.GetEnvironmentVariable("TERMINALHUB_CLAUDE_PATH")!,
@@ -46,7 +54,8 @@ public class WindowsCliEditingTests
         }
         finally
         {
-            for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]);
+            if (OperatingSystem.IsWindows())
+                for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]);
         }
         await WaitFor(() => HasPrompt(terminal.Buffer.CaptureFrame()), "Claude input prompt unavailable (trust/login/startup may be required).");
         terminal.SendText("ab中文cd");

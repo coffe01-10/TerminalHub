@@ -3,6 +3,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using TerminalHub.App.Views;
 using TerminalHub.Core.Pty;
+using TerminalHub.Core.Settings;
 using TerminalHub.Pty;
 using Xunit;
 
@@ -181,36 +182,64 @@ public class UiSmokeTests
     public async Task RealPty_EndToEnd()
     {
         if (!OperatingSystem.IsLinux()) return;
+        var previousMock = PtySessionFactory.UseMock;
         PtySessionFactory.UseMock = false;
+        // The default shell kind resolves to pwsh, which a Linux box may not have —
+        // the setup picker would then intercept startup and no session spawns.
+        // Provision what a Linux user gets after picking bash there.
+        var dir = Path.Combine(Path.GetTempPath(), "th-e2e-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var store = new SettingsStore(Path.Combine(dir, "settings.json"));
+            var shellKind = OperatingSystem.IsWindows() ? ShellKind.PowerShell : ShellKind.Bash;
+            store.Save(new AppSettings
+            {
+                Shell = shellKind,
+                StartupSessions =
+                [
+                    new StartupSession { Name = "Terminal 01", Tag = "开发环境", Shell = shellKind },
+                    new StartupSession { Name = "Terminal 02", Tag = "测试环境", Shell = shellKind },
+                    new StartupSession { Name = "Terminal 03", Tag = "部署控制", Shell = shellKind },
+                ]
+            });
 
-        var window = new MainWindow { Width = 1200, Height = 800 };
-        window.Show();
-        await Task.Delay(600);
+            var window = new MainWindow(store) { Width = 1200, Height = 800 };
+            window.Show();
+            await Task.Delay(600);
 
-        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
-        Assert.NotEmpty(vm.SessionCards);
+            var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+            Assert.True(vm.SessionCards.Count > 0,
+                $"no cards; shellSetup={vm.ShellSetupOpen} '{vm.ShellSetupMessage}'; log=" +
+                string.Join(" | ", vm.Dashboard.OutputLog.Select(l => l.Message)));
 
-        var emu = vm.ActiveSession!.Emulator;
-        emu.SendText("echo E2E_$((6*7))\r");
+            var emu = vm.ActiveSession!.Emulator;
+            emu.SendText("echo E2E_$((6*7))\r");
 
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-        while (DateTime.UtcNow < deadline && !emu.Buffer.TailText(30).Contains("E2E_42"))
-            await Task.Delay(100);
-        Assert.True(emu.Buffer.TailText(30).Contains("E2E_42"),
-            "real PTY output never reached the screen buffer");
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (DateTime.UtcNow < deadline && !emu.Buffer.TailText(30).Contains("E2E_42"))
+                await Task.Delay(100);
+            Assert.True(emu.Buffer.TailText(30).Contains("E2E_42"),
+                "real PTY output never reached the screen buffer");
 
-        // Debug tab gets the raw (ANSI-bearing) line for the same output.
-        deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
-        while (DateTime.UtcNow < deadline && vm.Dashboard.DebugLog.Count == 0)
-            await Task.Delay(100);
-        Assert.NotEmpty(vm.Dashboard.DebugLog);
+            // Debug tab gets the raw (ANSI-bearing) line for the same output.
+            deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+            while (DateTime.UtcNow < deadline && vm.Dashboard.DebugLog.Count == 0)
+                await Task.Delay(100);
+            Assert.NotEmpty(vm.Dashboard.DebugLog);
 
-        // Search finds the echoed marker in the active session's buffer.
-        vm.Dashboard.SearchQuery = "E2E_42";
-        await Task.Delay(150);
-        Assert.NotEmpty(vm.Dashboard.SearchHits);
-        Assert.Contains(vm.Dashboard.SearchHits, h => h.Text.Contains("E2E_42"));
-        window.Close();
+            // Search finds the echoed marker in the active session's buffer.
+            vm.Dashboard.SearchQuery = "E2E_42";
+            await Task.Delay(150);
+            Assert.NotEmpty(vm.Dashboard.SearchHits);
+            Assert.Contains(vm.Dashboard.SearchHits, h => h.Text.Contains("E2E_42"));
+            window.Close();
+        }
+        finally
+        {
+            PtySessionFactory.UseMock = previousMock;
+            try { Directory.Delete(dir, true); } catch { /* best effort */ }
+        }
     }
 
     /// <summary>Problems badge counts real error-classified output and clears.</summary>
