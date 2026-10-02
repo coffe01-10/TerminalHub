@@ -1,4 +1,4 @@
-Terminal Hub v0.3.1 — Windows x64（2026-10-01）
+Terminal Hub v0.3.3 — Windows x64（2026-10-02）
 
 解压整个文件夹，双击 TerminalHub.exe。无需安装 .NET SDK。
 系统要求：Windows 10 1809 或更高版本 / Windows 11，x64。

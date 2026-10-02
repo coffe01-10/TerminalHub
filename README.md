@@ -103,9 +103,9 @@ Claude Code, Codex CLI, and other tools install and run inside your shell. See [
   <img src="docs/readme/typing.svg" width="470" alt="Illustrated terminal typing the restore, build, and run commands">
 </p>
 
-> **v0.3.1.** [Download the Windows installer or portable ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.1) or start from source below. The app is unsigned. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target. See the [release notes](docs/releases/v0.3.1.md).
+> **v0.3.3.** [Download the Windows installer, Windows portable ZIP, or Linux x64 archive](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.3) or start from source below. The app is unsigned. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target. See the [release notes](docs/releases/v0.3.3.md).
 
-Linux x64: [download v0.3.2](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.2) and extract `TerminalHub-linux-x64.tar.gz`. The .NET runtime is included; see the [Linux release notes](docs/releases/v0.3.2.md) for system dependencies and verification limits.
+Linux x64: [download v0.3.3](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.3) and extract `TerminalHub-linux-x64.tar.gz`. The .NET runtime is included; see the [release notes](docs/releases/v0.3.3.md) for system dependencies and verification limits.
 
 Settings now offers a live appearance preview and configurable session shortcuts. Record a key combination in the Shortcuts tab and save it. Defaults: `Alt+1…9` selects a terminal in shelf order; `Ctrl+Tab` / `Ctrl+Shift+Tab` cycles sessions. These shortcuts work inside the main window.
 

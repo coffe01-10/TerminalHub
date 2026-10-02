@@ -53,7 +53,8 @@ $iscc = if ($env:ISCC) { $env:ISCC } else { (Get-Command iscc.exe -ErrorAction S
 if (-not $iscc) {
   $candidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
   )
   $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }

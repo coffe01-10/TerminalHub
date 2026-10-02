@@ -1,4 +1,4 @@
-Terminal Hub — Linux x64
+Terminal Hub v0.3.3 — Linux x64（2026-10-02）
 
 适用于使用 glibc 的 Linux x86_64 桌面环境，不适用于 ARM64 或 Alpine/musl。
 发布包包含 .NET 运行时，无需安装 .NET SDK。
