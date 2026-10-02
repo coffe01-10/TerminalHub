@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Inspector 右栏默认展开对齐 mockup**（`feat/inspector-default-visible-mockup`：冷启动默认开 · 显式关闭仍保留 · Processes 真实数据 · 实机截图两张）— Devin · `/workspace/TerminalHub`
+- [ ] **Inspector 右栏默认展开对齐 mockup**（`feat/inspector-default-visible-mockup`：冷启动默认开 · 显式关闭仍保留 · Processes 真实数据/列头排序/结束进程 · Files 全链路打磨：单击预览/图片预览/新建/重命名F2/隐藏文件/拖出拖入/日期列/全路径tooltip · 终端红绿灯 chrome · Ctrl+Shift+A 全选 · Ctrl+滚轮缩放 · 各面板空态 — Devin · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
