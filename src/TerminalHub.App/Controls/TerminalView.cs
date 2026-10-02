@@ -1293,6 +1293,13 @@ public partial class TerminalView : Control
                     e.Handled = true;
                     return;
                 }
+                // Ctrl+Insert: the classic pre-Ctrl+C copy combo (xterm/putty).
+                if (e.Key == Key.Insert && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                {
+                    _ = CopySelectionAsync();
+                    e.Handled = true;
+                    return;
+                }
                 if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)
                     && e.Key >= Key.A && e.Key <= Key.Z)
                 {
