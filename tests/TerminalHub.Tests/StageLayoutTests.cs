@@ -9,6 +9,7 @@ using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
 using TerminalHub.App.Views;
+using TerminalHub.Core.Pty;
 using TerminalHub.Core.Settings;
 using TerminalHub.Pty;
 using Xunit;
@@ -560,6 +561,31 @@ public class StageLayoutTests
         Assert.True(vm.Settings.InspectorVisible);
         Assert.True(vm.Settings.OutputVisible);
         Assert.Equal(2, vm.Settings.DockVisibilityMode);
+    }
+
+    [AvaloniaFact]
+    public async Task RestartSession_RespawnsExited_InSameShelfSlot()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var card = fixture.Vm.SessionCards[1];
+        var originals = fixture.Vm.SessionCards.ToHashSet();
+        ((MockPtySession)card.Model.Pty).Kill();
+        Assert.NotNull(card.Model.Pty.ExitCode);
+        await fixture.Vm.RestartSession(card);
+        // Card append + slot restore both arrive via dispatcher posts — wait
+        // for a genuinely new card (not an old card shifted into slot 1).
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!(fixture.Vm.SessionCards.Count == 5
+                 && !originals.Contains(fixture.Vm.SessionCards[1]))
+               && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        var spawned = fixture.Vm.SessionCards[1];
+        Assert.True(spawned.Model.Pty.IsRunning);
+        Assert.NotSame(card, spawned);
+        Assert.Same(spawned, fixture.Vm.ActiveCard);
     }
 }
 

@@ -1164,6 +1164,8 @@ public partial class MainWindow : Window
         flyout.Items.Add(Item("重命名", () => _ = RenameSessionAsync(card)));
         flyout.Items.Add(Item(card.Model.Pinned ? "取消置顶" : "置顶",
             () => Vm.SetPinned(card, !card.Model.Pinned)));
+        flyout.Items.Add(Item("重启会话", () => _ = Vm.RestartSession(card),
+            card.Model.Pty.ExitCode is not null));
         var moveTo = new MenuItem { Header = "移入分组" };
         foreach (var group in Vm.SessionGroups)
             moveTo.Items.Add(Item(group.Name, () => Vm.MoveCardToGroup(card, group.Id),

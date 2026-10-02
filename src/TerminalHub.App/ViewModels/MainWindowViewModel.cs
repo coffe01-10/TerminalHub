@@ -735,6 +735,33 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void CloseActiveSession() => CloseSession(ActiveCard);
 
+    /// <summary>「••• → 重启会话」: respawn an exited session in place — same
+    /// name/tag/cwd/shell, card re-inserted at its old shelf position and made
+    /// active. SSH entries keep their arguments so the remote reconnects.</summary>
+    public async Task RestartSession(SessionCardViewModel card)
+    {
+        if (card.Model.Pty.ExitCode is null) return;
+        var m = card.Model;
+        var index = SessionCards.IndexOf(card);
+        CloseSession(card);
+        var model = await CreateSessionAsync(m.Name, m.Tag, m.WorkingDirectory,
+            shellCommand: m.Shell, arguments: m.ShellArguments);
+        if (model is null) return;
+        // OnSessionAdded posts the card append on the same dispatcher priority —
+        // this queued action runs right after it and restores the shelf slot.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var newCard = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, model));
+            if (newCard is null) return;
+            if (index >= 0)
+            {
+                SessionCards.Remove(newCard);
+                SessionCards.Insert(Math.Min(index, SessionCards.Count), newCard);
+            }
+            ActiveCard = newCard;
+        });
+    }
+
     /// <summary>Ctrl+Tab / Ctrl+Shift+Tab: cycle session cards (wraps).</summary>
     public void CycleSession(int direction)
     {
