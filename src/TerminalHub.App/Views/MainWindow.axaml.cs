@@ -55,6 +55,7 @@ public partial class MainWindow : Window
         InitializeOutputTools();
         Vm.PropertyChanged += OnStageSelectionChanged;
         SessionShelf.SelectionChanged += OnShelfSelectionChanged;
+        InitializeShelfDrawer();
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
         Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
         // Group collapse/pin/reorder change header composition without touching
@@ -232,6 +233,9 @@ public partial class MainWindow : Window
         ThumbnailHeight = Math.Clamp(
             (SessionShelf.Bounds.Height - 34 - headerH
                 - (visibleCards - 1) * SessionCardViewModel.ShelfSpacing + tucked * overlap) / visibleCards, 208, 268);
+        // End padding lets the first and last cards reach the wheel's center too.
+        var centerPad = Math.Max(14, (SessionShelf.Bounds.Height - ThumbnailHeight) / 2);
+        SessionShelf.Padding = Vm.ShelfAutoHide ? new Thickness(14, centerPad, 10, centerPad) : new Thickness(14, 14, 10, 16);
         var shelfWidth = Vm.ShelfWidth > 0 ? Vm.ShelfWidth : (Bounds.Width < 1250 ? 232 : 280);
         shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
         // Clamp locally so a transient window shrink cannot overwrite the
@@ -241,7 +245,10 @@ public partial class MainWindow : Window
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
         inspectorWidth = Math.Clamp(inspectorWidth, 240, Math.Max(320, Bounds.Width * 0.45));
         (shelfWidth, inspectorWidth) = FitRailWidths(shelfWidth, Vm.InspectorVisible ? inspectorWidth : 0);
-        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(shelfWidth);
+        ShelfHost.Width = shelfWidth;
+        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Vm.ShelfAutoHide ? 0 : shelfWidth);
+        StageLayout.ColumnDefinitions[1].Width = new GridLength(Vm.ShelfAutoHide ? 0 : 18);
+        ShelfResizeHandle.IsVisible = !Vm.ShelfAutoHide;
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(inspectorWidth);
         Dispatcher.UIThread.Post(() =>
         {
@@ -250,13 +257,8 @@ public partial class MainWindow : Window
         }, DispatcherPriority.Loaded);
     }
 
-    /// <summary>Scroll the shelf so the card's painted bounds are fully inside
-    /// the viewport. ScrollIntoView only aligns the item slot, while a tucked
-    /// card renders <see cref="SessionCardViewModel.ShelfOverlap"/> px above it
-    /// — so measure the card itself and scroll by the exact delta. Measuring
-    /// before any scroll keeps the geometry self-consistent; only an
-    /// unrealized card needs a ScrollIntoView + layout first.</summary>
-    private void RevealShelfCard(SessionCardViewModel active)
+    /// <summary>Reveal the active card; only the floating wheel centers it.</summary>
+    private void RevealShelfCard(SessionCardViewModel active, bool animate = false)
     {
         var card = FindShelfCard(active);
         if (card is null)
@@ -268,26 +270,38 @@ public partial class MainWindow : Window
         var scroll = SessionShelf.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (card is null || scroll is null) return;
         if (card.TranslatePoint(default, SessionShelf) is not { } top) return;
-        var topPad = SessionShelf.Padding.Top;
-        var bottom = top.Y + card.Bounds.Height;
-        var viewBottom = SessionShelf.Bounds.Height - SessionShelf.Padding.Bottom;
-        var dy = top.Y < topPad ? top.Y - topPad
-            : bottom > viewBottom ? Math.Min(bottom - viewBottom, top.Y - topPad)
-            : 0;
-        if (dy != 0)
-            scroll.Offset = new Vector(scroll.Offset.X,
-                Math.Clamp(scroll.Offset.Y + dy, 0,
+        if (Vm.ShelfAutoHide)
+        {
+            var dy = top.Y + card.Bounds.Height / 2 - SessionShelf.Bounds.Height / 2;
+            CenterShelf(scroll, Math.Clamp(scroll.Offset.Y + dy, 0,
+                Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height)), animate);
+        }
+        else
+        {
+            // Keep the fixed shelf's original minimal scroll: already visible cards stay put.
+            _shelfCenterTimer.Stop();
+            var topPad = SessionShelf.Padding.Top;
+            var bottom = top.Y + card.Bounds.Height;
+            var viewBottom = SessionShelf.Bounds.Height - SessionShelf.Padding.Bottom;
+            var dy = top.Y < topPad ? top.Y - topPad
+                : bottom > viewBottom ? Math.Min(bottom - viewBottom, top.Y - topPad) : 0;
+            if (dy != 0)
+                scroll.Offset = new Vector(scroll.Offset.X, Math.Clamp(scroll.Offset.Y + dy, 0,
                     Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height)));
+        }
+        SessionShelf.UpdateLayout();
+        UpdateShelfFade();
     }
 
     // The chrome and terminal need room after both rails and gutters are deducted.
     private const double MinimumStageWidth = 460;
-    private double RailBudget => Math.Max(180 + (Vm.InspectorVisible ? 240 : 0),
+    private double RailBudget => Math.Max((Vm.ShelfAutoHide ? 0 : 180) + (Vm.InspectorVisible ? 240 : 0),
         (Bounds.Width - StageLayout.Margin.Left - StageLayout.Margin.Right)
-        - 18 - (Vm.InspectorVisible ? 12 : 0) - MinimumStageWidth);
+        - (Vm.ShelfAutoHide ? 0 : 18) - (Vm.InspectorVisible ? 12 : 0) - MinimumStageWidth);
 
     private (double shelf, double inspector) FitRailWidths(double shelf, double inspector)
     {
+        if (Vm.ShelfAutoHide) return (shelf, Math.Min(inspector, RailBudget));
         if (shelf + inspector <= RailBudget) return (shelf, inspector);
         var inspectorMin = Vm.InspectorVisible ? 240 : 0;
         var extra = shelf - 180 + inspector - inspectorMin;
@@ -305,6 +319,7 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(MainWindowViewModel.SettingsOpen) && Vm.SettingsOpen)
             DropletExpansion.SetOrigin(SettingsPanel, _lastPanelTrigger);
         if (e.PropertyName == nameof(MainWindowViewModel.InspectorVisible)) UpdateStageLayout();
+        if (e.PropertyName == nameof(MainWindowViewModel.ShelfAutoHide)) UpdateShelfMode();
         if (e.PropertyName == nameof(MainWindowViewModel.DockVisibilityMode)) UpdateDockMode();
         if (e.PropertyName == nameof(MainWindowViewModel.IsSplit) && Vm.IsSplit)
         {
@@ -317,14 +332,15 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             if (!_stageReady || generation != _selectionGeneration || !IsVisible || _dragCard is not null) return;
-            if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active)) RevealShelfCard(active);
+            if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
+                RevealShelfCard(active, animate: ShelfHost.IsVisible && _shelfRevealed);
             // Apply a shelf scroll before reading the card's visible origin.
             SessionShelf.UpdateLayout();
             var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
                 .FirstOrDefault(c => ReferenceEquals(c.DataContext, Vm.ActiveCard));
             // Measure in the shared parent: StageWindow itself is transformed
             // during a flight, so translating into it would distort the origin.
-            if (!Vm.IsSplit && card is not null && Vm.ActiveSession is not null)
+            if (!Vm.IsSplit && ShelfHost.IsVisible && card is not null && Vm.ActiveSession is not null)
             {
                 var body = card.Child ?? card;
                 var corners = new[] { new Point(), new Point(body.Bounds.Width, 0),
@@ -722,6 +738,7 @@ public partial class MainWindow : Window
         _dragCard = (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
             ?.DataContext as SessionCardViewModel;
         if (_dragCard is null) return;
+        _shelfCenterTimer.Stop();
         _dragOrigin = e.GetPosition(SessionShelf);
         _dragPosition = _dragOrigin;
         _shelfScroll = SessionShelf.GetVisualDescendants().OfType<ScrollViewer>().First();
@@ -1610,6 +1627,9 @@ public partial class MainWindow : Window
         Vm.PropertyChanged -= OnStageSelectionChanged;
         ++_selectionGeneration;
         _dockHideTimer.Stop();
+        _shelfHideTimer.Stop();
+        _shelfCenterTimer.Stop();
+        if (_shelfFadeScroll is not null) _shelfFadeScroll.ScrollChanged -= OnShelfScrolled;
         EndShelfDrag(commit: false);
         Vm.Dispose(); // persists settings + kills PTYs
         base.OnClosing(e);

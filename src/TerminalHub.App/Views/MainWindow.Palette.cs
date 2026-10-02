@@ -45,6 +45,8 @@ public partial class MainWindow
         Add("打开书签列表", "搜索、定位、复制已保存的输出书签", "",
             () => { OpenBookmarks(); return Task.CompletedTask; });
         Add("新建终端", "打开新的 Shell", "Ctrl+Shift+N", () => Vm.NewSessionCommand.ExecuteAsync(null));
+        Add("收起 / 固定会话栏", "收起后靠近左边缘呼出；滚轮切换终端", "",
+            () => { Vm.ToggleShelfCommand.Execute(null); return Task.CompletedTask; });
         Add("切换分屏", "并排查看终端", "", () => { Vm.ToggleSplitCommand.Execute(null); return Task.CompletedTask; });
         Add("上下分屏", "上下查看两个终端", "", () => Vm.SetSplitLayoutAsync("Vertical"));
         Add("四窗格", "同时查看四个终端", "", () => Vm.SetSplitLayoutAsync("Quad"));

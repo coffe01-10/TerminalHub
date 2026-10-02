@@ -15,6 +15,10 @@ public sealed class StageCard : Border
         AvaloniaProperty.Register<StageCard, bool>(nameof(IsActive));
     public static readonly StyledProperty<int> StageDistanceProperty =
         AvaloniaProperty.Register<StageCard, int>(nameof(StageDistance));
+    public static readonly StyledProperty<double> CenterDistanceProperty =
+        AvaloniaProperty.Register<StageCard, double>(nameof(CenterDistance));
+    public static readonly StyledProperty<bool> WheelModeProperty =
+        AvaloniaProperty.Register<StageCard, bool>(nameof(WheelMode));
     public static readonly StyledProperty<double> DepthProperty =
         AvaloniaProperty.Register<StageCard, double>(nameof(Depth), 1);
     public static readonly StyledProperty<double> TiltProperty =
@@ -36,6 +40,9 @@ public sealed class StageCard : Border
 
     public bool IsActive { get => GetValue(IsActiveProperty); set => SetValue(IsActiveProperty, value); }
     public int StageDistance { get => GetValue(StageDistanceProperty); set => SetValue(StageDistanceProperty, value); }
+    /// <summary>Distance from the shelf viewport center, in card slots.</summary>
+    public double CenterDistance { get => GetValue(CenterDistanceProperty); set => SetValue(CenterDistanceProperty, value); }
+    public bool WheelMode { get => GetValue(WheelModeProperty); set => SetValue(WheelModeProperty, value); }
     public double Depth { get => GetValue(DepthProperty); set => SetValue(DepthProperty, value); }
     public double Tilt { get => GetValue(TiltProperty); set => SetValue(TiltProperty, value); }
     public double Lift { get => GetValue(LiftProperty); set => SetValue(LiftProperty, value); }
@@ -66,7 +73,8 @@ public sealed class StageCard : Border
             body.RenderTransformOrigin = new RelativePoint(.5, .5, RelativeUnit.Relative);
             body.RenderTransform = _pose;
         }
-        if (change.Property == IsActiveProperty || change.Property == StageDistanceProperty)
+        if (change.Property == IsActiveProperty || change.Property == StageDistanceProperty
+            || change.Property == CenterDistanceProperty || change.Property == WheelModeProperty)
             UpdatePose();
         if (change.Property == DepthProperty || change.Property == TiltProperty || change.Property == LiftProperty || change.Property == SlotOffsetProperty)
             UpdateTransform();
@@ -80,7 +88,8 @@ public sealed class StageCard : Border
         var tilt = ThemeManager.Current == "Paper" ? 1.2 : ThemeManager.Current == "Black" ? .35 : 1.8;
         Tilt = _dragging || IsActive ? 0 : -Math.Clamp(StageDistance, -2, 2) * tilt * (_hovered ? .35 : 1);
         Lift = _dragging ? 1.6 : _pressed ? -.3 : _hovered ? IsActive ? .9 : 1.2 : IsActive ? .6 : 0;
-        Opacity = IsActive || _dragging || _hovered ? 1 : .92;
+        Opacity = IsActive || _dragging || _hovered ? 1
+            : WheelMode ? Math.Clamp(1 - Math.Abs(CenterDistance) * .3, .22, .88) : .92;
         ZIndex = _dragging ? 30 : _hovered ? 20 : IsActive ? 10 : 0;
         if (this.FindAncestorOfType<ListBoxItem>() is { } container)
             container.ZIndex = ZIndex;

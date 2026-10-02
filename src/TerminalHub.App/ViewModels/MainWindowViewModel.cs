@@ -58,6 +58,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _inspectorWidth;
     /// <summary>0 = responsive 232/280; right-edge drag pins an explicit width.</summary>
     [ObservableProperty] private double _shelfWidth;
+    [ObservableProperty] private bool _shelfAutoHide;
     [ObservableProperty] private int _dockVisibilityMode;
     [ObservableProperty] private string _activeWorkingDirectory = "";
     public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? "未选择会话" :
@@ -90,10 +91,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnOutputHeightChanged(double value) => _settings.OutputHeight = value;
     partial void OnInspectorWidthChanged(double value) => _settings.InspectorWidth = value;
     partial void OnShelfWidthChanged(double value) => _settings.ShelfWidth = value;
+    partial void OnShelfAutoHideChanged(bool value) => _settings.ShelfAutoHide = value;
     partial void OnDockVisibilityModeChanged(int value) => _settings.DockVisibilityMode = value;
 
     [RelayCommand] private void ToggleInspector() => InspectorVisible = !InspectorVisible;
     [RelayCommand] private void ToggleOutput() => OutputVisible = !OutputVisible;
+    [RelayCommand] private void ToggleShelf() => ShelfAutoHide = !ShelfAutoHide;
     /// <summary>Dock index of the active surface (-1 when a tab has no dock item).</summary>
     [ObservableProperty] private int _dockHighlight = -1;
 
@@ -341,6 +344,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_settings.OutputHeight > 0) _outputHeight = _settings.OutputHeight;
         _inspectorWidth = _settings.InspectorWidth;
         _shelfWidth = _settings.ShelfWidth;
+        _shelfAutoHide = _settings.ShelfAutoHide;
         _dockVisibilityMode = _settings.DockVisibilityMode;
         DeployDockTip = ComposeDeployDockTip();
         _workspaceName = _settings.WorkspaceName;

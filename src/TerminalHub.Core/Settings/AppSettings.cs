@@ -100,6 +100,8 @@ public sealed class AppSettings
     public double InspectorWidth { get; set; }
     /// <summary>Left session shelf width in px; 0 = responsive default.</summary>
     public double ShelfWidth { get; set; }
+    /// <summary>Collapse the session shelf and reveal it at the left window edge.</summary>
+    public bool ShelfAutoHide { get; set; }
     /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
     public int OutputLevelFilter { get; set; }
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>

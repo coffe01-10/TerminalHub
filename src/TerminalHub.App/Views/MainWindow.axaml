@@ -98,6 +98,14 @@
       <Setter Property="CornerRadius" Value="12"/>
       <Setter Property="Padding" Value="16"/>
     </Style>
+    <Style Selector="ctl|ShelfDrawer.floating">
+      <Setter Property="Background" Value="{DynamicResource UiFloating}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource FloatingShadow}"/>
+      <Setter Property="CornerRadius" Value="16"/>
+      <Setter Property="Padding" Value="4,10,4,10"/>
+    </Style>
     <Style Selector="TextBlock.settings-heading">
       <Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
       <Setter Property="FontSize" Value="11"/>
@@ -138,6 +146,10 @@
           <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
                       Spacing="10" VerticalAlignment="Center">
             <TextBlock Text="{Binding OsLabel}" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center"/>
+            <Button x:Name="ShelfToggleButton" Classes="terminal-tool" Classes.selected="{Binding !ShelfAutoHide}"
+                    Command="{Binding ToggleShelfCommand}" ToolTip.Tip="收起 / 固定左侧会话栏" AutomationProperties.Name="收起 / 固定左侧会话栏">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSplit}"/><TextBlock Text="会话" VerticalAlignment="Center"/></StackPanel>
+            </Button>
             <Button x:Name="PaletteButton" Classes="terminal-tool" Click="OnOpenPalette" ToolTip.Tip="命令面板 · 在快捷键设置中修改按键">
               <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSearch}"/><TextBlock Text="查找" VerticalAlignment="Center"/></StackPanel>
             </Button>
@@ -158,14 +170,26 @@
       </Border>
 
       <!-- ============ Main three-rail ============ -->
+      <Border x:Name="ShelfEdgeHint" Grid.Row="1" Width="16" HorizontalAlignment="Left" ZIndex="60"
+              IsVisible="{Binding ShelfAutoHide}" Background="Transparent" AutomationProperties.Name="左侧会话栏呼出区域">
+        <Border Width="3" Height="52" CornerRadius="2" Background="{DynamicResource UiAccent}" Opacity="0.55"
+                HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"/>
+      </Border>
       <Grid Grid.Row="1" x:Name="StageLayout" ColumnDefinitions="280,18,*,0,0" Margin="18,10,24,14">
 
         <!-- ===== LEFT: perspective session shelf ===== -->
-        <Grid Grid.Column="0" RowDefinitions="30,*,52">
-          <Grid ColumnDefinitions="*,Auto" Margin="20,0,20,0">
-            <TextBlock Text="会话空间" Foreground="{DynamicResource UiMuted}" FontSize="11" LetterSpacing="2"/>
-            <TextBlock Grid.Column="1" Text="{Binding TerminalCount, StringFormat='{}{0:00}'}"
-                       Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+        <ctl:ShelfDrawer x:Name="ShelfHost" Grid.Column="0" Grid.ColumnSpan="5" HorizontalAlignment="Left"
+                         Classes.floating="{Binding ShelfAutoHide}" ZIndex="50">
+        <Grid x:Name="ShelfContent" RowDefinitions="30,*,52">
+          <Grid ColumnDefinitions="*,Auto,Auto" Margin="20,0,10,0">
+            <TextBlock Text="会话空间" Foreground="{DynamicResource UiMuted}" FontSize="11" LetterSpacing="2" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="{Binding TerminalCount, StringFormat='{}{0:00}'}" Margin="0,0,8,0"
+                       Foreground="{DynamicResource UiMuted}" FontSize="11" VerticalAlignment="Center"/>
+            <Button x:Name="ShelfPinButton" Grid.Column="2" Classes="terminal-tool" Command="{Binding ToggleShelfCommand}"
+                    ToolTip.Tip="收起 / 固定会话栏" AutomationProperties.Name="收起 / 固定会话栏">
+              <Panel><TextBlock Text="‹" IsVisible="{Binding !ShelfAutoHide}" FontSize="20"/>
+                <TextBlock Text="固定" IsVisible="{Binding ShelfAutoHide}" FontSize="10"/></Panel>
+            </Button>
           </Grid>
           <ListBox x:Name="SessionShelf" Grid.Row="1" ItemsSource="{Binding ShelfItems}"
                    SelectedItem="{Binding ActiveCard, Mode=OneWay}" Background="Transparent" BorderThickness="0"
@@ -196,6 +220,7 @@
             <ListBox.DataTemplates>
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
+                               WheelMode="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ShelfAutoHide}"
                                Classes.active="{Binding IsActive}" Height="{Binding #Root.ThumbnailHeight}"
                                Margin="{Binding ShelfTopMargin}"
                                ToolTip.Tip="{Binding WorkingDirectory}" DoubleTapped="OnRenameCard">
@@ -281,6 +306,7 @@
             </Grid>
           </Button>
         </Grid>
+        </ctl:ShelfDrawer>
 
         <!-- right-edge drag handle for the session shelf (18px gutter column) -->
         <Border x:Name="ShelfResizeHandle" Grid.Column="1" Background="Transparent"
