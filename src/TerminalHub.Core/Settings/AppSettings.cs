@@ -87,6 +87,12 @@ public sealed class AppSettings
         Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public bool? InspectorVisible { get; set; }
     public bool OutputVisible { get; set; } = true;
+    /// <summary>Bottom panel height in px; 0 = default 170.</summary>
+    public double OutputHeight { get; set; }
+    /// <summary>Right inspector rail width in px; 0 = responsive default.</summary>
+    public double InspectorWidth { get; set; }
+    /// <summary>Left session shelf width in px; 0 = responsive default.</summary>
+    public double ShelfWidth { get; set; }
     /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
     public int OutputLevelFilter { get; set; }
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>

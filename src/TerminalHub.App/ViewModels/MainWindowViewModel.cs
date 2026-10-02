@@ -87,6 +87,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnInspectorVisibleChanged(bool value) => _settings.InspectorVisible = value;
     partial void OnOutputVisibleChanged(bool value) => _settings.OutputVisible = value;
+    partial void OnOutputHeightChanged(double value) => _settings.OutputHeight = value;
+    partial void OnInspectorWidthChanged(double value) => _settings.InspectorWidth = value;
+    partial void OnShelfWidthChanged(double value) => _settings.ShelfWidth = value;
     partial void OnDockVisibilityModeChanged(int value) => _settings.DockVisibilityMode = value;
 
     [RelayCommand] private void ToggleInspector() => InspectorVisible = !InspectorVisible;
@@ -345,6 +348,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
         _inspectorVisible = _settings.InspectorVisible ?? true;
         _outputVisible = _settings.OutputVisible;
+        if (_settings.OutputHeight > 0) _outputHeight = _settings.OutputHeight;
+        _inspectorWidth = _settings.InspectorWidth;
+        _shelfWidth = _settings.ShelfWidth;
         _dockVisibilityMode = _settings.DockVisibilityMode;
         DeployDockTip = ComposeDeployDockTip();
         _workspaceName = _settings.WorkspaceName;
