@@ -743,21 +743,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (card.Model.Pty.ExitCode is null) return;
         var m = card.Model;
         var index = SessionCards.IndexOf(card);
+        // Capture before CloseSession — Dispose may invalidate the emulator.
+        var (pinned, groupId, scheme) = (m.Pinned, m.GroupId, m.Emulator.ColorScheme);
         CloseSession(card);
         var model = await CreateSessionAsync(m.Name, m.Tag, m.WorkingDirectory,
             shellCommand: m.Shell, arguments: m.ShellArguments);
         if (model is null) return;
+        model.Pinned = pinned;
+        model.GroupId = groupId;
+        model.Emulator.ColorScheme = scheme;
         // OnSessionAdded posts the card append on the same dispatcher priority —
         // this queued action runs right after it and restores the shelf slot.
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             var newCard = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, model));
             if (newCard is null) return;
-            if (index >= 0)
-            {
-                SessionCards.Remove(newCard);
-                SessionCards.Insert(Math.Min(index, SessionCards.Count), newCard);
-            }
+            SessionCards.Remove(newCard);
+            // Pinned cards live in the pin block, grouped cards in their group
+            // span — the raw old index only fits ungrouped/unpinned cards.
+            var pos = newCard.Model.Pinned
+                ? Math.Min(index, SessionCards.TakeWhile(c => c.Model.Pinned).Count())
+                : !string.IsNullOrEmpty(newCard.Model.GroupId)
+                    ? IndexFor(newCard)
+                    : Math.Min(Math.Max(index, 0), SessionCards.Count);
+            SessionCards.Insert(Math.Clamp(pos, 0, SessionCards.Count), newCard);
             ActiveCard = newCard;
         });
     }

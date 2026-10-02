@@ -1006,6 +1006,10 @@
                       <Style Selector="ListBoxItem:selected">
                         <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
+                      <!-- OS files hovering a directory row: import lands inside it -->
+                      <Style Selector="ListBoxItem.drop-hot">
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
+                      </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="files:FileEntry">

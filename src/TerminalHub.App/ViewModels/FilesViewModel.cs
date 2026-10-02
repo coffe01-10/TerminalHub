@@ -537,9 +537,10 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         else
         {
             StatusIsError = false;
+            var sameDir = cur == Path.TrimEndingDirectorySeparator(Path.GetFullPath(CurrentPath));
             StatusText = copied > 0
                 ? (skipped > 0 ? $"已导入 {copied} 项，跳过 {skipped} 项" : $"已导入 {copied} 项")
-                : "已在当前目录中，跳过";
+                : sameDir ? "已在当前目录中，跳过" : "已在目标目录中，跳过";
         }
         return copied;
     }

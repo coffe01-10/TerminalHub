@@ -43,12 +43,13 @@ public partial class TerminalView : Control
     private bool _isScrolledUp;
     public bool IsScrolledUp => _isScrolledUp;
 
-    /// <summary>Lines scrolled up into scrollback — TwoWay-bound by the overlay
-    /// scrollbar thumb.</summary>
+    /// <summary>Absolute buffer line at the viewport top (= scrollback size minus
+    /// the scrolled-up offset) — TwoWay-bound by the overlay scrollbar thumb, so
+    /// the live bottom sits at Maximum like every other scrollbar.</summary>
     public static readonly DirectProperty<TerminalView, int> ScrollPositionProperty =
         AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ScrollPosition),
-            v => v.ScrollPosition, (v, value) => v.ScrollToOffset(value));
-    public int ScrollPosition => _viewOffset;
+            v => v.ScrollPosition, (v, value) => v.ScrollToOffset(v.ScrollbackSize - value));
+    public int ScrollPosition => _scrollbackSize - _viewOffset;
 
     /// <summary>Scrollable backlog size — the scrollbar's Maximum.</summary>
     public static readonly DirectProperty<TerminalView, int> ScrollbackSizeProperty =
@@ -184,10 +185,16 @@ public partial class TerminalView : Control
                 : 0);
             dirty = true;
         }
-        // Keep the scrollbar's extent in sync with the live buffer.
+        // Keep the scrollbar's extent in sync with the live buffer. When the
+        // backlog grows while _viewOffset holds, the view-top line (property
+        // value) moves too — raise it so the thumb tracks the same content.
         var scrollback = buf?.ScrollbackCount ?? 0;
         if (scrollback != _scrollbackSize)
+        {
+            var oldPosition = ScrollPosition;
             SetAndRaise(ScrollbackSizeProperty, ref _scrollbackSize, scrollback);
+            RaisePropertyChanged(ScrollPositionProperty, oldPosition, ScrollPosition);
+        }
         var rows = buf?.Rows ?? 0;
         if (rows != _viewportRows)
             SetAndRaise(ViewportRowsProperty, ref _viewportRows, rows);

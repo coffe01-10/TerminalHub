@@ -97,6 +97,7 @@ public partial class MainWindow : Window
         FilesList.AddHandler(InputElement.PointerReleasedEvent, OnFilesDragPointerReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
         FilesList.AddHandler(DragDrop.DragOverEvent, OnFilesDragOver, RoutingStrategies.Bubble);
+        FilesList.AddHandler(DragDrop.DragLeaveEvent, OnFilesDragLeave, RoutingStrategies.Bubble);
         FilesList.AddHandler(DragDrop.DropEvent, OnFilesDrop, RoutingStrategies.Bubble);
         OutputResizeHandle.AddHandler(InputElement.PointerPressedEvent, OnOutputResizePressed,
             RoutingStrategies.Bubble, handledEventsToo: true);
@@ -173,6 +174,9 @@ public partial class MainWindow : Window
         var shelfWidth = Vm.ShelfWidth > 0 ? Vm.ShelfWidth : (Bounds.Width < 1250 ? 232 : 280);
         shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(shelfWidth);
+        // A persisted OutputHeight from a larger window can crowd the terminal
+        // out on a small one — re-clamp against the live bounds every layout.
+        Vm.OutputHeight = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
         inspectorWidth = Math.Clamp(inspectorWidth, 240, Math.Max(320, Bounds.Width * 0.45));
@@ -961,17 +965,40 @@ public partial class MainWindow : Window
         if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
     }
 
-    // Drag-in: dropping OS files/dirs copies them into the hovered directory
-    // row, or the current directory on empty space. Paths inside the target
-    // are skipped so an in-panel drag is a no-op.
+    // Explorer-style drop feedback: hovering a directory row during an OS file
+    // drag marks it (the drop lands inside that directory).
+    private ListBoxItem? _dropHotItem;
+
     private void OnFilesDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None;
+        var hasFiles = e.Data.Contains(DataFormats.Files);
+        e.DragEffects = hasFiles ? DragDropEffects.Copy : DragDropEffects.None;
+        var item = hasFiles
+            ? (e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)
+            : null;
+        if (item?.DataContext is not TerminalHub.Core.Files.FileEntry { IsDirectory: true })
+            item = null;
+        if (!ReferenceEquals(item, _dropHotItem))
+        {
+            _dropHotItem?.Classes.Remove("drop-hot");
+            item?.Classes.Add("drop-hot");
+            _dropHotItem = item;
+        }
         e.Handled = true;
     }
 
+    private void OnFilesDragLeave(object? sender, DragEventArgs e)
+    {
+        _dropHotItem?.Classes.Remove("drop-hot");
+        _dropHotItem = null;
+    }
+
+    // Drag-in: dropping OS files/dirs copies them into the hovered directory
+    // row, or the current directory on empty space. Paths inside the target
+    // are skipped so an in-panel drag is a no-op.
     private void OnFilesDrop(object? sender, DragEventArgs e)
     {
+        OnFilesDragLeave(sender, e);
         var paths = e.Data.GetFiles()?
             .Select(item => item.TryGetLocalPath())
             .Where(p => !string.IsNullOrEmpty(p))
@@ -995,7 +1022,7 @@ public partial class MainWindow : Window
         {
             IEnumerable<IStorageItem> items => items
                 .Select(i => i.TryGetLocalPath()).OfType<string>().ToList(),
-            IEnumerable<string> raw => raw.Where(File.Exists).ToList(),
+            IEnumerable<string> raw => raw.Where(p => File.Exists(p) || Directory.Exists(p)).ToList(),
             _ => [],
         };
         if (paths.Count > 0) _ = Vm.Files.ImportPathsAsync(paths);

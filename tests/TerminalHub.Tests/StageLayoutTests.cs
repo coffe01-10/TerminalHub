@@ -587,6 +587,30 @@ public class StageLayoutTests
         Assert.NotSame(card, spawned);
         Assert.Same(spawned, fixture.Vm.ActiveCard);
     }
+
+    [AvaloniaFact]
+    public async Task RestartSession_KeepsPinnedCardInPinBlock()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var card = fixture.Vm.SessionCards[3];
+        fixture.Vm.SetPinned(card, true);   // moves to the pin block at index 0
+        Assert.Equal(0, fixture.Vm.SessionCards.IndexOf(card));
+        ((MockPtySession)card.Model.Pty).Kill();
+        var originals = fixture.Vm.SessionCards.ToHashSet();
+        await fixture.Vm.RestartSession(card);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!(fixture.Vm.SessionCards.Count > 0
+                 && !originals.Contains(fixture.Vm.SessionCards[0]))
+               && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        var spawned = fixture.Vm.SessionCards.Single(c => !originals.Contains(c));
+        Assert.True(spawned.Model.Pinned);
+        Assert.Equal(0, fixture.Vm.SessionCards.IndexOf(spawned));
+        Assert.Same(spawned, fixture.Vm.ActiveCard);
+    }
 }
 
 
