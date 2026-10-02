@@ -564,6 +564,7 @@
                     <!-- Output -->
                     <ListBox x:Name="OutputList" IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                              ItemsSource="{Binding Dashboard.VisibleOutput}"
+                             DoubleTapped="OnOutputEntryDoubleTapped"
                              Background="Transparent" BorderThickness="0" Padding="6">
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">

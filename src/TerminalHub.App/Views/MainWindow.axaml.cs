@@ -1091,6 +1091,14 @@ public partial class MainWindow : Window
             Vm.Logs.JumpToSessionEntry(entry);
     }
 
+    /// <summary>Same as Logs: double-tap an Output row to jump to its source
+    /// session (Source carries the session name).</summary>
+    private void OnOutputEntryDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Control c && c.DataContext is LogEntry entry)
+            Vm.Logs.JumpToSessionEntry(entry);
+    }
+
     private void OnLogsListKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
