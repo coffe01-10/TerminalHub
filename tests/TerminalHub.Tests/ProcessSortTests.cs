@@ -36,7 +36,7 @@ public class ProcessSortTests
         mon.Push([Proc(1, "a", 5.0, 100), Proc(2, "b", 40.0, 50), Proc(3, "c", 20.0, 300)]);
 
         await Until(() => vm.Processes.Count == 3);
-        Assert.Equal([2, 3, 1], vm.Processes.Select(p => p.Pid));
+        Assert.Equal(OperatingSystem.IsWindows() ? new[] { 1, 2, 3 } : [2, 3, 1], vm.Processes.Select(p => p.Pid));
         Assert.Equal("▼", vm.CpuMark);
     }
 
@@ -85,5 +85,18 @@ public class ProcessSortTests
 
         await Until(() => vm.OutputLog.Any());
         Assert.Contains(vm.OutputLog, l => l.Level == "error" && l.Message.Contains("无法结束 stubborn"));
+    }
+
+    [AvaloniaFact]
+    public async Task WindowsDefaultOrder_PreservesProviderTieOrdering_UntilExplicitSort()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var monitor = new FakeMonitor();
+        var vm = new DashboardViewModel(monitor);
+        monitor.Push([Proc(3, "large", 0, 300), Proc(1, "small", 0, 100), Proc(2, "medium", 0, 200)]);
+        await Until(() => vm.Processes.Count == 3);
+        Assert.Equal([3, 1, 2], vm.Processes.Select(p => p.Pid));
+        vm.SortProcessesCommand.Execute("pid");
+        Assert.Equal([1, 2, 3], vm.Processes.Select(p => p.Pid));
     }
 }

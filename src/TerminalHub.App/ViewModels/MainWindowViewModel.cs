@@ -115,8 +115,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Optional clock for tests; defaults to UTC now. Live elapsed uses the real attempt stamp.</summary>
     internal Func<DateTimeOffset> UtcNow { get; set; } = static () => DateTimeOffset.UtcNow;
 
-    /// <summary>Dock caption: idle reads 部署; a running publish reads 打包中.</summary>
-    public string DeployDockCaption => IsPublishRunning ? "打包中" : "部署";
+    /// <summary>Dock caption: idle reads Deploy on Windows, 部署 on Linux; a running publish reads 打包中.</summary>
+    public string DeployDockCaption => IsPublishRunning ? "打包中" : OperatingSystem.IsWindows() ? "Deploy" : "部署";
 
     /// <summary>
     /// Short last-outcome text from the real exit record. Empty until a publish has finished.
@@ -347,7 +347,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             WorkspaceTemplates.Add(template);
         ThemeManager.Apply(_settings.Theme);
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
-        _inspectorVisible = _settings.InspectorVisible ?? true;
+        _inspectorVisible = _settings.InspectorVisible ?? !OperatingSystem.IsWindows();
         _outputVisible = _settings.OutputVisible;
         if (_settings.OutputHeight > 0) _outputHeight = _settings.OutputHeight;
         _inspectorWidth = _settings.InspectorWidth;
@@ -833,7 +833,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Window caption carries the active session so taskbar / Alt+Tab
     /// shows which terminal a window belongs to.</summary>
     public string WindowTitle =>
-        ActiveCard is { } card ? $"{card.Name} — Terminal Hub" : "Terminal Hub · 终端控制中心";
+        OperatingSystem.IsWindows() ? "Terminal Hub · 终端控制中心"
+        : ActiveCard is { } card ? $"{card.Name} — Terminal Hub" : "Terminal Hub · 终端控制中心";
 
     public string NextSessionMenuText => SessionMenuText(SessionShortcutAction.Next, "下一个会话");
     public string PreviousSessionMenuText => SessionMenuText(SessionShortcutAction.Previous, "上一个会话");
@@ -1058,7 +1059,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!int.TryParse(parameter?.ToString(), out var index)) return;
         switch (index)
         {
-            case 0: DockHighlight = 0; _ = NewSession(); break;
+            case 0: if (!OperatingSystem.IsWindows()) DockHighlight = 0; _ = NewSession(); break;
             case 1: InspectorVisible = true; DockHighlight = 1; SelectedRightTab = 0; break;
             case 2: InspectorVisible = true; DockHighlight = 2; SelectedRightTab = 3; break;
             case 3: InspectorVisible = true; DockHighlight = 3; SelectedRightTab = 2; break;

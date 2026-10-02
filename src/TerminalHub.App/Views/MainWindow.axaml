@@ -173,7 +173,7 @@
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                    ScrollViewer.VerticalScrollBarVisibility="Auto">
             <ListBox.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="0"/></ItemsPanelTemplate>
+              <ItemsPanelTemplate><StackPanel Spacing="{x:Static vm:SessionCardViewModel.ShelfSpacing}"/></ItemsPanelTemplate>
             </ListBox.ItemsPanel>
             <ListBox.ItemContainerTheme>
               <!-- A complete theme: no Fluent pointer/selection rectangle behind the tilted card. -->
@@ -213,7 +213,7 @@
                     </Style>
                     <Style Selector="ctl|StageCard.active > Border">
                       <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
-                      <Setter Property="BorderThickness" Value="2"/>
+                      <Setter Property="BorderThickness" Value="{DynamicResource ActiveCardBorderThickness}"/>
                       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
                     </Style>
@@ -290,11 +290,11 @@
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                 BoxShadow="{DynamicResource SurfaceShadow}">
-          <Grid RowDefinitions="46,*,Auto" Margin="8">
+          <Grid x:Name="StageContentGrid" RowDefinitions="46,*,Auto" Margin="8">
 
             <!-- Single-row chrome like the mockup: icon · name · status · cwd | nav · actions -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+            <Grid x:Name="TerminalChrome" Grid.Row="0" ColumnDefinitions="Auto,*,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
+              <StackPanel x:Name="TerminalChromeIcon" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                 <Ellipse Width="9" Height="9" Fill="#FF5F57" Margin="0,0,5,0"/>
                 <Ellipse Width="9" Height="9" Fill="#FEBC2E" Margin="0,0,5,0"/>
                 <Ellipse Width="9" Height="9" Fill="#28C840" Margin="0,0,10,0"/>
@@ -303,42 +303,42 @@
                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
               </StackPanel>
-              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0" MaxWidth="360">
+              <Grid x:Name="TerminalChromeTitle" Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0" MaxWidth="360">
                 <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
                   <StackPanel Spacing="2"><TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/><TextBlock Text="{Binding ActiveCard.CommandStatusText}" FontSize="9" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding ActiveCard.CommandStatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/></StackPanel>
                 </Border>
               </Grid>
-              <Button Grid.Column="2" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
+              <Button x:Name="ChromeDirectory" Grid.Column="2" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
                       HorizontalContentAlignment="Left" Margin="6,0,10,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
                 <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" FontSize="11"/>
               </Button>
-              <Button Grid.Column="3" Classes="terminal-tool"
+              <Button x:Name="ChromeBack" Grid.Column="3" Classes="terminal-tool"
                       Command="{Binding CwdBackCommand}" IsEnabled="{Binding CanCwdBack}"
                       ToolTip.Tip="后退目录历史" AutomationProperties.Name="后退目录历史">
                 <PathIcon Data="{StaticResource ToolBack}"/>
               </Button>
-              <Button Grid.Column="4" Classes="terminal-tool"
+              <Button x:Name="ChromeRefresh" Grid.Column="4" Classes="terminal-tool"
                       Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新当前目录" AutomationProperties.Name="刷新当前目录">
                 <PathIcon Data="{StaticResource ToolRefresh}"/>
               </Button>
-              <Button Grid.Column="5" Classes="terminal-tool"
+              <Button x:Name="ChromeForward" Grid.Column="5" Classes="terminal-tool"
                       Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
                       ToolTip.Tip="前进目录历史" AutomationProperties.Name="前进目录历史">
                 <PathIcon Data="{StaticResource ToolForward}"/>
               </Button>
-              <Button Grid.Column="6" Classes="terminal-tool" Classes.selected="{Binding IsSplit}"
+              <Button x:Name="ChromeSplit" Grid.Column="6" Classes="terminal-tool" Classes.selected="{Binding IsSplit}"
                       Command="{Binding ToggleSplitCommand}"
                       ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。" AutomationProperties.Name="分屏">
                 <PathIcon Data="{StaticResource ToolSplit}"/>
               </Button>
-              <Button Grid.Column="7" Classes="terminal-tool"
+              <Button x:Name="ChromePopout" Grid.Column="7" Classes="terminal-tool"
                       Command="{Binding OpenInNewWindowCommand}"
                       ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）" AutomationProperties.Name="弹出">
                 <PathIcon Data="{StaticResource ToolPopout}"/>
               </Button>
-              <Button Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建会话 · Ctrl+Shift+N" AutomationProperties.Name="新建会话">
+              <Button x:Name="ChromeNew" Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建会话 · Ctrl+Shift+N" AutomationProperties.Name="新建会话">
                 <PathIcon Data="{StaticResource ToolAdd}"/>
               </Button>
               <Button x:Name="SessionMenuButton" Grid.Column="9" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
@@ -371,7 +371,7 @@
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
-              <Button Grid.Column="10" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
+              <Button x:Name="ChromeClose" Grid.Column="10" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
                 <PathIcon Data="{StaticResource ToolClose}"/>
               </Button>
             </Grid>
@@ -414,7 +414,7 @@
                              Minimum="0" Maximum="{Binding #MainTerminal.ScrollbackSize}"
                              ViewportSize="{Binding #MainTerminal.ViewportRows}"
                              Value="{Binding #MainTerminal.ScrollPosition, Mode=TwoWay}"
-                             IsVisible="{Binding #MainTerminal.HasScrollback}"/>
+                             Visibility="{Binding #MainTerminal.OverlayScrollBarVisibility}"/>
                 </Panel>
                 <!-- split view: two independent sessions + draggable divider -->
                 <Grid IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*">
@@ -450,7 +450,7 @@
                                  Minimum="0" Maximum="{Binding #LeftTerminal.ScrollbackSize}"
                                  ViewportSize="{Binding #LeftTerminal.ViewportRows}"
                                  Value="{Binding #LeftTerminal.ScrollPosition, Mode=TwoWay}"
-                                 IsVisible="{Binding #LeftTerminal.HasScrollback}"/>
+                                 Visibility="{Binding #LeftTerminal.OverlayScrollBarVisibility}"/>
                     </Panel>
                     </Grid>
                   </Border>
@@ -493,7 +493,7 @@
                                  Minimum="0" Maximum="{Binding #RightTerminal.ScrollbackSize}"
                                  ViewportSize="{Binding #RightTerminal.ViewportRows}"
                                  Value="{Binding #RightTerminal.ScrollPosition, Mode=TwoWay}"
-                                 IsVisible="{Binding #RightTerminal.HasScrollback}"/>
+                                 Visibility="{Binding #RightTerminal.OverlayScrollBarVisibility}"/>
                     </Panel>
                     </Grid>
                   </Border>
@@ -648,7 +648,7 @@
                     </DockPanel>
 
                     <!-- Search: filter active-session scrollback+screen, matched terms highlighted -->
-                    <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
+                    <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter={x:Static vm:DashboardViewModel.SearchTabIndex}}"
                           RowDefinitions="Auto,Auto,*">
                       <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="8,6,8,0">
                         <TextBox x:Name="FindBox" Text="{Binding Dashboard.SearchQuery}"
@@ -1091,7 +1091,7 @@
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                         IsVisible="{Binding !Files.HasPreview}">
                   <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="选中文件即可预览" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{Binding Files.PreviewHint}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center"/>
                     <TextBlock Text="拖到终端可粘贴路径" Foreground="{DynamicResource UiFaint}" FontSize="9"
                                HorizontalAlignment="Center" Margin="0,3,0,0" Opacity="0.7"/>
@@ -1370,7 +1370,7 @@
                   <Button Grid.Column="1" Content="＋" Padding="8,1" FontSize="12"
                           CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
-                          ToolTip.Tip="新建 / 收起连接表单" Command="{Binding Ssh.ToggleEditingCommand}"/>
+                          ToolTip.Tip="新建 / 收起连接表单" Command="{Binding Ssh.ToggleEditingCommand}" IsVisible="{Binding Ssh.CanToggleEditing}"/>
                 </Grid>
                 <!-- edit form -->
                 <Border Grid.Row="1" IsVisible="{Binding Ssh.Editing}" KeyDown="OnSshFormKeyDown"

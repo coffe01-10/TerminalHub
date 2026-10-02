@@ -9,12 +9,13 @@ namespace TerminalHub.App;
 /// shell-quoted path, same as a drop from Explorer.</summary>
 public static class FilesDragData
 {
-    public static async Task<DataObject?> CreateAsync(IStorageProvider provider, FileEntry entry)
+    public static async Task<DataObject?> CreateAsync(IStorageProvider provider, FileEntry entry,
+        CancellationToken cancellationToken = default)
     {
         IStorageItem? item = entry.IsDirectory
             ? await provider.TryGetFolderFromPathAsync(entry.FullPath)
             : await provider.TryGetFileFromPathAsync(entry.FullPath);
-        if (item is null) return null;
+        if (item is null || cancellationToken.IsCancellationRequested) return null;
         var data = new DataObject();
         data.Set(DataFormats.Files, new[] { item });
         return data;

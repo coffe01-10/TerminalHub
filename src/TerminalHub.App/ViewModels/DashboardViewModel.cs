@@ -12,6 +12,7 @@ public sealed record LogEntry(DateTime Time, string Level, string Message, strin
 /// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
 public partial class DashboardViewModel : ViewModelBase
 {
+    public const int SearchTabIndex = 3;
     private readonly ISystemMonitor _monitor;
     /// <summary>Process kill entry point (tests inject a capture).</summary>
     private readonly Action<int> _killPid;
@@ -38,6 +39,7 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private ProcSort _processSort = ProcSort.Cpu;
     [ObservableProperty] private bool _processSortAsc;      // cpu/mem desc, pid/name asc by default
     private IReadOnlyList<ProcessInfo> _lastProcesses = [];
+    private bool _processSortChosen = !OperatingSystem.IsWindows();
 
     [ObservableProperty] private int _selectedRightTab;       // 0 Proc 1 Files 2 Logs 3 Ssh
     [ObservableProperty] private int _selectedBottomTab;      // 0 Output 1 Debug 2 Problems 3 Search
@@ -53,7 +55,7 @@ public partial class DashboardViewModel : ViewModelBase
     partial void OnSearchQueryChanged(string value) => RefreshSearch();
     partial void OnSelectedBottomTabChanged(int value)
     {
-        if (value == 3) RefreshSearch();
+        if (value == SearchTabIndex) RefreshSearch();
     }
 
     public void RefreshSearch()
@@ -156,8 +158,8 @@ public partial class DashboardViewModel : ViewModelBase
     public string MemMark => SortMark(ProcSort.Mem);
     private string SortMark(ProcSort k) => ProcessSort == k ? (ProcessSortAsc ? "▲" : "▼") : "";
 
-    partial void OnProcessSortChanged(ProcSort value) { ResortProcesses(); RefreshSortMarks(); }
-    partial void OnProcessSortAscChanged(bool value) { ResortProcesses(); RefreshSortMarks(); }
+    partial void OnProcessSortChanged(ProcSort value) { _processSortChosen = true; ResortProcesses(); RefreshSortMarks(); }
+    partial void OnProcessSortAscChanged(bool value) { _processSortChosen = true; ResortProcesses(); RefreshSortMarks(); }
 
     private void RefreshSortMarks()
     {
@@ -192,7 +194,7 @@ public partial class DashboardViewModel : ViewModelBase
             ProcSort.Mem => a.MemoryBytes.CompareTo(b.MemoryBytes),
             _ => a.CpuPercent.CompareTo(b.CpuPercent),
         };
-        list.Sort((a, b) => ProcessSortAsc ? Cmp(a, b) : Cmp(b, a));
+        if (_processSortChosen) list.Sort((a, b) => ProcessSortAsc ? Cmp(a, b) : Cmp(b, a));
         Processes.Clear();
         foreach (var p in list) Processes.Add(p);
     }

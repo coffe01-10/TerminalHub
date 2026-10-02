@@ -140,7 +140,7 @@ public sealed class SingleInstanceActivation : IDisposable
             // On Linux (unix sockets) a client that lands in the backlog while the
             // server recycles its instance gets ECONNRESET instead of queueing like
             // WaitNamedPipe — retry inside the same 2s budget.
-            catch (IOException) when (!timeout.IsCancellationRequested)
+            catch (IOException) when (OperatingSystem.IsLinux() && !timeout.IsCancellationRequested)
             {
                 try { await Task.Delay(50, timeout.Token); }
                 catch (OperationCanceledException) { return false; }

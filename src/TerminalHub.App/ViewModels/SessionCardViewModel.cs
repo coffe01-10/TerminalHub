@@ -28,7 +28,8 @@ public partial class SessionCardViewModel : ViewModelBase
 
     /// <summary>Pixels each card tucks under the previous one on the shelf
     /// (mockup stack look). Keep in sync with the shelf margin binding.</summary>
-    public const double ShelfOverlap = 16;
+    public static double ShelfOverlap => OperatingSystem.IsWindows() ? 0 : 16;
+    public static double ShelfSpacing => OperatingSystem.IsWindows() ? 16 : 0;
 
     /// <summary>True for a card that sits at the top of its shelf segment —
     /// the very first item, or the first card below a group/pin header. Those
@@ -64,7 +65,7 @@ public partial class SessionCardViewModel : ViewModelBase
     public bool HasTag => Model.Tag != SessionTag.None;
     /// <summary>Show the tag pill only while the status text carries no real
     /// information; exited/unread sessions keep "已退出 · N" / "有新输出".</summary>
-    public bool ShowTagPill => HasTag && Model.IsRunning && !HasUnreadOutput;
+    public bool ShowTagPill => !OperatingSystem.IsWindows() && HasTag && Model.IsRunning && !HasUnreadOutput;
     public IBrush TagBrush => new SolidColorBrush(Color.Parse(Model.Tag.AccentColor()));
     /// <summary>Translucent tag-color fill for the header pill (mockup-style tinted chip).</summary>
     public IBrush TagPillBrush

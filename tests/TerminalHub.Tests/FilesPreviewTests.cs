@@ -23,7 +23,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void SelectingFile_AutoPreviews()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => !e.IsDirectory);
 
@@ -35,7 +35,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void SelectingDirectory_ClearsPreview()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => !e.IsDirectory);
         Assert.True(vm.HasPreview);
@@ -47,7 +47,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void NavigatingAway_WithoutFileSelection_ClearsPreview()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => !e.IsDirectory);
         Assert.True(vm.HasPreview);
@@ -60,7 +60,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void SelectingBinary_ShowsNotice_InsteadOfText()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => e.Name == "blob.bin");
 
@@ -72,7 +72,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void UnreadableFile_ClearsStalePreview()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => !e.IsDirectory);
         Assert.True(vm.HasPreview);
@@ -92,7 +92,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void MissingDir_MarksStatusAsError()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(Path.Combine(_root, "nope"));
 
         Assert.True(vm.StatusIsError);
@@ -103,7 +103,7 @@ public class FilesPreviewTests : IDisposable
     public void ShowHidden_Toggle_RefiltersListing()
     {
         File.WriteAllText(Path.Combine(_root, ".hideme"), "x");
-        using var vm = new FilesViewModel(showHidden: false);
+        using var vm = new FilesViewModel(previewOnSelection: true, showHidden: false);
         vm.NavigateTo(_root);
         Assert.DoesNotContain(vm.Entries, e => e.Name == ".hideme");
 
@@ -115,15 +115,16 @@ public class FilesPreviewTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void SelectingPng_ShowsImage_NotBinaryNotice()
+    public async Task SelectingPng_ShowsImage_NotBinaryNotice()
     {
         // Smallest valid 1×1 PNG — Bitmap must actually decode it.
         File.WriteAllBytes(Path.Combine(_root, "px.png"),
             Convert.FromBase64String(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="));
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => e.Name == "px.png");
+        await vm.PreviewLoading;
 
         Assert.True(vm.HasPreview);
         Assert.True(vm.PreviewIsImage);
@@ -132,12 +133,13 @@ public class FilesPreviewTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void CorruptPng_FallsBackToBinaryNotice()
+    public async Task CorruptPng_FallsBackToBinaryNotice()
     {
         File.WriteAllBytes(Path.Combine(_root, "bad.png"), [0x89, 0x50, 0x00, 0x01]);
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => e.Name == "bad.png");
+        await vm.PreviewLoading;
 
         Assert.True(vm.HasPreview);
         Assert.False(vm.PreviewIsImage);
@@ -147,7 +149,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void NavigateTo_ShowsItemCount_AndPreviewPath()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root); // 3 entries: sub/, a.txt, blob.bin
         Assert.Equal("3 项", vm.StatusText);
         Assert.False(vm.StatusIsError);
@@ -159,7 +161,7 @@ public class FilesPreviewTests : IDisposable
     [AvaloniaFact]
     public void NewFolder_AutoName_AndSelects()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.NewFolder(null);
         vm.NewFolder(null);
@@ -174,7 +176,7 @@ public class FilesPreviewTests : IDisposable
     [AvaloniaFact]
     public void NewTextFile_Named_AutoExt_AndSelects()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.NewTextFile("notes");           // no ext → .txt
         vm.NewTextFile("script.sh");       // explicit ext kept
@@ -190,7 +192,7 @@ public class FilesPreviewTests : IDisposable
     [AvaloniaFact]
     public void NewFolder_BadName_ReportsError()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.NewFolder("a/b\0c"); // separators/NUL rejected before touching the fs
 
@@ -201,7 +203,7 @@ public class FilesPreviewTests : IDisposable
     [AvaloniaFact]
     public void Rename_File_AndDir_MoveAndReselect()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         var file = vm.Entries.First(e => e.Name == "a.txt");
         vm.Rename(file, "renamed.txt");
@@ -219,7 +221,7 @@ public class FilesPreviewTests : IDisposable
     public void Rename_ToExisting_ReportsError()
     {
         File.WriteAllText(Path.Combine(_root, "taken.txt"), "x");
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.Rename(vm.Entries.First(e => e.Name == "a.txt"), "taken.txt");
 
@@ -237,7 +239,7 @@ public class FilesPreviewTests : IDisposable
         File.WriteAllText(Path.Combine(outside, "incoming.txt"), "hi");
         try
         {
-            using var vm = new FilesViewModel();
+            using var vm = new FilesViewModel(previewOnSelection: true);
             vm.NavigateTo(_root);
             var imported = await vm.ImportPathsAsync(new[]
             {
@@ -271,7 +273,7 @@ public class FilesPreviewTests : IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* FS without symlink support → covered below anyway */ }
             File.WriteAllText(Path.Combine(outside, "ok.txt"), "x");
 
-            using var vm = new FilesViewModel();
+            using var vm = new FilesViewModel(previewOnSelection: true);
             vm.NavigateTo(_root);
             var before = Directory.GetFileSystemEntries(_root).Length;
 
@@ -304,7 +306,7 @@ public class FilesPreviewTests : IDisposable
         File.WriteAllText(Path.Combine(outside, "f.txt"), "x");
         try
         {
-            using var vm = new FilesViewModel();
+            using var vm = new FilesViewModel(previewOnSelection: true);
             vm.NavigateTo(_root);
             var sub = Path.Combine(_root, "sub");
             var copied = await vm.ImportPathsAsync(new[] { Path.Combine(outside, "f.txt") }, sub);
@@ -322,7 +324,7 @@ public class FilesPreviewTests : IDisposable
     [AvaloniaFact]   // writes into the watched dir — watcher posts need a session
     public void NewFolder_ExplicitExistingName_Dedupes()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.NewFolder("sub");                    // "sub" exists in the fixture
         Assert.True(Directory.Exists(Path.Combine(_root, "sub 2")));
@@ -332,7 +334,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void Names_WithSeparators_OrTraversal_AreRejected()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
 
         vm.NewFolder("../escape");
@@ -355,7 +357,7 @@ public class FilesPreviewTests : IDisposable
     [Fact]
     public void Refresh_RestoredSameFile_KeepsPreview()
     {
-        using var vm = new FilesViewModel();
+        using var vm = new FilesViewModel(previewOnSelection: true);
         vm.NavigateTo(_root);
         vm.SelectedEntry = vm.Entries.First(e => !e.IsDirectory);
         Assert.True(vm.HasPreview);
@@ -364,5 +366,94 @@ public class FilesPreviewTests : IDisposable
         Assert.True(vm.HasPreview);
         Assert.Equal("a.txt", vm.PreviewTitle);
         Assert.Equal("a.txt", vm.SelectedEntry?.Name);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SlowImageDecode_DoesNotBlockUi_OrOverwriteSelectionAfterCompletion(bool dispose)
+    {
+        File.WriteAllBytes(Path.Combine(_root, "slow.png"), Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="));
+        var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        using var vm = new FilesViewModel(previewOnSelection: true, imageLoader: path =>
+        {
+            started.TrySetResult(Avalonia.Threading.Dispatcher.UIThread.CheckAccess());
+            Assert.True(release.Wait(TimeSpan.FromSeconds(10)), "Image selection blocked the dispatcher.");
+            return new Avalonia.Media.Imaging.Bitmap(path);
+        });
+        vm.NavigateTo(_root);
+        vm.SelectedEntry = vm.Entries.First(e => e.Name == "slow.png");
+        var loading = vm.PreviewLoading;
+        try
+        {
+            Assert.False(await started.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.False(loading.IsCompleted);
+            if (dispose) vm.Dispose();
+            else vm.SelectedEntry = vm.Entries.First(e => e.Name == "a.txt");
+        }
+        finally { release.Set(); }
+        await loading;
+        Assert.Null(vm.PreviewImage);
+        Assert.False(vm.PreviewIsImage);
+        if (dispose) Assert.False(vm.HasPreview);
+        else Assert.Contains("hello preview", vm.PreviewText);
+    }
+
+    private static void CreateDirectoryLink(string link, string target)
+    {
+        if (!OperatingSystem.IsWindows()) { Directory.CreateSymbolicLink(link, target); return; }
+        var start = new System.Diagnostics.ProcessStartInfo("cmd.exe")
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        start.ArgumentList.Add("/c"); start.ArgumentList.Add("mklink"); start.ArgumentList.Add("/J");
+        start.ArgumentList.Add(link); start.ArgumentList.Add(target);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, output);
+    }
+
+    [AvaloniaFact]
+    public async Task ImportPaths_LinkedDestination_AndLinkedParents_SkipSelfCopy()
+    {
+        var alias = _root + "-alias";
+        CreateDirectoryLink(alias, _root);
+        try
+        {
+            File.WriteAllText(Path.Combine(_root, "sub", "inside.txt"), "original");
+            using var vm = new FilesViewModel(previewOnSelection: true);
+            vm.NavigateTo(alias);
+            Assert.Equal(0, await vm.ImportPathsAsync([Path.Combine(_root, "a.txt")]));
+            Assert.False(File.Exists(Path.Combine(_root, "a 2.txt")));
+            Assert.Equal(0, await vm.ImportPathsAsync([_root]));
+            Assert.False(Directory.Exists(Path.Combine(_root, Path.GetFileName(_root))));
+            vm.NavigateTo(Path.Combine(alias, "sub"));
+            Assert.Equal(0, await vm.ImportPathsAsync([Path.Combine(_root, "sub", "inside.txt")]));
+            Assert.Equal(0, await vm.ImportPathsAsync([_root]));
+            Assert.False(File.Exists(Path.Combine(_root, "sub", "inside 2.txt")));
+            Assert.False(vm.StatusIsError);
+        }
+        finally { Directory.Delete(alias); }
+    }
+
+    [AvaloniaFact]
+    public async Task ImportPaths_SkippedDirectoryLinks_AreReported()
+    {
+        var source = _root + "-source";
+        Directory.CreateDirectory(source);
+        var link = Path.Combine(source, "loop");
+        CreateDirectoryLink(link, source);
+        try
+        {
+            File.WriteAllText(Path.Combine(source, "keep.txt"), "copied");
+            using var vm = new FilesViewModel(previewOnSelection: true);
+            vm.NavigateTo(_root);
+            Assert.Equal(1, await vm.ImportPathsAsync([source]));
+            Assert.Contains("跳过 1 个目录链接", vm.StatusText);
+            Assert.Equal("copied", File.ReadAllText(Path.Combine(_root, Path.GetFileName(source), "keep.txt")));
+            Assert.False(Directory.Exists(Path.Combine(_root, Path.GetFileName(source), "loop")));
+        }
+        finally { Directory.Delete(link); Directory.Delete(source, true); }
     }
 }

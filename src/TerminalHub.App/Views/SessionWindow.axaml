@@ -51,7 +51,7 @@
                    Minimum="0" Maximum="{Binding #PopoutTerminal.ScrollbackSize}"
                    ViewportSize="{Binding #PopoutTerminal.ViewportRows}"
                    Value="{Binding #PopoutTerminal.ScrollPosition, Mode=TwoWay}"
-                   IsVisible="{Binding #PopoutTerminal.HasScrollback}"/>
+                   Visibility="{Binding #PopoutTerminal.OverlayScrollBarVisibility}"/>
       </Panel>
     </Border>
   </Grid>

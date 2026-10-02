@@ -218,6 +218,7 @@ public class CliInteractionTests
         f.View.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent,
             Key = Key.A, KeyModifiers = KeyModifiers.Control | KeyModifiers.Shift });
         var text = f.View.GetSelectedText();
+        if (OperatingSystem.IsWindows()) { Assert.Null(text); Assert.Empty(f.Pty.Writes); return; }
         Assert.StartsWith("line-00", text);
         Assert.EndsWith("line-59", text);
         Assert.Empty(f.Pty.Writes); // Ctrl+Shift+A is a UI gesture — never reaches the shell
@@ -236,7 +237,48 @@ public class CliInteractionTests
         f.View.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent,
             Key = Key.A, KeyModifiers = KeyModifiers.Control | KeyModifiers.Shift });
         var text = f.View.GetSelectedText();
+        if (OperatingSystem.IsWindows()) { Assert.Null(text); Assert.Empty(f.Pty.Writes); return; }
         Assert.Contains("alt-screen-content", text);
         Assert.DoesNotContain("primary-", text);   // invisible scrollback must not be copied
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlInsert_PreservesWindowsCliSequence_AndLinuxCopy()
+    {
+        using var f = new Fixture();
+        f.Emulator.Parser.Feed("copy中文");
+        f.View.SelectAll();
+        await f.Window.Clipboard!.SetTextAsync("sentinel");
+        f.Window.KeyPressQwerty(PhysicalKey.Insert, RawInputModifiers.Control);
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("sentinel", await f.Window.Clipboard.GetTextAsync());
+            Assert.Equal("\x1b[2;5~", f.Pty.Text);
+            f.Pty.Writes.Clear();
+        }
+        else
+        {
+            Assert.Equal(f.View.GetSelectedText(), await f.Window.Clipboard.GetTextAsync());
+            Assert.StartsWith("copy中文", await f.Window.Clipboard.GetTextAsync());
+            Assert.Empty(f.Pty.Writes);
+        }
+        f.Window.KeyPressQwerty(PhysicalKey.Insert, RawInputModifiers.Control | RawInputModifiers.Shift);
+        Assert.Equal("\x1b[2;6~", f.Pty.Text);
+    }
+
+    [AvaloniaFact]
+    public void CtrlWheel_PreservesWindowsScrollback_AndLinuxZoom()
+    {
+        using var f = new Fixture();
+        f.Emulator.Parser.Feed(string.Join("\r\n", Enumerable.Range(0, 80).Select(i => $"line-{i}")));
+        var font = f.View.TerminalFontSize;
+        f.Window.MouseWheel(new Point(40, 8), new Vector(0, 1), RawInputModifiers.Control);
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(font, f.View.TerminalFontSize);
+            Assert.True(f.View.IsScrolledUp);
+        }
+        else Assert.Equal(font + 1, f.View.TerminalFontSize);
+        Assert.Empty(f.Pty.Writes);
     }
 }

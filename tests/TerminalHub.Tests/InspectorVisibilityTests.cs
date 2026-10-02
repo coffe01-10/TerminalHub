@@ -10,20 +10,22 @@ using Xunit;
 
 namespace TerminalHub.Tests;
 
-/// <summary>Dashboard mockup: the right inspector (Processes/Files/Logs/SSH)
-/// is expanded on cold start at mockup width (~300-326). An explicitly
-/// persisted InspectorVisible=false still keeps it closed.</summary>
+/// <summary>Windows keeps its closed inspector default; Linux follows the mockup.
+/// An explicitly persisted choice wins on both platforms.</summary>
 public class InspectorVisibilityTests
 {
     [AvaloniaFact]
-    public void Default_InspectorVisible_OnColdStart()
+    public void Default_InspectorVisibility_RespectsPlatform()
     {
-        Assert.Null(new AppSettings().InspectorVisible); // unset = default-on
+        Assert.Null(new AppSettings().InspectorVisible); // unset = platform default
 
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         using var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(Path.Combine(dir, "settings.json")));
-        Assert.True(vm.InspectorVisible); // fresh install → inspector expanded
+        Assert.Equal(!OperatingSystem.IsWindows(), vm.InspectorVisible);
         Assert.Equal(0, vm.SelectedRightTab); // Processes tab first, like the mockup
+        Assert.Equal(!OperatingSystem.IsWindows(), vm.OutputVisible);
+        Assert.Equal(OperatingSystem.IsWindows() ? 0 : 1, vm.DockVisibilityMode);
+        Assert.Equal(OperatingSystem.IsWindows() ? "Deploy" : "部署", vm.DeployDockCaption);
     }
 
     [AvaloniaFact]
@@ -48,6 +50,7 @@ public class InspectorVisibilityTests
         try
         {
             using var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
+            vm.InspectorVisible = true;
             vm.ToggleInspectorCommand.Execute(null); // user hides it
             Assert.False(vm.InspectorVisible);
             vm.PersistSettings();
@@ -80,7 +83,7 @@ public class InspectorVisibilityTests
     }
 
     [AvaloniaFact]
-    public async Task InspectorPanel_VisibleByDefault_RendersProcessRows()
+    public async Task InspectorPanel_ExplicitlyOpened_RendersProcessRows()
     {
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1440, Height = 900 };
@@ -88,7 +91,8 @@ public class InspectorVisibilityTests
         {
             window.Show();
             var vm = (MainWindowViewModel)window.DataContext!;
-            Assert.True(vm.InspectorVisible);
+            Assert.Equal(!OperatingSystem.IsWindows(), vm.InspectorVisible);
+            vm.InspectorVisible = true;
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(6);
             while (vm.Dashboard.Processes.Count == 0 && DateTime.UtcNow < deadline)
@@ -120,7 +124,7 @@ public class InspectorVisibilityTests
             Assert.DoesNotContain("InspectorVisible", File.ReadAllText(path));
 
             var loaded = new SettingsStore(path).Load();
-            Assert.Null(loaded.InspectorVisible); // absent key still loads as null → default on
+            Assert.Null(loaded.InspectorVisible); // absent key still loads as null → platform default
         }
         finally { Directory.Delete(dir, true); }
     }

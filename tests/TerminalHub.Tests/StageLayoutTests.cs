@@ -37,6 +37,7 @@ public class StageLayoutTests
             var store = new SettingsStore(Path.Combine(_directory, "settings.json"));
             store.Save(new AppSettings
             {
+                InspectorVisible = true, OutputVisible = true, DockVisibilityMode = 1,
                 StartupSessions = Enumerable.Range(1, 5).Select(i => new StartupSession
                 {
                     Name = firstSessionName is not null && i == 1 ? firstSessionName : $"Terminal {i:00}",
@@ -56,7 +57,7 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
-    public async Task ActiveThumb_ShowsNeonAccentGlow_InactiveDoesNot()
+    public async Task ActiveThumb_UsesPlatformShadow_InactiveDoesNot()
     {
         using var fixture = new StageFixture();
         await Task.Delay(600);
@@ -67,7 +68,7 @@ public class StageLayoutTests
         var accent = (SolidColorBrush)ThemeManager.Brush("Accent");
 
         var activeBorder = active.GetVisualChildren().OfType<Border>().First();
-        Assert.Equal(2, activeBorder.BorderThickness.Left);
+        Assert.Equal(OperatingSystem.IsWindows() ? 1 : 2, activeBorder.BorderThickness.Left);
         Assert.Equal(accent.Color, ((ISolidColorBrush)activeBorder.BorderBrush!).Color);
         // Neon halo: a visible glow shadow tinted with the theme accent.
         bool Glows(BoxShadows shadows)
@@ -83,7 +84,9 @@ public class StageLayoutTests
             }
             return false;
         }
-        Assert.True(Glows(activeBorder.BoxShadow));
+        if (OperatingSystem.IsWindows())
+            Assert.Equal((BoxShadows)Application.Current!.Resources["ActiveCardShadow"]!, activeBorder.BoxShadow);
+        else Assert.True(Glows(activeBorder.BoxShadow));
 
         var inactive = cards.First(c => !c.IsActive);
         var inactiveBorder = inactive.GetVisualChildren().OfType<Border>().First();
@@ -139,13 +142,25 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
-    public async Task NewSessionDock_IsPrimaryAccentPill()
+    public async Task NewSessionDock_IsLinuxPrimaryAccentPill_AndWindowsKeepsOriginalEntries()
     {
         using var fixture = new StageFixture();
         await Task.Delay(400);
         var vm = fixture.Vm;
         var window = fixture.Window;
         var btn = window.FindControl<Button>("NewDockButton")!;
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.False(btn.IsVisible);
+            Assert.False(window.FindControl<Button>("SettingsDockButton")!.IsVisible);
+            var dock = window.FindControl<DropletDock>("ActionDock")!;
+            Assert.Equal(new[] { "1", "2", "3", "4" }, dock.GetVisualDescendants()
+                .OfType<Button>().Where(b => b.Classes.Contains("dock") && b.IsVisible)
+                .Select(b => b.CommandParameter?.ToString()));
+            Assert.NotNull(window.FindControl<Button>("ChromeNew")!.Command);
+            return;
+        }
+        Assert.True(btn.IsVisible);
         Assert.Contains("dock-primary", btn.Classes);
         var accent = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindResource("UiAccent")).Color;
         var onAccent = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindResource("UiOnAccent")).Color;
@@ -202,7 +217,7 @@ public class StageLayoutTests
         await Task.Delay(600);
         var card = fixture.Vm.SessionCards[0];
         Assert.True(card.HasTag);
-        Assert.True(card.ShowTagPill); // running + no unread: pill replaces plain 运行中
+        Assert.Equal(!OperatingSystem.IsWindows(), card.ShowTagPill); // running + no unread: pill replaces plain 运行中
         card.HasUnreadOutput = true;
         Assert.False(card.ShowTagPill); // 有新输出 must not hide behind the pill
     }
@@ -212,7 +227,7 @@ public class StageLayoutTests
     [InlineData("Black", "#A9C8F5")]
     [InlineData("White", "#245AB5")]
     [InlineData("Paper", "#8C5132")]
-    public void ActiveCardShadow_GlowsWithThemeAccent(string theme, string accentHex)
+    public void ActiveCardShadow_MatchesPlatformAppearance(string theme, string accentHex)
     {
         var previous = ThemeManager.Current;
         try
@@ -230,7 +245,16 @@ public class StageLayoutTests
                     && Math.Abs(s.Color.B - accent.B) < 0x40)
                     glows = true;
             }
-            Assert.True(glows, $"{theme}: ActiveCardShadow lacks an accent-tinted glow");
+            if (OperatingSystem.IsWindows())
+            {
+                var expected = BoxShadows.Parse(theme switch
+                {
+                    "Paper" => "0 2 3 0 #28816D50", "White" => "0 3 8 0 #20314766",
+                    "Black" => "0 1 4 0 #60000000", _ => "0 3 12 0 #40258ED6"
+                });
+                Assert.Equal(expected, shadows);
+            }
+            else Assert.True(glows, $"{theme}: ActiveCardShadow lacks an accent-tinted glow");
         }
         finally { ThemeManager.Apply(previous); }
     }
@@ -651,7 +675,7 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
-    public async Task Bell_OnBackgroundSession_ShowsNotificationAndMarksUnread()
+    public async Task Bell_RespectsPlatformNotificationBehavior()
     {
         using var fixture = new StageFixture();
         var ready = DateTime.UtcNow.AddSeconds(5);
@@ -659,6 +683,17 @@ public class StageLayoutTests
             await Task.Delay(25);
         var bg = fixture.Vm.SessionCards.First(c => !c.IsActive);
         bg.Model.Emulator.Parser.Feed("\a"u8);
+        if (OperatingSystem.IsWindows())
+        {
+            await Task.Delay(120);
+            Assert.False(fixture.Vm.NotificationVisible);
+            Assert.False(bg.HasUnreadOutput);
+            var view = fixture.Window.FindControl<TerminalView>("MainTerminal")!;
+            fixture.Vm.ActiveSession!.Emulator.Parser.Feed("\a"u8);
+            Assert.Equal(0L, typeof(TerminalView).GetField("_bellFlashUntil",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(view));
+            return;
+        }
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (!fixture.Vm.NotificationVisible && DateTime.UtcNow < deadline)
             await Task.Delay(25);
@@ -671,6 +706,75 @@ public class StageLayoutTests
         await Task.Delay(120);
         Assert.False(fixture.Vm.NotificationVisible);
     }
+
+    [AvaloniaFact]
+    public async Task WideSavedRails_WindowShrink_PreservesStageChrome_AndSavedWidths()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        fixture.Vm.ShelfWidth = 648;
+        fixture.Vm.InspectorWidth = 648;
+        fixture.Window.Width = 1100;
+        await Task.Delay(400);
+        var stage = fixture.Window.FindControl<StageSurface>("StageWindow")!;
+        Assert.True(stage.Bounds.Width >= 459, $"Stage width: {stage.Bounds.Width}");
+        var menu = fixture.Window.FindControl<Button>("SessionMenuButton")!;
+        var stageRight = stage.TranslatePoint(new Point(stage.Bounds.Width, 0), fixture.Window)!.Value.X;
+        Assert.True(menu.TranslatePoint(new Point(menu.Bounds.Width, 0), fixture.Window)!.Value.X <= stageRight + 1);
+        Assert.Equal(648, fixture.Vm.ShelfWidth);
+        Assert.Equal(648, fixture.Vm.InspectorWidth);
+    }
+
+    [AvaloniaFact]
+    public async Task EmptySshForm_EscapeReturnsTerminalFocus_WithoutHidingAddForm()
+    {
+        using var fixture = new StageFixture();
+        fixture.Vm.SelectedRightTab = 3;
+        await Task.Delay(600);
+        var host = fixture.Window.GetVisualDescendants().OfType<TextBox>()
+            .Single(t => t.Watermark as string == "主机 host / IP");
+        host.Focus();
+        fixture.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.True(host.IsEffectivelyVisible);
+        Assert.True(fixture.Vm.Ssh.Editing);
+        Assert.True(OperatingSystem.IsWindows() ? host.IsFocused
+            : fixture.Window.FindControl<TerminalView>("MainTerminal")!.IsFocused);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("ShelfResizeHandle")]
+    [InlineData("InspectorResizeHandle")]
+    public async Task RailDrag_KeepsRoomForStage_AlongsideOtherRail(string name)
+    {
+        using var fixture = new StageFixture(width: 1100);
+        await Task.Delay(600);
+        var handle = fixture.Window.FindControl<Control>(name)!;
+        var start = handle.TranslatePoint(new Point(handle.Bounds.Width / 2, 100), fixture.Window)!.Value;
+        var end = start + new Vector(name == "ShelfResizeHandle" ? 600 : -600, 0);
+        fixture.Window.MouseDown(start, MouseButton.Left);
+        fixture.Window.MouseMove(end, RawInputModifiers.LeftMouseButton);
+        fixture.Window.MouseUp(end, MouseButton.Left);
+        await Task.Delay(100);
+        var stage = fixture.Window.FindControl<StageSurface>("StageWindow")!;
+        Assert.True(stage.Bounds.Width >= 459, $"Stage width: {stage.Bounds.Width}");
+    }
+
+    [AvaloniaFact]
+    public async Task OutputResize_AfterHeightClamp_StartsFromDisplayedHeight()
+    {
+        using var fixture = new StageFixture(height: 900);
+        await Task.Delay(600);
+        fixture.Vm.OutputHeight = 800;
+        fixture.Window.Height = 700;
+        await Task.Delay(200);
+        var panel = fixture.Window.FindControl<Border>("OutputPanel")!;
+        var height = panel.Height;
+        Assert.True(height < fixture.Vm.OutputHeight);
+        var handle = fixture.Window.FindControl<Control>("OutputResizeHandle")!;
+        var start = handle.TranslatePoint(new Point(handle.Bounds.Width / 2, handle.Bounds.Height / 2), fixture.Window)!.Value;
+        fixture.Window.MouseDown(start, MouseButton.Left);
+        fixture.Window.MouseMove(start + new Vector(0, 20), RawInputModifiers.LeftMouseButton);
+        fixture.Window.MouseUp(start + new Vector(0, 20), MouseButton.Left);
+        Assert.Equal(height - 20, fixture.Vm.OutputHeight, 1);
+    }
 }
-
-

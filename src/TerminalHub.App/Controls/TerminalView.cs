@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.TextInput;
 using Avalonia.Interactivity;
@@ -63,11 +64,13 @@ public partial class TerminalView : Control
     private int _viewportRows;
     public int ViewportRows => _viewportRows;
 
-    /// <summary>True while scrollback exists — shows the overlay scrollbar.</summary>
-    public static readonly DirectProperty<TerminalView, bool> HasScrollbackProperty =
-        AvaloniaProperty.RegisterDirect<TerminalView, bool>(nameof(HasScrollback), v => v.HasScrollback);
-    private bool _hasScrollback;
-    public bool HasScrollback => _hasScrollback;
+    /// <summary>Linux scrollback overlay. Windows keeps the original terminal
+    /// mouse area unobstructed, including its rightmost cells. Bind Visibility,
+    /// since ScrollBar recalculates IsVisible whenever its extent changes.</summary>
+    public static readonly DirectProperty<TerminalView, ScrollBarVisibility> OverlayScrollBarVisibilityProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, ScrollBarVisibility>(nameof(OverlayScrollBarVisibility), v => v.OverlayScrollBarVisibility);
+    private ScrollBarVisibility _overlayScrollBarVisibility = ScrollBarVisibility.Hidden;
+    public ScrollBarVisibility OverlayScrollBarVisibility => _overlayScrollBarVisibility;
 
     /// <summary>Scrollbar drag → same clamp/notify path as wheel scrolling.</summary>
     public void ScrollToOffset(int linesUp)
@@ -200,9 +203,10 @@ public partial class TerminalView : Control
         var rows = buf?.Rows ?? 0;
         if (rows != _viewportRows)
             SetAndRaise(ViewportRowsProperty, ref _viewportRows, rows);
-        var hasScrollback = scrollback > 0 && buf?.OnAlternateScreen != true;
-        if (hasScrollback != _hasScrollback)
-            SetAndRaise(HasScrollbackProperty, ref _hasScrollback, hasScrollback);
+        var visibility = !OperatingSystem.IsWindows() && scrollback > 0 && buf?.OnAlternateScreen != true
+            ? ScrollBarVisibility.Visible : ScrollBarVisibility.Hidden;
+        if (visibility != _overlayScrollBarVisibility)
+            SetAndRaise(OverlayScrollBarVisibilityProperty, ref _overlayScrollBarVisibility, visibility);
         var blink = !IsPreview && IsFocused
             && Environment.TickCount64 - _lastBlink >= 530;
         if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
@@ -301,7 +305,11 @@ public partial class TerminalView : Control
     private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
 
     // Parser-thread hook: the refresh tick turns this deadline into the overlay.
-    private void OnBell() => Interlocked.Exchange(ref _bellFlashUntil, Environment.TickCount64 + 140);
+    private void OnBell()
+    {
+        if (!OperatingSystem.IsWindows())
+            Interlocked.Exchange(ref _bellFlashUntil, Environment.TickCount64 + 140);
+    }
 
     private void OnScrollbackChanged(int delta) => Interlocked.Add(ref _scrollDrift, delta);
 
@@ -1167,6 +1175,12 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
+        if (!OperatingSystem.IsWindows() && e.Key == Key.Insert && e.KeyModifiers == KeyModifiers.Control)
+        {
+            _ = CopySelectionAsync();
+            e.Handled = true;
+            return;
+        }
         // Keys consumed by an IME composition (VK_PROCESSKEY etc.) must not reach
         // the shell — e.g. Enter that picks a candidate would double-submit.
         if (e.Key is Key.ImeProcessed or Key.ImeAccept or Key.ImeConvert
@@ -1306,16 +1320,9 @@ public partial class TerminalView : Control
                     e.Handled = true;
                     return;
                 }
-                if (e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                if (!OperatingSystem.IsWindows() && e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {
                     SelectAll();
-                    e.Handled = true;
-                    return;
-                }
-                // Ctrl+Insert: the classic pre-Ctrl+C copy combo (xterm/putty).
-                if (e.Key == Key.Insert && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-                {
-                    _ = CopySelectionAsync();
                     e.Handled = true;
                     return;
                 }
@@ -1369,9 +1376,9 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        if (!OperatingSystem.IsWindows() && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
-            // Ctrl+wheel = font zoom (Windows Terminal convention). TwoWay-bound
+            // Linux Ctrl+wheel = font zoom. TwoWay-bound
             // to Vm.FontSize so the change persists like Ctrl+=/−. Only when the
             // app didn't claim the mouse — mouse-tracking CLIs get the event.
             SetCurrentValue(TerminalFontSizeProperty,
@@ -1392,7 +1399,7 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
-        ScrollBy((int)(-e.Delta.Y * 3));
+        ScrollBy((int)(e.Delta.Y * 3));
         e.Handled = true;
     }
 

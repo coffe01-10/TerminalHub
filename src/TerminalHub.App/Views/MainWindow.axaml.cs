@@ -43,6 +43,7 @@ public partial class MainWindow : Window
             DockHint.IsHitTestVisible = ActionDock.Reveal < .65;
         };
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
+        if (OperatingSystem.IsWindows()) ApplyWindowsChrome();
         Vm.PaletteRequested += OpenPalette;
         Vm.RevealCommandRequested += OnRevealCommand;
         InitializeOutputTools();
@@ -96,6 +97,11 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         FilesList.AddHandler(InputElement.PointerReleasedEvent, OnFilesDragPointerReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
+        FilesList.PointerCaptureLost += (_, e) =>
+        {
+            if (ReferenceEquals(e.Pointer, _filesDragPointer)) EndFilesDrag();
+        };
+        Closed += (_, _) => EndFilesDrag();
         FilesList.AddHandler(DragDrop.DragOverEvent, OnFilesDragOver, RoutingStrategies.Bubble);
         FilesList.AddHandler(DragDrop.DragLeaveEvent, OnFilesDragLeave, RoutingStrategies.Bubble);
         FilesList.AddHandler(DragDrop.DropEvent, OnFilesDrop, RoutingStrategies.Bubble);
@@ -149,6 +155,41 @@ public partial class MainWindow : Window
     // StageLayout grid columns: 0=shelf, 1=shelf splitter, 2=stage, 3=inspector gutter, 4=inspector.
     private const int ShelfColumn = 0, InspectorGutterColumn = 3, InspectorColumn = 4;
 
+    // Keep the Windows title + directory toolbar height and button positions.
+    // The shared controls retain their bindings, flyout and live terminal instance.
+    private void ApplyWindowsChrome()
+    {
+        StageContentGrid.RowDefinitions = new RowDefinitions("84,*,Auto");
+        TerminalViewport.BorderThickness = default;
+        NewDockButton.IsVisible = false;
+        SettingsDockButton.IsVisible = false;
+        TerminalChrome.RowDefinitions = new RowDefinitions("44,40");
+        TerminalChrome.Margin = new Thickness(8, 0, 4, 0);
+        TerminalChrome.ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*,Auto,Auto,Auto");
+        Grid.SetColumnSpan(TerminalChromeTitle, 4);
+        TerminalChromeTitle.MaxWidth = double.PositiveInfinity;
+        TerminalChromeTitle.Margin = new Thickness(0, 0, 12, 4);
+        TerminalChromeIcon.Margin = new Thickness(0, 0, 10, 4);
+        ChromeNew.Margin = new Thickness(0, 0, 0, 4);
+        ChromeClose.Margin = new Thickness(0, 0, 0, 4);
+        foreach (var dot in TerminalChromeIcon.Children.OfType<Avalonia.Controls.Shapes.Ellipse>()) dot.IsVisible = false;
+        void Place(Control control, int row, int column)
+        { Grid.SetRow(control, row); Grid.SetColumn(control, column); }
+        Place(ChromeNew, 0, 5); Place(ChromeClose, 0, 6);
+        Place(ChromeBack, 1, 0); Place(ChromeRefresh, 1, 1); Place(ChromeForward, 1, 2);
+        Place(ChromeDirectory, 1, 3); Place(ChromeSplit, 1, 4);
+        Place(ChromePopout, 1, 5); Place(SessionMenuButton, 1, 6);
+        void Label(Button button, string text)
+        {
+            var icon = (PathIcon)button.Content!;
+            button.Content = null;
+            button.Content = new StackPanel
+            { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6,
+                Children = { icon, new TextBlock { Text = text, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } } };
+        }
+        Label(ChromeSplit, "分屏"); Label(ChromePopout, "弹出");
+    }
+
     private void UpdateStageLayout()
     {
         if (_dragCard is not null) return;
@@ -170,17 +211,19 @@ public partial class MainWindow : Window
             else if (item is SessionCardViewModel c) { seen++; if (!c.IsStackTop) tucked++; }
         }
         ThumbnailHeight = Math.Clamp(
-            (SessionShelf.Bounds.Height - 34 - headerH + tucked * overlap) / visibleCards, 208, 268);
+            (SessionShelf.Bounds.Height - 34 - headerH
+                - (visibleCards - 1) * SessionCardViewModel.ShelfSpacing + tucked * overlap) / visibleCards, 208, 268);
         var shelfWidth = Vm.ShelfWidth > 0 ? Vm.ShelfWidth : (Bounds.Width < 1250 ? 232 : 280);
         shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
-        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(shelfWidth);
         // Clamp locally so a transient window shrink cannot overwrite the
         // user's persisted height — the panel regrows with the window.
         OutputPanel.Height = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
         inspectorWidth = Math.Clamp(inspectorWidth, 240, Math.Max(320, Bounds.Width * 0.45));
-        StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? inspectorWidth : 0);
+        (shelfWidth, inspectorWidth) = FitRailWidths(shelfWidth, Vm.InspectorVisible ? inspectorWidth : 0);
+        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(shelfWidth);
+        StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(inspectorWidth);
         Dispatcher.UIThread.Post(() =>
         {
             if (_stageReady && IsVisible && Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
@@ -216,6 +259,22 @@ public partial class MainWindow : Window
             scroll.Offset = new Vector(scroll.Offset.X,
                 Math.Clamp(scroll.Offset.Y + dy, 0,
                     Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height)));
+    }
+
+    // The chrome and terminal need room after both rails and gutters are deducted.
+    private const double MinimumStageWidth = 460;
+    private double RailBudget => Math.Max(180 + (Vm.InspectorVisible ? 240 : 0),
+        (Bounds.Width - StageLayout.Margin.Left - StageLayout.Margin.Right)
+        - 18 - (Vm.InspectorVisible ? 12 : 0) - MinimumStageWidth);
+
+    private (double shelf, double inspector) FitRailWidths(double shelf, double inspector)
+    {
+        if (shelf + inspector <= RailBudget) return (shelf, inspector);
+        var inspectorMin = Vm.InspectorVisible ? 240 : 0;
+        var extra = shelf - 180 + inspector - inspectorMin;
+        var scale = (RailBudget - 180 - inspectorMin) / extra;
+        return (180 + (shelf - 180) * scale,
+            inspectorMin + (inspector - inspectorMin) * scale);
     }
 
     private StageCard? FindShelfCard(SessionCardViewModel active)
@@ -335,6 +394,7 @@ public partial class MainWindow : Window
     /// <summary>Enter on the host list = connect the selected row.</summary>
     private void OnSshListKeyDown(object? sender, KeyEventArgs e)
     {
+        if (OperatingSystem.IsWindows()) return;
         if (e.Key == Key.Enter && Vm.Ssh.Selected is { } h)
         {
             Vm.Ssh.ConnectCommand.Execute(h);
@@ -346,6 +406,7 @@ public partial class MainWindow : Window
     /// active terminal — the uniform "back to typing" affordance.</summary>
     private void OnPanelEscapeKeyDown(object? sender, KeyEventArgs e)
     {
+        if (OperatingSystem.IsWindows()) return;
         if (e.Key == Key.Escape)
         {
             ActiveTerminal()?.Focus();
@@ -354,9 +415,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Enter anywhere in the SSH form = 添加/更新 (its own validation shows errors).
-    /// Esc collapses the form (same "返回" gesture as the palette).</summary>
+    /// Esc returns focus to the terminal; an empty host list keeps its add form.</summary>
     private void OnSshFormKeyDown(object? sender, KeyEventArgs e)
     {
+        if (OperatingSystem.IsWindows()) return;
         if (e.Key == Key.Escape)
         {
             Vm.Ssh.ToggleEditingCommand.Execute(null);
@@ -374,6 +436,7 @@ public partial class MainWindow : Window
     /// <summary>Double-click a saved host = connect (single click loads the edit form).</summary>
     private void OnSshRowDoubleTapped(object? sender, TappedEventArgs e)
     {
+        if (OperatingSystem.IsWindows()) return;
         if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>()?.DataContext is SshHost h
             && Vm.Ssh.ConnectCommand.CanExecute(h))
@@ -541,6 +604,7 @@ public partial class MainWindow : Window
     /// spawns a session. Taps on a card or group header keep their own meaning.</summary>
     private void OnShelfBackgroundDoubleTapped(object? sender, TappedEventArgs e)
     {
+        if (OperatingSystem.IsWindows()) return;
         if (e.Source is Visual v && v.FindAncestorOfType<ListBoxItem>(includeSelf: true) is null)
         {
             Vm.NewSessionCommand.Execute(null);
@@ -672,6 +736,7 @@ public partial class MainWindow : Window
         // stray middle release during an armed left-drag must not close it.
         if (e.InitialPressMouseButton == MouseButton.Middle)
         {
+            if (OperatingSystem.IsWindows()) return;
             if (_dragCard is null
                 && (e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is null
                 && (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
@@ -687,7 +752,7 @@ public partial class MainWindow : Window
         // pops it out — the browser "drag a tab off the strip" convention.
         // Vertical reorder keeps working; only clear horizontal overflow detaches.
         var pos = e.GetPosition(SessionShelf);
-        var detach = _cardDragging
+        var detach = !OperatingSystem.IsWindows() && _cardDragging
             && (pos.X > SessionShelf.Bounds.Width + 24 || pos.X < -24);
         var clicked = _cardDragging ? null : _dragCard;
         var dragged = _dragCard;
@@ -872,11 +937,11 @@ public partial class MainWindow : Window
             Vm.NewSessionCommand.Execute(null);
             e.Handled = true;
         }
-        else if (e.Key == Key.F)
+        else if (!OperatingSystem.IsWindows() && e.Key == Key.F)
         {
             // Ctrl+Shift+F: open the bottom panel on Search and focus the box.
             Vm.OutputVisible = true;
-            Vm.Dashboard.SelectedBottomTab = 3;
+            Vm.Dashboard.SelectedBottomTab = DashboardViewModel.SearchTabIndex;
             FindBox.Focus();
             e.Handled = true;
         }
@@ -969,11 +1034,24 @@ public partial class MainWindow : Window
     // drag. Single click stays a pure selection (and previews the file).
     private Point? _filesDragStart;
     private TerminalHub.Core.Files.FileEntry? _filesDragEntry;
+    private CancellationTokenSource? _filesDragPending;
+    private IPointer? _filesDragPointer;
 
-    private void OnFilesDragPointerPressed(object? sender, PointerPressedEventArgs e)
+    private void EndFilesDrag()
     {
         _filesDragStart = null;
         _filesDragEntry = null;
+        _filesDragPending?.Cancel();
+        _filesDragPending?.Dispose();
+        _filesDragPending = null;
+        var pointer = _filesDragPointer;
+        _filesDragPointer = null;
+        if (ReferenceEquals(pointer?.Captured, FilesList)) pointer.Capture(null);
+    }
+
+    private void OnFilesDragPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        EndFilesDrag();
         var point = e.GetCurrentPoint(FilesList);
         // Explorer convention: mouse back button navigates to the parent dir.
         if (point.Properties.IsXButton1Pressed)
@@ -997,8 +1075,7 @@ public partial class MainWindow : Window
 
     private void OnFilesDragPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        _filesDragStart = null;
-        _filesDragEntry = null;
+        EndFilesDrag();
     }
 
     private async void OnFilesDragPointerMoved(object? sender, PointerEventArgs e)
@@ -1006,16 +1083,39 @@ public partial class MainWindow : Window
         if (_filesDragStart is not { } start || _filesDragEntry is not { } entry) return;
         if (!e.GetCurrentPoint(FilesList).Properties.IsLeftButtonPressed)
         {
-            _filesDragStart = null;
-            _filesDragEntry = null;
+            EndFilesDrag();
             return;
         }
         var delta = e.GetPosition(FilesList) - start;
         if (delta.X * delta.X + delta.Y * delta.Y < 36) return;
         _filesDragStart = null;
         _filesDragEntry = null;
-        var data = await FilesDragData.CreateAsync(StorageProvider, entry);
-        if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+        var pending = new CancellationTokenSource();
+        _filesDragPending = pending;
+        var token = pending.Token;
+        // Capture while resolving a slow storage path so release outside the list
+        // still cancels this gesture before an OS drag can start.
+        _filesDragPointer = e.Pointer;
+        e.Pointer.Capture(FilesList);
+        try
+        {
+            var data = await FilesDragData.CreateAsync(StorageProvider, entry, token);
+            if (token.IsCancellationRequested) return;
+            EndFilesDrag();
+            if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (!token.IsCancellationRequested)
+            {
+                Vm.Files.StatusIsError = true;
+                Vm.Files.StatusText = $"无法拖出文件: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_filesDragPending, pending)) EndFilesDrag();
+        }
     }
 
     // Explorer-style drop feedback: hovering a directory row during an OS file
@@ -1109,7 +1209,7 @@ public partial class MainWindow : Window
     {
         if (!e.GetCurrentPoint(OutputResizeHandle).Properties.IsLeftButtonPressed) return;
         _outputDragStartY = e.GetPosition(this).Y;
-        _outputDragStartH = Vm.OutputHeight;
+        _outputDragStartH = OutputPanel.Height;
         e.Pointer.Capture(OutputResizeHandle);
         e.Handled = true;
     }
@@ -1145,7 +1245,8 @@ public partial class MainWindow : Window
     {
         if (!Equals(e.Pointer.Captured, InspectorResizeHandle)) return;
         var delta = _inspectorDragStartX - e.GetPosition(this).X;
-        Vm.InspectorWidth = Math.Clamp(_inspectorDragStartW + delta, 240, Math.Max(320, Bounds.Width * 0.45));
+        var max = Math.Max(240, RailBudget - StageLayout.ColumnDefinitions[ShelfColumn].ActualWidth);
+        Vm.InspectorWidth = Math.Clamp(_inspectorDragStartW + delta, 240, max);
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorWidth);
         e.Handled = true;
     }
@@ -1172,7 +1273,8 @@ public partial class MainWindow : Window
     {
         if (!Equals(e.Pointer.Captured, ShelfResizeHandle)) return;
         var delta = e.GetPosition(this).X - _shelfDragStartX;
-        Vm.ShelfWidth = Math.Clamp(_shelfDragStartW + delta, 180, Math.Max(280, Bounds.Width * 0.45));
+        var max = Math.Max(180, RailBudget - StageLayout.ColumnDefinitions[InspectorColumn].ActualWidth);
+        Vm.ShelfWidth = Math.Clamp(_shelfDragStartW + delta, 180, max);
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Vm.ShelfWidth);
         e.Handled = true;
     }
@@ -1280,8 +1382,9 @@ public partial class MainWindow : Window
             PopoutSessionsMenu.Items.Clear();
             foreach (var win in Vm.Popouts)
             {
-                var item = new MenuItem { Header = $"聚焦 {win.Session.Name}" };
-                ToolTip.SetTip(item, win.Session.WorkingDirectory);
+                if (win.Session is not { } session) continue;
+                var item = new MenuItem { Header = $"聚焦 {session.Name}" };
+                ToolTip.SetTip(item, session.WorkingDirectory);
                 var target = win;
                 item.Click += (_, _) => target.Activate();
                 PopoutSessionsMenu.Items.Add(item);

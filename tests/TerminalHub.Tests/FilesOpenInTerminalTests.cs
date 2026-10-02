@@ -1,4 +1,8 @@
 using System.Reflection;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.VisualTree;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -41,6 +45,19 @@ public class FilesOpenInTerminalTests
                         null, [new DirectoryInfo(uri.LocalPath)], null)),
                 _ => throw new NotSupportedException(method?.Name),
             };
+        }
+    }
+
+    public class DelayedResolveProxy : DispatchProxy
+    {
+        public TaskCompletionSource<IStorageFile?> Result { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Started { get; private set; }
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
+        {
+            if (method?.Name != nameof(IStorageProvider.TryGetFileFromPathAsync))
+                throw new NotSupportedException(method?.Name);
+            Started = true;
+            return Result.Task;
         }
     }
 
@@ -151,14 +168,30 @@ public class FilesOpenInTerminalTests
     }
 
     [Fact]
-    public void Open_File_OpensExternally_Dir_Navigates()
+    public void Open_File_PreservesPlatformBehavior_AndMenuStillOpensExternally()
     {
-        var opened = new List<string>();
-        var vm = new TerminalHub.App.ViewModels.FilesViewModel(openExternal: opened.Add);
-        // Double-click/Enter on a file escalates to the default app; single
-        // click already previews, so re-previewing would be a no-op.
-        vm.Open(new FileEntry { Name = "note.txt", FullPath = FileInDir });
-        Assert.Equal(new[] { FileInDir }, opened);
+        var root = Path.Combine(Path.GetTempPath(), "th-open-action-" + Guid.NewGuid());
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "note.txt");
+        File.WriteAllText(path, "in-app preview");
+        try
+        {
+            var opened = new List<string>();
+            using var vm = new TerminalHub.App.ViewModels.FilesViewModel(openExternal: opened.Add);
+            var file = new FileEntry { Name = "note.txt", FullPath = path };
+            vm.Open(file);
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.Empty(opened);
+                Assert.True(vm.HasPreview);
+                Assert.Contains("in-app preview", vm.PreviewText);
+            }
+            else Assert.Equal(new[] { path }, opened);
+            opened.Clear();
+            vm.OpenExternallyCommand.Execute(file);
+            Assert.Equal(new[] { path }, opened);
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     [Fact]
@@ -227,5 +260,65 @@ public class FilesOpenInTerminalTests
             window.Close();
         }
         finally { Directory.Delete(Path.Combine(Path.GetTempPath(), "th-open"), true); }
+    }
+
+    [Fact]
+    public async Task DragData_ReleasedWhileResolvingStorage_DoesNotProducePayload()
+    {
+        var provider = DispatchProxy.Create<IStorageProvider, DelayedResolveProxy>();
+        var proxy = (DelayedResolveProxy)provider;
+        using var cancel = new CancellationTokenSource();
+        var entry = new FileEntry { Name = "note.txt", FullPath = FileInDir };
+        var pending = FilesDragData.CreateAsync(provider, entry, cancel.Token);
+        Assert.True(proxy.Started);
+        cancel.Cancel();
+        var immediate = DispatchProxy.Create<IStorageProvider, FileResolveProxy>();
+        var resolved = await FilesDragData.CreateAsync(immediate, entry);
+        proxy.Result.SetResult((IStorageFile)resolved!.GetFiles()!.Single());
+        Assert.Null(await pending);
+    }
+
+    [AvaloniaFact]
+    public async Task FilesDrag_ReleaseOutsideList_CancelsPendingStorageLookup()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "th-drag-" + Guid.NewGuid());
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "sample.txt");
+        File.WriteAllText(path, "sample");
+        try
+        {
+            using var fixture = new StageLayoutTests.StageFixture();
+            var window = fixture.Window;
+            await Task.Delay(600);
+            fixture.Vm.SelectedRightTab = 1;
+            await Task.Delay(100);
+            fixture.Vm.Files.NavigateTo(root);
+            var provider = DispatchProxy.Create<IStorageProvider, DelayedResolveProxy>();
+            var proxy = (DelayedResolveProxy)provider;
+            typeof(Avalonia.Controls.TopLevel).GetField("_storageProvider",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, provider);
+            await Task.Delay(600);
+            var list = window.FindControl<Avalonia.Controls.ListBox>("FilesList")!;
+            var row = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(list)
+                .OfType<Avalonia.Controls.ListBoxItem>()
+                .Single(r => r.DataContext is FileEntry entry && entry.FullPath == path);
+            var start = row.TranslatePoint(new Avalonia.Point(35, row.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(start, MouseButton.Left);
+            window.MouseMove(start + new Avalonia.Vector(12, 0), Avalonia.Input.RawInputModifiers.LeftMouseButton);
+            Assert.True(proxy.Started);
+            var pending = (CancellationTokenSource)typeof(MainWindow).GetField("_filesDragPending",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+            var token = pending.Token;
+            window.MouseMove(new Avalonia.Point(500, 100), Avalonia.Input.RawInputModifiers.LeftMouseButton);
+            window.MouseUp(new Avalonia.Point(500, 100), MouseButton.Left);
+            Assert.True(token.IsCancellationRequested);
+            var immediate = DispatchProxy.Create<IStorageProvider, FileResolveProxy>();
+            var data = await FilesDragData.CreateAsync(immediate, new FileEntry { Name = "sample.txt", FullPath = path });
+            proxy.Result.SetResult((IStorageFile)data!.GetFiles()!.Single());
+            await Task.Delay(50);
+            Assert.Null(typeof(MainWindow).GetField("_filesDragPending",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window));
+        }
+        finally { Directory.Delete(root, true); }
     }
 }

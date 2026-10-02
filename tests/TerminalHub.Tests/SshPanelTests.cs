@@ -199,7 +199,7 @@ public class SshPanelTests
         // With saved hosts the panel is a connection list, not a form.
         var store = new List<SshHost> { new SshHost { Host = "h1" } };
         var vm = new SshViewModel(store, _ => { }, () => { });
-        Assert.False(vm.Editing);
+        Assert.Equal(OperatingSystem.IsWindows(), vm.Editing);
 
         var (empty, _, _) = MakeVm();
         Assert.True(empty.Editing);
@@ -210,12 +210,12 @@ public class SshPanelTests
     {
         var store = new List<SshHost> { new SshHost { Host = "h1", Port = 2201 } };
         var vm = new SshViewModel(store, _ => { }, () => { });
-        Assert.False(vm.Editing);
+        Assert.Equal(OperatingSystem.IsWindows(), vm.Editing);
         vm.Selected = vm.Hosts[0];
         Assert.True(vm.Editing);
         Assert.Equal("2201", vm.EditPort);
         vm.ToggleEditingCommand.Execute(null);
-        Assert.False(vm.Editing);
+        Assert.Equal(OperatingSystem.IsWindows(), vm.Editing);
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public class SshPanelTests
         var vm = new SshViewModel(store, _ => { }, () => { });
         vm.Selected = vm.Hosts[0];
         vm.ToggleEditingCommand.Execute(null);
-        Assert.False(vm.Editing);
+        Assert.Equal(OperatingSystem.IsWindows(), vm.Editing);
 
         vm.RemoveCommand.Execute(vm.Hosts[0]);
         Assert.Empty(vm.Hosts);
@@ -264,7 +264,7 @@ public class SshPanelTests
         Assert.Single(vm.Hosts);
         Assert.Null(vm.Selected);
         Assert.Equal("", vm.EditHost);
-        Assert.False(vm.Editing);
+        Assert.Equal(OperatingSystem.IsWindows(), vm.Editing);
     }
 
     [Fact]
@@ -273,6 +273,14 @@ public class SshPanelTests
         var store = new List<SshHost> { new SshHost { Host = "h1", Port = 2201 } };
         var vm = new SshViewModel(store, _ => { }, () => { });
         vm.Selected = vm.Hosts[0]; // form filled with h1
+        if (OperatingSystem.IsWindows())
+        {
+            vm.ToggleEditingCommand.Execute(null);
+            Assert.True(vm.Editing);
+            Assert.Equal("h1", vm.EditHost);
+            Assert.Same(vm.Hosts[0], vm.Selected);
+            return;
+        }
         vm.ToggleEditingCommand.Execute(null);  // close
         vm.ToggleEditingCommand.Execute(null);  // ＋ = new connection
 
@@ -283,5 +291,19 @@ public class SshPanelTests
         vm.EditHost = "h2";
         vm.AddOrUpdateCommand.Execute(null);
         Assert.Equal(2, store.Count); // adds — must not overwrite h1
+    }
+
+    [Fact]
+    public void EmptyList_CancelEditing_PreservesTheOnlyAddEntryPoint_AndDraft()
+    {
+        var (vm, _, _) = MakeVm();
+        vm.EditHost = "draft";
+        vm.ToggleEditingCommand.Execute(null);
+        Assert.True(vm.Editing);
+        Assert.Equal("draft", vm.EditHost);
+        vm.AddOrUpdateCommand.Execute(null);
+        vm.RemoveCommand.Execute(vm.Hosts[0]);
+        vm.ToggleEditingCommand.Execute(null);
+        Assert.True(vm.Editing);
     }
 }

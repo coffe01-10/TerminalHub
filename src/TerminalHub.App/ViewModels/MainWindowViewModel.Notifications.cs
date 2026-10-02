@@ -42,7 +42,7 @@ public partial class MainWindowViewModel
     /// on screen — no banner.</summary>
     private void OnSessionBell(TerminalSessionModel s)
     {
-        if (_disposed) return;
+        if (_disposed || OperatingSystem.IsWindows()) return;
         if (IsSplit ? s == LeftPane || s == RightPane : s == ActiveSession) return;
         ShowNotification(s, $"🔔 {s.Name} · 终端响铃");
         if (SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s)) is { } card)

@@ -508,10 +508,11 @@ public sealed class ScreenBuffer
     public void Backspace()
     {
         _pendingWrap = false;
-        // BS moves exactly one column. Apps like readline already count display
-        // columns and emit one \b per column — snapping to a wide glyph's lead
-        // cell here would step twice and land the cursor one char too far left.
+        // Linux readline emits one BS per display column; retain the established
+        // Windows wide-character snap until its editing behavior is changed explicitly.
         if (CursorX > 0) CursorX--;
+        if (OperatingSystem.IsWindows() && CellAt(CursorY, CursorX).IsWideContinuation && CursorX > 0)
+            CursorX--;
     }
 
     public void Tab()

@@ -100,6 +100,51 @@ public class WindowsStreamingTests
         await recovered.Task.WaitAsync(TimeSpan.FromSeconds(15));
     }
 
+    [Fact]
+    public async Task RealPowerShell_ReadLine_DeletesChineseAtEditingCursor()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var pty = new ConPtySession();
+        using var terminal = new TerminalEmulator(pty);
+        var options = new PtyOptions
+        {
+            Shell = "powershell.exe",
+            Arguments = "-NoLogo -NoProfile -NoExit -Command \"Import-Module PSReadLine; function prompt { 'TH-EDIT> ' }\""
+        };
+        var ids = new[] { -10, -11, -12 };
+        var handles = ids.Select(GetStdHandle).ToArray();
+        try
+        {
+            foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
+            await terminal.StartAsync(options);
+        }
+        finally
+        {
+            for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]);
+        }
+        async Task WaitForText(string expected)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline)
+            {
+                lock (terminal.Buffer.SyncRoot)
+                    if (terminal.Buffer.TailText(10).Contains(expected)) return;
+                await Task.Delay(30);
+            }
+            lock (terminal.Buffer.SyncRoot)
+                Assert.Fail($"Expected {expected} in real PowerShell output: {terminal.Buffer.TailText(10)}");
+        }
+        await WaitForText("TH-EDIT>");
+        pty.Write(Encoding.UTF8.GetBytes("ab中文cd"));
+        await WaitForText("ab中文cd");
+        // No Enter: only edit the command line, without executing a command.
+        pty.Write("\x1b[D\x1b[D\x7f"u8);
+        await WaitForText("ab中cd");
+        await Task.Delay(100);
+        lock (terminal.Buffer.SyncRoot)
+            Assert.Equal("TH-EDIT> ".Length + 4, terminal.Buffer.CursorX);
+    }
+
     [DllImport("kernel32.dll")] private static extern IntPtr GetStdHandle(int id);
     [DllImport("kernel32.dll")] private static extern bool SetStdHandle(int id, IntPtr handle);
 }

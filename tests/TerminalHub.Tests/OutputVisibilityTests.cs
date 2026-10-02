@@ -10,19 +10,17 @@ using Xunit;
 
 namespace TerminalHub.Tests;
 
-/// <summary>Dashboard mockup: the Output bottom bar is expanded by default and
-/// carries only real app/session events (timestamp + level) — no demo rows.
-/// Toggle still hides it and persists.</summary>
+/// <summary>Platform Output defaults, persisted choices and real rendered app events.</summary>
 public class OutputVisibilityTests
 {
     [AvaloniaFact]
-    public void Default_OutputVisible()
+    public void Default_OutputVisibility_RespectsPlatform()
     {
-        Assert.True(new AppSettings().OutputVisible);
+        Assert.Equal(!OperatingSystem.IsWindows(), new AppSettings().OutputVisible);
 
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(Path.Combine(dir, "settings.json")));
-        Assert.True(vm.OutputVisible); // fresh install → output bar expanded
+        Assert.Equal(!OperatingSystem.IsWindows(), vm.OutputVisible);
     }
 
     [AvaloniaFact]
@@ -33,7 +31,7 @@ public class OutputVisibilityTests
         try
         {
             var vm = new MainWindowViewModel(new IdleMonitor(), new SettingsStore(path));
-            Assert.True(vm.OutputVisible);
+            vm.OutputVisible = true;
             vm.ToggleOutputCommand.Execute(null); // user hides it
             Assert.False(vm.OutputVisible);
             vm.PersistSettings();
@@ -49,7 +47,7 @@ public class OutputVisibilityTests
     }
 
     [AvaloniaFact]
-    public async Task OutputPanel_VisibleByDefault_RendersRealEvent()
+    public async Task OutputPanel_ExplicitlyOpened_RendersRealEvent()
     {
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1440, Height = 900 };
@@ -58,7 +56,9 @@ public class OutputVisibilityTests
         var vm = (MainWindowViewModel)window.DataContext!;
 
         var panel = window.FindControl<Border>("OutputPanel")!;
-        Assert.True(panel.IsVisible); // default-on without clicking 输出
+        Assert.Equal(!OperatingSystem.IsWindows(), panel.IsVisible);
+        vm.OutputVisible = true;
+        Assert.True(panel.IsVisible);
 
         // Trigger a real app event: split creates one logged entry per pane.
         vm.ToggleSplitCommand.Execute(null);
@@ -128,6 +128,8 @@ public class OutputVisibilityTests
         await Task.Delay(600);
         var vm = (MainWindowViewModel)window.DataContext!;
 
+        vm.OutputVisible = true;
+        await Task.Delay(100);
         var combo = window.FindControl<ComboBox>("OutputLevelCombo")!;
         Assert.True(combo.IsEffectivelyVisible);
         Assert.Equal(0, combo.SelectedIndex); // 全部

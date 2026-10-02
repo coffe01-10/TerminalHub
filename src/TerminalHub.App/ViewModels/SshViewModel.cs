@@ -28,6 +28,7 @@ public partial class SshViewModel : ViewModelBase
     /// view; the form opens on demand (or automatically while no host exists).</summary>
     [ObservableProperty] private bool _editing;
     public bool HasHosts => Hosts.Count > 0;
+    public bool CanToggleEditing => !OperatingSystem.IsWindows();
 
     public SshViewModel(
         List<SshHost> hosts,
@@ -41,7 +42,7 @@ public partial class SshViewModel : ViewModelBase
         _sshAvailable = sshAvailable ?? SshLocator.Available;
         foreach (var h in _hosts) Hosts.Add(h);
         Hosts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasHosts));
-        _editing = Hosts.Count == 0;
+        _editing = OperatingSystem.IsWindows() || Hosts.Count == 0;
     }
 
     /// <summary>Selecting a row fills the edit form (edit → 添加/更新 to save).</summary>
@@ -61,7 +62,13 @@ public partial class SshViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleEditing()
     {
-        if (Editing) { Editing = false; return; }
+        if (!CanToggleEditing) return; // Windows keeps its always-visible editor and draft.
+        if (Editing)
+        {
+            // With no hosts the form is the only add entry point.
+            if (HasHosts) Editing = false;
+            return;
+        }
         Selected = null;
         ClearEdit();
         Editing = true;
@@ -142,7 +149,7 @@ public partial class SshViewModel : ViewModelBase
         }
         // The empty list always offers the form — it is the only way to add.
         if (Hosts.Count == 0) Editing = true;
-        else if (wasSelected) Editing = false;
+        else if (wasSelected) Editing = OperatingSystem.IsWindows();
     }
 
     /// <summary>Spawn a new terminal session running `ssh -p port user@host`.</summary>

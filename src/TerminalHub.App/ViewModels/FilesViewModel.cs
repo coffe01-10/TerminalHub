@@ -18,6 +18,12 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private readonly Action<string> _revealInFileManager;
     private readonly Action<string> _openExternal;
     private bool _initialized;
+    private int _previewRequest;
+    private readonly Func<string, Avalonia.Media.Imaging.Bitmap> _imageLoader;
+    private readonly bool _previewOnSelection;
+    /// <summary>The current image load; text previews complete synchronously.</summary>
+    public Task PreviewLoading { get; private set; } = Task.CompletedTask;
+    public string PreviewHint => _previewOnSelection ? "选中文件即可预览" : "Enter 或双击文件查看预览";
 
     /// <summary>One clickable breadcrumb segment.</summary>
     public sealed record Crumb(string Label, string Path);
@@ -48,8 +54,8 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// <param name="hasActiveSession">Whether a live session exists to receive `cd`.</param>
     /// <param name="revealInFileManager">Opens the OS file manager at a path
     /// (tests inject a capture; null → platform default).</param>
-    /// <param name="showHidden">Include dot-prefixed/OS-hidden entries; off by
-    /// default like Explorer/Finder.</param>
+    /// <param name="showHidden">Include dot-prefixed/OS-hidden entries; Windows
+    /// keeps its unfiltered listing, Linux hides them by default.</param>
     /// <param name="openExternal">Launches a file with the OS default app
     /// (tests inject a capture; null → platform default).</param>
     public FilesViewModel(Func<string?>? sessionCwd = null,
@@ -58,7 +64,9 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
                           Func<bool>? hasActiveSession = null,
                           Action<string>? revealInFileManager = null,
                           Action<string>? openExternal = null,
-                          bool showHidden = false)
+                          bool? showHidden = null,
+                          Func<string, Avalonia.Media.Imaging.Bitmap>? imageLoader = null,
+                          bool? previewOnSelection = null)
     {
         _sessionCwd = sessionCwd ?? (() => null);
         _openTerminalAt = openTerminalAt;
@@ -66,7 +74,9 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         _hasActiveSession = hasActiveSession;
         _revealInFileManager = revealInFileManager ?? RevealDefault;
         _openExternal = openExternal ?? OpenDefault;
-        _showHidden = showHidden;
+        _showHidden = showHidden ?? OperatingSystem.IsWindows();
+        _previewOnSelection = previewOnSelection ?? !OperatingSystem.IsWindows();
+        _imageLoader = imageLoader ?? (path => new Avalonia.Media.Imaging.Bitmap(path));
     }
 
     /// <summary>Toggling dotfile visibility refilters the current directory.</summary>
@@ -81,8 +91,9 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         CopyPathCommand.NotifyCanExecuteChanged();
         RevealInFileManagerCommand.NotifyCanExecuteChanged();
         OpenExternallyCommand.NotifyCanExecuteChanged();
+        if (!_previewOnSelection) return; // Windows previews only on Open / Enter / double-click.
         if (value is { IsDirectory: false }) PreviewFile(value.FullPath);
-        else HasPreview = false;
+        else ClearPreview();
     }
 
     /// <summary>Active-session churn also gates 「在此打开终端」 — the shell VM
@@ -176,8 +187,10 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         {
             Interlocked.Exchange(ref _refreshPending, 0);
             if (_disposed) return;
+            var request = _previewRequest;
             NavigateTo(CurrentPath);
-            if (HasPreview && SelectedEntry is { IsDirectory: false } entry) PreviewFile(entry.FullPath);
+            if (request == _previewRequest && HasPreview && SelectedEntry is { IsDirectory: false } entry)
+                PreviewFile(entry.FullPath);
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
@@ -185,6 +198,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     {
         _disposed = true;
         _watcher?.Dispose();
+        ClearPreview();
     }
 
     private void RebuildCrumbs()
@@ -208,11 +222,12 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Open an entry (double-click / Enter): dir → navigate,
-    /// file → default app (single-click already previews).</summary>
+    /// file → in-app preview on Windows, default app on Linux.</summary>
     public void Open(FileEntry? entry)
     {
         if (entry is null) return;
         if (entry.IsDirectory) NavigateTo(entry.FullPath);
+        else if (OperatingSystem.IsWindows()) PreviewFile(entry.FullPath);
         else OpenExternally(entry);
     }
 
@@ -225,44 +240,32 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     /// <summary>Bitmaps beyond this size fall through to the binary notice.</summary>
     public const long MaxImagePreviewBytes = 16 * 1024 * 1024;
 
-    private void PreviewFile(string path)
+    private void ClearPreview()
     {
-        // Release the previous bitmap before replacing: keeping it alive would
-        // hold the source file open (a real file lock on Windows).
-        PreviewImage?.Dispose();
+        _previewRequest++;
+        var previous = PreviewImage;
         PreviewImage = null;
         PreviewIsImage = false;
+        HasPreview = false;
+        previous?.Dispose();
+        PreviewLoading = Task.CompletedTask;
+    }
+
+    private void PreviewFile(string path)
+    {
+        ClearPreview();
+        if (ImageExtensions.Contains(Path.GetExtension(path)))
+        {
+            PreviewTitle = Path.GetFileName(path);
+            PreviewPath = Path.GetFullPath(path);
+            PreviewMeta = "";
+            PreviewText = "正在加载图片…";
+            HasPreview = true;
+            PreviewLoading = PreviewImageAsync(path, _previewRequest);
+            return;
+        }
         try
         {
-            // Images bypass ReadPreview: its 2 MB text cap would classify even
-            // a modest PNG as TooLarge before the bitmap decode is attempted.
-            if (ImageExtensions.Contains(Path.GetExtension(path)))
-            {
-                var info = new FileInfo(path);
-                var imeta = $"{MainWindowViewModel.FmtBytes(info.Length)} · {info.LastWriteTime:yyyy-MM-dd HH:mm}";
-                PreviewTitle = Path.GetFileName(path);
-                PreviewPath = Path.GetFullPath(path);
-                if (info.Length <= MaxImagePreviewBytes && TryLoadImage(path))
-                {
-                    PreviewMeta = $"{imeta} · 图片";
-                    PreviewText = "";
-                    PreviewIsImage = true;
-                }
-                else if (PreviewImage is null && info.Length > MaxImagePreviewBytes)
-                {
-                    PreviewMeta = $"{imeta} · 超过 {MainWindowViewModel.FmtBytes(MaxImagePreviewBytes)}";
-                    PreviewText = "〔图片过大 — 不提供预览〕";
-                }
-                else
-                {
-                    // Decode failed (corrupt/mislabeled) — honest binary notice.
-                    PreviewMeta = $"{imeta} · 二进制文件";
-                    PreviewText = "〔二进制文件 — 不提供文本预览〕";
-                }
-                HasPreview = true;
-                return;
-            }
-
             var p = LocalFileBrowser.ReadPreview(path);
             PreviewTitle = Path.GetFileName(path);
             PreviewPath = Path.GetFullPath(path);
@@ -286,26 +289,57 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Selection-tracked preview: a failed read must not leave the
-            // previous file's preview on screen under the new selection.
-            HasPreview = false;
-            StatusIsError = true;
-            StatusText = $"无法读取文件: {ex.Message}";
+            ReportPreviewError(ex);
         }
     }
 
-    private bool TryLoadImage(string path)
+    private async Task PreviewImageAsync(string path, int request)
     {
         try
         {
-            PreviewImage = new Avalonia.Media.Imaging.Bitmap(path);
-            return true;
+            // File I/O and bitmap decode stay off the dispatcher, including slow shares.
+            var (image, meta, notice) = await Task.Run(() =>
+            {
+                var info = new FileInfo(path);
+                var meta = $"{MainWindowViewModel.FmtBytes(info.Length)} · {info.LastWriteTime:yyyy-MM-dd HH:mm}";
+                if (info.Length > MaxImagePreviewBytes)
+                    return ((Avalonia.Media.Imaging.Bitmap?)null,
+                        $"{meta} · 超过 {MainWindowViewModel.FmtBytes(MaxImagePreviewBytes)}",
+                        "〔图片过大 — 不提供预览〕");
+                var image = TryLoadImage(path);
+                return image is not null ? (image, $"{meta} · 图片", "")
+                    : (image, $"{meta} · 二进制文件", "〔二进制文件 — 不提供文本预览〕");
+            });
+            // A slow decode must never overwrite a later selection or survive disposal.
+            if (_disposed || request != _previewRequest)
+            {
+                image?.Dispose();
+                return;
+            }
+            PreviewImage = image;
+            PreviewIsImage = image is not null;
+            PreviewMeta = meta;
+            PreviewText = notice;
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (!_disposed && request == _previewRequest) ReportPreviewError(ex);
+        }
+    }
+
+    private void ReportPreviewError(Exception ex)
+    {
+        HasPreview = false;
+        StatusIsError = true;
+        StatusText = $"无法读取文件: {ex.Message}";
+    }
+
+    private Avalonia.Media.Imaging.Bitmap? TryLoadImage(string path)
+    {
+        try { return _imageLoader(path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                      or ArgumentException or InvalidOperationException)
-        {
-            return false;
-        }
+        { return null; }
     }
 
     [RelayCommand]
@@ -526,7 +560,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetDir ?? CurrentPath));
         StatusIsError = false;
         StatusText = "导入中…";
-        var (copied, skipped, error) = await Task.Run(() => DoImport(cur, list));
+        var (copied, skipped, linksSkipped, error) = await Task.Run(() => DoImport(cur, list));
         if (_disposed) return copied;
         if (copied > 0) NavigateTo(CurrentPath);   // refresh first — it rewrites StatusText
         if (error is not null)
@@ -545,31 +579,30 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
                 ? (skipped > 0 ? $"已导入 {copied} 项，跳过 {skipped} 项" : $"已导入 {copied} 项")
                 : sameDir ? "已在当前目录中，跳过" : "已在目标目录中，跳过";
         }
+        if (linksSkipped > 0) StatusText += $" · 跳过 {linksSkipped} 个目录链接";
         return copied;
     }
 
-    private static (int copied, int skipped, string? error) DoImport(string cur, List<string> paths)
+    private static (int copied, int skipped, int linksSkipped, string? error) DoImport(string cur, List<string> paths)
     {
-        var copied = 0; var skipped = 0;
+        var copied = 0; var skipped = 0; var linksSkipped = 0;
         foreach (var raw in paths)
         {
             try
             {
                 var src = Path.TrimEndingDirectorySeparator(Path.GetFullPath(raw));
-                // A symlinked source resolves to its real target — a link into
-                // CurrentPath must count as "already inside" too.
-                var resolved = Directory.Exists(src)
-                    ? Path.TrimEndingDirectorySeparator(
-                        new DirectoryInfo(src).ResolveLinkTarget(true)?.FullName ?? src)
-                    : src;
-                if (PathContains(cur, src) || PathContains(src, cur)
-                    || PathContains(cur, resolved) || PathContains(resolved, cur))
+                if (!Directory.Exists(src) && !File.Exists(src)) { skipped++; continue; }
+                // Resolve BOTH paths, including linked parent components. A destination
+                // junction into the source otherwise makes CopyDirectory copy itself.
+                var actualTarget = ResolvePath(cur);
+                var actualSource = ResolvePath(src);
+                if (PathContains(actualTarget, actualSource) || PathContains(actualSource, actualTarget))
                 {
                     skipped++;
                     continue;
                 }
                 var dest = Path.Combine(cur, UniqueNameIn(cur, Path.GetFileName(src)));
-                if (Directory.Exists(src)) CopyDirectory(src, dest);
+                if (Directory.Exists(src)) linksSkipped += CopyDirectory(src, dest);
                 else if (File.Exists(src)) File.Copy(src, dest);
                 else { skipped++; continue; }
                 copied++;
@@ -577,10 +610,26 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                          or ArgumentException or NotSupportedException)
             {
-                return (copied, skipped, $"无法导入 {Path.GetFileName(raw)}: {ex.Message}");
+                return (copied, skipped, linksSkipped, $"无法导入 {Path.GetFileName(raw)}: {ex.Message}");
             }
         }
-        return (copied, skipped, null);
+        return (copied, skipped, linksSkipped, null);
+    }
+
+    private static string ResolvePath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var resolved = Path.GetPathRoot(full)!;
+        var relative = full[resolved.Length..];
+        foreach (var part in relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            resolved = Path.Combine(resolved, part);
+            FileSystemInfo info = Directory.Exists(resolved)
+                ? new DirectoryInfo(resolved) : new FileInfo(resolved);
+            resolved = info.ResolveLinkTarget(true)?.FullName ?? resolved;
+        }
+        return Path.TrimEndingDirectorySeparator(resolved);
     }
 
     /// <summary>dir contains path (or is equal to it). Case-insensitive on
@@ -595,17 +644,19 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             || path.StartsWith(d + Path.DirectorySeparatorChar, cmp);
     }
 
-    private static void CopyDirectory(string src, string dest)
+    private static int CopyDirectory(string src, string dest)
     {
         Directory.CreateDirectory(dest);
+        var skippedLinks = 0;
         foreach (var dir in Directory.EnumerateDirectories(src))
         {
             var info = new DirectoryInfo(dir);
-            if (info.LinkTarget is not null) continue;   // never chase links — loop safety
-            CopyDirectory(dir, Path.Combine(dest, info.Name));
+            if (info.LinkTarget is not null) { skippedLinks++; continue; }
+            skippedLinks += CopyDirectory(dir, Path.Combine(dest, info.Name));
         }
         foreach (var file in Directory.EnumerateFiles(src))
             File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
+        return skippedLinks;
     }
 
     private string UniqueName(string baseName) => UniqueNameIn(CurrentPath, baseName);
