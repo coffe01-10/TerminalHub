@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using TerminalHub.App.Views;
@@ -92,6 +93,43 @@ public class UiSmokeTests
         Assert.True(File.Exists(Path.Combine(outDir, "files.png")));
         Assert.True(File.Exists(Path.Combine(outDir, "ssh.png")));
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task F2_OnFilesList_OpensFileRename_NotSessionRename()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        await Task.Delay(500);
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        vm.SelectedRightTab = 1;
+        await Task.Delay(300);
+        Assert.NotEmpty(vm.Files.Entries);
+        vm.Files.SelectedEntry = vm.Files.Entries.First();
+
+        var filesList = window.FindControl<Avalonia.Controls.ListBox>("FilesList")!;
+        filesList.RaiseEvent(new Avalonia.Input.KeyEventArgs
+        {
+            RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent,
+            Key = Avalonia.Input.Key.F2,
+            Source = filesList,
+        });
+        await Task.Delay(200);
+
+        // The tunneling session-shortcut handler must not steal F2: the dialog
+        // that opens is the Files rename prompt (「重命名」), not 「重命名终端」.
+        var dialogs = window.OwnedWindows.Where(w => w.IsVisible).ToList();
+        try
+        {
+            var dialog = Assert.Single(dialogs);
+            Assert.Equal("重命名", dialog.Title);
+        }
+        finally
+        {
+            foreach (var d in dialogs) d.Close();
+            window.Close();
+        }
     }
 
     [AvaloniaFact]

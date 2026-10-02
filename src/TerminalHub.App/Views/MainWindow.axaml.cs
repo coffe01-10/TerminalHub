@@ -750,8 +750,12 @@ public partial class MainWindow : Window
         if (e.Source is ShortcutEditor) return;
         if (Vm.HandleSessionShortcut(e)) { e.Handled = true; return; }
         // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
+        // F2 on the Files list must reach its own bubble handler (file rename);
+        // everywhere else it opens the session rename dialog.
         if (e.Key == Key.F2 && e.KeyModifiers == KeyModifiers.None
-            && e.Source is not (TextBox or TerminalView)) { OnRenameActive(sender, e); return; }
+            && e.Source is not (TextBox or TerminalView)
+            && (e.Source as Visual)?.FindAncestorOfType<ListBox>(includeSelf: true) != FilesList)
+        { OnRenameActive(sender, e); return; }
         // AltGr arrives as Ctrl+Alt. Those keys belong to the character, not font zoom.
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Alt)) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -913,10 +917,10 @@ public partial class MainWindow : Window
     private void OnFilesDrop(object? sender, DragEventArgs e)
     {
         var paths = e.Data.GetFiles()?
-            .Select(item => item.Path.LocalPath)
+            .Select(item => item.TryGetLocalPath())
             .Where(p => !string.IsNullOrEmpty(p))
             .ToList();
-        if (paths is { Count: > 0 }) Vm.Files.ImportPaths(paths);
+        if (paths is { Count: > 0 }) _ = Vm.Files.ImportPathsAsync(paths!);
         e.Handled = true;
     }
 

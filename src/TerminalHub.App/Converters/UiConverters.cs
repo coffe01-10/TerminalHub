@@ -79,7 +79,8 @@ public sealed class ModifiedConverter : IValueConverter
     public static readonly ModifiedConverter Instance = new();
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is DateTimeOffset d ? d.ToLocalTime().ToString("MM-dd HH:mm") : "";
+        => value is DateTimeOffset d
+            ? d.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) : "";
 
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }

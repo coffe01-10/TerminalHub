@@ -424,6 +424,18 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private bool IsFileSelection(FileEntry? entry)
         => (entry ?? SelectedEntry) is { IsDirectory: false };
 
+    /// <summary>Reject separators / traversal / OS-invalid chars in a name typed
+    /// into a create-or-rename field. Returns true and reports when invalid.</summary>
+    private bool RejectBadName(string name)
+    {
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+            && !name.Contains('/') && !name.Contains('\\')
+            && name is not "." and not "..") return false;
+        StatusIsError = true;
+        StatusText = $"名称无效: {name}";
+        return true;
+    }
+
     /// <summary>Create a folder under CurrentPath. Null/blank name → auto
     /// 「新建文件夹」「新建文件夹 2」…; the new entry gets selected.</summary>
     public void NewFolder(string? name)
@@ -431,6 +443,8 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         try
         {
             var final = string.IsNullOrWhiteSpace(name) ? UniqueName("新建文件夹") : name.Trim();
+            if (RejectBadName(final)) return;
+            final = UniqueName(final);   // explicit names dedupe too — never a silent no-op
             var path = Path.Combine(CurrentPath, final);
             Directory.CreateDirectory(path);
             NavigateTo(CurrentPath);
@@ -454,6 +468,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         try
         {
             var baseName = string.IsNullOrWhiteSpace(name) ? "新建文本.txt" : name.Trim();
+            if (RejectBadName(baseName)) return;
             if (!baseName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
                 && !baseName.Contains('.')) baseName += ".txt";
             var final = UniqueName(baseName);
@@ -479,7 +494,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     {
         if (entry is null || string.IsNullOrWhiteSpace(newName)) return;
         newName = newName.Trim();
-        if (newName == entry.Name) return;
+        if (newName == entry.Name || RejectBadName(newName)) return;
         try
         {
             var dest = Path.Combine(CurrentPath, newName);
@@ -499,20 +514,57 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Copy OS-dropped files/dirs into CurrentPath (drag-in import).
-    /// Name clashes get the usual 「n」 suffix; items already inside the
-    /// current directory are skipped. Returns the number actually copied.</summary>
-    public int ImportPaths(IEnumerable<string> paths)
+    /// <summary>Copy OS-dropped files/dirs into CurrentPath (drag-in import),
+    /// off the UI thread. Skips items inside / equal to / ancestors of
+    /// CurrentPath (a drop back onto its own directory or a parent dragged in
+    /// from Explorer would otherwise recurse into the destination forever).
+    /// Returns the number actually copied.</summary>
+    public async Task<int> ImportPathsAsync(IEnumerable<string> paths)
+    {
+        var list = paths.ToList();
+        if (list.Count == 0) return 0;
+        var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(CurrentPath));
+        StatusIsError = false;
+        StatusText = "导入中…";
+        var (copied, skipped, error) = await Task.Run(() => DoImport(cur, list));
+        if (_disposed) return copied;
+        if (copied > 0) NavigateTo(CurrentPath);   // refresh first — it rewrites StatusText
+        if (error is not null)
+        {
+            StatusIsError = true;
+            StatusText = error;
+        }
+        else
+        {
+            StatusIsError = false;
+            StatusText = copied > 0
+                ? (skipped > 0 ? $"已导入 {copied} 项，跳过 {skipped} 项" : $"已导入 {copied} 项")
+                : "已在当前目录中，跳过";
+        }
+        return copied;
+    }
+
+    private static (int copied, int skipped, string? error) DoImport(string cur, List<string> paths)
     {
         var copied = 0; var skipped = 0;
-        var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(CurrentPath)) + Path.DirectorySeparatorChar;
         foreach (var raw in paths)
         {
-            var src = Path.TrimEndingDirectorySeparator(Path.GetFullPath(raw));
-            if (src.StartsWith(cur, StringComparison.Ordinal)) { skipped++; continue; }
             try
             {
-                var dest = Path.Combine(CurrentPath, UniqueName(Path.GetFileName(src)));
+                var src = Path.TrimEndingDirectorySeparator(Path.GetFullPath(raw));
+                // A symlinked source resolves to its real target — a link into
+                // CurrentPath must count as "already inside" too.
+                var resolved = Directory.Exists(src)
+                    ? Path.TrimEndingDirectorySeparator(
+                        new DirectoryInfo(src).ResolveLinkTarget(true)?.FullName ?? src)
+                    : src;
+                if (PathContains(cur, src) || PathContains(src, cur)
+                    || PathContains(cur, resolved) || PathContains(resolved, cur))
+                {
+                    skipped++;
+                    continue;
+                }
+                var dest = Path.Combine(cur, UniqueNameIn(cur, Path.GetFileName(src)));
                 if (Directory.Exists(src)) CopyDirectory(src, dest);
                 else if (File.Exists(src)) File.Copy(src, dest);
                 else { skipped++; continue; }
@@ -521,36 +573,47 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                          or ArgumentException or NotSupportedException)
             {
-                StatusIsError = true;
-                StatusText = $"无法导入 {Path.GetFileName(src)}: {ex.Message}";
-                return copied;
+                return (copied, skipped, $"无法导入 {Path.GetFileName(raw)}: {ex.Message}");
             }
         }
-        if (copied > 0) NavigateTo(CurrentPath);
-        StatusIsError = false;
-        StatusText = copied > 0
-            ? (skipped > 0 ? $"已导入 {copied} 项，跳过 {skipped} 项" : $"已导入 {copied} 项")
-            : (skipped > 0 ? "已在当前目录中" : StatusText);
-        return copied;
+        return (copied, skipped, null);
+    }
+
+    /// <summary>dir contains path (or is equal to it). Case-insensitive on
+    /// Windows where the filesystem is; root contains everything under it.</summary>
+    private static bool PathContains(string dir, string path)
+    {
+        var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase
+                                              : StringComparison.Ordinal;
+        var d = Path.TrimEndingDirectorySeparator(dir);
+        if (d == Path.GetPathRoot(d)) return path.StartsWith(d, cmp);
+        return string.Equals(d, path, cmp)
+            || path.StartsWith(d + Path.DirectorySeparatorChar, cmp);
     }
 
     private static void CopyDirectory(string src, string dest)
     {
         Directory.CreateDirectory(dest);
         foreach (var dir in Directory.EnumerateDirectories(src))
-            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
+        {
+            var info = new DirectoryInfo(dir);
+            if (info.LinkTarget is not null) continue;   // never chase links — loop safety
+            CopyDirectory(dir, Path.Combine(dest, info.Name));
+        }
         foreach (var file in Directory.EnumerateFiles(src))
             File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
     }
 
-    private string UniqueName(string baseName)
+    private string UniqueName(string baseName) => UniqueNameIn(CurrentPath, baseName);
+
+    private static string UniqueNameIn(string dir, string baseName)
     {
         var stem = Path.GetFileNameWithoutExtension(baseName);
         var ext = Path.GetExtension(baseName);
         var name = baseName;
         var i = 1;
-        while (Directory.Exists(Path.Combine(CurrentPath, name))
-               || File.Exists(Path.Combine(CurrentPath, name)))
+        while (Directory.Exists(Path.Combine(dir, name))
+               || File.Exists(Path.Combine(dir, name)))
             name = $"{stem} {++i}{ext}";
         return name;
     }

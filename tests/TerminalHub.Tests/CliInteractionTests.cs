@@ -222,4 +222,21 @@ public class CliInteractionTests
         Assert.EndsWith("line-59", text);
         Assert.Empty(f.Pty.Writes); // Ctrl+Shift+A is a UI gesture — never reaches the shell
     }
+
+    [AvaloniaFact]
+    public void CtrlShiftA_OnAlternateScreen_ExcludesHiddenScrollback()
+    {
+        using var f = new Fixture();
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < 60; i++) sb.Append($"primary-{i:D2}\r\n");
+        f.Emulator.Parser.Feed(sb.ToString().TrimEnd('\r', '\n'));   // fills scrollback
+        f.Emulator.Parser.Feed("\x1b[?1049h");                       // alternate screen
+        f.Emulator.Parser.Feed("alt-screen-content");
+
+        f.View.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent,
+            Key = Key.A, KeyModifiers = KeyModifiers.Control | KeyModifiers.Shift });
+        var text = f.View.GetSelectedText();
+        Assert.Contains("alt-screen-content", text);
+        Assert.DoesNotContain("primary-", text);   // invisible scrollback must not be copied
+    }
 }

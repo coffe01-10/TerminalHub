@@ -1616,8 +1616,11 @@ public partial class TerminalView : Control
         lock (buf.SyncRoot)
         {
             SynchronizeCoordinates();
-            if (buf.TotalLines == 0) return;
-            _selAnchor = (0, 0);
+            // On the alternate screen the scrollback is preserved but invisible —
+            // selecting it would copy stale primary-screen text into a TUI.
+            var first = buf.OnAlternateScreen ? buf.ScrollbackCount : 0;
+            if (buf.TotalLines <= first) return;
+            _selAnchor = (first, 0);
             _selEnd = (buf.TotalLines - 1, buf.Columns - 1);
             _wordSelection = false;
         }

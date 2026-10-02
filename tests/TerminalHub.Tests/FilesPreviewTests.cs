@@ -192,10 +192,10 @@ public class FilesPreviewTests : IDisposable
     {
         using var vm = new FilesViewModel();
         vm.NavigateTo(_root);
-        vm.NewFolder("a/b\0c"); // invalid path chars → ArgumentException/IOException
+        vm.NewFolder("a/b\0c"); // separators/NUL rejected before touching the fs
 
         Assert.True(vm.StatusIsError);
-        Assert.Contains("无法创建", vm.StatusText);
+        Assert.Contains("名称无效", vm.StatusText);
     }
 
     [AvaloniaFact]
@@ -229,7 +229,7 @@ public class FilesPreviewTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void ImportPaths_CopiesFileAndDir_UniqueNames_SkipsInPlace()
+    public async Task ImportPaths_CopiesFileAndDir_UniqueNames_SkipsInPlace()
     {
         var outside = Path.Combine(_root, "..", $"ext-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(outside, "pkg", "nested"));
@@ -239,7 +239,7 @@ public class FilesPreviewTests : IDisposable
         {
             using var vm = new FilesViewModel();
             vm.NavigateTo(_root);
-            var imported = vm.ImportPaths(new[]
+            var imported = await vm.ImportPathsAsync(new[]
             {
                 Path.Combine(outside, "incoming.txt"),
                 Path.Combine(outside, "pkg"),
@@ -252,10 +252,81 @@ public class FilesPreviewTests : IDisposable
             Assert.False(vm.StatusIsError);
 
             // Second import of the same name → unique suffix, not overwrite.
-            vm.ImportPaths(new[] { Path.Combine(outside, "incoming.txt") });
+            await vm.ImportPathsAsync(new[] { Path.Combine(outside, "incoming.txt") });
             Assert.True(File.Exists(Path.Combine(_root, "incoming 2.txt")));
         }
         finally { Directory.Delete(outside, true); }
+    }
+
+    [AvaloniaFact]
+    public async Task ImportPaths_SelfAncestor_AndSymlink_AreSkipped_NotRecursive()
+    {
+        var outside = Path.Combine(_root, "..", $"ext-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outside);
+        try
+        {
+            // A symlink back to its own parent — copying it would loop forever.
+            var loop = Path.Combine(outside, "loop");
+            try { Directory.CreateSymbolicLink(loop, outside); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* FS without symlink support → covered below anyway */ }
+            File.WriteAllText(Path.Combine(outside, "ok.txt"), "x");
+
+            using var vm = new FilesViewModel();
+            vm.NavigateTo(_root);
+            var before = Directory.GetFileSystemEntries(_root).Length;
+
+            var imported = await vm.ImportPathsAsync(new[]
+            {
+                _root,                                   // the directory itself
+                Directory.GetParent(_root)!.FullName,    // an ancestor
+                Path.Combine(_root, "a.txt"),            // already inside
+            });
+            Assert.Equal(0, imported);
+            Assert.Equal(before, Directory.GetFileSystemEntries(_root).Length);
+            Assert.False(vm.StatusIsError);
+            Assert.Contains("跳过", vm.StatusText);
+
+            // Source tree containing a self-link still completes: the link dir
+            // is copied as nothing (skipped), not recursed into.
+            var copied = await vm.ImportPathsAsync(new[] { outside });
+            Assert.Equal(1, copied);
+            Assert.True(File.Exists(Path.Combine(_root, Path.GetFileName(outside), "ok.txt")));
+            Assert.False(Directory.Exists(Path.Combine(_root, Path.GetFileName(outside), "loop")));
+        }
+        finally { Directory.Delete(outside, true); }
+    }
+
+    [AvaloniaFact]   // writes into the watched dir — watcher posts need a session
+    public void NewFolder_ExplicitExistingName_Dedupes()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+        vm.NewFolder("sub");                    // "sub" exists in the fixture
+        Assert.True(Directory.Exists(Path.Combine(_root, "sub 2")));
+        Assert.Equal("sub 2", vm.SelectedEntry?.Name);
+    }
+
+    [Fact]
+    public void Names_WithSeparators_OrTraversal_AreRejected()
+    {
+        using var vm = new FilesViewModel();
+        vm.NavigateTo(_root);
+
+        vm.NewFolder("../escape");
+        Assert.True(vm.StatusIsError);
+        Assert.False(Directory.Exists(Path.Combine(_root, "..", "escape")));
+
+        vm.NewFolder("a/b");
+        Assert.True(vm.StatusIsError);
+        Assert.False(Directory.Exists(Path.Combine(_root, "a")));
+
+        vm.NewTextFile("../escape.txt");
+        Assert.True(vm.StatusIsError);
+
+        vm.Rename(vm.Entries.First(e => e.Name == "a.txt"), "../moved.txt");
+        Assert.True(vm.StatusIsError);
+        Assert.True(File.Exists(Path.Combine(_root, "a.txt")));
+        Assert.False(File.Exists(Path.Combine(_root, "..", "moved.txt")));
     }
 
     [Fact]
