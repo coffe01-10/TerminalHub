@@ -30,6 +30,7 @@ public partial class MainWindowViewModel
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            OnProjectTaskCompleted(session, command.ExitCode);
             if (_disposed || !_settings.NotifyCommandCompletion || !session.IsRunning) return;
             if (IsSplit ? session == LeftPane || session == RightPane : session == ActiveSession) return;
             ShowNotification(session,
@@ -55,7 +56,7 @@ public partial class MainWindowViewModel
         if (_notificationSession is { Detached: true } detached)
             _popouts.FirstOrDefault(p => p.Session == detached)?.Activate();
         else if (_notificationSession is { } session)
-            ActiveCard = SessionCards.FirstOrDefault(c => c.Model == session);
+            ActivateSearchSession(session);
         NotificationVisible = false;
     }
 }

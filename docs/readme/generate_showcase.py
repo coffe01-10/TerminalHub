@@ -1,107 +1,154 @@
-"""Generate the README's brand scene and palette studies (not UI screenshots).
+"""Generate stable README illustrations, independent of application page layouts.
 
 Run from the repository root: python docs/readme/generate_showcase.py
-Uses the existing logo's paths and only Python's standard library.
+Only Python's standard library is required.
 """
 from html import escape
 from pathlib import Path
-import generate_logo
 
 ROOT = Path(__file__).resolve().parent
+FONT = "Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif"
+MONO = "Cascadia Mono, Consolas, DejaVu Sans Mono, monospace"
 
 
-def svg(width, height, title, content):
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="{escape(title)}">
+def text(x, y, value, size=20, color="#E8F0FA", extra="", mono=False):
+    font = MONO if mono else FONT
+    return (f'<text x="{x}" y="{y}" fill="{color}" font-family="{font}" '
+            f'font-size="{size}" {extra}>{escape(value)}</text>')
+
+
+def svg(width, height, title, description, content):
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"
+     viewBox="0 0 {width} {height}" role="img" aria-label="{escape(title)}">
 <title>{escape(title)}</title>
+<desc>{escape(description)}</desc>
 {content}
 </svg>
 '''
 
 
-def text(x, y, value, size=20, color="#DCE8F7", extra=""):
-    return f'<text x="{x}" y="{y}" fill="{color}" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="{size}" {extra}>{escape(value)}</text>'
-
-
-def window(x, y, width, height, angle, accent, label):
-    lines = []
-    for i, length in enumerate((.48, .7, .36, .61)):
-        lines.append(f'<rect x="22" y="{70+i*19}" width="{int(width*length)}" height="5" rx="2.5" fill="{accent}" opacity="{.6-i*.11}"/>')
-    return f'''<g transform="translate({x} {y}) rotate({angle} {width/2} {height/2})">
-<rect x="0" y="10" width="{width}" height="{height}" rx="16" fill="#030914" opacity=".65"/>
-<rect width="{width}" height="{height}" rx="16" fill="url(#glass)" stroke="{accent}" stroke-opacity=".48"/>
-<path d="M1 39H{width-1}" stroke="{accent}" stroke-opacity=".2"/>
-<circle cx="19" cy="20" r="3" fill="{accent}"/>
-<circle cx="30" cy="20" r="3" fill="{accent}" opacity=".4"/>
-<circle cx="41" cy="20" r="3" fill="{accent}" opacity=".2"/>
-{text(width-20,24,label,10,accent,'text-anchor="end" letter-spacing="2"')}
-{''.join(lines)}
-<path d="M23 {height-34}l9 7-9 7m19 0h17" fill="none" stroke="{accent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+def emblem(x, y, scale=1):
+    """Reuse the project's three-terminal motif, without third-party CLI logos."""
+    return f'''<g transform="translate({x} {y}) scale({scale})">
+<rect width="100" height="100" rx="22" fill="#2476E9"/>
+<g fill="#2476E9" stroke="#F5FAFF" stroke-width="4" stroke-linejoin="round">
+<rect x="9" y="17" width="34" height="27" rx="5" transform="rotate(-12 26 30)"/>
+<rect x="57" y="17" width="34" height="27" rx="5" transform="rotate(12 74 30)"/>
+<rect x="25" y="51" width="50" height="35" rx="6"/>
+</g>
+<path d="M35 63L43 69L35 75M49 76H62" fill="none" stroke="#F5FAFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M37 44L44 51M63 44L56 51" stroke="#F5FAFF" stroke-width="3"/>
 </g>'''
 
 
 def hero(zh=False):
-    # Reuse the established three-window emblem and pixel wordmark.
-    logo = generate_logo.build()
-    logo = logo[logo.index('<defs>'):logo.rindex('</svg>')]
-    logo = logo.replace('class="logo-ink"', 'color="#EAF3FF"').replace('class="logo-accent"', 'color="#4AE1CD"')
-    tagline = "多个终端，一个工作空间。" if zh else "Every terminal. One workspace."
-    subline = "实时预览 / 并排分屏 / 随心切换" if zh else "Live previews / Split panes / Your theme"
+    title = "Terminal Hub — 专为 AI CLI 打造的终端管理工作台" if zh else "Terminal Hub — A workbench built for AI CLIs"
+    description = ("Claude Code、Codex CLI 和 Shell 会话围绕 Terminal Hub 汇聚。"
+                   "这是一幅产品定位概念图，不是界面截图。" if zh else
+                   "Claude Code, Codex CLI, and shell sessions surround Terminal Hub. "
+                   "A conceptual product illustration, not an application screenshot.")
     body = '''<defs>
-<linearGradient id="back" x2="1" y2="1"><stop stop-color="#08101D"/><stop offset="1" stop-color="#122B43"/></linearGradient>
-<linearGradient id="glass" x2=".4" y2="1"><stop stop-color="#203B54"/><stop offset="1" stop-color="#101E31"/></linearGradient>
-<radialGradient id="glow"><stop stop-color="#298FAD" stop-opacity=".24"/><stop offset="1" stop-color="#298FAD" stop-opacity="0"/></radialGradient>
-<pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#88BFDA" stroke-opacity=".045"/></pattern>
-<clipPath id="frame"><rect width="1200" height="420" rx="24"/></clipPath>
+<linearGradient id="canvas" x2="1" y2="1"><stop stop-color="#0B1422"/><stop offset="1" stop-color="#142C43"/></linearGradient>
+<radialGradient id="halo"><stop stop-color="#388CCC" stop-opacity=".22"/><stop offset="1" stop-color="#388CCC" stop-opacity="0"/></radialGradient>
+<pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#9EC8E9" stroke-opacity=".045"/></pattern>
+<clipPath id="frame"><rect width="1200" height="500" rx="24"/></clipPath>
 </defs>
 <g clip-path="url(#frame)">
-<rect width="1200" height="420" fill="url(#back)"/>
-<rect width="1200" height="420" fill="url(#grid)"/>
-<ellipse cx="963" cy="202" rx="440" ry="370" fill="url(#glow)"/>
-<path d="M643 420C751 321 675 189 852 92S1137 73 1240-38" fill="none" stroke="#6FB4D3" stroke-opacity=".16"/>
-<path d="M695 420C802 321 740 202 910 125S1170 107 1270 10" fill="none" stroke="#6FB4D3" stroke-opacity=".09"/>
-<path d="M60 60h28" stroke="#42D8C1" stroke-width="3"/>
+<rect width="1200" height="500" fill="url(#canvas)"/>
+<rect width="1200" height="500" fill="url(#grid)"/>
+<ellipse cx="934" cy="251" rx="342" ry="330" fill="url(#halo)"/>
+<path d="M665 64V436" stroke="#92B2CE" stroke-opacity=".16"/>
+<path d="M66 63H94" stroke="#4DE0C7" stroke-width="3"/>
 '''
-    body += text(102,65,"NATIVE TERMINAL WORKSPACE",13,"#9DB2C9",'letter-spacing="3"')
-    body += f'<g transform="translate(54 112) scale(.88)">{logo}</g>'
-    body += text(63,274,tagline,31 if zh else 32,"#E8F1FD",'font-weight="600"')
-    body += text(64,314,subline,18,"#92A9C2")
-    body += '<circle cx="68" cy="367" r="3" fill="#4AE1CD"/>'
-    body += text(82,372,"WINDOWS FIRST   ·   LINUX READY   ·   OPEN SOURCE",11,"#91A8C0",'letter-spacing="1.1"')
-    body += window(791,51,270,195,-10,"#719DD0","SESSION 01")
-    body += window(897,110,248,209,9,"#68A7E8","SESSION 02")
-    body += window(741,170,302,209,-3,"#4AE1CD","IN FOCUS")
-    body += '<path d="M1142 343h16m-8-8v16" stroke="#4AE1CD" opacity=".55"/><circle cx="738" cy="101" r="3" fill="#E8C989" opacity=".75"/>'
-    body += '</g><rect x=".5" y=".5" width="1199" height="419" rx="24" fill="none" stroke="#476780" stroke-opacity=".5"/>'
-    return svg(1200,420,"Terminal Hub — " + tagline,body)
+    body += text(108, 68, "BUILT AROUND YOUR AI CLI", 12, "#A9BED5", 'letter-spacing="2"')
+    body += text(63, 173, "Terminal Hub", 68, "#F1F6FC", 'font-weight="700" letter-spacing="-2"')
+    if zh:
+        body += text(66, 245, "专为 AI CLI 打造的", 27, "#B7CBDD")
+        body += text(63, 300, "终端管理工作台", 44, "#F1F6FC", 'font-weight="600"')
+    else:
+        body += text(65, 247, "Built for AI CLIs.", 40, "#F1F6FC", 'font-weight="600"')
+        body += text(66, 297, "Keep your sessions together.", 27, "#B7CBDD")
+    body += '<path d="M66 359H595" stroke="#9EBAD2" stroke-opacity=".2"/>'
+    body += text(66, 399, "LOCAL SHELLS   /   REAL PTYs   /   OPEN SOURCE", 12, "#B7CBDD", 'letter-spacing="1"')
+    body += text(66, 440, "把注意力留给任务。" if zh else "Keep your attention on the work.", 17, "#8DA8C2")
+    # Session nodes and connections express containment, not AI orchestration.
+    body += '''<g fill="none" stroke="#78A9CC" stroke-width="1.5">
+<circle cx="924" cy="252" r="150" stroke-opacity=".19"/>
+<circle cx="924" cy="252" r="100" stroke-dasharray="3 9" stroke-opacity=".3"/>
+<path d="M840 130C896 130 870 223 924 223" stroke="#F0C9A5"/>
+<path d="M1016 234H986" stroke="#80BDF0"/>
+<path d="M848 372C917 372 898 294 924 294" stroke="#4DE0C7"/>
+</g>
+<circle cx="924" cy="252" r="68" fill="#182F47" stroke="#3D6686"/>
+'''
+    body += emblem(874, 202)
+    nodes = [(710, 102, 170, "$ claude", "#F0C9A5"),
+             (1000, 206, 166, "$ codex", "#80BDF0"),
+             (728, 344, 152, "$ shell", "#4DE0C7")]
+    for x, y, width, label, color in nodes:
+        body += f'<rect x="{x}" y="{y}" width="{width}" height="56" rx="12" fill="#101F31" stroke="{color}" stroke-opacity=".65"/>'
+        body += text(x + 20, y + 35, label, 22, color, mono=True)
+    body += text(925, 442, "MANY SESSIONS. ONE WORKBENCH.", 12, "#ACC3D8", 'text-anchor="middle" letter-spacing="1.6"')
+    body += '</g><rect x=".5" y=".5" width="1199" height="499" rx="24" fill="none" stroke="#4C6D8B" stroke-opacity=".6"/>'
+    return svg(1200, 500, title, description, body)
 
 
-THEMES = (
-    ("glass", "01", "DARK GLASS", "Depth & light", "#0B111E", "#152436", "#52657B", "#E2E8F0", "#65ACED", "#34D399"),
-    ("black", "02", "BLACK", "Less, with focus", "#08090B", "#101114", "#303238", "#E8E9ED", "#A9C8F5", "#67C69C"),
-    ("white", "03", "WHITE", "Room to breathe", "#E9EEF4", "#FFFFFF", "#CCD6E2", "#1E2D41", "#245AB5", "#19734B"),
-    ("paper", "04", "PAPER", "A warmer workspace", "#E7E0D1", "#F8F3E8", "#C8BDA9", "#3C352B", "#986040", "#526844"),
-)
+def compact_hero(zh=False):
+    title = "Terminal Hub — 专为 AI CLI 打造的终端管理工作台" if zh else "Terminal Hub — A workbench built for AI CLIs"
+    body = '''<defs>
+<linearGradient id="canvas" x2="1" y2="1"><stop stop-color="#0B1422"/><stop offset="1" stop-color="#142C43"/></linearGradient>
+</defs>
+<rect x=".5" y=".5" width="599" height="379" rx="22" fill="url(#canvas)" stroke="#4C6D8B"/>
+<path d="M34 37H55" stroke="#4DE0C7" stroke-width="3"/>
+'''
+    body += text(69, 41, "BUILT AROUND YOUR AI CLI", 11, "#A9BED5", 'letter-spacing="1.5"')
+    body += text(30, 111, "Terminal Hub", 64, "#F1F6FC", 'font-weight="700" letter-spacing="-2"')
+    if zh:
+        body += text(34, 165, "专为 AI CLI 打造的", 24, "#B7CBDD")
+        body += text(32, 213, "终端管理工作台", 36, "#F1F6FC", 'font-weight="600"')
+    else:
+        body += text(33, 169, "Built for AI CLIs.", 34, "#F1F6FC", 'font-weight="600"')
+        body += text(34, 212, "Your sessions, together.", 24, "#B7CBDD")
+    body += emblem(461, 139, .78)
+    for x, label, color in [(34, "$ claude", "#F0C9A5"), (216, "$ codex", "#80BDF0"), (398, "$ shell", "#4DE0C7")]:
+        body += f'<rect x="{x}" y="259" width="168" height="54" rx="10" fill="#101F31" stroke="{color}" stroke-opacity=".65"/>'
+        body += text(x + 18, 293, label, 21, color, mono=True)
+    body += text(300, 352, "MANY SESSIONS. ONE WORKBENCH.", 13, "#ACC3D8", 'text-anchor="middle" letter-spacing="1.6"')
+    return svg(600, 380, title, "Compact product illustration for narrow README layouts, not an application screenshot.", body)
 
 
-def palette(number, name, subtitle, canvas, surface, border, ink, accent, good):
-    body = f'<rect x="1" y="1" width="578" height="183" rx="14" fill="{canvas}" stroke="{border}"/>'
-    body += text(26,36,number,12,accent,'letter-spacing="2"')
-    body += text(26,77,name,27,ink,'font-weight="700" letter-spacing="1.5"')
-    body += text(26,104,subtitle,15,ink,'opacity=".7"')
-    # Abstract view motif, deliberately not presented as a rendered UI.
-    body += f'<rect x="345" y="27" width="207" height="131" rx="9" fill="{surface}" stroke="{border}"/>'
-    body += f'<path d="M345 51h207m-153 0v107" stroke="{border}"/>'
-    for y in (64,92,120):
-        body += f'<rect x="356" y="{y}" width="32" height="20" rx="3" fill="{canvas}" stroke="{border}"/>'
-    body += f'<circle cx="360" cy="39" r="3" fill="{good}"/><path d="M418 74l9 7-9 7m19 0h13" fill="none" stroke="{accent}" stroke-width="3"/>'
-    body += f'<path d="M418 103h102m-102 14h73m-73 14h90" stroke="{ink}" stroke-opacity=".15" stroke-width="4"/>'
-    for i,color in enumerate((canvas,surface,border,accent,good)):
-        body += f'<rect x="{26+i*40}" y="132" width="32" height="22" rx="5" fill="{color}" stroke="{border}"/>'
-    return svg(580,185,f"{name} — {subtitle}. Theme palette illustration.",body)
+def workflow():
+    body = '''<rect x="1" y="1" width="1198" height="278" rx="20" fill="#F3F6FA" stroke="#CDD8E5"/>
+<path d="M403 52V228M797 52V228" stroke="#D3DDE8"/>
+'''
+    steps = [(30, "01", "START", "Project + shell", "#2476E9"),
+             (425, "02", "WORK", "Independent sessions", "#168875"),
+             (820, "03", "RETURN", "Restore your layout", "#8C5132")]
+    for x, number, label, caption, color in steps:
+        body += text(x + 24, 47, number, 12, color, 'font-weight="600" letter-spacing="2"')
+        body += text(x + 24, 182, label, 29, "#213348", 'font-weight="700" letter-spacing="1.2"')
+        body += text(x + 24, 217, caption, 19, "#526278")
+    # Folder: a project, rather than a particular application's page.
+    body += '''<g transform="translate(54 73)" fill="none" stroke="#2476E9" stroke-width="3" stroke-linejoin="round">
+<path d="M0 12V56H74V15H35L27 5H0V12Z"/><path d="M13 30H58M13 42H45" stroke-opacity=".6"/>
+</g>
+<g transform="translate(449 73)" fill="none" stroke="#168875" stroke-width="2.5" stroke-linejoin="round">
+<rect width="45" height="42" rx="5"/><rect x="58" width="45" height="42" rx="5"/><rect x="116" width="45" height="42" rx="5"/>
+<path d="M11 12L20 21L11 30M23 30H33M69 12L78 21L69 30M81 30H91M127 12L136 21L127 30M139 30H149"/>
+</g>
+<g transform="translate(844 72)" fill="none" stroke="#8C5132" stroke-width="3" stroke-linejoin="round">
+<path d="M56 5A31 31 0 1 0 63 49M56 5H40M56 5V21" stroke-linecap="round"/>
+<rect x="17" y="22" width="27" height="25" rx="3"/><path d="M17 32H44M28 32V47"/>
+</g>
+<path d="M344 187H366L359 180M366 187L359 194M738 187H760L753 180M760 187L753 194" fill="none" stroke="#8297AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+'''
+    return svg(1200, 280, "Start a project. Work across sessions. Restore your layout.",
+               "A workflow illustration, not an application screenshot. Restoring a layout creates fresh shell processes.",
+               body)
 
 
 if __name__ == "__main__":
     for language in ("en", "zh"):
-        (ROOT / f"hero-{language}.svg").write_text(hero(language == "zh"),encoding="utf-8")
-    for key,*theme in THEMES:
-        (ROOT / f"theme-{key}.svg").write_text(palette(*theme),encoding="utf-8")
+        (ROOT / f"hero-{language}.svg").write_text(hero(language == "zh"), encoding="utf-8")
+        (ROOT / f"hero-{language}-compact.svg").write_text(compact_hero(language == "zh"), encoding="utf-8")
+    (ROOT / "workflow.svg").write_text(workflow(), encoding="utf-8")

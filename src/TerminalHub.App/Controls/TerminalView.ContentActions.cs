@@ -37,7 +37,7 @@ public partial class TerminalView
         var quoted = ShellPathInput.Format(paths, ShellCommand);
         if (quoted.Length == 0) return false;
         Focus();
-        _emulator.PasteText(quoted);
+        SendUserInput(new([], quoted));
         return true;
     }
 

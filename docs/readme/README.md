@@ -1,41 +1,34 @@
 # README 展示素材
 
-这些素材用于仓库首页，不参与应用运行。
+仓库首页用 SVG 表达产品定位与工作方式。素材不描绘具体页面，也不跟随界面改版更新。
 
-## 来源
+## 首页引用的素材
 
-- `hero-en.svg`、`hero-zh.svg` 是双语品牌横幅；`theme-glass.svg`、`theme-black.svg`、`theme-white.svg`、`theme-paper.svg` 是可点击的主题配色示意图。由 `generate_showcase.py` 生成，沿用既有字标路径和三窗徽章。窗口图形用于品牌与配色说明，不是产品运行截图。所有 SVG 自包含，不依赖图片托管或外部字体。
-- `logo.svg` 由本目录的 `generate_logo.py` 生成。徽章沿用应用图标的三窗枢纽造型（`src/TerminalHub.App/Assets/terminal-hub-icon.png`），字标为脚本绘制的 5×7 像素字形；墨色通过 `prefers-color-scheme` 随明暗主题变化。
-- `typing.svg` 由本目录的 `generate_typing.py` 生成。迷你终端窗口用 SMIL textPath 逐字敲入还原、构建与启动命令，随光标跟踪闪烁、循环清屏重播；机制参考 readme-typing-svg（DenverCoder1），本地生成而非调用外部服务。内容为示意动画，不是终端录屏。
-- `runtime.svg`、`ui.svg`、`platform.svg`、`license.svg` 由本目录的 `generate_badges.py` 生成。采用项目的深蓝与强调色，不依赖外部徽章服务；徽章描述技术栈与许可证，不代表 CI 或兼容性测试结果。
-- `workspace.png`、`split.png`、`settings.png`、`black.png` 于 2026-09-29 从当前应用代码导出。来源是 `ThemeWorkspaceTests.ThemeCoversTerminalAndPreview_WithoutChangingPtyDimensions`，采用 Avalonia Headless + Skia 渲染真实原生控件，PTY 为 Mock，终端文本为示例数据。图片未经合成或重绘，不用于证明真实 CLI 交互或动画帧率。
-- 首页的组织方式参考 `write-visual-readme` 技能；图标、截图和徽章均采用本项目素材，未引用其他项目的品牌图片。
+- `hero-en.svg`、`hero-zh.svg`：双语品牌横幅。三个独立的命令行会话围绕 Terminal Hub 汇聚，强调“专为 AI CLI 打造的终端管理工作台”。图形为概念示意，不表示自动调度 AI、共享对话上下文或产品运行画面。
+- `workflow.svg`：开始项目、并行会话、恢复布局的工作方式示意。恢复布局会创建新的 Shell 进程，不恢复原进程的内存状态。
+- `hero-en-compact.svg`、`hero-zh-compact.svg`：窄屏使用的紧凑横幅，保留更大的文字与命令行标识。
+- 以上五幅图由 `generate_showcase.py` 生成，只使用 Python 标准库。品牌图标沿用本项目的三扇终端造型，CLI 名称使用普通文字，不包含第三方品牌图标。SVG 自包含，无外部图片或字体依赖；文字使用系统字体回退。
+- `runtime.svg`、`ui.svg`、`platform.svg`、`license.svg` 由 `generate_badges.py` 生成，描述技术栈、平台与许可证，不代表 CI 或兼容性测试结果。
 
-## 更新
+## 更新 SVG
 
-仓库根目录运行以下命令重新生成品牌横幅、主题卡片、logo、打字动画与徽章：
+仓库根目录运行：
 
 ```powershell
-python docs/readme/generate_logo.py
-python docs/readme/generate_typing.py
-python docs/readme/generate_badges.py
 python docs/readme/generate_showcase.py
 ```
 
-需要更新界面图时，将截图输出到一个临时目录，再运行已有的主题渲染用例：
+只有定位或工作方式发生变化时才需要改横幅与概念图。文字与几何布局保存在生成脚本中，修改后重新生成即可；中英文横幅共享绘图逻辑。徽章的信息发生变化时运行 `python docs/readme/generate_badges.py`。
 
-```powershell
-$env:TERMINALHUB_STAGE_CAPTURES = Join-Path $env:TEMP 'terminalhub-readme-captures'
-dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj --filter 'FullyQualifiedName~ThemeCoversTerminalAndPreview'
-```
+查看时检查中文字体回退、桌面与窄屏的可读性，以及 README 的图片链接。图中的主要信息也保留在正文和图片 alt 中。
 
-人工检查后，按以下关系替换本目录的正式素材。临时目录和环境变量用完即清理；不要删除本目录的正式图片。
+## 保留的历史素材
 
-| 导出文件 | 首页素材 |
-| --- | --- |
-| `theme-DarkGlass.png` | `workspace.png` |
-| `split-White.png` | `split.png` |
-| `settings-Paper.png` | `settings.png` |
-| `theme-Black.png` | `black.png` |
+`logo.svg`、`typing.svg`、`theme-*.svg` 与已有 PNG 保留为历史素材，首页不再引用页面截图、主题画廊或打字动画，不要求随界面更新同步维护。
 
-检查截图中是否包含私人路径或用户数据；避免使用个人真实会话作为展示样本。
+- `logo.svg` 由 `generate_logo.py` 生成，沿用应用图标造型与本地像素字标。
+- `typing.svg` 由 `generate_typing.py` 生成，是命令示意动画。
+- `theme-*.svg` 是旧版的主题配色示意图。
+- `workspace.png`、`split.png`、`settings.png`、`black.png` 于 2026-09-29 使用 Avalonia Headless + Skia 和 Mock PTY 导出，是当时原生控件的渲染，不能用于证明当前界面或真实 CLI 行为。
+
+首页组织方式参考 `write-visual-readme` 技能，最终 SVG、文案和生成脚本均保存在本仓库。

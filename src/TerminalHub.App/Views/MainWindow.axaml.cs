@@ -49,6 +49,7 @@ public partial class MainWindow : Window
                 _lastPanelTrigger = source.GetSelfAndVisualAncestors().OfType<Button>().FirstOrDefault();
         }, RoutingStrategies.Tunnel, handledEventsToo: true);
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
+        foreach (var terminal in new[] { MainTerminal, LeftTerminal, RightTerminal, BottomLeftTerminal, BottomRightTerminal }) terminal.InputSender = Vm.SendTerminalInput;
         if (OperatingSystem.IsWindows()) ApplyWindowsChrome();
         Vm.PaletteRequested += OpenPalette;
         Vm.RevealCommandRequested += OnRevealCommand;
@@ -631,7 +632,7 @@ public partial class MainWindow : Window
                     Dispatcher.UIThread.Post(() => reattached.SetResult());
                     await reattached.Task;
                 }
-                if (!Vm.SessionCards.Any(c => ReferenceEquals(c.Model, session)))
+                if (!Vm.AllSessionCards.Any(c => ReferenceEquals(c.Model, session)))
                 { Vm.Dashboard.SearchStatus = "原会话已关闭，请重新搜索。"; return false; }
                 Vm.ActivateSearchSession(session);
             }
@@ -972,6 +973,7 @@ public partial class MainWindow : Window
     /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
+        if (Vm.BroadcastEnabled && e.Key == Key.Escape) { Vm.StopBroadcast(); e.Handled = true; return; }
         _lastPanelTrigger = null;
         if (PalettePanel.IsVisible) { HandlePaletteKey(e); return; }
         if (BookmarkPanel.IsVisible) { HandleBookmarkKey(e); return; }
@@ -1619,6 +1621,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+        _projectTools?.Close();
         Vm.PaletteRequested -= OpenPalette;
         Vm.RevealCommandRequested -= OnRevealCommand;
         Vm.RevealBookmarkRequested -= OnRevealBookmark;

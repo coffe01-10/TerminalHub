@@ -94,6 +94,9 @@ public sealed class ScreenBuffer
     private bool[]? _savedWrapped;
     private int _primaryX, _primaryY;
     private bool _primaryPendingWrap;
+    internal TerminalFrame? CaptureRecordingPrimary()
+        => _savedScreen is null ? null : new(Columns, Rows, _savedScreen.ToArray(), _primaryX, _primaryY, true, false);
+    internal (CellAttrs Attrs, TerminalColor Fg, TerminalColor Bg) RecordingPrimaryStyle => (_savedPrimary.Attrs, _savedPrimary.Fg, _savedPrimary.Bg);
     /// <summary>Physical row coordinates changed (reflow or screen switch).</summary>
     public int LayoutVersion { get; private set; }
     /// <summary>Soft-wrap flag for each scrollback line (parallel to <see cref="_scrollback"/>).</summary>

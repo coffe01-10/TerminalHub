@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280"
+     viewBox="0 0 1200 280" role="img" aria-label="Start a project. Work across sessions. Restore your layout.">
+<title>Start a project. Work across sessions. Restore your layout.</title>
+<desc>A workflow illustration, not an application screenshot. Restoring a layout creates fresh shell processes.</desc>
+<rect x="1" y="1" width="1198" height="278" rx="20" fill="#F3F6FA" stroke="#CDD8E5"/>
+<path d="M403 52V228M797 52V228" stroke="#D3DDE8"/>
+<text x="54" y="47" fill="#2476E9" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="12" font-weight="600" letter-spacing="2">01</text><text x="54" y="182" fill="#213348" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="29" font-weight="700" letter-spacing="1.2">START</text><text x="54" y="217" fill="#526278" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="19" >Project + shell</text><text x="449" y="47" fill="#168875" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="12" font-weight="600" letter-spacing="2">02</text><text x="449" y="182" fill="#213348" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="29" font-weight="700" letter-spacing="1.2">WORK</text><text x="449" y="217" fill="#526278" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="19" >Independent sessions</text><text x="844" y="47" fill="#8C5132" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="12" font-weight="600" letter-spacing="2">03</text><text x="844" y="182" fill="#213348" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="29" font-weight="700" letter-spacing="1.2">RETURN</text><text x="844" y="217" fill="#526278" font-family="Segoe UI, Inter, Arial, Microsoft YaHei, sans-serif" font-size="19" >Restore your layout</text><g transform="translate(54 73)" fill="none" stroke="#2476E9" stroke-width="3" stroke-linejoin="round">
+<path d="M0 12V56H74V15H35L27 5H0V12Z"/><path d="M13 30H58M13 42H45" stroke-opacity=".6"/>
+</g>
+<g transform="translate(449 73)" fill="none" stroke="#168875" stroke-width="2.5" stroke-linejoin="round">
+<rect width="45" height="42" rx="5"/><rect x="58" width="45" height="42" rx="5"/><rect x="116" width="45" height="42" rx="5"/>
+<path d="M11 12L20 21L11 30M23 30H33M69 12L78 21L69 30M81 30H91M127 12L136 21L127 30M139 30H149"/>
+</g>
+<g transform="translate(844 72)" fill="none" stroke="#8C5132" stroke-width="3" stroke-linejoin="round">
+<path d="M56 5A31 31 0 1 0 63 49M56 5H40M56 5V21" stroke-linecap="round"/>
+<rect x="17" y="22" width="27" height="25" rx="3"/><path d="M17 32H44M28 32V47"/>
+</g>
+<path d="M344 187H366L359 180M366 187L359 194M738 187H760L753 180M760 187L753 194" fill="none" stroke="#8297AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>

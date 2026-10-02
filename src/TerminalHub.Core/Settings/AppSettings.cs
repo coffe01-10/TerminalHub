@@ -107,6 +107,10 @@ public sealed class AppSettings
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
     public int DockVisibilityMode { get; set; } = OperatingSystem.IsWindows() ? 0 : 1;
     public string WorkspaceName { get; set; } = "MangaFlow";
+    public List<ProjectWorkspaceState> ProjectWorkspaces { get; set; } = [];
+    public string ActiveProjectWorkspaceId { get; set; } = "";
+    public List<OutputRule> OutputRules { get; set; } = [];
+    public List<ProjectTaskDefinition> ProjectTasks { get; set; } = [];
     public List<WorkspaceTemplate> WorkspaceTemplates { get; set; } = [];
     public List<SessionGroup> SessionGroups { get; set; } = [];
     public List<FavoriteCommand> FavoriteCommands { get; set; } = [];

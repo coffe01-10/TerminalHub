@@ -24,6 +24,13 @@ public static class ShellIntegration
     public static bool IsBash(string shell) =>
         Path.GetFileNameWithoutExtension(shell).Equals("bash", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Tasks still emit completion when Windows PowerShell cannot load PSReadLine.
+    /// The normal Enter hook already sets CommandActive; only its absence needs a C mark.</summary>
+    public static string PrepareTaskCommand(string shell, string command) => IsPowerShell(shell)
+        ? "if (-not $global:TerminalHubCommandActive) { $global:LASTEXITCODE = $null; $global:TerminalHubCommandActive = $true; " +
+          "[Console]::Write([char]27 + ']133;C' + [char]7) }; " + command
+        : command;
+
     /// <summary>Interactive bash reads this file instead of ~/.bashrc. The script
     /// chain-loads the user's rc files first, then installs the marks — so user
     /// aliases survive and our hooks cannot be overwritten by the profile.</summary>

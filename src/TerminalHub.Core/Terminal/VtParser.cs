@@ -44,6 +44,8 @@ public sealed class VtParser
     private int _utf8Remaining;
     private int _utf8Value;
     private int _utf8Min;
+    private readonly List<byte> _pendingInput = [];
+    internal byte[] PendingInput => _pendingInput.ToArray();
     /// <summary>The last emitted rune was U+200D ZWJ — the next rune joins the same cluster.</summary>
     private bool _afterZwj;
 
@@ -65,6 +67,8 @@ public sealed class VtParser
 
     /// <summary>Raised after a batch of input has been applied (renderer hint).</summary>
     public event Action? BufferChanged;
+    /// <summary>Recording subscribers only enqueue bytes; PTY replies stay outside the lock.</summary>
+    public event Action<ReadOnlyMemory<byte>>? DataApplied;
 
     /// <summary>BEL (0x07) in the ground state — the app turns it into a
     /// visual notification instead of a sound.</summary>
@@ -86,11 +90,17 @@ public sealed class VtParser
         {
             if (data.Length > 0) _buffer.BumpVersion();
             foreach (var b in data)
+            {
+                if (_pendingInput.Count > 0 || _state != State.Ground || _utf8Remaining > 0 || b == 0x1b || b >= 0x80) _pendingInput.Add(b);
                 FeedByte(b);
+                if (_state == State.Ground && _utf8Remaining == 0) _pendingInput.Clear();
+                else if (_pendingInput.Count > MaxOscBytes + 128) _pendingInput.RemoveRange(0, _pendingInput.Count - MaxOscBytes);
+            }
             responses = _responses.ToArray();
             _responses.Clear();
             commandMarkers = _commandMarkers.ToArray();
             _commandMarkers.Clear();
+            if (DataApplied is { } applied && data.Length > 0) applied(data.ToArray());
         }
         // Replies (DA, DECRPM, OSC queries, kitty flags) go out AFTER releasing
         // SyncRoot — ConPtySession.Write blocks on WriteFile and must never stall

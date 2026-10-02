@@ -18,6 +18,15 @@ namespace TerminalHub.App.Controls;
 /// </summary>
 public partial class TerminalView : Control
 {
+    public Action<TerminalEmulator, TerminalInput>? InputSender { get; set; }
+    public bool FullFramePreview { get; set; }
+    private void SendUserText(string text) => SendUserInput(TerminalInput.Text(text));
+    private void SendUserBytes(byte[] bytes) => SendUserInput(new(bytes));
+    private void SendUserInput(TerminalInput input)
+    {
+        if (_emulator is null) return;
+        if (InputSender is { } sender) sender(_emulator, input); else input.SendTo(_emulator);
+    }
     public static readonly StyledProperty<TerminalEmulator?> EmulatorProperty =
         AvaloniaProperty.Register<TerminalView, TerminalEmulator?>(nameof(Emulator));
 
@@ -501,7 +510,7 @@ public partial class TerminalView : Control
         var rows = b.Rows;
         var col0 = 0;
         var cols = b.Columns;
-        if (IsPreview)
+        if (IsPreview && !FullFramePreview)
         {
             var r1 = b.Rows - 1;
             while (r1 > 0 && IsBlankRow(b.Cells.AsSpan(r1 * b.Columns, b.Columns))) r1--;
@@ -587,6 +596,23 @@ public partial class TerminalView : Control
                 }
             }
         }
+
+        if (!IsPreview && _emulator.OutputRules.Count > 0)
+            for (var row = row0; row < row0 + rows; row++)
+            {
+                var span = b.Cells.AsSpan(row * b.Columns, b.Columns);
+                var (text, columns) = ScreenBuffer.FlattenRow(span);
+                foreach (var matcher in _emulator.OutputRules)
+                {
+                    if (!Color.TryParse(matcher.Rule.Color, out var color)) continue;
+                    foreach (var match in matcher.Find(text))
+                    {
+                        var start = columns[match.Index]; var end = columns[match.Index + match.Length - 1];
+                        ctx.DrawRectangle(new SolidColorBrush(color, .32), null,
+                            new Rect(start * _cellW, row * _cellH, (end + GlyphColumns(span, end) - start) * _cellW, _cellH));
+                    }
+                }
+            }
 
         // Cursor
         if (_viewOffset == 0 && b.CursorVisible
@@ -1140,7 +1166,7 @@ public partial class TerminalView : Control
         base.OnTextInput(e);
         if (IsPreview || _emulator is null || e.Text is null) return;
         ResetScroll();
-        _emulator.SendText(e.Text);
+        SendUserText(e.Text);
         _typedTail += e.Text;
         if (_typedTail.Length > 32) _typedTail = _typedTail[^32..];
         e.Handled = true;
@@ -1221,7 +1247,7 @@ public partial class TerminalView : Control
             + (e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 4 : 0);
         if (e.Key == Key.Enter && modifiers > 1 && (_emulator.Buffer.KittyKeyboardFlags & 1) != 0)
         {
-            _emulator.SendText($"\x1b[13;{modifiers}u");
+            SendUserText($"\x1b[13;{modifiers}u");
             e.Handled = true;
             return;
         }
@@ -1230,20 +1256,20 @@ public partial class TerminalView : Control
         // Shift must not drop the Alt and fall through to plain "\r".
         if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
-            _emulator.SendText("\x1b\r");
+            SendUserText("\x1b\r");
             e.Handled = true;
             return;
         }
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.Enter)
         {
             // Outside negotiated Kitty mode keep readline's legacy Enter.
-            _emulator.SendText("\r");
+            SendUserText("\r");
             e.Handled = true;
             return;
         }
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.Tab)
         {
-            _emulator.SendText("\x1b[Z");
+            SendUserText("\x1b[Z");
             e.Handled = true;
             return;
         }
@@ -1275,14 +1301,14 @@ public partial class TerminalView : Control
         {
             // Alt-screen apps (less, vim, htop) own the scrollback — the key
             // belongs to them; local scrollback scroll applies to the main screen.
-            if (_emulator.Buffer.OnAlternateScreen) _emulator.SendText(TildeKey(5));
+            if (_emulator.Buffer.OnAlternateScreen) SendUserText(TildeKey(5));
             else ScrollBy(_emulator.Buffer.Rows - 2);
             e.Handled = true;
             return;
         }
         if (e.Key == Key.PageDown)
         {
-            if (_emulator.Buffer.OnAlternateScreen) _emulator.SendText(TildeKey(6));
+            if (_emulator.Buffer.OnAlternateScreen) SendUserText(TildeKey(6));
             else ScrollBy(-(_emulator.Buffer.Rows - 2));
             e.Handled = true;
             return;
@@ -1292,7 +1318,7 @@ public partial class TerminalView : Control
         {
             if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z)
             {
-                _emulator.SendText("\x1b" + (char)('a' + e.Key - Key.A));
+                SendUserText("\x1b" + (char)('a' + e.Key - Key.A));
                 e.Handled = true;
                 return;
             }
@@ -1302,7 +1328,7 @@ public partial class TerminalView : Control
             if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt)
                 && e.Key is Key.Oem5 or Key.Oem4 or Key.Oem6 or Key.Space)
             {
-                _emulator.SendBytes([(byte)(e.Key switch { Key.Oem4 => 27, Key.Oem5 => 28, Key.Oem6 => 29, _ => 0 })]);
+                SendUserBytes([(byte)(e.Key switch { Key.Oem4 => 27, Key.Oem5 => 28, Key.Oem6 => 29, _ => 0 })]);
                 e.Handled = true;
                 return;
             }
@@ -1329,7 +1355,7 @@ public partial class TerminalView : Control
                 if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)
                     && e.Key >= Key.A && e.Key <= Key.Z)
                 {
-                    _emulator.SendBytes([(byte)(e.Key - Key.A + 1)]);
+                    SendUserBytes([(byte)(e.Key - Key.A + 1)]);
                     ResetScroll();
                     e.Handled = true;
                     return;
@@ -1339,7 +1365,7 @@ public partial class TerminalView : Control
         }
 
         ResetScroll();
-        _emulator.SendText(send);
+        SendUserText(send);
         e.Handled = true;
     }
 
@@ -1355,7 +1381,7 @@ public partial class TerminalView : Control
                 // the clipboard read must not paste into the previous session.
                 ResetScroll();
                 _typedTail = "";
-                _emulator?.PasteText(text);
+                SendUserInput(new([], text));
             }
         }
         catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Clipboard paste failed: {ex.Message}"); }
@@ -1395,7 +1421,7 @@ public partial class TerminalView : Control
                 ? (up ? "\x1bOA" : "\x1bOB")
                 : (up ? "\x1b[A" : "\x1b[B");
             var steps = Math.Clamp((int)Math.Ceiling(Math.Abs(e.Delta.Y) * 3), 1, 64);
-            _emulator.SendText(string.Concat(Enumerable.Repeat(seq, steps)));
+            SendUserText(string.Concat(Enumerable.Repeat(seq, steps)));
             e.Handled = true;
             return;
         }

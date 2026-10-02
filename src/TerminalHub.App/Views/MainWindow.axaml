@@ -41,6 +41,25 @@
   </Window.Resources>
 
   <Window.Styles>
+    <Style Selector="Border.workspace-tab">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Margin" Value="0,4"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Border.workspace-tab:pointerover"><Setter Property="Background" Value="{DynamicResource UiSurface}"/></Style>
+    <Style Selector="Border.workspace-tab.active"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/><Setter Property="BorderBrush" Value="{DynamicResource UiAccentSoft}"/></Style>
+    <Style Selector="Button.workspace-name">
+      <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="12,0,8,0"/>
+      <Setter Property="Height" Value="30"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+      <Setter Property="Template"><ControlTemplate><ContentPresenter Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/></ControlTemplate></Setter>
+    </Style>
+    <Style Selector="Border.workspace-tab.active Button.workspace-name"><Setter Property="Foreground" Value="{DynamicResource UiAccent}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Border.workspace-tab:pointerover Button.workspace-name"><Setter Property="Foreground" Value="{DynamicResource UiInk}"/></Style>
+    <Style Selector="Border.workspace-tab Button.workspace-close"><Setter Property="Opacity" Value="0.4"/><Setter Property="Height" Value="24"/><Setter Property="MinWidth" Value="24"/><Setter Property="Padding" Value="5"/><Setter Property="Margin" Value="0,0,4,0"/></Style>
+    <Style Selector="Border.workspace-tab.active Button.workspace-close, Border.workspace-tab:pointerover Button.workspace-close"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Border.workspace-tab Border.workspace-count"><Setter Property="Background" Value="{DynamicResource UiSurface}"/><Setter Property="CornerRadius" Value="4"/><Setter Property="Padding" Value="5,1"/><Setter Property="MinWidth" Value="18"/></Style>
     <Style Selector="Button.terminal-tool">
       <Setter Property="Height" Value="32"/>
       <Setter Property="MinWidth" Value="32"/>
@@ -132,7 +151,7 @@
 
   <Panel>
     <ctl:WorkspaceBackdrop/>
-    <Grid RowDefinitions="64,*,Auto,32">
+    <Grid RowDefinitions="64,42,*,Auto,32">
 
       <!-- ============ Title bar ============ -->
       <Border Grid.Row="0" Background="Transparent" Padding="26,0" PointerPressed="OnTitleBarPointerPressed">
@@ -170,12 +189,36 @@
       </Border>
 
       <!-- ============ Main three-rail ============ -->
-      <Border x:Name="ShelfEdgeHint" Grid.Row="1" Width="16" HorizontalAlignment="Left" ZIndex="60"
+      <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="26,0,26,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding ProjectWorkspaces}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:LiveWorkspace">
+              <Border Classes="workspace-tab" Classes.active="{Binding IsActive}">
+                <StackPanel Orientation="Horizontal">
+                  <Button Classes="workspace-name" Tag="{Binding}" Click="OnSwitchWorkspace" DoubleTapped="OnRenameWorkspace" ToolTip.Tip="点击切换，双击重命名" AutomationProperties.Name="{Binding Name}">
+                    <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                      <Border Classes="workspace-count"><TextBlock Text="{Binding Count}" FontSize="10" Foreground="{DynamicResource UiMuted}" HorizontalAlignment="Center"/></Border>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="terminal-tool workspace-close" Tag="{Binding}" Click="OnCloseWorkspace" ToolTip.Tip="关闭工作区及其中的终端" AutomationProperties.Name="关闭工作区"><PathIcon Data="{StaticResource ToolClose}" Width="10" Height="10"/></Button>
+                </StackPanel>
+              </Border>
+            </DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <Button Grid.Column="1" Classes="terminal-tool" Command="{Binding NewProjectWorkspaceCommand}" Margin="10,0"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolAdd}"/><TextBlock Text="新建工作区" VerticalAlignment="Center"/></StackPanel></Button>
+        <Button Grid.Column="2" Classes="terminal-tool" Click="OnProjectTools"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}"/><TextBlock Text="工作区工具" VerticalAlignment="Center"/></StackPanel></Button>
+      </Grid>
+      <Border x:Name="ShelfEdgeHint" Grid.Row="2" Width="16" HorizontalAlignment="Left" ZIndex="60"
               IsVisible="{Binding ShelfAutoHide}" Background="Transparent" AutomationProperties.Name="左侧会话栏呼出区域">
         <Border Width="3" Height="52" CornerRadius="2" Background="{DynamicResource UiAccent}" Opacity="0.55"
                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"/>
       </Border>
-      <Grid Grid.Row="1" x:Name="StageLayout" ColumnDefinitions="280,18,*,0,0" Margin="18,10,24,14">
+      <Border Grid.Row="2" ZIndex="80" IsVisible="{Binding BroadcastEnabled}" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,4,0,0" Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1" CornerRadius="10" Padding="16,6">
+        <StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="{Binding BroadcastStatus}" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center" MaxWidth="650" TextTrimming="CharacterEllipsis"/><Button Content="停止 · Esc" Command="{Binding StopBroadcastCommand}" Classes="terminal-tool"/></StackPanel>
+      </Border>
+      <Grid Grid.Row="2" x:Name="StageLayout" ColumnDefinitions="280,18,*,0,0" Margin="18,10,24,14">
 
         <!-- ===== LEFT: perspective session shelf ===== -->
         <ctl:ShelfDrawer x:Name="ShelfHost" Grid.Column="0" Grid.ColumnSpan="5" HorizontalAlignment="Left"
@@ -1624,7 +1667,7 @@
       </Grid>
 
       <!-- ============ Status bar ============ -->
-      <Border Grid.Row="3" Background="{DynamicResource UiCanvas}" Padding="26,0">
+      <Border Grid.Row="4" Background="{DynamicResource UiCanvas}" Padding="26,0">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -1647,7 +1690,7 @@
         </Grid>
       </Border>
 
-      <Border x:Name="DockSpace" Grid.Row="2" Height="112"
+      <Border x:Name="DockSpace" Grid.Row="3" Height="112"
               IsVisible="{Binding DockVisibilityMode, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"/>
     </Grid>
 

@@ -13,6 +13,8 @@ public sealed class TerminalEmulator : IDisposable
 
     public ScreenBuffer Buffer { get; }
     public VtParser Parser { get; }
+    public IReadOnlyList<OutputRuleMatcher> OutputRules { get; set; } = [];
+    public event Action<int, int>? Resized;
     private TerminalColorScheme _colorScheme;
     public TerminalColorScheme ColorScheme
     {
@@ -75,6 +77,7 @@ public sealed class TerminalEmulator : IDisposable
     }
 
     public IPtySession Pty => _pty;
+    public void RefreshDisplay() => Changed?.Invoke();
 
     public Task StartAsync(PtyOptions options, CancellationToken ct = default)
         => _pty.StartAsync(options with { Columns = Buffer.Columns, Rows = Buffer.Rows }, ct);
@@ -130,7 +133,11 @@ public sealed class TerminalEmulator : IDisposable
     /// <summary>Resize the grid and the underlying PTY.</summary>
     public void Resize(int columns, int rows)
     {
-        Buffer.Resize(columns, rows);
+        lock (Buffer.SyncRoot)
+        {
+            Buffer.Resize(columns, rows);
+            Resized?.Invoke(columns, rows);
+        }
         _pty.Resize(columns, rows);
         Changed?.Invoke();
     }

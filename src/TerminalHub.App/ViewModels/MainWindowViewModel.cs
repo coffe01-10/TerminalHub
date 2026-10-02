@@ -240,7 +240,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnActiveCardChanged(SessionCardViewModel? value)
     {
         OnPropertyChanged(nameof(WindowTitle));
-        if (_rebuildingShelf || _syncingActive || value is null) return;
+        if (_rebuildingShelf || _syncingActive || _switchingWorkspace || value is null) return;
         if (IsSplit && value.Model is { } picked)
         {
             AssignToPane(FocusedPane, picked);
@@ -255,6 +255,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Active-session change arms/disarms popout + Files' terminal button.</summary>
     partial void OnActiveSessionChanged(TerminalSessionModel? value)
     {
+        OnPropertyChanged(nameof(IsRecordingCurrent));
         OpenInNewWindowCommand.NotifyCanExecuteChanged();
         Files.NotifySessionAvailability();
     }
@@ -348,6 +349,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _dockVisibilityMode = _settings.DockVisibilityMode;
         DeployDockTip = ComposeDeployDockTip();
         _workspaceName = _settings.WorkspaceName;
+        InitializeProjectTabs();
 
         _monitor = monitor ?? new SystemMonitor();
         _monitor.Sampled += OnSampled;
@@ -356,7 +358,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dashboard = new DashboardViewModel(_monitor);
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
         Dashboard.SearchSessionSource = () => Dashboard.SearchScope == 1
-            ? SessionCards.Select(c => c.Model).Concat(DetachedSessions).ToArray()
+            ? AllSessionCards.Select(c => c.Model).Concat(DetachedSessions).ToArray()
             : ActiveSession is { } active ? new[] { active } : [];
         Dashboard.OutputLevelFilter = _settings.OutputLevelFilter;
         Dashboard.PropertyChanged += (_, e) =>
@@ -379,7 +381,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _settings.FilesShowHidden = Files.ShowHidden;
         };
         Logs = new LogsViewModel(Dashboard, _sessionLog,
-            () => SessionCards.Select(c => c.Name).ToList(),
+            () => AllSessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
             v => _settings.SessionLogToFile = v,
             bufferCapacity: LogsViewModel.NormalizeSavedBufferCapacity(_settings.LogsBufferCapacity),
@@ -395,6 +397,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _settings.LogsCompactDensity);
         Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal, sshAvailable);
+        InitializeProjectTools();
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
         SessionCards.CollectionChanged += OnSessionCardsChanged;
@@ -414,7 +417,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public async Task SpawnStartupSessionsAsync()
     {
         var configuredShell = _settings.ResolveShellCommand();
-        var usesConfiguredShell = _settings.Workspace.Sessions.Count > 0
+        var usesConfiguredShell = _settings.ProjectWorkspaces.Count > 0
+            ? _settings.ProjectWorkspaces.Any(w => w.Layout.Sessions.Any(s => string.IsNullOrWhiteSpace(s.Shell) || s.Shell == configuredShell))
+            : _settings.Workspace.Sessions.Count > 0
             ? _settings.Workspace.Sessions.Any(s => string.IsNullOrWhiteSpace(s.Shell) || s.Shell == configuredShell)
             : _settings.StartupSessions.Count == 0
                 || _settings.StartupSessions.Any(s => _settings.ResolveShellCommand(s.Shell) == configuredShell);
@@ -426,6 +431,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             SelectedStartupShell = AvailableStartupShells.FirstOrDefault();
             ShellSetupMessage = $"未找到 {configuredShell}。请选择本机可用的 Shell，或填写已安装程序的路径。";
             ShellSetupOpen = true;
+            return;
+        }
+        if (_settings.ProjectWorkspaces.Count > 0)
+        {
+            await RestoreProjectWorkspacesAsync();
             return;
         }
         if (_settings.Workspace.Sessions.Count > 0)
@@ -527,6 +537,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         string? name, SessionTag tag, string cwd,
         ShellKind? shell = null, string? shellCommand = null, string? arguments = null)
     {
+        var workspace = ActiveWorkspace;
         var shellCmd = !string.IsNullOrWhiteSpace(shellCommand)
             ? shellCommand
             : _settings.ResolveShellCommand(shell);
@@ -555,14 +566,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            return await _sessions.CreateAsync(
-                PtySessionFactory.Create,
+            var created = await _sessions.CreateAsync(
+                () => { var pty = PtySessionFactory.Create(); _sessionWorkspaces[pty.Id] = workspace; return pty; },
                 new PtyOptions { Shell = shellCmd, WorkingDirectory = cwd,
                     Arguments = arguments ?? "",
                     Environment = OperatingSystem.IsWindows() && shellCmd == "cmd.exe"
                         ? new Dictionary<string, string> { ["PROMPT"] = "$E]9;9;$P$E\\$P$G" }
                         : new Dictionary<string, string>() },
                 name, tag);
+            if (workspace != ActiveWorkspace && !_restoringProjects) _sessions.Activate(ActiveWorkspace.Active ?? SessionCards.FirstOrDefault()?.Model);
+            return created;
         }
         catch (Exception ex)
         {
@@ -584,10 +597,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Awaits on the caller's context (UI) — Sessions mutations stay on the UI thread.</summary>
     private async Task SpawnSshAsync(TerminalHub.Core.Ssh.SshHost host)
     {
+        var workspace = ActiveWorkspace;
         try
         {
             await _sessions.CreateAsync(
-                PtySessionFactory.Create,
+                () => { var pty = PtySessionFactory.Create(); _sessionWorkspaces[pty.Id] = workspace; return pty; },
                 new PtyOptions
                 {
                     Shell = "ssh",
@@ -655,17 +669,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (layout == "Single") { ExitSplit(); return; }
         if (!Enum.TryParse<SplitLayout>(layout, out var requested)) return;
         _changingLayout = true;
+        var workspace = ActiveWorkspace;
         try
         {
             var focused = _sessions.Active;
             var panes = (IsSplit ? Enumerable.Range(0, PaneCount).Select(GetPane) : new[] { _sessions.Active })
                 .Where(s => s is not null && _sessions.Sessions.Contains(s)).Cast<TerminalSessionModel>().Distinct().ToList();
             var count = requested == SplitLayout.Quad ? 4 : 2;
-            foreach (var session in _sessions.Sessions)
+            foreach (var session in _sessions.Sessions.Where(s => _sessionWorkspaces.GetValueOrDefault(s.Id) == workspace))
                 if (!panes.Contains(session)) panes.Add(session);
             while (panes.Count < count)
             {
                 var created = await CreateSessionAsync(null, SessionTag.Dev, ActiveWorkingDirectory);
+                if (workspace != ActiveWorkspace) return;
                 if (created is null) return;
                 panes.Add(created);
             }
@@ -700,6 +716,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
     public void ActivateSearchSession(TerminalSessionModel session)
     {
+        if (_sessionWorkspaces.TryGetValue(session.Id, out var owner) && owner != ActiveWorkspace) SwitchProjectWorkspace(owner);
         if (IsSplit)
         {
             var visible = Enumerable.Range(0, PaneCount).FirstOrDefault(i => ReferenceEquals(GetPane(i), session), -1);
@@ -713,7 +730,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         for (var i = 0; i < PaneCount; i++)
         {
             if (!ReferenceEquals(GetPane(i), removed)) continue;
-            var replacement = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, removed)
+            var replacement = ActiveWorkspace.Cards.Select(c => c.Model).FirstOrDefault(s => !ReferenceEquals(s, removed)
                 && !Enumerable.Range(0, PaneCount).Any(j => ReferenceEquals(GetPane(j), s)));
             SetPane(i, replacement);
         }
@@ -742,7 +759,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <see cref="SelectedRightTab"/>). Unknown / missing → false.</summary>
     private bool TryActivateSessionByName(string name)
     {
-        var card = SessionCards.FirstOrDefault(c =>
+        var card = AllSessionCards.FirstOrDefault(c =>
             string.Equals(c.Name, name, StringComparison.Ordinal));
         if (card is null) return false;
         _sessions.Activate(card.Model);
@@ -755,6 +772,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (card is null) return;
         var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, card.Model));
         _sessions.Close(card.Model);
+        _sessions.Activate(SessionCards.FirstOrDefault(c => c != card && c.Model.IsRunning)?.Model
+            ?? SessionCards.FirstOrDefault(c => c != card)?.Model);
         if (vm is not null) SessionCards.Remove(vm);
     }
 
@@ -951,7 +970,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         DetachedSessions.Add(session);
+        _sessions.Activate(SessionCards.FirstOrDefault(c => c.Model != session)?.Model);
         var win = new SessionWindow(session, FontSize, TerminalFont);
+        win.Terminal.InputSender = SendTerminalInput;
+        win.AddHandler(Avalonia.Input.InputElement.KeyDownEvent, (_, e) =>
+        { if (BroadcastEnabled && e.Key == Avalonia.Input.Key.Escape) { StopBroadcast(); e.Handled = true; } }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _popouts.Add(win);
         PositionPopout(win);
         win.Closed += (_, _) => OnPopoutClosed(win, session);
@@ -1004,6 +1027,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.RenameSessionFilter(oldName, name);
         card.Refresh();
         Logs.RefreshSessions();
+        foreach (var task in _allProjectTasks.Where(t => t.WorkspaceId == ActiveWorkspace.Id && t.SessionName == oldName)) task.SessionName = name;
+        RefreshProjectTools();
         OnPropertyChanged(nameof(LeftPaneName));
         OnPropertyChanged(nameof(RightPaneName));
         OnPropertyChanged(nameof(BottomLeftPaneName));
@@ -1013,6 +1038,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnSessionCardsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (!_switchingWorkspace && ActiveWorkspace is { } workspace)
+        {
+            workspace.Cards.Clear(); workspace.Cards.AddRange(SessionCards); workspace.Refresh();
+            RefreshProjectTools();
+        }
         Logs.RefreshSessions();
         if (!_disposed) RebuildShelf();
     }
@@ -1395,6 +1425,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private async Task SpawnPublishAsync(PublishPlan plan)
     {
+        var workspace = ActiveWorkspace;
         var spawned = Guid.Empty;
         try
         {
@@ -1404,6 +1435,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     // Register the id before StartAsync so the first subscribed
                     // script line is already known to be a publish stream.
                     var pty = PtySessionFactory.Create();
+                    _sessionWorkspaces[pty.Id] = workspace;
                     lock (_publishLock)
                     {
                         spawned = pty.Id;
@@ -1766,7 +1798,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public string WorkspaceNameLive
     {
         get => _settings.WorkspaceName;
-        set { _settings.WorkspaceName = value; WorkspaceName = value; OnPropertyChanged(); }
+        set { _settings.WorkspaceName = value; WorkspaceName = value; ActiveWorkspace.Name = value; OnPropertyChanged(); }
     }
 
     [RelayCommand]
@@ -1784,7 +1816,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
         _settings.SessionGroups = SessionGroups.ToList();
         _settings.FavoriteCommands = FavoriteCommands.Select(favorite => favorite.Model).ToList();
-        if (!ShellSetupOpen) SnapshotWorkspace();
+        SnapshotProjectTools();
+        // Filter notifications can save while the shelf is being rebuilt. Capturing that
+        // temporary single-pane/partial list would overwrite the layout being restored.
+        if (!ShellSetupOpen && !_switchingWorkspace && !_restoringProjects) { SnapshotWorkspace(); SnapshotProjectTabs(); }
         _settingsStore.Save(_settings);
     }
 
@@ -1795,10 +1830,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         => _settings.Workspace = CaptureWorkspace();
 
     private readonly Dictionary<Guid, (string Command, bool Run)> _startupCommands = new();
-    private WorkspaceState CaptureWorkspace()
+    private WorkspaceState CaptureWorkspace(LiveWorkspace? workspace = null)
     {
-        var ordered = SessionCards.Select(c => c.Model)
-            .Concat(DetachedSessions)
+        workspace ??= ActiveWorkspace;
+        var current = workspace == ActiveWorkspace;
+        var layout = workspace.Layout;
+        var ordered = (current ? SessionCards.AsEnumerable() : workspace.Cards).Select(c => c.Model)
+            .Concat(_sessions.Sessions.Where(s => _sessionWorkspaces.GetValueOrDefault(s.Id) == workspace))
+            .Concat(DetachedSessions.Where(s => _sessionWorkspaces.GetValueOrDefault(s.Id) == workspace))
+            .Distinct()
             .Where(m => !m.ExcludeFromWorkspace)
             .ToList();
         var ws = new WorkspaceState();
@@ -1818,16 +1858,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Pinned = m.Pinned,
             ColorScheme = m.Emulator.ColorScheme,
         }).ToList();
-        ws.ActiveIndex = IndexOf(_sessions.Active);
-        ws.IsSplit = IsSplit;
-        ws.LeftIndex = IndexOf(LeftPane);
-        ws.RightIndex = IndexOf(RightPane);
-        ws.FocusedPane = FocusedPane;
-        ws.SplitLayout = SplitLayout;
-        ws.BottomLeftIndex = IndexOf(BottomLeftPane);
-        ws.BottomRightIndex = IndexOf(BottomRightPane);
-        ws.ColumnRatio = ColumnRatio;
-        ws.RowRatio = RowRatio;
+        ws.ActiveIndex = IndexOf(current ? _sessions.Active : workspace.SavedActive);
+        ws.IsSplit = current ? IsSplit : layout.IsSplit;
+        ws.LeftIndex = IndexOf(current ? LeftPane : workspace.SavedPanes[0]);
+        ws.RightIndex = IndexOf(current ? RightPane : workspace.SavedPanes[1]);
+        ws.FocusedPane = current ? FocusedPane : layout.FocusedPane;
+        ws.SplitLayout = current ? SplitLayout : layout.SplitLayout;
+        ws.BottomLeftIndex = IndexOf(current ? BottomLeftPane : workspace.SavedPanes[2]);
+        ws.BottomRightIndex = IndexOf(current ? BottomRightPane : workspace.SavedPanes[3]);
+        ws.ColumnRatio = current ? ColumnRatio : layout.ColumnRatio;
+        ws.RowRatio = current ? RowRatio : layout.RowRatio;
         return ws;
         int IndexOf(TerminalSessionModel? m) => m is null ? -1 : ordered.IndexOf(m);
     }
@@ -2005,6 +2045,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var d = new Utf8LineDecoder();
             d.LineReceived += line =>
             {
+                EvaluateOutputRules(id, line);
                 var level = ClassifyLine(line);
                 var name = _sessionNames.GetValueOrDefault(id, "session");
                 bool publish;
@@ -2034,6 +2075,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnSessionAdded(TerminalSessionModel s)
     {
+        var owner = _sessionWorkspaces.GetValueOrDefault(s.Id) ?? ActiveWorkspace;
+        _sessionWorkspaces[s.Id] = owner;
+        s.Emulator.OutputRules = _ruleMatchers;
         _sessionNames[s.Id] = s.Name;
         // Reattach after a popout: the PTY wiring and cwd history were kept
         // alive through the detach — re-subscribing would double every output
@@ -2050,6 +2094,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 lock (_cwdLock) HistoryFor(s).Push(s.WorkingDirectory);
             s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
             s.Emulator.CommandCompleted += command => OnCommandCompleted(s, command);
+            s.Pty.Exited += (_, code) => RunOnUi(() => OnProjectTaskCompleted(s, code));
             s.Emulator.Bell += () => RunOnUi(() => OnSessionBell(s));
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -2059,7 +2104,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (_disposed) { s.Dispose(); return; }
             var card = new SessionCardViewModel(s);
             card.Refresh();
-            SessionCards.Add(card);
+            owner.Cards.Add(card); owner.Refresh();
+            if (owner == ActiveWorkspace) SessionCards.Add(card);
             RefreshCounts();
             SyncActive();
         });
@@ -2084,8 +2130,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (IsSplit) ReplaceRemovedPane(s);
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
             if (vm is not null) SessionCards.Remove(vm);
+            if (_sessionWorkspaces.TryGetValue(s.Id, out var owner))
+            { owner.Cards.RemoveAll(c => c.Model == s); owner.Refresh(); }
             if (!detached)
             {
+                _sessionWorkspaces.TryRemove(s.Id, out _);
+                _ = StopSessionRecordingAsync(s.Id);
                 // Session names recycle ("Terminal 01" → the next auto-named
                 // session). The Logs filter map is keyed by name — drop the dead
                 // session's combo so a recycled name doesn't inherit it.
@@ -2100,6 +2150,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _syncingActive;
     private void SyncActive()
     {
+        if (!_switchingWorkspace && !_restoringProjects && _sessions.Active is { } requested
+            && _sessionWorkspaces.TryGetValue(requested.Id, out var owner) && owner != ActiveWorkspace)
+        { SwitchProjectWorkspace(owner); _sessions.Activate(requested); }
         _syncingActive = true;
         try
         {
@@ -2131,6 +2184,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         TerminalCount = SessionCards.Count;
         RunningCount = SessionCards.Count(c => c.Model.IsRunning);
         foreach (var c in SessionCards) c.Refresh();
+        foreach (var workspace in ProjectWorkspaces)
+        { foreach (var c in workspace.Cards) if (workspace != ActiveWorkspace) c.Refresh(); workspace.Refresh(); }
         UpdateGroupActivity();
         StatusLine = $"工作空间  {WorkspaceName}      {TerminalCount} 个终端      {RunningCount} 个运行中";
     }
@@ -2197,6 +2252,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _disposed = true;   // popout Closed handlers must not reattach anymore
+        DisposeProjectTools();
         _updateDownloadCancellation?.Cancel();
         StopTemplatePreview();
         BindCommandSession(null);

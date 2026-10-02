@@ -145,6 +145,43 @@ public class WindowsStreamingTests
             Assert.Equal("TH-EDIT> ".Length + 4, terminal.Buffer.CursorX);
     }
 
+    [Theory]
+    [InlineData("pwsh")]
+    [InlineData("powershell.exe")]
+    public async Task RealPowerShell_TaskCompletionAndRecordingReplayUseActualOutput(string shell)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var pty = new ConPtySession(); using var terminal = new TerminalEmulator(pty);
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completed = new TaskCompletionSource<ShellCommandState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        terminal.CwdChanged += _ => ready.TrySetResult(); terminal.CommandCompleted += command => completed.TrySetResult(command);
+        var handles = new[] { -10, -11, -12 }.Select(GetStdHandle).ToArray();
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".threc");
+        try
+        {
+            try
+            {
+                foreach (var id in new[] { -10, -11, -12 }) SetStdHandle(id, IntPtr.Zero);
+                await terminal.StartAsync(new PtyOptions { Shell = shell, Arguments = "-NoLogo -NoProfile " + ShellIntegration.PowerShellArguments, WorkingDirectory = Environment.CurrentDirectory });
+            }
+            finally { for (var i = 0; i < handles.Length; i++) SetStdHandle(-10 - i, handles[i]); }
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(15)); await Task.Delay(400);
+            await using (var recorder = new TerminalRecorder(terminal, path, "actual PowerShell"))
+            {
+                terminal.PasteText(ShellIntegration.PrepareTaskCommand(shell, "Write-Output 'project-task-output 中文'; cmd /c exit 7")); terminal.SendText("\r");
+                ShellCommandState command;
+                try { command = await completed.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
+                catch (TimeoutException) { Assert.Fail("Shell completion missing: " + terminal.Buffer.TailText(15)); throw; }
+                Assert.Equal(7, command.ExitCode);
+                await Task.Delay(100);
+            }
+            using var playback = await TerminalPlayback.LoadAsync(path); playback.Seek(playback.DurationMs);
+            Assert.NotEmpty(playback.Emulator.Buffer.SearchLines("project-task-output 中文"));
+            Assert.Equal(7, Assert.Single(playback.Emulator.Commands.Records).ExitCode);
+        }
+        finally { File.Delete(path); }
+    }
+
     [DllImport("kernel32.dll")] private static extern IntPtr GetStdHandle(int id);
     [DllImport("kernel32.dll")] private static extern bool SetStdHandle(int id, IntPtr handle);
 }

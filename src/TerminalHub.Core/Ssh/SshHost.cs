@@ -40,6 +40,7 @@ public sealed record SshHost
     [JsonIgnore]
     public string CommandLine => $"ssh {SshArguments}";
 
+    public static string QuoteArgument(string s) => QuoteIfNeeded(s);
     private static string QuoteIfNeeded(string s)
     {
         if (OperatingSystem.IsWindows()) return QuoteWindows(s);
