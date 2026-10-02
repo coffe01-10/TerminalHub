@@ -34,6 +34,7 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Process table sort keys (column headers cycle asc/desc).</summary>
     public enum ProcSort { Pid, Name, Cpu, Mem }
 
+    [ObservableProperty] private string _processesEmptyText = "采样中…";
     [ObservableProperty] private ProcSort _processSort = ProcSort.Cpu;
     [ObservableProperty] private bool _processSortAsc;      // cpu/mem desc, pid/name asc by default
     private IReadOnlyList<ProcessInfo> _lastProcesses = [];
@@ -142,6 +143,9 @@ public partial class DashboardViewModel : ViewModelBase
 
             _lastProcesses = m.Processes;
             ResortProcesses();
+            // First real tick arrived — an empty table now means "no data",
+            // not "still warming up".
+            if (m.Processes.Count == 0) ProcessesEmptyText = "暂无进程";
         });
     }
 

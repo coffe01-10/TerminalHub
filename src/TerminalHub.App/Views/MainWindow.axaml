@@ -770,7 +770,7 @@
                     </Button>
                   </Grid>
                   <Panel Grid.Row="1">
-                    <TextBlock Text="采样中…" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{Binding Dashboard.ProcessesEmptyText}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding Dashboard.Processes.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <ListBox ItemsSource="{Binding Dashboard.Processes}"
