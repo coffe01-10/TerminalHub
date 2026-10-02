@@ -995,8 +995,13 @@
                           <TextBlock Text="▸" Foreground="{DynamicResource UiAccent}" IsVisible="{Binding IsDirectory}"/>
                           <TextBlock Text="·" Foreground="{DynamicResource UiFaint}" IsVisible="{Binding !IsDirectory}"/>
                           <TextBlock Grid.Column="1" Margin="2,0,0,0" TextTrimming="CharacterEllipsis"
-                                     Foreground="{DynamicResource UiInk}"
-                                     ToolTip.Tip="{Binding LinkTarget}">
+                                     Foreground="{DynamicResource UiInk}">
+                            <ToolTip.Tip>
+                              <MultiBinding Converter="{x:Static vm:FileTooltipConverter.Instance}">
+                                <Binding Path="FullPath"/>
+                                <Binding Path="LinkTarget"/>
+                              </MultiBinding>
+                            </ToolTip.Tip>
                             <Run Text="{Binding Name}"
                                  Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
                             <Run Text="{Binding IsSymlink, Converter={x:Static vm:BoolToSymlinkMarkConverter.Instance}}"

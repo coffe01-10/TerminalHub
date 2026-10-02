@@ -104,6 +104,20 @@ public sealed class StringNotEmptyConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>FileEntry.FullPath (+ " → target" for symlinks) as the row tooltip.</summary>
+public sealed class FileTooltipConverter : IMultiValueConverter
+{
+    public static readonly FileTooltipConverter Instance = new();
+
+    public object Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var path = values.Count > 0 ? values[0] as string : null;
+        var target = values.Count > 1 ? values[1] as string : null;
+        if (string.IsNullOrEmpty(path)) return "";
+        return string.IsNullOrEmpty(target) ? path : $"{path}\n→ {target}";
+    }
+}
+
 /// <summary>bool → accent brush when true, muted gray when false (e.g. split-toggle state).</summary>
 public sealed class BoolBrushConverter : IValueConverter
 {
