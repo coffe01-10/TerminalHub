@@ -633,6 +633,19 @@ public partial class MainWindow : Window
 
     private void OnShelfPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        // Middle-click a card = close it (browser/terminal tab convention);
+        // the left-drag path below only ever arms on the left button.
+        if (e.InitialPressMouseButton == MouseButton.Middle)
+        {
+            if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is null
+                && (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
+                    ?.DataContext is SessionCardViewModel card)
+            {
+                Vm.CloseSessionCommand.Execute(card);
+                e.Handled = true;
+            }
+            return;
+        }
         if (_dragCard is null) return;
         var clicked = _cardDragging ? null : _dragCard;
         EndShelfDrag(commit: true);
