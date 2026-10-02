@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Terminal Hub — publish a self-contained Linux x64 binary.
 # Output: artifacts/TerminalHub-linux-x64.tar.gz
-# Pass MSBuild options such as -p:Version=0.3.3 to override the release version.
+# Pass MSBuild options such as -p:Version=0.3.4 to override the release version.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,8 +28,11 @@ chmod +x artifacts/publish/linux-x64/TerminalHub
 # Explicit modes also work when cross-publishing under Git Bash on NTFS.
 archive="artifacts/TerminalHub-linux-x64.tar"
 trap 'rm -f "$archive"' EXIT
-tar -cf "$archive" --mode=0755 -C artifacts/publish/linux-x64 TerminalHub
-tar -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 LICENSE QUICKSTART.linux.zh-CN.txt
+# Windows' bsdtar can precede Git Bash's GNU tar on PATH and lacks --mode.
+TAR=${TAR:-tar}
+if [[ "$OSTYPE" == msys* && "$TAR" == tar ]]; then TAR=/usr/bin/tar; fi
+"$TAR" -cf "$archive" --mode=0755 -C artifacts/publish/linux-x64 TerminalHub
+"$TAR" -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 LICENSE QUICKSTART.linux.zh-CN.txt
 gzip -f "$archive"
 
 echo "==> artifacts/TerminalHub-linux-x64.tar.gz"

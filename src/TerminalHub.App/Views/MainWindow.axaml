@@ -50,10 +50,11 @@
     </Style>
     <Style Selector="Border.workspace-tab:pointerover"><Setter Property="Background" Value="{DynamicResource UiSurface}"/></Style>
     <Style Selector="Border.workspace-tab.active"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/><Setter Property="BorderBrush" Value="{DynamicResource UiAccentSoft}"/></Style>
+    <Style Selector="Border.workspace-tab.dragging"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/><Setter Property="Opacity" Value="0.85"/></Style>
     <Style Selector="Button.workspace-name">
       <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="12,0,8,0"/>
       <Setter Property="Height" Value="30"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
-      <Setter Property="Template"><ControlTemplate><ContentPresenter Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/></ControlTemplate></Setter>
+      <Setter Property="Template"><ControlTemplate><ContentPresenter Content="{TemplateBinding Content}" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/></ControlTemplate></Setter>
     </Style>
     <Style Selector="Border.workspace-tab.active Button.workspace-name"><Setter Property="Foreground" Value="{DynamicResource UiAccent}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="Border.workspace-tab:pointerover Button.workspace-name"><Setter Property="Foreground" Value="{DynamicResource UiInk}"/></Style>
@@ -190,12 +191,13 @@
 
       <!-- ============ Main three-rail ============ -->
       <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="26,0,26,0">
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding ProjectWorkspaces}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ScrollViewer x:Name="WorkspaceTabScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <ItemsControl x:Name="WorkspaceTabs" ItemsSource="{Binding ProjectWorkspaces}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:LiveWorkspace">
               <Border Classes="workspace-tab" Classes.active="{Binding IsActive}">
                 <StackPanel Orientation="Horizontal">
-                  <Button Classes="workspace-name" Tag="{Binding}" Click="OnSwitchWorkspace" DoubleTapped="OnRenameWorkspace" ToolTip.Tip="点击切换，双击重命名" AutomationProperties.Name="{Binding Name}">
+                  <Button Classes="workspace-name" Tag="{Binding}" Click="OnSwitchWorkspace" ToolTip.Tip="点击切换 · 拖动排序 · 右键重命名" AutomationProperties.Name="{Binding Name}">
+                    <Button.ContextMenu><ContextMenu><MenuItem Header="重命名工作区" Tag="{Binding}" Click="OnRenameWorkspace"/></ContextMenu></Button.ContextMenu>
                     <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Name}" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                       <Border Classes="workspace-count"><TextBlock Text="{Binding Count}" FontSize="10" Foreground="{DynamicResource UiMuted}" HorizontalAlignment="Center"/></Border>
@@ -261,6 +263,7 @@
               </ControlTheme>
             </ListBox.ItemContainerTheme>
             <ListBox.DataTemplates>
+              <ctl:CachedShelfTemplate>
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
                                WheelMode="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ShelfAutoHide}"
@@ -327,6 +330,8 @@
                   </Border>
                 </ctl:StageCard>
               </DataTemplate>
+              </ctl:CachedShelfTemplate>
+              <ctl:CachedShelfTemplate>
               <DataTemplate x:DataType="vm:SessionGroupHeader">
                 <Border Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                         CornerRadius="8" Padding="10,6" Margin="6,0" Cursor="Hand">
@@ -337,6 +342,7 @@
                   </Grid>
                 </Border>
               </DataTemplate>
+              </ctl:CachedShelfTemplate>
             </ListBox.DataTemplates>
           </ListBox>
           <Button Grid.Row="2" CornerRadius="12" Margin="14,8,10,0" Padding="14,9"

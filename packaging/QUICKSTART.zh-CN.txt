@@ -1,4 +1,4 @@
-Terminal Hub v0.3.3 — Windows x64（2026-10-02）
+Terminal Hub v0.3.4 — Windows x64（2026-10-02）
 
 解压整个文件夹，双击 TerminalHub.exe。无需安装 .NET SDK。
 系统要求：Windows 10 1809 或更高版本 / Windows 11，x64。
@@ -8,6 +8,8 @@ Terminal Hub v0.3.3 — Windows x64（2026-10-02）
 WSL 选项需要已经安装并配置好 Linux 发行版。
 
 Ctrl+Shift+N 新建会话；Ctrl+Tab 切换会话。
+顶部工作区标签点击切换、左右拖动排序，右键菜单重命名；顺序随配置保存。
+自动收起侧栏时靠近左侧呼出，当前终端居中；固定侧栏沿用原有逻辑。
 Alt+1…9 按左侧顺序切换到对应终端。
 点击顶部设置按钮 → 快捷键，可按键录入上一个、下一个及第 1–9 个终端的快捷键。
 Backspace / Delete 清除绑定，点击「完成」保存；可恢复默认配置。

@@ -62,9 +62,8 @@ public partial class MainWindowViewModel
             foreach (var card in SessionCards) card.SetDisplayed(false);
             StopBroadcast();
             ExitSplit();
-            SessionCards.Clear();
             ActiveWorkspace = workspace;
-            foreach (var card in workspace.Cards) SessionCards.Add(card);
+            SessionCards.ReplaceAll(workspace.Cards);
             workspace.IsActive = true;
             WorkspaceName = workspace.Name;
             _settings.WorkspaceName = workspace.Name;
@@ -114,6 +113,14 @@ public partial class MainWindowViewModel
         }
         ProjectWorkspaces.Remove(workspace);
         _allProjectTasks.RemoveAll(task => task.WorkspaceId == workspace.Id);
+        SaveSettingsInternal();
+    }
+
+    public void MoveProjectWorkspace(LiveWorkspace workspace, int index)
+    {
+        var from = ProjectWorkspaces.IndexOf(workspace);
+        if (from < 0 || from == index) return;
+        ProjectWorkspaces.Move(from, index);
         SaveSettingsInternal();
     }
 

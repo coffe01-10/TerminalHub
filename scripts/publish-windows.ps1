@@ -30,11 +30,14 @@ Write-Host "==> Published to $out" -ForegroundColor Green
 # A portable preview is useful even without Inno Setup installed.
 Copy-Item -LiteralPath (Join-Path $repo 'packaging\QUICKSTART.zh-CN.txt') -Destination $out
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $out
+$version = ([xml](Get-Content -LiteralPath (Join-Path $repo 'src\TerminalHub.App\TerminalHub.App.csproj') -Raw)).Project.PropertyGroup.Version
+Copy-Item -LiteralPath (Join-Path $repo "docs\releases\v$version.md") -Destination (Join-Path $out 'CHANGES.md')
+Copy-Item -LiteralPath (Join-Path $repo 'docs\performance-workspace-switch-2026-10-02.md') -Destination (Join-Path $out 'PERFORMANCE.md')
 $previewZip = Join-Path $repo 'artifacts\TerminalHub-windows-x64-preview.zip'
 # Package the program payload explicitly; personal settings and SSH records
 # placed beside a portable executable must never enter a release archive.
 $portableNames = @('TerminalHub.exe', 'TerminalHub.Core.pdb', 'TerminalHub.Pty.pdb',
-  'TerminalHub.pdb', 'LICENSE', 'QUICKSTART.zh-CN.txt', 'CHANGES-2026-10-01.md', 'PERFORMANCE-2026-10-01.md')
+  'TerminalHub.pdb', 'LICENSE', 'QUICKSTART.zh-CN.txt', 'CHANGES.md', 'PERFORMANCE.md')
 $portableStream = [System.IO.File]::Open($previewZip, [System.IO.FileMode]::Create)
 $portableArchive = [System.IO.Compression.ZipArchive]::new($portableStream, [System.IO.Compression.ZipArchiveMode]::Create)
 try {

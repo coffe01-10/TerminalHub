@@ -1,4 +1,4 @@
-Terminal Hub v0.3.3 — Linux x64（2026-10-02）
+Terminal Hub v0.3.4 — Linux x64（2026-10-02）
 
 适用于使用 glibc 的 Linux x86_64 桌面环境，不适用于 ARM64 或 Alpine/musl。
 发布包包含 .NET 运行时，无需安装 .NET SDK。
@@ -18,6 +18,8 @@ Avalonia 的 Linux 部署说明：
   ./TerminalHub
 
 默认使用本机 bash 和真实 PTY；缺少默认 Shell 时可以选择其他已安装 Shell。
+顶部工作区标签点击切换、左右拖动排序，右键菜单重命名；顺序随配置保存。
+自动收起侧栏时靠近左侧呼出，当前终端居中；固定侧栏沿用原有逻辑。
 配置保存在 ${XDG_CONFIG_HOME:-$HOME/.config}/terminalhub/settings.json。
 升级时替换程序文件，保留个人配置；关闭程序会结束本次终端进程。
 恢复工作区布局会创建新 Shell，不会恢复已经结束的进程。

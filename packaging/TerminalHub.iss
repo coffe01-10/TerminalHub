@@ -4,7 +4,7 @@
 
 #define AppName      "Terminal Hub"
 #define AppNameZh    "终端控制中心"
-#define AppVersion   "0.3.3"
+#define AppVersion   "0.3.4"
 #define AppPublisher "coffe01-10"
 #define AppExe       "TerminalHub.exe"
 
@@ -39,7 +39,13 @@ Name: "chinesesimp"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut / 创建桌面快捷方式"; GroupDescription: "Shortcuts:"
 
 [Files]
-Source: "..\app\*"; DestDir: "{app}"; Excludes: "settings.json,settings-*.json,.ssh\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Share the portable package's explicit program payload; never collect local settings.
+Source: "..\app\TerminalHub.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app\TerminalHub*.pdb"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app\QUICKSTART.zh-CN.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app\CHANGES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app\PERFORMANCE.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}";      Filename: "{app}\{#AppExe}"

@@ -26,7 +26,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly AppSettings _settings;
     private readonly SettingsStore _settingsStore;
 
-    public ObservableCollection<SessionCardViewModel> SessionCards { get; } = [];
+    public WorkspaceCollection<SessionCardViewModel> SessionCards { get; } = [];
     public ObservableCollection<SessionShortcutViewModel> SessionShortcuts { get; } = [];
     public List<AvailableShell> AvailableStartupShells { get; private set; } = [];
     [ObservableProperty] private bool _shellSetupOpen;
@@ -404,7 +404,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         _sessions.SessionAdded += OnSessionAdded;
         _sessions.SessionRemoved += OnSessionRemoved;
-        _sessions.ActiveChanged += s => Avalonia.Threading.Dispatcher.UIThread.Post(() => SyncActive());
+        _sessions.ActiveChanged += s => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            // Workspace switching already synchronizes the final session. Ignore
+            // its queued duplicate (and intermediate activations during restore).
+            if (!ReferenceEquals(ActiveSession, _sessions.Active)) SyncActive();
+        });
         _sessions.SessionStateChanged += _ => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshCounts);
     }
 

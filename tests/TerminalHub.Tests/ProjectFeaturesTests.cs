@@ -18,6 +18,73 @@ namespace TerminalHub.Tests;
 
 public class ProjectFeaturesTests
 {
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkspaceSwitchBatchesShelfAndReusesThumbnails_RapidSwitchKeepsFinalSelection(bool autoHide)
+    {
+        using var f = new StageLayoutTests.StageFixture();
+        await Task.Delay(650);
+        var vm = f.Vm;
+        vm.ShelfAutoHide = autoHide;
+        if (autoHide)
+        {
+            await Task.Delay(350);
+            f.Window.MouseMove(new Point(4, 300));
+            await Task.Delay(300);
+        }
+        var first = vm.ActiveWorkspace;
+        var cards = vm.SessionCards.ToArray();
+        var thumbnails = f.Window.GetVisualDescendants().OfType<StageCard>()
+            .ToDictionary(c => (SessionCardViewModel)c.DataContext!);
+        await vm.NewProjectWorkspaceCommand.ExecuteAsync(null);
+        await Task.Delay(200);
+        var second = vm.ActiveWorkspace;
+        vm.ShelfAutoHide = autoHide;
+        var sessionChanges = 0; var shelfChanges = 0;
+        System.Collections.Specialized.NotifyCollectionChangedEventHandler onSessions = (_, _) => sessionChanges++;
+        System.Collections.Specialized.NotifyCollectionChangedEventHandler onShelf = (_, _) => shelfChanges++;
+        vm.SessionCards.CollectionChanged += onSessions;
+        vm.ShelfItems.CollectionChanged += onShelf;
+        vm.SwitchProjectWorkspace(first);
+        Assert.Equal(1, sessionChanges); Assert.Equal(1, shelfChanges);
+        await Task.Delay(100);
+        if (autoHide)
+        {
+            // Hidden drawers defer creating their visual items until revealed.
+            f.Window.MouseMove(new Point(900, 300));
+            f.Window.MouseMove(new Point(4, 300));
+            await Task.Delay(300);
+        }
+        Assert.Equal(cards, vm.SessionCards);
+        Assert.Same(vm.ActiveCard, f.Window.FindControl<ListBox>("SessionShelf")!.SelectedItem);
+        var restoredThumbnails = f.Window.GetVisualDescendants().OfType<StageCard>().ToArray();
+        Assert.Equal(cards.Length, restoredThumbnails.Length);
+        foreach (var thumbnail in restoredThumbnails)
+        {
+            var card = (SessionCardViewModel)thumbnail.DataContext!;
+            Assert.Same(thumbnails[card], thumbnail);
+            Assert.Equal(autoHide, thumbnail.WheelMode);
+            Assert.Same(card.Model.Emulator, thumbnail.GetVisualDescendants().OfType<StagePreview>().Single().Emulator);
+        }
+        // Workspace tabs should present their final surface immediately, rather
+        // than starting a thumbnail flight on each complete workspace rebuild.
+        Assert.Equal(1, f.Window.FindControl<StageSurface>("StageWindow")!.Reveal);
+        for (var i = 0; i < 6; i++)
+        {
+            vm.SwitchProjectWorkspace(second);
+            vm.SwitchProjectWorkspace(first);
+        }
+        await Task.Delay(150);
+        Assert.Same(first, vm.ActiveWorkspace);
+        Assert.Same(first.Active, vm.ActiveSession);
+        Assert.Same(vm.ActiveSession!.Emulator, f.Window.FindControl<TerminalView>("MainTerminal")!.Emulator);
+        Assert.Same(vm.ActiveCard, f.Window.FindControl<ListBox>("SessionShelf")!.SelectedItem);
+        Assert.All(vm.AllSessionCards, c => Assert.True(c.Model.IsRunning));
+        vm.SessionCards.CollectionChanged -= onSessions;
+        vm.ShelfItems.CollectionChanged -= onShelf;
+    }
+
     [AvaloniaFact]
     public async Task WorkspaceSwitchPreservesPtyAndSplit_SearchReturnsToBackgroundWorkspace()
     {
@@ -159,9 +226,11 @@ public class ProjectFeaturesTests
             await vm.NewProjectWorkspaceCommand.ExecuteAsync(null); await Task.Delay(100); vm.ActiveWorkspace.Name = "后端";
             vm.NewOutputRuleCommand.Execute(null); vm.SelectedOutputRule!.Pattern = "warning";
             vm.NewProjectTaskCommand.Execute(null); vm.SelectedProjectTask!.Command = "dotnet build";
+            vm.MoveProjectWorkspace(vm.ProjectWorkspaces[0], 1);
             var ids = vm.AllSessionCards.Select(c => c.Model.Id).ToArray(); first.Close(); first = null;
             second = new MainWindow(store); second.Show(); await Task.Delay(800); var restored = (MainWindowViewModel)second.DataContext!;
             Assert.Equal(2, restored.ProjectWorkspaces.Count); Assert.Equal("后端", restored.ActiveWorkspace.Name); Assert.Single(restored.SessionCards);
+            Assert.Equal(new[] { "后端", "前端" }, restored.ProjectWorkspaces.Select(w => w.Name));
             Assert.Equal("dotnet build", Assert.Single(restored.ProjectTasks).Command); Assert.Equal("warning", Assert.Single(restored.OutputRules).Pattern);
             restored.SwitchProjectWorkspace(restored.ProjectWorkspaces.First(w => w.Name == "前端"));
             Assert.True(restored.IsSplit); Assert.Equal(SplitLayout.Vertical, restored.SplitLayout); Assert.Equal(2, restored.SessionCards.Count);

@@ -55,10 +55,10 @@ public partial class MainWindow : Window
         Vm.RevealCommandRequested += OnRevealCommand;
         InitializeOutputTools();
         Vm.PropertyChanged += OnStageSelectionChanged;
+        InitializeWorkspaceTabs();
         SessionShelf.SelectionChanged += OnShelfSelectionChanged;
         InitializeShelfDrawer();
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
-        Vm.SessionCards.CollectionChanged += (_, _) => UpdateStageLayout();
         // Group collapse/pin/reorder change header composition without touching
         // SessionCards — ThumbnailHeight accounts for headers, so recompute on
         // every shelf rebuild.
@@ -251,8 +251,19 @@ public partial class MainWindow : Window
         StageLayout.ColumnDefinitions[1].Width = new GridLength(Vm.ShelfAutoHide ? 0 : 18);
         ShelfResizeHandle.IsVisible = !Vm.ShelfAutoHide;
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(inspectorWidth);
+        QueueShelfReveal();
+    }
+
+    private bool _shelfRevealPending;
+    private void QueueShelfReveal()
+    {
+        // Shelf changes and SizeChanged can occur in the same layout pass.
+        // Scroll only once after the complete list has been arranged.
+        if (_shelfRevealPending) return;
+        _shelfRevealPending = true;
         Dispatcher.UIThread.Post(() =>
         {
+            _shelfRevealPending = false;
             if (_stageReady && IsVisible && Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
                 RevealShelfCard(active);
         }, DispatcherPriority.Loaded);
@@ -315,8 +326,15 @@ public partial class MainWindow : Window
         => SessionShelf.GetVisualDescendants().OfType<StageCard>()
             .FirstOrDefault(c => ReferenceEquals(c.DataContext, active));
 
+    private bool _workspaceSelectionPending;
     private void OnStageSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainWindowViewModel.ActiveWorkspace))
+        {
+            _workspaceSelectionPending = _stageReady;
+            ++_selectionGeneration;
+            StageWindow.FinishActivation();
+        }
         if (e.PropertyName == nameof(MainWindowViewModel.SettingsOpen) && Vm.SettingsOpen)
             DropletExpansion.SetOrigin(SettingsPanel, _lastPanelTrigger);
         if (e.PropertyName == nameof(MainWindowViewModel.InspectorVisible)) UpdateStageLayout();
@@ -328,20 +346,22 @@ public partial class MainWindow : Window
             StageWindow.FinishActivation();
         }
         if (!_stageReady || e.PropertyName != nameof(MainWindowViewModel.ActiveSession)) return;
+        var workspaceSwitch = _workspaceSelectionPending;
+        _workspaceSelectionPending = false;
         var generation = ++_selectionGeneration;
         // SyncActive finishes binding the new card before we locate its visual.
         Dispatcher.UIThread.Post(() =>
         {
             if (!_stageReady || generation != _selectionGeneration || !IsVisible || _dragCard is not null) return;
             if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
-                RevealShelfCard(active, animate: ShelfHost.IsVisible && _shelfRevealed);
+                RevealShelfCard(active, animate: !workspaceSwitch && ShelfHost.IsVisible && _shelfRevealed);
             // Apply a shelf scroll before reading the card's visible origin.
             SessionShelf.UpdateLayout();
             var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
                 .FirstOrDefault(c => ReferenceEquals(c.DataContext, Vm.ActiveCard));
             // Measure in the shared parent: StageWindow itself is transformed
             // during a flight, so translating into it would distort the origin.
-            if (!Vm.IsSplit && ShelfHost.IsVisible && card is not null && Vm.ActiveSession is not null)
+            if (!workspaceSwitch && !Vm.IsSplit && ShelfHost.IsVisible && card is not null && Vm.ActiveSession is not null)
             {
                 var body = card.Child ?? card;
                 var corners = new[] { new Point(), new Point(body.Bounds.Width, 0),
@@ -1621,6 +1641,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+        EndWorkspaceTabDrag(commit: false);
         _projectTools?.Close();
         Vm.PaletteRequested -= OpenPalette;
         Vm.RevealCommandRequested -= OnRevealCommand;

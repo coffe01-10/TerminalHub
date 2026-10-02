@@ -40,7 +40,7 @@ internal static class Program
     [DllImport("kernel32.dll")] private static extern bool SetStdHandle(int id, IntPtr handle);
 }
 
-public sealed class MeasurementApplication : TerminalHub.App.App
+public sealed partial class MeasurementApplication : TerminalHub.App.App
 {
     public override void Initialize()
     {
@@ -49,7 +49,11 @@ public sealed class MeasurementApplication : TerminalHub.App.App
     }
     public override void OnFrameworkInitializationCompleted()
     {
-        Dispatcher.UIThread.Post(async () => await MeasureAsync());
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (Environment.GetCommandLineArgs().Contains("--workspace-switch")) await MeasureWorkspaceSwitchAsync();
+            else await MeasureAsync();
+        });
     }
     private sealed record Sample(int Sessions, string Load, double WallMs, double AppCpuMs,
         double AppCpuPercentOfMachine, double AppCpuPercentOfOneCore, double AllocatedMiB,

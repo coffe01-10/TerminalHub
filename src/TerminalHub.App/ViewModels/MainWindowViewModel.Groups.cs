@@ -8,7 +8,7 @@ namespace TerminalHub.App.ViewModels;
 public partial class MainWindowViewModel
 {
     public ObservableCollection<SessionGroup> SessionGroups { get; } = [];
-    public ObservableCollection<object> ShelfItems { get; } = [];
+    public WorkspaceCollection<object> ShelfItems { get; } = [];
     private readonly Dictionary<string, SessionGroupHeader> _groupHeaders = new();
     private bool _rebuildingShelf;
 
@@ -198,13 +198,17 @@ public partial class MainWindowViewModel
         _rebuildingShelf = true;
         try
         {
-            for (var i = 0; i < next.Count; i++)
+            if (_switchingWorkspace) ShelfItems.ReplaceAll(next);
+            else
             {
-                if (i < ShelfItems.Count && ReferenceEquals(ShelfItems[i], next[i])) continue;
-                if (i < ShelfItems.Count) ShelfItems[i] = next[i];
-                else ShelfItems.Add(next[i]);
+                for (var i = 0; i < next.Count; i++)
+                {
+                    if (i < ShelfItems.Count && ReferenceEquals(ShelfItems[i], next[i])) continue;
+                    if (i < ShelfItems.Count) ShelfItems[i] = next[i];
+                    else ShelfItems.Add(next[i]);
+                }
+                while (ShelfItems.Count > next.Count) ShelfItems.RemoveAt(ShelfItems.Count - 1);
             }
-            while (ShelfItems.Count > next.Count) ShelfItems.RemoveAt(ShelfItems.Count - 1);
             UpdateGroupActivity();
         }
         finally { _rebuildingShelf = false; }
