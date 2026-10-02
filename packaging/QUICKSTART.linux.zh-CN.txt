@@ -1,0 +1,35 @@
+Terminal Hub — Linux x64
+
+适用于使用 glibc 的 Linux x86_64 桌面环境，不适用于 ARM64 或 Alpine/musl。
+发布包包含 .NET 运行时，无需安装 .NET SDK。
+仍需图形和系统库；Avalonia 需要 libX11、libICE、libSM、fontconfig。
+Debian/Ubuntu 可安装：
+  sudo apt install libx11-6 libice6 libsm6 libfontconfig1
+.NET 8 系统依赖随发行版不同，参见：
+  https://learn.microsoft.com/dotnet/core/install/linux
+Avalonia 的 Linux 部署说明：
+  https://docs.avaloniaui.net/docs/deployment/linux
+
+解压并启动：
+  mkdir -p TerminalHub
+  tar -xzf TerminalHub-linux-x64.tar.gz -C TerminalHub
+  cd TerminalHub
+  chmod +x TerminalHub
+  ./TerminalHub
+
+默认使用本机 bash 和真实 PTY；缺少默认 Shell 时可以选择其他已安装 Shell。
+配置保存在 ${XDG_CONFIG_HOME:-$HOME/.config}/terminalhub/settings.json。
+升级时替换程序文件，保留个人配置；关闭程序会结束本次终端进程。
+恢复工作区布局会创建新 Shell，不会恢复已经结束的进程。
+
+Ctrl+Shift+N 新建会话；Ctrl+Tab 切换会话。
+Ctrl+Shift+C 复制，Ctrl+V 粘贴，Ctrl+C 中断 Shell/CLI。
+Ctrl+滚轮调整字号；Ctrl+Shift+F 打开历史搜索。
+应用占用鼠标时按住 Shift 使用终端拖选和历史滚动。
+分屏和弹出窗口使用同一会话，布局切换无需重启进程。
+文件单击预览，Enter／双击使用系统默认应用打开。
+Thunar 文件夹右键集成可在设置中启用；其他文件管理器可用 --cwd 启动目录。
+
+如果 CLI 变成无彩色，检查启动环境中的 NO_COLOR；程序保留用户显式环境选择。
+反馈请附 Linux 发行版、桌面环境、Shell/CLI 版本及复现步骤：
+  https://github.com/coffe01-10/TerminalHub/issues

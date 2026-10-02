@@ -105,6 +105,8 @@ Claude Code, Codex CLI, and other tools install and run inside your shell. See [
 
 > **v0.3.1.** [Download the Windows installer or portable ZIP](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.1) or start from source below. The app is unsigned. Windows is the primary platform, Linux sees less daily verification, and macOS is not a verified target. See the [release notes](docs/releases/v0.3.1.md).
 
+Linux x64: [download v0.3.2](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.3.2) and extract `TerminalHub-linux-x64.tar.gz`. The .NET runtime is included; see the [Linux release notes](docs/releases/v0.3.2.md) for system dependencies and verification limits.
+
 Settings now offers a live appearance preview and configurable session shortcuts. Record a key combination in the Shortcuts tab and save it. Defaults: `Alt+1…9` selects a terminal in shelf order; `Ctrl+Tab` / `Ctrl+Shift+Tab` cycles sessions. These shortcuts work inside the main window.
 
 ### Portable Windows preview
@@ -212,7 +214,7 @@ Linux x64:
 bash scripts/publish-linux.sh
 ```
 
-Output goes to `artifacts/publish/linux-x64/`. Self-contained builds carry the .NET runtime, but Linux still needs the corresponding graphics system libraries.
+Output goes to `artifacts/publish/linux-x64/` and `artifacts/TerminalHub-linux-x64.tar.gz`. Self-contained builds carry the .NET runtime, but Linux still needs the corresponding graphics system libraries. A release version can be passed as an MSBuild option, for example `bash scripts/publish-linux.sh -p:Version=0.3.2`.
 
 </details>
 
