@@ -104,6 +104,12 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         OutputResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnOutputResizeReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
+        InspectorResizeHandle.AddHandler(InputElement.PointerPressedEvent, OnInspectorResizePressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        InspectorResizeHandle.AddHandler(InputElement.PointerMovedEvent, OnInspectorResizeMoved,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        InspectorResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnInspectorResizeReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += async (_, _) =>
         {
             try
@@ -160,7 +166,9 @@ public partial class MainWindow : Window
             (SessionShelf.Bounds.Height - 34 - headerH + tucked * overlap) / visibleCards, 208, 268);
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Bounds.Width < 1250 ? 232 : 280);
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
-        StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? (Bounds.Width < 1250 ? 300 : 326) : 0);
+        var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
+        inspectorWidth = Math.Clamp(inspectorWidth, 240, Math.Max(320, Bounds.Width * 0.45));
+        StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorVisible ? inspectorWidth : 0);
         Dispatcher.UIThread.Post(() =>
         {
             if (_stageReady && IsVisible && Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
@@ -989,6 +997,33 @@ public partial class MainWindow : Window
     private void OnOutputResizeReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (Equals(e.Pointer.Captured, OutputResizeHandle)) e.Pointer.Capture(null);
+    }
+
+    // Inspector rail left-edge drag — left grows the panel. The explicit width
+    // is stored on the VM so later UpdateStageLayout passes keep it (clamped).
+    private double _inspectorDragStartX, _inspectorDragStartW;
+
+    private void OnInspectorResizePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(InspectorResizeHandle).Properties.IsLeftButtonPressed) return;
+        _inspectorDragStartX = e.GetPosition(this).X;
+        _inspectorDragStartW = StageLayout.ColumnDefinitions[InspectorColumn].ActualWidth;
+        e.Pointer.Capture(InspectorResizeHandle);
+        e.Handled = true;
+    }
+
+    private void OnInspectorResizeMoved(object? sender, PointerEventArgs e)
+    {
+        if (!Equals(e.Pointer.Captured, InspectorResizeHandle)) return;
+        var delta = _inspectorDragStartX - e.GetPosition(this).X;
+        Vm.InspectorWidth = Math.Clamp(_inspectorDragStartW + delta, 240, Math.Max(320, Bounds.Width * 0.45));
+        StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(Vm.InspectorWidth);
+        e.Handled = true;
+    }
+
+    private void OnInspectorResizeReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (Equals(e.Pointer.Captured, InspectorResizeHandle)) e.Pointer.Capture(null);
     }
 
 

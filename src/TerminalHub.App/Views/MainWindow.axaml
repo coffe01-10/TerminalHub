@@ -695,6 +695,10 @@
           </Grid>
         </ctl:StageSurface>
 
+        <!-- left-edge drag handle for the inspector rail (12px gutter column) -->
+        <Border x:Name="InspectorResizeHandle" Grid.Column="3" Background="Transparent"
+                Cursor="SizeWestEast" ToolTip.Tip="拖拽调整右栏宽度"/>
+
         <!-- ===== RIGHT: Processes/Files/Logs/SSH ===== -->
         <Border Grid.Column="4" CornerRadius="{DynamicResource SurfaceCorner}" IsVisible="{Binding InspectorVisible}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
