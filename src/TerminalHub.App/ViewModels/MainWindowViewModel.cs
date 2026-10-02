@@ -236,6 +236,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// mode the picked card is assigned to the focused pane.</summary>
     partial void OnActiveCardChanged(SessionCardViewModel? value)
     {
+        OnPropertyChanged(nameof(WindowTitle));
         if (_rebuildingShelf || value is null) return;
         if (IsSplit && value.Model is { } picked)
         {
@@ -829,6 +830,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(PreviousSessionMenuText));
     }
 
+    /// <summary>Window caption carries the active session so taskbar / Alt+Tab
+    /// shows which terminal a window belongs to.</summary>
+    public string WindowTitle =>
+        ActiveCard is { } card ? $"{card.Name} — Terminal Hub" : "Terminal Hub · 终端控制中心";
+
     public string NextSessionMenuText => SessionMenuText(SessionShortcutAction.Next, "下一个会话");
     public string PreviousSessionMenuText => SessionMenuText(SessionShortcutAction.Previous, "上一个会话");
     private string SessionMenuText(SessionShortcutAction action, string label)
@@ -973,6 +979,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.RefreshSessions();
         OnPropertyChanged(nameof(LeftPaneName));
         OnPropertyChanged(nameof(RightPaneName));
+        OnPropertyChanged(nameof(WindowTitle));
     }
 
     private void OnSessionCardsChanged(object? sender, NotifyCollectionChangedEventArgs e)
