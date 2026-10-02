@@ -110,6 +110,12 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         InspectorResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnInspectorResizeReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
+        ShelfResizeHandle.AddHandler(InputElement.PointerPressedEvent, OnShelfResizePressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        ShelfResizeHandle.AddHandler(InputElement.PointerMovedEvent, OnShelfResizeMoved,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        ShelfResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnShelfResizeReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += async (_, _) =>
         {
             try
@@ -164,7 +170,9 @@ public partial class MainWindow : Window
         }
         ThumbnailHeight = Math.Clamp(
             (SessionShelf.Bounds.Height - 34 - headerH + tucked * overlap) / visibleCards, 208, 268);
-        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Bounds.Width < 1250 ? 232 : 280);
+        var shelfWidth = Vm.ShelfWidth > 0 ? Vm.ShelfWidth : (Bounds.Width < 1250 ? 232 : 280);
+        shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
+        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(shelfWidth);
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
         inspectorWidth = Math.Clamp(inspectorWidth, 240, Math.Max(320, Bounds.Width * 0.45));
@@ -1024,6 +1032,33 @@ public partial class MainWindow : Window
     private void OnInspectorResizeReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (Equals(e.Pointer.Captured, InspectorResizeHandle)) e.Pointer.Capture(null);
+    }
+
+    // Session shelf right-edge drag — right grows the shelf. Same pin-on-drag
+    // convention as the inspector rail.
+    private double _shelfDragStartX, _shelfDragStartW;
+
+    private void OnShelfResizePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(ShelfResizeHandle).Properties.IsLeftButtonPressed) return;
+        _shelfDragStartX = e.GetPosition(this).X;
+        _shelfDragStartW = StageLayout.ColumnDefinitions[ShelfColumn].ActualWidth;
+        e.Pointer.Capture(ShelfResizeHandle);
+        e.Handled = true;
+    }
+
+    private void OnShelfResizeMoved(object? sender, PointerEventArgs e)
+    {
+        if (!Equals(e.Pointer.Captured, ShelfResizeHandle)) return;
+        var delta = e.GetPosition(this).X - _shelfDragStartX;
+        Vm.ShelfWidth = Math.Clamp(_shelfDragStartW + delta, 180, Math.Max(280, Bounds.Width * 0.45));
+        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Vm.ShelfWidth);
+        e.Handled = true;
+    }
+
+    private void OnShelfResizeReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (Equals(e.Pointer.Captured, ShelfResizeHandle)) e.Pointer.Capture(null);
     }
 
 

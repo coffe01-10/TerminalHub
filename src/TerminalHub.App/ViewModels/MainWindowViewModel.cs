@@ -56,6 +56,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>0 = follow the responsive default (300/326); a left-edge drag
     /// pins an explicit width that window resizes then keep (clamped).</summary>
     [ObservableProperty] private double _inspectorWidth;
+    /// <summary>0 = responsive 232/280; right-edge drag pins an explicit width.</summary>
+    [ObservableProperty] private double _shelfWidth;
     [ObservableProperty] private int _dockVisibilityMode;
     [ObservableProperty] private string _activeWorkingDirectory = "";
     public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? "未选择会话" :
