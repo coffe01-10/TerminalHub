@@ -66,6 +66,10 @@ public sealed class VtParser
     /// <summary>Raised after a batch of input has been applied (renderer hint).</summary>
     public event Action? BufferChanged;
 
+    /// <summary>BEL (0x07) in the ground state — the app turns it into a
+    /// visual notification instead of a sound.</summary>
+    public event Action? Bell;
+
     public ScreenBuffer Buffer => _buffer;
 
     public VtParser(ScreenBuffer buffer, Action<byte[]>? responder = null)
@@ -186,7 +190,7 @@ public sealed class VtParser
         switch (b)
         {
             case 0x00: case 0x7F: break;                        // NUL/DEL ignored
-            case 0x07: break;                                   // BEL
+            case 0x07: Bell?.Invoke(); break;                   // BEL → visual bell
             case 0x08: _afterZwj = false; _buffer.Backspace(); break;
             case 0x09: _afterZwj = false; _buffer.Tab(); break;
             case 0x0A: case 0x0B: case 0x0C: _afterZwj = false; _buffer.LineFeed(); break;

@@ -22,6 +22,21 @@ public partial class MainWindowViewModel
             NotificationVisible = true;
         });
     }
+    /// <summary>PTY BEL: a bell on a background pane/session surfaces the same
+    /// banner as command completion (its「查看终端」jumps to the source) and
+    /// flags the shelf card unread. A bell in the visible terminal is already
+    /// on screen — no banner.</summary>
+    private void OnSessionBell(TerminalSessionModel s)
+    {
+        if (_disposed) return;
+        if (IsSplit ? s == LeftPane || s == RightPane : s == ActiveSession) return;
+        _notificationSession = s;
+        NotificationText = $"🔔 {s.Name} · 终端响铃";
+        NotificationVisible = true;
+        if (SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s)) is { } card)
+            card.HasUnreadOutput = true;
+    }
+
     [RelayCommand] private void DismissNotification() => NotificationVisible = false;
     [RelayCommand] private void ShowNotificationSession()
     {

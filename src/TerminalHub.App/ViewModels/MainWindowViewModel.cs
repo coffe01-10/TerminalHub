@@ -2009,6 +2009,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 lock (_cwdLock) HistoryFor(s).Push(s.WorkingDirectory);
             s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
             s.Emulator.CommandCompleted += command => OnCommandCompleted(s, command);
+            s.Emulator.Bell += () => RunOnUi(() => OnSessionBell(s));
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {

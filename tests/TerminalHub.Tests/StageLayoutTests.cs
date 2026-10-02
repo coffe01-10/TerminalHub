@@ -641,6 +641,28 @@ public class StageLayoutTests
         // Stays inside the group span — at its old slot between the siblings.
         Assert.Equal(slot, fixture.Vm.SessionCards.IndexOf(spawned));
     }
+
+    [AvaloniaFact]
+    public async Task Bell_OnBackgroundSession_ShowsNotificationAndMarksUnread()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var bg = fixture.Vm.SessionCards.First(c => !c.IsActive);
+        bg.Model.Emulator.Parser.Feed("\a"u8);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!fixture.Vm.NotificationVisible && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        Assert.True(fixture.Vm.NotificationVisible);
+        Assert.Contains(bg.Model.Name, fixture.Vm.NotificationText);
+        Assert.True(bg.HasUnreadOutput);
+        // A bell on the active session stays silent — it's already on screen.
+        fixture.Vm.NotificationVisible = false;
+        fixture.Vm.ActiveSession!.Emulator.Parser.Feed("\a"u8);
+        await Task.Delay(120);
+        Assert.False(fixture.Vm.NotificationVisible);
+    }
 }
 
 
