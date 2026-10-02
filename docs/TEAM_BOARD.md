@@ -18,7 +18,7 @@
 
 ## 进行中
 
-- [ ] **Inspector 右栏默认展开对齐 mockup**（`feat/inspector-default-visible-mockup`：冷启动默认开 · 显式关闭仍保留 · Processes 真实数据/列头排序/结束进程 · Files 全链路打磨：单击预览/图片预览/新建/重命名F2/隐藏文件/拖出拖入/日期列/全路径tooltip · 终端红绿灯 chrome · Ctrl+Shift+A 全选 · Ctrl+滚轮缩放 · 各面板空态 · 三向布局可拖拽调尺寸+持久化（底栏高/右栏宽/会话架宽）· 终端滚动条四视口 · 会话卡中键关闭+退出重启 · Ctrl+Shift+F 直达搜索 · Output 双击跳会话） — Devin · `/workspace/TerminalHub`
+- [ ] **Inspector 右栏默认展开对齐 mockup**（`feat/inspector-default-visible-mockup`：冷启动默认开 · 显式关闭仍保留 · Processes 真实数据/列头排序/结束进程 · Files 全链路打磨：单击预览/图片预览/新建/重命名F2/隐藏文件/拖出拖入/日期列/全路径tooltip/侧键后退 · 终端红绿灯 chrome · Ctrl+Shift+A 全选 · Ctrl+滚轮缩放 · Ctrl+Insert/Shift+Insert 复制粘贴 · 各面板空态 · 三向布局可拖拽调尺寸+持久化（底栏高/右栏宽/会话架宽）· 终端滚动条四视口 · 会话卡中键关闭+退出重启+拖出弹窗+架空区双击新建 · Ctrl+Shift+F 直达搜索 · Output 双击跳会话 · 面板 Esc 回终端 · 通知横幅 8s 自隐 · 窗口标题随活动会话 · 菜单召回弹出窗口） — Devin · `/workspace/TerminalHub`
 - [ ] **盯梢** — Devin 继续；GLM/Grok 按需；有变化才群里说
 
 ## 待认领 / 下一刀
