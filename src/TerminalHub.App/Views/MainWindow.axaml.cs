@@ -936,11 +936,17 @@ public partial class MainWindow : Window
     {
         _filesDragStart = null;
         _filesDragEntry = null;
-        if (!e.GetCurrentPoint(FilesList).Properties.IsLeftButtonPressed) return;
+        var point = e.GetCurrentPoint(FilesList);
         if (e.Source is Control { DataContext: TerminalHub.Core.Files.FileEntry entry })
         {
-            _filesDragStart = e.GetPosition(FilesList);
-            _filesDragEntry = entry;
+            // Explorer convention: right-click selects the row before its menu.
+            if (point.Properties.IsRightButtonPressed)
+                Vm.Files.SelectedEntry = entry;
+            else if (point.Properties.IsLeftButtonPressed)
+            {
+                _filesDragStart = e.GetPosition(FilesList);
+                _filesDragEntry = entry;
+            }
         }
     }
 
