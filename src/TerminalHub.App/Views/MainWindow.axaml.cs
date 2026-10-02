@@ -835,6 +835,11 @@ public partial class MainWindow : Window
             _ = RenameFileEntryAsync(Vm.Files.SelectedEntry);
             e.Handled = true;
         }
+        else if (e.Key == Key.V && e.KeyModifiers == KeyModifiers.Control)
+        {
+            _ = PasteClipboardFilesAsync();
+            e.Handled = true;
+        }
     }
 
     /// <summary>Empty-area context menu: create folder/file in the current dir.
@@ -905,9 +910,9 @@ public partial class MainWindow : Window
         if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
     }
 
-    // Drag-in: dropping OS files/dirs onto the list copies them into the
-    // current directory. Paths already inside CurrentPath are skipped so an
-    // in-panel drag back onto the list is a no-op.
+    // Drag-in: dropping OS files/dirs copies them into the hovered directory
+    // row, or the current directory on empty space. Paths inside the target
+    // are skipped so an in-panel drag is a no-op.
     private void OnFilesDragOver(object? sender, DragEventArgs e)
     {
         e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None;
@@ -920,8 +925,29 @@ public partial class MainWindow : Window
             .Select(item => item.TryGetLocalPath())
             .Where(p => !string.IsNullOrEmpty(p))
             .ToList();
-        if (paths is { Count: > 0 }) _ = Vm.Files.ImportPathsAsync(paths!);
+        // A directory row under the cursor is the drop target (Explorer rule).
+        var target = (e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)
+            ?.DataContext is TerminalHub.Core.Files.FileEntry { IsDirectory: true } dir
+            ? dir.FullPath : null;
+        if (paths is { Count: > 0 }) _ = Vm.Files.ImportPathsAsync(paths!, target);
         e.Handled = true;
+    }
+
+    private async void OnFilesPasteClick(object? sender, RoutedEventArgs e)
+        => await PasteClipboardFilesAsync();
+
+    private async Task PasteClipboardFilesAsync()
+    {
+        var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clip is null) return;
+        var paths = (await clip.GetDataAsync(DataFormats.Files)) switch
+        {
+            IEnumerable<IStorageItem> items => items
+                .Select(i => i.TryGetLocalPath()).OfType<string>().ToList(),
+            IEnumerable<string> raw => raw.Where(File.Exists).ToList(),
+            _ => [],
+        };
+        if (paths.Count > 0) _ = Vm.Files.ImportPathsAsync(paths);
     }
 
 

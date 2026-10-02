@@ -296,6 +296,29 @@ public class FilesPreviewTests : IDisposable
         finally { Directory.Delete(outside, true); }
     }
 
+    [AvaloniaFact]
+    public async Task ImportPaths_IntoSubdir_TargetDirHonored()
+    {
+        var outside = Path.Combine(_root, "..", $"ext-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "f.txt"), "x");
+        try
+        {
+            using var vm = new FilesViewModel();
+            vm.NavigateTo(_root);
+            var sub = Path.Combine(_root, "sub");
+            var copied = await vm.ImportPathsAsync(new[] { Path.Combine(outside, "f.txt") }, sub);
+            Assert.Equal(1, copied);
+            Assert.True(File.Exists(Path.Combine(sub, "f.txt")));
+            Assert.False(File.Exists(Path.Combine(_root, "f.txt")));
+
+            // Dropping a dir onto its own row → self-target → skipped.
+            var skipped = await vm.ImportPathsAsync(new[] { sub }, sub);
+            Assert.Equal(0, skipped);
+        }
+        finally { Directory.Delete(outside, true); }
+    }
+
     [AvaloniaFact]   // writes into the watched dir — watcher posts need a session
     public void NewFolder_ExplicitExistingName_Dedupes()
     {

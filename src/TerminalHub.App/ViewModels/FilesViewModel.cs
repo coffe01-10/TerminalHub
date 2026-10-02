@@ -514,16 +514,16 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Copy OS-dropped files/dirs into CurrentPath (drag-in import),
-    /// off the UI thread. Skips items inside / equal to / ancestors of
-    /// CurrentPath (a drop back onto its own directory or a parent dragged in
-    /// from Explorer would otherwise recurse into the destination forever).
-    /// Returns the number actually copied.</summary>
-    public async Task<int> ImportPathsAsync(IEnumerable<string> paths)
+    /// <summary>Copy OS-dropped files/dirs into <paramref name="targetDir"/>
+    /// (defaults to CurrentPath), off the UI thread. Skips items inside /
+    /// equal to / ancestors of the target (a drop back onto its own directory
+    /// or a parent dragged in from Explorer would recurse into the destination
+    /// forever). Returns the number actually copied.</summary>
+    public async Task<int> ImportPathsAsync(IEnumerable<string> paths, string? targetDir = null)
     {
         var list = paths.ToList();
         if (list.Count == 0) return 0;
-        var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(CurrentPath));
+        var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetDir ?? CurrentPath));
         StatusIsError = false;
         StatusText = "导入中…";
         var (copied, skipped, error) = await Task.Run(() => DoImport(cur, list));

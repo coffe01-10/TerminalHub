@@ -955,6 +955,7 @@
                       <ContextMenu>
                         <MenuItem Header="新建文件夹" Click="OnFilesNewFolderClick"/>
                         <MenuItem Header="新建文本文件" Click="OnFilesNewTextFileClick"/>
+                        <MenuItem Header="粘贴" Click="OnFilesPasteClick" ToolTip.Tip="把剪贴板中的文件复制到当前目录 (Ctrl+V)"/>
                       </ContextMenu>
                     </ListBox.ContextMenu>
                     <ListBox.Styles>
