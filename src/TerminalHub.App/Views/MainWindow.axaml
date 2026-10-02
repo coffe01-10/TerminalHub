@@ -627,7 +627,8 @@
                           RowDefinitions="Auto,Auto,*">
                       <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="8,6,8,0">
                         <TextBox Text="{Binding Dashboard.SearchQuery}"
-                                 Watermark="在当前会话中搜索…" FontSize="11"
+                                 Watermark="在当前会话中搜索… · Enter 下一处" FontSize="11"
+                                 KeyDown="OnSearchBoxKeyDown"
                                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                                  CornerRadius="6" Padding="8,4"/>
                         <Button Grid.Column="1" Content="▲" Padding="8,2" Margin="6,0,0,0" FontSize="10"

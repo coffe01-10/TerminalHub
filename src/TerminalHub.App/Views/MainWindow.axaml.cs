@@ -454,6 +454,14 @@ public partial class MainWindow : Window
     private void OnSearchPrevMatch(object? sender, RoutedEventArgs e) => ActiveTerminal()?.GoToMatch(-1);
     private void OnSearchNextMatch(object? sender, RoutedEventArgs e) => ActiveTerminal()?.GoToMatch(+1);
 
+    /// <summary>Enter in the find box jumps to the next hit; Shift+Enter goes back.</summary>
+    private void OnSearchBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        ActiveTerminal()?.GoToMatch(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : +1);
+        e.Handled = true;
+    }
+
     /// <summary>Double-click a search result row → scroll the terminal to that
     /// absolute buffer line (keeps the scrolled-up state, no snap to bottom).</summary>
     private void OnSearchHitDoubleTapped(object? sender, TappedEventArgs e)
