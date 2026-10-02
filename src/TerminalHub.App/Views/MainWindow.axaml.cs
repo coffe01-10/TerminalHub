@@ -342,9 +342,28 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Enter anywhere in the SSH form = 添加/更新 (its own validation shows errors).</summary>
+    /// <summary>Esc inside the side rail or bottom panel returns focus to the
+    /// active terminal — the uniform "back to typing" affordance.</summary>
+    private void OnPanelEscapeKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            ActiveTerminal()?.Focus();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Enter anywhere in the SSH form = 添加/更新 (its own validation shows errors).
+    /// Esc collapses the form (same "返回" gesture as the palette).</summary>
     private void OnSshFormKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape)
+        {
+            Vm.Ssh.ToggleEditingCommand.Execute(null);
+            ActiveTerminal()?.Focus();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Enter)
         {
             Vm.Ssh.AddOrUpdateCommand.Execute(null);

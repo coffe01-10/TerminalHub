@@ -502,6 +502,7 @@
 
             <!-- Bottom panel: Output / Debug / Problems / Search -->
             <Border x:Name="OutputPanel" Grid.Row="2" Height="170" Margin="0,6,0,0"
+                    KeyDown="OnPanelEscapeKeyDown"
                     IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
               <Panel>
@@ -725,7 +726,7 @@
         <!-- ===== RIGHT: Processes/Files/Logs/SSH ===== -->
         <Border Grid.Column="4" CornerRadius="{DynamicResource SurfaceCorner}" IsVisible="{Binding InspectorVisible}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
-                BoxShadow="{DynamicResource SurfaceShadow}">
+                BoxShadow="{DynamicResource SurfaceShadow}" KeyDown="OnPanelEscapeKeyDown">
           <Grid RowDefinitions="42,*" Margin="9">
 
             <ListBox Grid.Row="0" SelectedIndex="{Binding SelectedRightTab}"
