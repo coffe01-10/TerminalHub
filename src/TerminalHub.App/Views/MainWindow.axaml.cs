@@ -96,6 +96,8 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         FilesList.AddHandler(InputElement.PointerReleasedEvent, OnFilesDragPointerReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
+        FilesList.AddHandler(DragDrop.DragOverEvent, OnFilesDragOver, RoutingStrategies.Bubble);
+        FilesList.AddHandler(DragDrop.DropEvent, OnFilesDrop, RoutingStrategies.Bubble);
         Opened += async (_, _) =>
         {
             try
@@ -897,6 +899,25 @@ public partial class MainWindow : Window
         _filesDragEntry = null;
         var data = await FilesDragData.CreateAsync(StorageProvider, entry);
         if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+    }
+
+    // Drag-in: dropping OS files/dirs onto the list copies them into the
+    // current directory. Paths already inside CurrentPath are skipped so an
+    // in-panel drag back onto the list is a no-op.
+    private void OnFilesDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnFilesDrop(object? sender, DragEventArgs e)
+    {
+        var paths = e.Data.GetFiles()?
+            .Select(item => item.Path.LocalPath)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+        if (paths is { Count: > 0 }) Vm.Files.ImportPaths(paths);
+        e.Handled = true;
     }
 
 

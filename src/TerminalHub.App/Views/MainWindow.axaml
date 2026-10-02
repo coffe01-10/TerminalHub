@@ -948,6 +948,7 @@
                   <ListBox x:Name="FilesList" ItemsSource="{Binding Files.Entries}"
                            SelectedItem="{Binding Files.SelectedEntry}"
                            Background="Transparent" BorderThickness="0" Padding="4"
+                           DragDrop.AllowDrop="True"
                            DoubleTapped="OnFileEntryDoubleTapped"
                            KeyDown="OnFilesListKeyDown">
                     <ListBox.ContextMenu>

@@ -499,6 +499,50 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Copy OS-dropped files/dirs into CurrentPath (drag-in import).
+    /// Name clashes get the usual 「n」 suffix; items already inside the
+    /// current directory are skipped. Returns the number actually copied.</summary>
+    public int ImportPaths(IEnumerable<string> paths)
+    {
+        var copied = 0; var skipped = 0;
+        var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(CurrentPath)) + Path.DirectorySeparatorChar;
+        foreach (var raw in paths)
+        {
+            var src = Path.TrimEndingDirectorySeparator(Path.GetFullPath(raw));
+            if (src.StartsWith(cur, StringComparison.Ordinal)) { skipped++; continue; }
+            try
+            {
+                var dest = Path.Combine(CurrentPath, UniqueName(Path.GetFileName(src)));
+                if (Directory.Exists(src)) CopyDirectory(src, dest);
+                else if (File.Exists(src)) File.Copy(src, dest);
+                else { skipped++; continue; }
+                copied++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                         or ArgumentException or NotSupportedException)
+            {
+                StatusIsError = true;
+                StatusText = $"无法导入 {Path.GetFileName(src)}: {ex.Message}";
+                return copied;
+            }
+        }
+        if (copied > 0) NavigateTo(CurrentPath);
+        StatusIsError = false;
+        StatusText = copied > 0
+            ? (skipped > 0 ? $"已导入 {copied} 项，跳过 {skipped} 项" : $"已导入 {copied} 项")
+            : (skipped > 0 ? "已在当前目录中" : StatusText);
+        return copied;
+    }
+
+    private static void CopyDirectory(string src, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        foreach (var dir in Directory.EnumerateDirectories(src))
+            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
+        foreach (var file in Directory.EnumerateFiles(src))
+            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
+    }
+
     private string UniqueName(string baseName)
     {
         var stem = Path.GetFileNameWithoutExtension(baseName);

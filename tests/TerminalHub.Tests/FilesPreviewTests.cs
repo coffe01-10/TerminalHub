@@ -228,6 +228,36 @@ public class FilesPreviewTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_root, "a.txt")));
     }
 
+    [AvaloniaFact]
+    public void ImportPaths_CopiesFileAndDir_UniqueNames_SkipsInPlace()
+    {
+        var outside = Path.Combine(_root, "..", $"ext-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(outside, "pkg", "nested"));
+        File.WriteAllText(Path.Combine(outside, "pkg", "nested", "x.txt"), "deep");
+        File.WriteAllText(Path.Combine(outside, "incoming.txt"), "hi");
+        try
+        {
+            using var vm = new FilesViewModel();
+            vm.NavigateTo(_root);
+            var imported = vm.ImportPaths(new[]
+            {
+                Path.Combine(outside, "incoming.txt"),
+                Path.Combine(outside, "pkg"),
+                Path.Combine(_root, "a.txt"),     // already inside → skipped
+            });
+            Assert.Equal(2, imported);
+            Assert.True(File.Exists(Path.Combine(_root, "incoming.txt")));
+            Assert.True(File.Exists(Path.Combine(_root, "pkg", "nested", "x.txt")));
+            Assert.Equal("已导入 2 项，跳过 1 项", vm.StatusText);
+            Assert.False(vm.StatusIsError);
+
+            // Second import of the same name → unique suffix, not overwrite.
+            vm.ImportPaths(new[] { Path.Combine(outside, "incoming.txt") });
+            Assert.True(File.Exists(Path.Combine(_root, "incoming 2.txt")));
+        }
+        finally { Directory.Delete(outside, true); }
+    }
+
     [Fact]
     public void Refresh_RestoredSameFile_KeepsPreview()
     {
