@@ -1295,6 +1295,16 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            // Ctrl+wheel = font zoom (Windows Terminal convention). TwoWay-bound
+            // to Vm.FontSize so the change persists like Ctrl+=/−. Only when the
+            // app didn't claim the mouse — mouse-tracking CLIs get the event.
+            SetCurrentValue(TerminalFontSizeProperty,
+                Math.Clamp(Math.Round(TerminalFontSize + Math.Sign(e.Delta.Y)), 8, 32));
+            e.Handled = true;
+            return;
+        }
         if (_emulator.Buffer.OnAlternateScreen)
         {
             // The alternate screen has no scrollback — the wheel belongs to the

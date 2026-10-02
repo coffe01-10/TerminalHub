@@ -395,7 +395,7 @@
                   <ctl:TerminalView x:Name="MainTerminal"
                                     Emulator="{Binding ActiveSession.Emulator}"
                                     WorkingDirectory="{Binding ActiveWorkingDirectory}" ShellCommand="{Binding ActiveSession.Shell}" IsRemote="{Binding ActiveSession.IsRemote}"
-                                    TerminalFontSize="{Binding FontSize}"
+                                    TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                     TerminalFontFamily="{Binding TerminalFont}"
                                     SearchQuery="{Binding Dashboard.SearchQuery}"/>
                   <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"
@@ -425,7 +425,7 @@
                       <Panel Grid.Row="1" Margin="6,7,6,4">
                       <ctl:TerminalView x:Name="LeftTerminal" Emulator="{Binding LeftPane.Emulator}"
                                         WorkingDirectory="{Binding LeftPane.WorkingDirectory}" ShellCommand="{Binding LeftPane.Shell}" IsRemote="{Binding LeftPane.IsRemote}"
-                                        TerminalFontSize="{Binding FontSize}"
+                                        TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"/>
                       <Button Content="⬇" HorizontalAlignment="Right" VerticalAlignment="Bottom"
@@ -457,7 +457,7 @@
                       <Panel Grid.Row="1" Margin="6,7,6,4" Background="Transparent">
                       <ctl:TerminalView x:Name="RightTerminal" Emulator="{Binding RightPane.Emulator}"
                                         WorkingDirectory="{Binding RightPane.WorkingDirectory}" ShellCommand="{Binding RightPane.Shell}" IsRemote="{Binding RightPane.IsRemote}"
-                                        TerminalFontSize="{Binding FontSize}"
+                                        TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"
                                         IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
