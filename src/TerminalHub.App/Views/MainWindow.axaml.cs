@@ -174,9 +174,9 @@ public partial class MainWindow : Window
         var shelfWidth = Vm.ShelfWidth > 0 ? Vm.ShelfWidth : (Bounds.Width < 1250 ? 232 : 280);
         shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(shelfWidth);
-        // A persisted OutputHeight from a larger window can crowd the terminal
-        // out on a small one — re-clamp against the live bounds every layout.
-        Vm.OutputHeight = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
+        // Clamp locally so a transient window shrink cannot overwrite the
+        // user's persisted height — the panel regrows with the window.
+        OutputPanel.Height = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
         inspectorWidth = Math.Clamp(inspectorWidth, 240, Math.Max(320, Bounds.Width * 0.45));
@@ -638,10 +638,12 @@ public partial class MainWindow : Window
     private void OnShelfPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         // Middle-click a card = close it (browser/terminal tab convention);
-        // the left-drag path below only ever arms on the left button.
+        // the left-drag path below only ever arms on the left button — and a
+        // stray middle release during an armed left-drag must not close it.
         if (e.InitialPressMouseButton == MouseButton.Middle)
         {
-            if ((e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is null
+            if (_dragCard is null
+                && (e.Source as Control)?.FindAncestorOfType<Button>(includeSelf: true) is null
                 && (e.Source as Control)?.FindAncestorOfType<StageCard>(includeSelf: true)
                     ?.DataContext is SessionCardViewModel card)
             {
@@ -1016,16 +1018,35 @@ public partial class MainWindow : Window
 
     private async Task PasteClipboardFilesAsync()
     {
-        var clip = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clip is null) return;
-        var paths = (await clip.GetDataAsync(DataFormats.Files)) switch
+        // Same guard as terminal paste: Win32's clipboard throws while another
+        // process holds it open — and the context-menu path here is async void.
+        try
         {
-            IEnumerable<IStorageItem> items => items
-                .Select(i => i.TryGetLocalPath()).OfType<string>().ToList(),
-            IEnumerable<string> raw => raw.Where(p => File.Exists(p) || Directory.Exists(p)).ToList(),
-            _ => [],
-        };
-        if (paths.Count > 0) _ = Vm.Files.ImportPathsAsync(paths);
+            var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+            var paths = clip is null ? null : (await clip.GetDataAsync(DataFormats.Files)) switch
+            {
+                IEnumerable<IStorageItem> items => items
+                    .Select(i => i.TryGetLocalPath()).OfType<string>().ToList(),
+                IEnumerable<string> raw => raw.Where(p => File.Exists(p) || Directory.Exists(p)).ToList(),
+                _ => [],
+            };
+            if (paths is { Count: > 0 }) _ = Vm.Files.ImportPathsAsync(paths);
+        }
+        catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Files paste failed: {ex.Message}"); }
+    }
+
+    /// <summary>Grey out 粘贴 when the clipboard holds no file list.</summary>
+    private async void OnFilesContextMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+        var hasFiles = false;
+        try
+        {
+            hasFiles = clip is not null
+                && await clip.GetDataAsync(DataFormats.Files) is System.Collections.IEnumerable;
+        }
+        catch { /* clipboard busy — leave the item enabled rather than grey a valid paste */ }
+        PasteMenuItem.IsEnabled = hasFiles;
     }
 
     // Bottom-panel height: capture the pointer on the 8px top-edge handle and
@@ -1046,7 +1067,8 @@ public partial class MainWindow : Window
     {
         if (!Equals(e.Pointer.Captured, OutputResizeHandle)) return;
         var delta = _outputDragStartY - e.GetPosition(this).Y;
-        Vm.OutputHeight = Math.Clamp(_outputDragStartH + delta, 90, Math.Max(140, Bounds.Height * 0.6));
+        Vm.OutputHeight = OutputPanel.Height =
+            Math.Clamp(_outputDragStartH + delta, 90, Math.Max(140, Bounds.Height * 0.6));
         e.Handled = true;
     }
 

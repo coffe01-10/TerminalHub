@@ -1376,7 +1376,13 @@ public partial class TerminalView : Control
     private void SetViewOffset(int value)
     {
         var max = _emulator?.Buffer.ScrollbackCount ?? 0;
-        SetAndRaise(ScrollPositionProperty, ref _viewOffset, Math.Clamp(value, 0, max));
+        var clamped = Math.Clamp(value, 0, max);
+        if (clamped == _viewOffset) return;
+        // Raise the *position* (= scrollback − offset) — SetAndRaise on the
+        // offset field would report inverted old/new values to subscribers.
+        var old = ScrollPosition;
+        _viewOffset = clamped;
+        RaisePropertyChanged(ScrollPositionProperty, old, ScrollPosition);
         SetScrolledUp(_viewOffset > 0);
     }
 

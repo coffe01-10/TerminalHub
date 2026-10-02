@@ -760,12 +760,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (newCard is null) return;
             SessionCards.Remove(newCard);
             // Pinned cards live in the pin block, grouped cards in their group
-            // span — the raw old index only fits ungrouped/unpinned cards.
-            var pos = newCard.Model.Pinned
-                ? Math.Min(index, SessionCards.TakeWhile(c => c.Model.Pinned).Count())
-                : !string.IsNullOrEmpty(newCard.Model.GroupId)
-                    ? IndexFor(newCard)
-                    : Math.Min(Math.Max(index, 0), SessionCards.Count);
+            // span — the raw old index only fits ungrouped/unpinned cards. For
+            // a group, clamp into its [first, last+1) span so an intra-group
+            // slot survives the respawn.
+            int pos;
+            if (newCard.Model.Pinned)
+                pos = Math.Min(index, SessionCards.TakeWhile(c => c.Model.Pinned).Count());
+            else if (!string.IsNullOrEmpty(newCard.Model.GroupId)
+                     && SessionCards.Where(c => c.Model.GroupId == newCard.Model.GroupId).ToList() is { Count: > 0 } grp)
+                pos = Math.Clamp(index,
+                    SessionCards.IndexOf(grp[0]), SessionCards.IndexOf(grp[^1]) + 1);
+            else if (!string.IsNullOrEmpty(newCard.Model.GroupId))
+                pos = IndexFor(newCard);
+            else
+                pos = index;
             SessionCards.Insert(Math.Clamp(pos, 0, SessionCards.Count), newCard);
             ActiveCard = newCard;
         });

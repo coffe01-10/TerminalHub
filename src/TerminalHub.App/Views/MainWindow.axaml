@@ -501,7 +501,7 @@
             </Border>
 
             <!-- Bottom panel: Output / Debug / Problems / Search -->
-            <Border x:Name="OutputPanel" Grid.Row="2" Height="{Binding OutputHeight}" Margin="0,6,0,0"
+            <Border x:Name="OutputPanel" Grid.Row="2" Height="170" Margin="0,6,0,0"
                     IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
               <Panel>
@@ -986,10 +986,10 @@
                            DoubleTapped="OnFileEntryDoubleTapped"
                            KeyDown="OnFilesListKeyDown">
                     <ListBox.ContextMenu>
-                      <ContextMenu>
+                      <ContextMenu Opened="OnFilesContextMenuOpened">
                         <MenuItem Header="新建文件夹" Click="OnFilesNewFolderClick"/>
                         <MenuItem Header="新建文本文件" Click="OnFilesNewTextFileClick"/>
-                        <MenuItem Header="粘贴" Click="OnFilesPasteClick" ToolTip.Tip="把剪贴板中的文件复制到当前目录 (Ctrl+V)"/>
+                        <MenuItem x:Name="PasteMenuItem" Header="粘贴" Click="OnFilesPasteClick" ToolTip.Tip="把剪贴板中的文件复制到当前目录 (Ctrl+V)"/>
                       </ContextMenu>
                     </ListBox.ContextMenu>
                     <ListBox.Styles>
