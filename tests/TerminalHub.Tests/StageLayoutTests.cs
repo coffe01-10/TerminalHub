@@ -18,6 +18,13 @@ namespace TerminalHub.Tests;
 
 public class StageLayoutTests
 {
+    private static async Task Until(Func<bool> condition, string? message = null)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(25);
+        Assert.True(condition(), message ?? "Timed out waiting for the UI to settle.");
+    }
+
     internal sealed class StageFixture : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "terminalhub-stage-" + Guid.NewGuid());
@@ -530,12 +537,13 @@ public class StageLayoutTests
         await Task.Delay(700);
         var surface = fixture.Window.FindControl<StageSurface>("StageWindow")!;
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[0];
-        await Task.Delay(90);
-        Assert.False(surface.RenderTransform?.Value.IsIdentity ?? true);
+        // Under load the posted ActivateFrom can take longer than a fixed delay
+        // to kick the spring — wait for the flight to actually start.
+        await Until(() => !(surface.RenderTransform?.Value.IsIdentity ?? true),
+            "Activation spring never started.");
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[1];
         fixture.Window.Close();
-        await Task.Delay(650);
-        Assert.Equal(1d, surface.Reveal);
+        await Until(() => surface.Reveal == 1d, "Spring did not settle after close.");
         Assert.True(surface.RenderTransform?.Value.IsIdentity ?? true);
     }
 

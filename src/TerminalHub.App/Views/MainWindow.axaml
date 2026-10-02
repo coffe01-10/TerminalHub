@@ -357,6 +357,7 @@
                     <MenuItem Header="关闭会话        Ctrl+Shift+W" Command="{Binding CloseActiveSessionCommand}"/>
                     <MenuItem Header="{Binding NextSessionMenuText}" Command="{Binding CycleSessionNextCommand}"/>
                     <MenuItem Header="{Binding PreviousSessionMenuText}" Command="{Binding CycleSessionPrevCommand}"/>
+                    <MenuItem x:Name="PopoutSessionsMenu" Header="弹出窗口"/>
                     <Separator/>
                     <MenuItem Header="复制 CWD" Command="{Binding CopyActiveCwdCommand}"/>
                     <Separator/>

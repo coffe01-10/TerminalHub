@@ -1247,6 +1247,22 @@ public partial class MainWindow : Window
         }
         if (MoveToGroupMenu.Items.Count == 0)
             MoveToGroupMenu.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
+        // Popped-out sessions leave the shelf entirely — this submenu is the
+        // only in-window way to refocus a popout buried under other windows.
+        if (PopoutSessionsMenu is not null)
+        {
+            PopoutSessionsMenu.Items.Clear();
+            foreach (var win in Vm.Popouts)
+            {
+                var item = new MenuItem { Header = $"聚焦 {win.Session.Name}" };
+                ToolTip.SetTip(item, win.Session.WorkingDirectory);
+                var target = win;
+                item.Click += (_, _) => target.Activate();
+                PopoutSessionsMenu.Items.Add(item);
+            }
+            if (PopoutSessionsMenu.Items.Count == 0)
+                PopoutSessionsMenu.Items.Add(new MenuItem { Header = "无弹出窗口", IsEnabled = false });
+        }
     }
 
     /// <summary>Per-card "⋯" menu on shelf cards (mockup): same session ops as
