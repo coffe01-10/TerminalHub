@@ -169,7 +169,7 @@
           </Grid>
           <ListBox x:Name="SessionShelf" Grid.Row="1" ItemsSource="{Binding ShelfItems}"
                    SelectedItem="{Binding ActiveCard, Mode=OneWay}" Background="Transparent" BorderThickness="0"
-                   Padding="14,14,10,16" ClipToBounds="False"
+                   Padding="14,14,10,16" ClipToBounds="False" DoubleTapped="OnShelfBackgroundDoubleTapped"
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                    ScrollViewer.VerticalScrollBarVisibility="Auto">
             <ListBox.ItemsPanel>

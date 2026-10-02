@@ -537,6 +537,17 @@ public partial class MainWindow : Window
         Vm.CommandNotice = "这段输出已被历史缓冲裁掉，无法定位。";
     }
 
+    /// <summary>Browser tab-strip convention: double-tap the empty shelf area
+    /// spawns a session. Taps on a card or group header keep their own meaning.</summary>
+    private void OnShelfBackgroundDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Visual v && v.FindAncestorOfType<ListBoxItem>(includeSelf: true) is null)
+        {
+            Vm.NewSessionCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     private void OnShelfSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_shelfSelectionGuard) return;
