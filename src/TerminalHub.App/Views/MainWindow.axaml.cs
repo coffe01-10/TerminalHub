@@ -815,6 +815,14 @@ public partial class MainWindow : Window
             Vm.NewSessionCommand.Execute(null);
             e.Handled = true;
         }
+        else if (e.Key == Key.F)
+        {
+            // Ctrl+Shift+F: open the bottom panel on Search and focus the box.
+            Vm.OutputVisible = true;
+            Vm.Dashboard.SelectedBottomTab = 3;
+            FindBox.Focus();
+            e.Handled = true;
+        }
     }
 
     private void OnMinimizeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
