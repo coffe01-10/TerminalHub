@@ -30,6 +30,8 @@ public sealed class TerminalEmulator : IDisposable
 
     /// <summary>Raised (on a background thread) when the buffer changed.</summary>
     public event Action? Changed;
+    /// <summary>PTY rang the bell (BEL in ground state).</summary>
+    public event Action? Bell;
     private long _commandStarted;
     public ShellCommandState? CommandState { get; private set; }
     public CommandJournal Commands { get; } = new();
@@ -54,6 +56,7 @@ public sealed class TerminalEmulator : IDisposable
         _pty = pty ?? new MockPtySession();
         _pty.OutputReceived += OnPtyOutput;
         Parser.BufferChanged += () => Changed?.Invoke();
+        Parser.Bell += () => Bell?.Invoke();
         Parser.ObserveCommands = markers => Commands.Apply(markers, Buffer);
         Parser.CommandsObserved += () => CommandsChanged?.Invoke();
         Parser.CommandMarker += (marker, code) =>

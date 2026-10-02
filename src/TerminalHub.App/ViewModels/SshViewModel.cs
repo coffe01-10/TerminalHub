@@ -24,6 +24,11 @@ public partial class SshViewModel : ViewModelBase
     [ObservableProperty] private string _editPort = "22";
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private SshHost? _selected;
+    /// <summary>Whether the edit form is expanded. Saved hosts get a list-first
+    /// view; the form opens on demand (or automatically while no host exists).</summary>
+    [ObservableProperty] private bool _editing;
+    public bool HasHosts => Hosts.Count > 0;
+    public bool CanToggleEditing => !OperatingSystem.IsWindows();
 
     public SshViewModel(
         List<SshHost> hosts,
@@ -36,6 +41,8 @@ public partial class SshViewModel : ViewModelBase
         _persist = persist;
         _sshAvailable = sshAvailable ?? SshLocator.Available;
         foreach (var h in _hosts) Hosts.Add(h);
+        Hosts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasHosts));
+        _editing = OperatingSystem.IsWindows() || Hosts.Count == 0;
     }
 
     /// <summary>Selecting a row fills the edit form (edit → 添加/更新 to save).</summary>
@@ -46,6 +53,31 @@ public partial class SshViewModel : ViewModelBase
         EditUser = value.User;
         EditHost = value.Host;
         EditPort = value.Port.ToString();
+        Editing = true; // selecting a row means the user wants to edit it
+    }
+
+    /// <summary>Host list is the default view once hosts exist — ＋ opens a
+    /// blank form for a new connection (never pre-filled with the selected
+    /// host, or 添加/更新 would overwrite that row instead of adding).</summary>
+    [RelayCommand]
+    private void ToggleEditing()
+    {
+        if (!CanToggleEditing) return; // Windows keeps its always-visible editor and draft.
+        if (Editing)
+        {
+            // With no hosts the form is the only add entry point.
+            if (HasHosts) Editing = false;
+            return;
+        }
+        Selected = null;
+        ClearEdit();
+        Editing = true;
+    }
+
+    private void ClearEdit()
+    {
+        EditName = EditUser = EditHost = "";
+        EditPort = "22";
     }
 
     /// <summary>Add a new host, or update the row whose Name/Target matches.</summary>
@@ -101,13 +133,23 @@ public partial class SshViewModel : ViewModelBase
     {
         if (host is null) return;
         var idx = Hosts.IndexOf(host);
-        if (idx >= 0)
+        if (idx < 0) return;
+        // SshHost is a record (value equality): after AddOrUpdate replaces the
+        // row instance, Selected still holds the stale-but-equal record, so a
+        // reference compare would miss. Value compare is what we need.
+        var wasSelected = Selected is { } s && s == host;
+        Hosts.RemoveAt(idx);
+        _hosts.RemoveAt(idx);
+        _persist();
+        if (wasSelected)
         {
-            Hosts.RemoveAt(idx);
-            _hosts.RemoveAt(idx);
-            _persist();
+            // The deleted host's values must not linger in the form.
+            Selected = null;
+            ClearEdit();
         }
-        if (ReferenceEquals(Selected, host)) Selected = null;
+        // The empty list always offers the form — it is the only way to add.
+        if (Hosts.Count == 0) Editing = true;
+        else if (wasSelected) Editing = OperatingSystem.IsWindows();
     }
 
     /// <summary>Spawn a new terminal session running `ssh -p port user@host`.</summary>

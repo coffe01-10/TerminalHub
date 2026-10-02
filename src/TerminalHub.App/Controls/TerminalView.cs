@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.TextInput;
 using Avalonia.Interactivity;
@@ -43,6 +44,41 @@ public partial class TerminalView : Control
     private bool _isScrolledUp;
     public bool IsScrolledUp => _isScrolledUp;
 
+    /// <summary>Absolute buffer line at the viewport top (= scrollback size minus
+    /// the scrolled-up offset) — TwoWay-bound by the overlay scrollbar thumb, so
+    /// the live bottom sits at Maximum like every other scrollbar.</summary>
+    public static readonly DirectProperty<TerminalView, int> ScrollPositionProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ScrollPosition),
+            v => v.ScrollPosition, (v, value) => v.ScrollToOffset(v.ScrollbackSize - value));
+    public int ScrollPosition => _scrollbackSize - _viewOffset;
+
+    /// <summary>Scrollable backlog size — the scrollbar's Maximum.</summary>
+    public static readonly DirectProperty<TerminalView, int> ScrollbackSizeProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ScrollbackSize), v => v.ScrollbackSize);
+    private int _scrollbackSize;
+    public int ScrollbackSize => _scrollbackSize;
+
+    /// <summary>Visible rows — the scrollbar's ViewportSize.</summary>
+    public static readonly DirectProperty<TerminalView, int> ViewportRowsProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ViewportRows), v => v.ViewportRows);
+    private int _viewportRows;
+    public int ViewportRows => _viewportRows;
+
+    /// <summary>Linux scrollback overlay. Windows keeps the original terminal
+    /// mouse area unobstructed, including its rightmost cells. Bind Visibility,
+    /// since ScrollBar recalculates IsVisible whenever its extent changes.</summary>
+    public static readonly DirectProperty<TerminalView, ScrollBarVisibility> OverlayScrollBarVisibilityProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, ScrollBarVisibility>(nameof(OverlayScrollBarVisibility), v => v.OverlayScrollBarVisibility);
+    private ScrollBarVisibility _overlayScrollBarVisibility = ScrollBarVisibility.Hidden;
+    public ScrollBarVisibility OverlayScrollBarVisibility => _overlayScrollBarVisibility;
+
+    /// <summary>Scrollbar drag → same clamp/notify path as wheel scrolling.</summary>
+    public void ScrollToOffset(int linesUp)
+    {
+        SetViewOffset(linesUp);
+        InvalidateVisual();
+    }
+
     private TerminalEmulator? _emulator;
     private int _dirty = 1;
     private long _lastBlink;
@@ -52,6 +88,8 @@ public partial class TerminalView : Control
     private double _cellW = 8, _cellH = 16;
     private int _viewOffset;          // lines scrolled up into scrollback
     private int _scrollDrift;         // scrollback lines appended while scrolled up
+    private long _bellFlashUntil;     // TickCount64 deadline written on the parser thread
+    private bool _bellFlashOn;        // UI-thread mirror flipped by the refresh tick
     private bool _cursorOn = true;
     private readonly DispatcherTimer _blink;
     private readonly Dictionary<Color, IBrush> _brushCache = new();
@@ -147,15 +185,35 @@ public partial class TerminalView : Control
             SynchronizeCoordinates();
         if (drift != 0 && buf is not null)
         {
-            _viewOffset = _viewOffset > 0
+            SetViewOffset(_viewOffset > 0
                 ? Math.Clamp(_viewOffset + drift, 0, buf.ScrollbackCount)
-                : 0;
-            SetScrolledUp(_viewOffset > 0);
+                : 0);
             dirty = true;
         }
+        // Keep the scrollbar's extent in sync with the live buffer. When the
+        // backlog grows while _viewOffset holds, the view-top line (property
+        // value) moves too — raise it so the thumb tracks the same content.
+        var scrollback = buf?.ScrollbackCount ?? 0;
+        if (scrollback != _scrollbackSize)
+        {
+            var oldPosition = ScrollPosition;
+            SetAndRaise(ScrollbackSizeProperty, ref _scrollbackSize, scrollback);
+            RaisePropertyChanged(ScrollPositionProperty, oldPosition, ScrollPosition);
+        }
+        var rows = buf?.Rows ?? 0;
+        if (rows != _viewportRows)
+            SetAndRaise(ViewportRowsProperty, ref _viewportRows, rows);
+        var visibility = !OperatingSystem.IsWindows() && scrollback > 0 && buf?.OnAlternateScreen != true
+            ? ScrollBarVisibility.Visible : ScrollBarVisibility.Hidden;
+        if (visibility != _overlayScrollBarVisibility)
+            SetAndRaise(OverlayScrollBarVisibilityProperty, ref _overlayScrollBarVisibility, visibility);
         var blink = !IsPreview && IsFocused
             && Environment.TickCount64 - _lastBlink >= 530;
         if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
+        // Visual bell: _bellFlashUntil is written on the parser thread; flip
+        // _bellFlashOn here so the overlay paints/expires on the UI thread.
+        var flash = Environment.TickCount64 < Interlocked.Read(ref _bellFlashUntil);
+        if (flash != _bellFlashOn) { _bellFlashOn = flash; dirty = true; }
         if (_selecting) DragScrollStep();
         var sync = buf?.SynchronizedOutput == true;
         if (!IsPreview && IsFocused)
@@ -200,6 +258,7 @@ public partial class TerminalView : Control
         {
             old.Changed -= OnBufferChanged;
             old.Buffer.ScrollbackChanged -= OnScrollbackChanged;
+            old.Bell -= OnBell;
         }
         _applicationPointer?.Capture(null);
         _selectionPointer?.Capture(null);
@@ -226,7 +285,7 @@ public partial class TerminalView : Control
         _wordSelection = false;
         _hits = null;
         _hitLine = -1;
-        if (next is not null && _attached) next.Changed += OnBufferChanged;
+        if (next is not null && _attached) { next.Changed += OnBufferChanged; next.Bell += OnBell; }
         if (next is not null)
         {
             // The PTY belongs to the session, so previews and split/popout views
@@ -244,6 +303,13 @@ public partial class TerminalView : Control
     }
 
     private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
+
+    // Parser-thread hook: the refresh tick turns this deadline into the overlay.
+    private void OnBell()
+    {
+        if (!OperatingSystem.IsWindows())
+            Interlocked.Exchange(ref _bellFlashUntil, Environment.TickCount64 + 140);
+    }
 
     private void OnScrollbackChanged(int delta) => Interlocked.Add(ref _scrollDrift, delta);
 
@@ -297,6 +363,7 @@ public partial class TerminalView : Control
         OnThemeChanged(); // A detached pane may have missed a theme change.
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
+        if (_emulator is not null) _emulator.Bell += OnBell;
         ThemeManager.Changed += OnThemeChanged;
         // A hidden ancestor flip (single↔split, pop-out dock) arranges us again
         // without touching Bounds/IsVisible — recheck the emulator size on every
@@ -320,6 +387,7 @@ public partial class TerminalView : Control
         // buffer's delegate list until the session closes — repeated popout/
         // reattach accumulates dead visual subtrees (and their text caches).
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged -= OnScrollbackChanged;
+        if (_emulator is not null) _emulator.Bell -= OnBell;
         ThemeManager.Changed -= OnThemeChanged;
         base.OnDetachedFromVisualTree(e);
     }
@@ -595,6 +663,13 @@ public partial class TerminalView : Control
                 ctx.DrawLine(new Pen(accent, 2),
                     new Point(caretX, py + 2), new Point(caretX, py + _cellH - 3));
             }
+        }
+
+        // Visual bell (xterm visualBell): brief translucent wash over the pane.
+        if (_bellFlashOn)
+        {
+            var bc = _colors.Cursor;
+            ctx.DrawRectangle(Brush(Color.FromArgb(46, bc.R, bc.G, bc.B)), null, new Rect(Bounds.Size));
         }
     }
 
@@ -1100,6 +1175,12 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
+        if (!OperatingSystem.IsWindows() && e.Key == Key.Insert && e.KeyModifiers == KeyModifiers.Control)
+        {
+            _ = CopySelectionAsync();
+            e.Handled = true;
+            return;
+        }
         // Keys consumed by an IME composition (VK_PROCESSKEY etc.) must not reach
         // the shell — e.g. Enter that picks a candidate would double-submit.
         if (e.Key is Key.ImeProcessed or Key.ImeAccept or Key.ImeConvert
@@ -1239,6 +1320,12 @@ public partial class TerminalView : Control
                     e.Handled = true;
                     return;
                 }
+                if (!OperatingSystem.IsWindows() && e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                {
+                    SelectAll();
+                    e.Handled = true;
+                    return;
+                }
                 if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)
                     && e.Key >= Key.A && e.Key <= Key.Z)
                 {
@@ -1289,6 +1376,16 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
+        if (!OperatingSystem.IsWindows() && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            // Linux Ctrl+wheel = font zoom. TwoWay-bound
+            // to Vm.FontSize so the change persists like Ctrl+=/−. Only when the
+            // app didn't claim the mouse — mouse-tracking CLIs get the event.
+            SetCurrentValue(TerminalFontSizeProperty,
+                Math.Clamp(Math.Round(TerminalFontSize + Math.Sign(e.Delta.Y)), 8, 32));
+            e.Handled = true;
+            return;
+        }
         if (_emulator.Buffer.OnAlternateScreen)
         {
             // The alternate screen has no scrollback — the wheel belongs to the
@@ -1302,23 +1399,37 @@ public partial class TerminalView : Control
             e.Handled = true;
             return;
         }
-        ScrollBy((int)(-e.Delta.Y * 3));
+        ScrollBy((int)(e.Delta.Y * 3));
         e.Handled = true;
+    }
+
+    /// <summary>Single write path for the scroll offset — clamps to the live
+    /// scrollback, raises <see cref="ScrollPosition"/> for the scrollbar, and
+    /// keeps the scrolled-up flag consistent.</summary>
+    private void SetViewOffset(int value)
+    {
+        var max = _emulator?.Buffer.ScrollbackCount ?? 0;
+        var clamped = Math.Clamp(value, 0, max);
+        if (clamped == _viewOffset) return;
+        // Raise the *position* (= scrollback − offset) — SetAndRaise on the
+        // offset field would report inverted old/new values to subscribers.
+        var old = ScrollPosition;
+        _viewOffset = clamped;
+        RaisePropertyChanged(ScrollPositionProperty, old, ScrollPosition);
+        SetScrolledUp(_viewOffset > 0);
     }
 
     private void ScrollBy(int delta)
     {
         if (_emulator is null) return;
-        _viewOffset = Math.Clamp(_viewOffset + delta, 0, _emulator.Buffer.ScrollbackCount);
-        SetScrolledUp(_viewOffset > 0);
+        SetViewOffset(_viewOffset + delta);
         InvalidateVisual();
     }
 
     /// <summary>Back to the live bottom; also clears the scrolled-up flag.</summary>
     private void ResetScroll()
     {
-        _viewOffset = 0;
-        SetScrolledUp(false);
+        SetViewOffset(0);
     }
 
     /// <summary>Snap the viewport back to the live bottom (the "回到底部" affordance).</summary>
@@ -1592,6 +1703,25 @@ public partial class TerminalView : Control
         }
     }
 
+    /// <summary>Select the whole buffer — scrollback + screen (Ctrl+Shift+A).</summary>
+    public void SelectAll()
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return;
+        lock (buf.SyncRoot)
+        {
+            SynchronizeCoordinates();
+            // On the alternate screen the scrollback is preserved but invisible —
+            // selecting it would copy stale primary-screen text into a TUI.
+            var first = buf.OnAlternateScreen ? buf.ScrollbackCount : 0;
+            if (buf.TotalLines <= first) return;
+            _selAnchor = (first, 0);
+            _selEnd = (buf.TotalLines - 1, buf.Columns - 1);
+            _wordSelection = false;
+        }
+        InvalidateVisual();
+    }
+
     /// <summary>Copy the current selection to the clipboard (Ctrl+Shift+C).</summary>
     public async Task CopySelectionAsync()
     {
@@ -1677,8 +1807,7 @@ public partial class TerminalView : Control
         var firstVisible = buf.ScrollbackCount - _viewOffset;
         if (line >= firstVisible && line < firstVisible + buf.Rows) { InvalidateVisual(); return; }
         // visual row v shows abs (scrollback - offset + v); aim for v ≈ Rows/3
-        _viewOffset = Math.Clamp(buf.ScrollbackCount - line + buf.Rows / 3, 0, buf.ScrollbackCount);
-        SetScrolledUp(_viewOffset > 0);
+        SetViewOffset(buf.ScrollbackCount - line + buf.Rows / 3);
         InvalidateVisual();
     }
 

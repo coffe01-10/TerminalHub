@@ -52,6 +52,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _settingsOpen;
     [ObservableProperty] private bool _inspectorVisible;
     [ObservableProperty] private bool _outputVisible;
+    [ObservableProperty] private double _outputHeight = 170;   // bottom panel, drag-resizable
+    /// <summary>0 = follow the responsive default (300/326); a left-edge drag
+    /// pins an explicit width that window resizes then keep (clamped).</summary>
+    [ObservableProperty] private double _inspectorWidth;
+    /// <summary>0 = responsive 232/280; right-edge drag pins an explicit width.</summary>
+    [ObservableProperty] private double _shelfWidth;
     [ObservableProperty] private int _dockVisibilityMode;
     [ObservableProperty] private string _activeWorkingDirectory = "";
     public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? "未选择会话" :
@@ -81,6 +87,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnInspectorVisibleChanged(bool value) => _settings.InspectorVisible = value;
     partial void OnOutputVisibleChanged(bool value) => _settings.OutputVisible = value;
+    partial void OnOutputHeightChanged(double value) => _settings.OutputHeight = value;
+    partial void OnInspectorWidthChanged(double value) => _settings.InspectorWidth = value;
+    partial void OnShelfWidthChanged(double value) => _settings.ShelfWidth = value;
     partial void OnDockVisibilityModeChanged(int value) => _settings.DockVisibilityMode = value;
 
     [RelayCommand] private void ToggleInspector() => InspectorVisible = !InspectorVisible;
@@ -106,8 +115,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Optional clock for tests; defaults to UTC now. Live elapsed uses the real attempt stamp.</summary>
     internal Func<DateTimeOffset> UtcNow { get; set; } = static () => DateTimeOffset.UtcNow;
 
-    /// <summary>Dock caption: idle reads 部署; a running publish reads 打包中.</summary>
-    public string DeployDockCaption => IsPublishRunning ? "打包中" : "部署";
+    /// <summary>Dock caption: idle reads Deploy on Windows, 部署 on Linux; a running publish reads 打包中.</summary>
+    public string DeployDockCaption => IsPublishRunning ? "打包中" : OperatingSystem.IsWindows() ? "Deploy" : "部署";
 
     /// <summary>
     /// Short last-outcome text from the real exit record. Empty until a publish has finished.
@@ -227,6 +236,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// mode the picked card is assigned to the focused pane.</summary>
     partial void OnActiveCardChanged(SessionCardViewModel? value)
     {
+        OnPropertyChanged(nameof(WindowTitle));
         if (_rebuildingShelf || value is null) return;
         if (IsSplit && value.Model is { } picked)
         {
@@ -337,8 +347,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             WorkspaceTemplates.Add(template);
         ThemeManager.Apply(_settings.Theme);
         TerminalLinkOpener.EditorPath = _settings.FileEditorPath;
-        _inspectorVisible = _settings.InspectorVisible;
+        _inspectorVisible = _settings.InspectorVisible ?? !OperatingSystem.IsWindows();
         _outputVisible = _settings.OutputVisible;
+        if (_settings.OutputHeight > 0) _outputHeight = _settings.OutputHeight;
+        _inspectorWidth = _settings.InspectorWidth;
+        _shelfWidth = _settings.ShelfWidth;
         _dockVisibilityMode = _settings.DockVisibilityMode;
         DeployDockTip = ComposeDeployDockTip();
         _workspaceName = _settings.WorkspaceName;
@@ -362,7 +375,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             () => ActiveSession is { Tag: not SessionTag.Ssh } ? ActiveSession.WorkingDirectory : null,
             openTerminalAt: CdActiveSessionTo,
             copyTextAsync: CopyTextToClipboardAsync,
-            hasActiveSession: () => ActiveSession is { Tag: not SessionTag.Ssh });
+            hasActiveSession: () => ActiveSession is { Tag: not SessionTag.Ssh },
+            showHidden: _settings.FilesShowHidden);
+        Files.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FilesViewModel.ShowHidden))
+                _settings.FilesShowHidden = Files.ShowHidden;
+        };
         Logs = new LogsViewModel(Dashboard, _sessionLog,
             () => SessionCards.Select(c => c.Name).ToList(),
             _settings.SessionLogToFile,
@@ -717,6 +736,50 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void CloseActiveSession() => CloseSession(ActiveCard);
 
+    /// <summary>「••• → 重启会话」: respawn an exited session in place — same
+    /// name/tag/cwd/shell, card re-inserted at its old shelf position and made
+    /// active. SSH entries keep their arguments so the remote reconnects.</summary>
+    public async Task RestartSession(SessionCardViewModel card)
+    {
+        if (card.Model.Pty.ExitCode is null) return;
+        var m = card.Model;
+        var index = SessionCards.IndexOf(card);
+        // Capture before CloseSession — Dispose may invalidate the emulator.
+        var (pinned, groupId, scheme) = (m.Pinned, m.GroupId, m.Emulator.ColorScheme);
+        CloseSession(card);
+        var model = await CreateSessionAsync(m.Name, m.Tag, m.WorkingDirectory,
+            shellCommand: m.Shell, arguments: m.ShellArguments);
+        if (model is null) return;
+        model.Pinned = pinned;
+        model.GroupId = groupId;
+        model.Emulator.ColorScheme = scheme;
+        // OnSessionAdded posts the card append on the same dispatcher priority —
+        // this queued action runs right after it and restores the shelf slot.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var newCard = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, model));
+            if (newCard is null) return;
+            SessionCards.Remove(newCard);
+            // Pinned cards live in the pin block, grouped cards in their group
+            // span — the raw old index only fits ungrouped/unpinned cards. For
+            // a group, clamp into its [first, last+1) span so an intra-group
+            // slot survives the respawn.
+            int pos;
+            if (newCard.Model.Pinned)
+                pos = Math.Min(index, SessionCards.TakeWhile(c => c.Model.Pinned).Count());
+            else if (!string.IsNullOrEmpty(newCard.Model.GroupId)
+                     && SessionCards.Where(c => c.Model.GroupId == newCard.Model.GroupId).ToList() is { Count: > 0 } grp)
+                pos = Math.Clamp(index,
+                    SessionCards.IndexOf(grp[0]), SessionCards.IndexOf(grp[^1]) + 1);
+            else if (!string.IsNullOrEmpty(newCard.Model.GroupId))
+                pos = IndexFor(newCard);
+            else
+                pos = index;
+            SessionCards.Insert(Math.Clamp(pos, 0, SessionCards.Count), newCard);
+            ActiveCard = newCard;
+        });
+    }
+
     /// <summary>Ctrl+Tab / Ctrl+Shift+Tab: cycle session cards (wraps).</summary>
     public void CycleSession(int direction)
     {
@@ -766,6 +829,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(NextSessionMenuText));
         OnPropertyChanged(nameof(PreviousSessionMenuText));
     }
+
+    /// <summary>Window caption carries the active session so taskbar / Alt+Tab
+    /// shows which terminal a window belongs to.</summary>
+    public string WindowTitle =>
+        OperatingSystem.IsWindows() ? "Terminal Hub · 终端控制中心"
+        : ActiveCard is { } card ? $"{card.Name} — Terminal Hub" : "Terminal Hub · 终端控制中心";
 
     public string NextSessionMenuText => SessionMenuText(SessionShortcutAction.Next, "下一个会话");
     public string PreviousSessionMenuText => SessionMenuText(SessionShortcutAction.Previous, "上一个会话");
@@ -911,6 +980,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.RefreshSessions();
         OnPropertyChanged(nameof(LeftPaneName));
         OnPropertyChanged(nameof(RightPaneName));
+        OnPropertyChanged(nameof(WindowTitle));
     }
 
     private void OnSessionCardsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -989,7 +1059,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!int.TryParse(parameter?.ToString(), out var index)) return;
         switch (index)
         {
-            case 0: DockHighlight = 0; _ = NewSession(); break;
+            case 0: if (!OperatingSystem.IsWindows()) DockHighlight = 0; _ = NewSession(); break;
             case 1: InspectorVisible = true; DockHighlight = 1; SelectedRightTab = 0; break;
             case 2: InspectorVisible = true; DockHighlight = 2; SelectedRightTab = 3; break;
             case 3: InspectorVisible = true; DockHighlight = 3; SelectedRightTab = 2; break;
@@ -1947,6 +2017,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 lock (_cwdLock) HistoryFor(s).Push(s.WorkingDirectory);
             s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
             s.Emulator.CommandCompleted += command => OnCommandCompleted(s, command);
+            s.Emulator.Bell += () => RunOnUi(() => OnSessionBell(s));
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {

@@ -9,6 +9,10 @@ public sealed record FileEntry
     public required string FullPath { get; init; }
     public bool IsDirectory { get; init; }
     public bool IsSymlink { get; init; }
+    /// <summary>Link target as stored (may be relative); null for non-links.</summary>
+    public string? LinkTarget { get; init; }
+    /// <summary>Dot-prefixed name (Unix convention) or the OS hidden attribute.</summary>
+    public bool IsHidden { get; init; }
     public long SizeBytes { get; init; }
     public DateTimeOffset Modified { get; init; }
 }
@@ -43,7 +47,7 @@ public static class LocalFileBrowser
     /// Throws <see cref="DirectoryNotFoundException"/> / <see cref="UnauthorizedAccessException"/>
     /// when the directory itself is unreadable.
     /// </summary>
-    public static IReadOnlyList<FileEntry> ListDirectory(string path)
+    public static IReadOnlyList<FileEntry> ListDirectory(string path, bool includeHidden = true)
     {
         var dirs = new List<FileEntry>();
         var files = new List<FileEntry>();
@@ -53,14 +57,14 @@ public static class LocalFileBrowser
             FileEntry? e = null;
             try { e = ToEntry(new DirectoryInfo(d), isDirectory: true); }
             catch { /* skip unreadable */ }
-            if (e is not null) dirs.Add(e);
+            if (e is not null && (includeHidden || !e.IsHidden)) dirs.Add(e);
         }
         foreach (var f in Directory.EnumerateFiles(path))
         {
             FileEntry? e = null;
             try { e = ToEntry(new FileInfo(f), isDirectory: false); }
             catch { /* skip unreadable */ }
-            if (e is not null) files.Add(e);
+            if (e is not null && (includeHidden || !e.IsHidden)) files.Add(e);
         }
 
         dirs.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
@@ -76,6 +80,9 @@ public static class LocalFileBrowser
             FullPath = info.FullName,
             IsDirectory = isDirectory,
             IsSymlink = info.LinkTarget is not null,
+            LinkTarget = info.LinkTarget,
+            IsHidden = info.Name.StartsWith('.')
+                       || info.Attributes.HasFlag(FileAttributes.Hidden),
             SizeBytes = isDirectory ? 0 : ((FileInfo)info).Length,
             Modified = info.LastWriteTime,
         };

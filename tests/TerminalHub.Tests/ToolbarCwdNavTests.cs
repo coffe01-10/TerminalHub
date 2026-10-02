@@ -128,7 +128,7 @@ public class ToolbarCwdNavTests
             Assert.Contains(buttons, b => ToolTip.GetTip(b) as string == "后退目录历史" && ReferenceEquals(b.Command, vm.CwdBackCommand));
             Assert.Contains(buttons, b => ToolTip.GetTip(b) as string == "前进目录历史" && ReferenceEquals(b.Command, vm.CwdForwardCommand));
             Assert.Contains(buttons, b => ToolTip.GetTip(b) as string == "刷新当前目录" && ReferenceEquals(b.Command, vm.RefreshCwdCommand));
-            Assert.Contains(buttons, b => ToolTip.GetTip(b) as string == "刷新" && ReferenceEquals(b.Command, vm.Files.RefreshCommand));
+            Assert.Contains(buttons, b => ToolTip.GetTip(b) as string == "刷新 (F5)" && ReferenceEquals(b.Command, vm.Files.RefreshCommand));
             win.Close();
         }
         finally

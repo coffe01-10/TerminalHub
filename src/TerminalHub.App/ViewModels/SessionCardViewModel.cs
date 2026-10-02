@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using TerminalHub.Core.Sessions;
@@ -23,6 +24,31 @@ public partial class SessionCardViewModel : ViewModelBase
     private bool _isDisplayed;
     private long _seenOutputVersion;
     private int _previewVersion = -1;
+    private bool _isStackTop;
+
+    /// <summary>Pixels each card tucks under the previous one on the shelf
+    /// (mockup stack look). Keep in sync with the shelf margin binding.</summary>
+    public static double ShelfOverlap => OperatingSystem.IsWindows() ? 0 : 16;
+    public static double ShelfSpacing => OperatingSystem.IsWindows() ? 16 : 0;
+
+    /// <summary>True for a card that sits at the top of its shelf segment —
+    /// the very first item, or the first card below a group/pin header. Those
+    /// cards must not pull up: the first would bleed into the shelf title row,
+    /// and a card under a header would paint over the header's bottom half.</summary>
+    public bool IsStackTop
+    {
+        get => _isStackTop;
+        set
+        {
+            if (_isStackTop == value) return;
+            _isStackTop = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShelfTopMargin));
+        }
+    }
+
+    /// <summary>Negative top margin producing the tucked stack; zero on segment tops.</summary>
+    public Thickness ShelfTopMargin => _isStackTop ? default : new Thickness(0, -ShelfOverlap, 0, 0);
 
     public string Name => Model.Name;
     public string WorkingDirectory => Model.WorkingDirectory;
@@ -37,6 +63,9 @@ public partial class SessionCardViewModel : ViewModelBase
     }
     public string TagText => Model.Tag.DisplayName();
     public bool HasTag => Model.Tag != SessionTag.None;
+    /// <summary>Show the tag pill only while the status text carries no real
+    /// information; exited/unread sessions keep "已退出 · N" / "有新输出".</summary>
+    public bool ShowTagPill => !OperatingSystem.IsWindows() && HasTag && Model.IsRunning && !HasUnreadOutput;
     public IBrush TagBrush => new SolidColorBrush(Color.Parse(Model.Tag.AccentColor()));
     /// <summary>Translucent tag-color fill for the header pill (mockup-style tinted chip).</summary>
     public IBrush TagPillBrush
@@ -62,6 +91,7 @@ public partial class SessionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(CommandStatusText));
         OnPropertyChanged(nameof(StatusBrush));
+        OnPropertyChanged(nameof(ShowTagPill));
     }
 
     public void SetDisplayed(bool displayed)
@@ -90,6 +120,7 @@ public partial class SessionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(Name));
         OnPropertyChanged(nameof(StatusBrush));
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(ShowTagPill));
         OnPropertyChanged(nameof(WorkingDirectory));
         OnPropertyChanged(nameof(CommandStatusText));
         OnPropertyChanged(nameof(DirectoryName));

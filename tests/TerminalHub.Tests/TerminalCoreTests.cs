@@ -459,14 +459,13 @@ public class TerminalCoreTests
     }
 
     [Fact]
-    public void Backspace_IsExactlyOneColumn_EvenOntoContinuation()
+    public void Backspace_PreservesPlatformWideCharacterBehavior()
     {
         var (p, b) = Make(20, 4);
         p.Feed("中");
-        b.Backspace();                              // cursor was at 2 → one column left
-        // xterm semantics: BS never snaps to a glyph's lead cell — apps count
-        // display columns themselves (bash/readline emits 4 \b to pass 中文).
-        Assert.Equal(1, b.CursorX);
+        b.Backspace();
+        // Preserve Windows snapping; Linux readline counts display columns itself.
+        Assert.Equal(OperatingSystem.IsWindows() ? 0 : 1, b.CursorX);
     }
 
     // ---------- regressions: 2026-09 code-review fixes ----------

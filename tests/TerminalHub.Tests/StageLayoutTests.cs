@@ -3,11 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
 using TerminalHub.App.Views;
+using TerminalHub.Core.Pty;
 using TerminalHub.Core.Settings;
 using TerminalHub.Pty;
 using Xunit;
@@ -16,21 +18,30 @@ namespace TerminalHub.Tests;
 
 public class StageLayoutTests
 {
+    private static async Task Until(Func<bool> condition, string? message = null)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(25);
+        Assert.True(condition(), message ?? "Timed out waiting for the UI to settle.");
+    }
+
     internal sealed class StageFixture : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "terminalhub-stage-" + Guid.NewGuid());
         public MainWindow Window { get; }
         public MainWindowViewModel Vm => (MainWindowViewModel)Window.DataContext!;
 
-        public StageFixture(int width = 1440, int height = 900)
+        public StageFixture(int width = 1440, int height = 900, string? firstSessionName = null)
         {
             PtySessionFactory.UseMock = true;
             var store = new SettingsStore(Path.Combine(_directory, "settings.json"));
             store.Save(new AppSettings
             {
+                InspectorVisible = true, OutputVisible = true, DockVisibilityMode = 1,
                 StartupSessions = Enumerable.Range(1, 5).Select(i => new StartupSession
                 {
-                    Name = $"Terminal {i:00}", Tag = i == 2 ? "测试环境" : "开发环境",
+                    Name = firstSessionName is not null && i == 1 ? firstSessionName : $"Terminal {i:00}",
+                    Tag = i == 2 ? "测试环境" : "开发环境",
                     WorkingDirectory = Environment.CurrentDirectory
                 }).ToList()
             });
@@ -46,18 +57,18 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
-    public async Task ActiveThumb_ShowsNeonAccentGlow_InactiveDoesNot()
+    public async Task ActiveThumb_UsesPlatformShadow_InactiveDoesNot()
     {
         using var fixture = new StageFixture();
         await Task.Delay(600);
         var cards = fixture.Window.GetVisualDescendants().OfType<StageCard>()
             .Where(c => c.IsEffectivelyVisible).ToList();
         Assert.NotEmpty(cards);
-        var active = Assert.Single(cards.Where(c => c.IsActive));
+        var active = Assert.Single(cards, c => c.IsActive);
         var accent = (SolidColorBrush)ThemeManager.Brush("Accent");
 
         var activeBorder = active.GetVisualChildren().OfType<Border>().First();
-        Assert.Equal(2, activeBorder.BorderThickness.Left);
+        Assert.Equal(OperatingSystem.IsWindows() ? 1 : 2, activeBorder.BorderThickness.Left);
         Assert.Equal(accent.Color, ((ISolidColorBrush)activeBorder.BorderBrush!).Color);
         // Neon halo: a visible glow shadow tinted with the theme accent.
         bool Glows(BoxShadows shadows)
@@ -73,7 +84,9 @@ public class StageLayoutTests
             }
             return false;
         }
-        Assert.True(Glows(activeBorder.BoxShadow));
+        if (OperatingSystem.IsWindows())
+            Assert.Equal((BoxShadows)Application.Current!.Resources["ActiveCardShadow"]!, activeBorder.BoxShadow);
+        else Assert.True(Glows(activeBorder.BoxShadow));
 
         var inactive = cards.First(c => !c.IsActive);
         var inactiveBorder = inactive.GetVisualChildren().OfType<Border>().First();
@@ -81,12 +94,140 @@ public class StageLayoutTests
         Assert.NotEqual(accent.Color, ((ISolidColorBrush?)inactiveBorder.BorderBrush)?.Color);
     }
 
+    [AvaloniaFact]
+    public async Task LongSessionName_ChromeButtonsStayReachable()
+    {
+        var longName = "VeryLongSessionName-" + new string('长', 40) + "-tail";
+        using var fixture = new StageFixture(width: 1100, height: 700, firstSessionName: longName);
+        await Task.Delay(700);
+        var window = fixture.Window;
+        fixture.Vm.ActiveCard = fixture.Vm.SessionCards[0];
+        await Task.Delay(300);
+
+        var stage = window.FindControl<StageSurface>("StageWindow")!;
+        var menu = window.FindControl<Button>("SessionMenuButton")!;
+        var close = window.GetVisualDescendants().OfType<Button>()
+            .First(b => ToolTip.GetTip(b) as string == "关闭当前终端 · Ctrl+Shift+W");
+        Assert.True(menu.IsEffectivelyVisible);
+        Assert.True(close.IsEffectivelyVisible);
+
+        // The star-sized name column must shrink so the trailing Auto columns
+        // (menu, close) stay inside the stage card's right edge.
+        var stageRight = stage.TranslatePoint(new Point(stage.Bounds.Width, 0), window)!.Value.X;
+        Assert.True(close.TranslatePoint(new Point(close.Bounds.Width, 0), window)!.Value.X <= stageRight + 1);
+        Assert.True(menu.TranslatePoint(new Point(menu.Bounds.Width, 0), window)!.Value.X <= stageRight + 1);
+    }
+
+    [AvaloniaFact]
+    public async Task ShelfStack_SegmentTopsNoOverlap_OthersTuck()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var vm = fixture.Vm;
+        var cards = vm.SessionCards;
+        Assert.NotEmpty(cards);
+        Assert.Equal(0, cards[0].ShelfTopMargin.Top); // topmost card must not bleed into the title row
+        Assert.All(cards.Skip(1), c => Assert.Equal(-SessionCardViewModel.ShelfOverlap, c.ShelfTopMargin.Top));
+
+        // A card right below a pin/group header tops its own segment — tucking
+        // it would paint over the header's bottom half.
+        var pinned = cards[0];
+        var grouped = cards[2];
+        vm.SetPinned(pinned, true);
+        vm.CreateGroup("组", grouped);
+        Assert.Equal(0, pinned.ShelfTopMargin.Top); // below the pin header
+        Assert.Equal(0, grouped.ShelfTopMargin.Top); // below the group header
+        Assert.All(cards.Where(c => c != pinned && c != grouped),
+            c => Assert.Equal(-SessionCardViewModel.ShelfOverlap, c.ShelfTopMargin.Top));
+    }
+
+    [AvaloniaFact]
+    public async Task NewSessionDock_IsLinuxPrimaryAccentPill_AndWindowsKeepsOriginalEntries()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(400);
+        var vm = fixture.Vm;
+        var window = fixture.Window;
+        var btn = window.FindControl<Button>("NewDockButton")!;
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.False(btn.IsVisible);
+            Assert.False(window.FindControl<Button>("SettingsDockButton")!.IsVisible);
+            var dock = window.FindControl<DropletDock>("ActionDock")!;
+            Assert.Equal(new[] { "1", "2", "3", "4" }, dock.GetVisualDescendants()
+                .OfType<Button>().Where(b => b.Classes.Contains("dock") && b.IsVisible)
+                .Select(b => b.CommandParameter?.ToString()));
+            Assert.NotNull(window.FindControl<Button>("ChromeNew")!.Command);
+            return;
+        }
+        Assert.True(btn.IsVisible);
+        Assert.Contains("dock-primary", btn.Classes);
+        var accent = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindResource("UiAccent")).Color;
+        var onAccent = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindResource("UiOnAccent")).Color;
+        Assert.Equal(accent, Assert.IsAssignableFrom<ISolidColorBrush>(btn.Background).Color);
+        var icon = btn.GetVisualDescendants().OfType<PathIcon>().First();
+        Assert.Equal(onAccent, Assert.IsAssignableFrom<ISolidColorBrush>(icon.Foreground).Color);
+
+        // dock-active persists after the click — the icon must stay OnAccent
+        // instead of sinking into the accent fill.
+        vm.DockSelectCommand.Execute("0");
+        await Task.Delay(300);
+        Assert.Equal(accent, Assert.IsAssignableFrom<ISolidColorBrush>(btn.Background).Color);
+        Assert.Equal(onAccent, Assert.IsAssignableFrom<ISolidColorBrush>(icon.Foreground).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task CardMenu_PerCardActions_WithoutActivating()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var vm = fixture.Vm;
+        var window = fixture.Window;
+        var cards = window.GetVisualDescendants().OfType<StageCard>()
+            .Where(c => c.IsEffectivelyVisible).ToList();
+        Assert.True(cards.Count >= 2);
+        var target = cards.First(c => !ReferenceEquals(c.DataContext, vm.ActiveCard));
+        var targetVm = (SessionCardViewModel)target.DataContext!;
+        var button = target.GetVisualDescendants().OfType<Button>()
+            .First(b => ToolTip.GetTip(b) as string == "会话操作");
+
+        var before = vm.ActiveCard;
+        button.Flyout!.ShowAt(button);
+        await Task.Delay(200);
+        var flyout = Assert.IsType<MenuFlyout>(button.Flyout);
+        Assert.Same(before, vm.ActiveCard); // opening the menu must not activate the card
+        var items = flyout.Items.OfType<MenuItem>().ToList();
+        Assert.Contains(items, i => i.Header as string == "设为当前终端");
+        Assert.Contains(items, i => i.Header as string == "置顶");
+        Assert.Contains(items, i => i.Header as string == "移入分组");
+        Assert.Contains(items, i => i.Header as string == "关闭会话");
+        flyout.Hide();
+
+        items.First(i => i.Header as string == "置顶")
+            .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        await Task.Delay(300);
+        Assert.True(targetVm.Model.Pinned); // menu action applied to the pointed card
+        Assert.Same(before, vm.ActiveCard); // and still did not switch the stage
+    }
+
+    [AvaloniaFact]
+    public async Task TagPill_YieldsToUnreadOrExitStatus()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        var card = fixture.Vm.SessionCards[0];
+        Assert.True(card.HasTag);
+        Assert.Equal(!OperatingSystem.IsWindows(), card.ShowTagPill); // running + no unread: pill replaces plain 运行中
+        card.HasUnreadOutput = true;
+        Assert.False(card.ShowTagPill); // 有新输出 must not hide behind the pill
+    }
+
     [AvaloniaTheory]
     [InlineData("DarkGlass", "#65ACED")]
     [InlineData("Black", "#A9C8F5")]
     [InlineData("White", "#245AB5")]
     [InlineData("Paper", "#8C5132")]
-    public void ActiveCardShadow_GlowsWithThemeAccent(string theme, string accentHex)
+    public void ActiveCardShadow_MatchesPlatformAppearance(string theme, string accentHex)
     {
         var previous = ThemeManager.Current;
         try
@@ -104,7 +245,16 @@ public class StageLayoutTests
                     && Math.Abs(s.Color.B - accent.B) < 0x40)
                     glows = true;
             }
-            Assert.True(glows, $"{theme}: ActiveCardShadow lacks an accent-tinted glow");
+            if (OperatingSystem.IsWindows())
+            {
+                var expected = BoxShadows.Parse(theme switch
+                {
+                    "Paper" => "0 2 3 0 #28816D50", "White" => "0 3 8 0 #20314766",
+                    "Black" => "0 1 4 0 #60000000", _ => "0 3 12 0 #40258ED6"
+                });
+                Assert.Equal(expected, shadows);
+            }
+            else Assert.True(glows, $"{theme}: ActiveCardShadow lacks an accent-tinted glow");
         }
         finally { ThemeManager.Apply(previous); }
     }
@@ -119,6 +269,7 @@ public class StageLayoutTests
         await Task.Delay(700);
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[2];
         fixture.Vm.DockVisibilityMode = 0; // exercise the auto-hide path explicitly
+        fixture.Vm.InspectorVisible = false; // default-on; this test asserts the toggle reveals it
         fixture.Vm.OutputVisible = false;    // this test asserts the toggle reveals the panel
         await Task.Delay(450);
         var stage = window.FindControl<StageSurface>("StageWindow")!;
@@ -410,12 +561,13 @@ public class StageLayoutTests
         await Task.Delay(700);
         var surface = fixture.Window.FindControl<StageSurface>("StageWindow")!;
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[0];
-        await Task.Delay(90);
-        Assert.False(surface.RenderTransform?.Value.IsIdentity ?? true);
+        // Under load the posted ActivateFrom can take longer than a fixed delay
+        // to kick the spring — wait for the flight to actually start.
+        await Until(() => !(surface.RenderTransform?.Value.IsIdentity ?? true),
+            "Activation spring never started.");
         fixture.Vm.ActiveCard = fixture.Vm.SessionCards[1];
         fixture.Window.Close();
-        await Task.Delay(650);
-        Assert.Equal(1d, surface.Reveal);
+        await Until(() => surface.Reveal == 1d, "Spring did not settle after close.");
         Assert.True(surface.RenderTransform?.Value.IsIdentity ?? true);
     }
 
@@ -434,6 +586,7 @@ public class StageLayoutTests
         await Task.Delay(650);
         Assert.Equal(expectedColumns, next.Model.Emulator.Buffer.Columns);
         Assert.Equal(expectedRows, next.Model.Emulator.Buffer.Rows);
+        vm.InspectorVisible = false; // default-on now; flip to write an explicit value
         vm.InspectorVisible = true;
         vm.OutputVisible = true;
         vm.DockVisibilityMode = 2;
@@ -441,6 +594,187 @@ public class StageLayoutTests
         Assert.True(vm.Settings.OutputVisible);
         Assert.Equal(2, vm.Settings.DockVisibilityMode);
     }
+
+    [AvaloniaFact]
+    public async Task RestartSession_RespawnsExited_InSameShelfSlot()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var card = fixture.Vm.SessionCards[1];
+        var originals = fixture.Vm.SessionCards.ToHashSet();
+        ((MockPtySession)card.Model.Pty).Kill();
+        Assert.NotNull(card.Model.Pty.ExitCode);
+        await fixture.Vm.RestartSession(card);
+        // Card append + slot restore both arrive via dispatcher posts — wait
+        // for a genuinely new card (not an old card shifted into slot 1).
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!(fixture.Vm.SessionCards.Count == 5
+                 && !originals.Contains(fixture.Vm.SessionCards[1]))
+               && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        var spawned = fixture.Vm.SessionCards[1];
+        Assert.True(spawned.Model.Pty.IsRunning);
+        Assert.NotSame(card, spawned);
+        Assert.Same(spawned, fixture.Vm.ActiveCard);
+    }
+
+    [AvaloniaFact]
+    public async Task RestartSession_KeepsPinnedCardInPinBlock()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var card = fixture.Vm.SessionCards[3];
+        fixture.Vm.SetPinned(card, true);   // moves to the pin block at index 0
+        Assert.Equal(0, fixture.Vm.SessionCards.IndexOf(card));
+        ((MockPtySession)card.Model.Pty).Kill();
+        var originals = fixture.Vm.SessionCards.ToHashSet();
+        await fixture.Vm.RestartSession(card);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!(fixture.Vm.SessionCards.Count > 0
+                 && !originals.Contains(fixture.Vm.SessionCards[0]))
+               && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        var spawned = fixture.Vm.SessionCards.Single(c => !originals.Contains(c));
+        Assert.True(spawned.Model.Pinned);
+        Assert.Equal(0, fixture.Vm.SessionCards.IndexOf(spawned));
+        Assert.Same(spawned, fixture.Vm.ActiveCard);
+    }
+
+    [AvaloniaFact]
+    public async Task RestartSession_KeepsGroupedCardInsideItsGroup()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var card = fixture.Vm.SessionCards[1];
+        fixture.Vm.CreateGroup("组A", card);
+        fixture.Vm.MoveCardToGroup(fixture.Vm.SessionCards[3],
+            card.Model.GroupId);   // [G:A1] [card] [G:A2] — restart the middle one
+        var groupId = card.Model.GroupId;
+        var slot = fixture.Vm.SessionCards.IndexOf(card);
+        ((MockPtySession)card.Model.Pty).Kill();
+        var originals = fixture.Vm.SessionCards.ToHashSet();
+        await fixture.Vm.RestartSession(card);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        // Append lands before the slot-restore post — wait for the new card
+        // to actually arrive at its old group position, not merely exist.
+        while (!(fixture.Vm.SessionCards.Count == 5
+                 && !originals.Contains(fixture.Vm.SessionCards[slot])
+                 && fixture.Vm.SessionCards[slot].Model.GroupId == groupId)
+               && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        var spawned = fixture.Vm.SessionCards.Single(c => !originals.Contains(c));
+        Assert.Equal(groupId, spawned.Model.GroupId);
+        // Stays inside the group span — at its old slot between the siblings.
+        Assert.Equal(slot, fixture.Vm.SessionCards.IndexOf(spawned));
+    }
+
+    [AvaloniaFact]
+    public async Task Bell_RespectsPlatformNotificationBehavior()
+    {
+        using var fixture = new StageFixture();
+        var ready = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 5 && DateTime.UtcNow < ready)
+            await Task.Delay(25);
+        var bg = fixture.Vm.SessionCards.First(c => !c.IsActive);
+        bg.Model.Emulator.Parser.Feed("\a"u8);
+        if (OperatingSystem.IsWindows())
+        {
+            await Task.Delay(120);
+            Assert.False(fixture.Vm.NotificationVisible);
+            Assert.False(bg.HasUnreadOutput);
+            var view = fixture.Window.FindControl<TerminalView>("MainTerminal")!;
+            fixture.Vm.ActiveSession!.Emulator.Parser.Feed("\a"u8);
+            Assert.Equal(0L, typeof(TerminalView).GetField("_bellFlashUntil",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(view));
+            return;
+        }
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!fixture.Vm.NotificationVisible && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        Assert.True(fixture.Vm.NotificationVisible);
+        Assert.Contains(bg.Model.Name, fixture.Vm.NotificationText);
+        Assert.True(bg.HasUnreadOutput);
+        // A bell on the active session stays silent — it's already on screen.
+        fixture.Vm.NotificationVisible = false;
+        fixture.Vm.ActiveSession!.Emulator.Parser.Feed("\a"u8);
+        await Task.Delay(120);
+        Assert.False(fixture.Vm.NotificationVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task WideSavedRails_WindowShrink_PreservesStageChrome_AndSavedWidths()
+    {
+        using var fixture = new StageFixture();
+        await Task.Delay(600);
+        fixture.Vm.ShelfWidth = 648;
+        fixture.Vm.InspectorWidth = 648;
+        fixture.Window.Width = 1100;
+        await Task.Delay(400);
+        var stage = fixture.Window.FindControl<StageSurface>("StageWindow")!;
+        Assert.True(stage.Bounds.Width >= 459, $"Stage width: {stage.Bounds.Width}");
+        var menu = fixture.Window.FindControl<Button>("SessionMenuButton")!;
+        var stageRight = stage.TranslatePoint(new Point(stage.Bounds.Width, 0), fixture.Window)!.Value.X;
+        Assert.True(menu.TranslatePoint(new Point(menu.Bounds.Width, 0), fixture.Window)!.Value.X <= stageRight + 1);
+        Assert.Equal(648, fixture.Vm.ShelfWidth);
+        Assert.Equal(648, fixture.Vm.InspectorWidth);
+    }
+
+    [AvaloniaFact]
+    public async Task EmptySshForm_EscapeReturnsTerminalFocus_WithoutHidingAddForm()
+    {
+        using var fixture = new StageFixture();
+        fixture.Vm.SelectedRightTab = 3;
+        await Task.Delay(600);
+        var host = fixture.Window.GetVisualDescendants().OfType<TextBox>()
+            .Single(t => t.Watermark as string == "主机 host / IP");
+        host.Focus();
+        fixture.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.True(host.IsEffectivelyVisible);
+        Assert.True(fixture.Vm.Ssh.Editing);
+        Assert.True(OperatingSystem.IsWindows() ? host.IsFocused
+            : fixture.Window.FindControl<TerminalView>("MainTerminal")!.IsFocused);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("ShelfResizeHandle")]
+    [InlineData("InspectorResizeHandle")]
+    public async Task RailDrag_KeepsRoomForStage_AlongsideOtherRail(string name)
+    {
+        using var fixture = new StageFixture(width: 1100);
+        await Task.Delay(600);
+        var handle = fixture.Window.FindControl<Control>(name)!;
+        var start = handle.TranslatePoint(new Point(handle.Bounds.Width / 2, 100), fixture.Window)!.Value;
+        var end = start + new Vector(name == "ShelfResizeHandle" ? 600 : -600, 0);
+        fixture.Window.MouseDown(start, MouseButton.Left);
+        fixture.Window.MouseMove(end, RawInputModifiers.LeftMouseButton);
+        fixture.Window.MouseUp(end, MouseButton.Left);
+        await Task.Delay(100);
+        var stage = fixture.Window.FindControl<StageSurface>("StageWindow")!;
+        Assert.True(stage.Bounds.Width >= 459, $"Stage width: {stage.Bounds.Width}");
+    }
+
+    [AvaloniaFact]
+    public async Task OutputResize_AfterHeightClamp_StartsFromDisplayedHeight()
+    {
+        using var fixture = new StageFixture(height: 900);
+        await Task.Delay(600);
+        fixture.Vm.OutputHeight = 800;
+        fixture.Window.Height = 700;
+        await Task.Delay(200);
+        var panel = fixture.Window.FindControl<Border>("OutputPanel")!;
+        var height = panel.Height;
+        Assert.True(height < fixture.Vm.OutputHeight);
+        var handle = fixture.Window.FindControl<Control>("OutputResizeHandle")!;
+        var start = handle.TranslatePoint(new Point(handle.Bounds.Width / 2, handle.Bounds.Height / 2), fixture.Window)!.Value;
+        fixture.Window.MouseDown(start, MouseButton.Left);
+        fixture.Window.MouseMove(start + new Vector(0, 20), RawInputModifiers.LeftMouseButton);
+        fixture.Window.MouseUp(start + new Vector(0, 20), MouseButton.Left);
+        Assert.Equal(height - 20, fixture.Vm.OutputHeight, 1);
+    }
 }
-
-

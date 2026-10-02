@@ -25,6 +25,18 @@ public sealed class LogLevelConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>[int selectedTab, int itemCount] + int param → true when that tab is active AND empty.</summary>
+public sealed class TabEmptyConverter : IMultiValueConverter
+{
+    public static readonly TabEmptyConverter Instance = new();
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+        => values is [int tab, int count]
+           && int.TryParse(parameter?.ToString(), out var want)
+           && tab == want && count == 0;
+    public object?[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>int equality for tab/visibility — handles string parameters.</summary>
 public sealed class IntEqualConverter : IValueConverter
 {
@@ -61,6 +73,18 @@ public sealed class BytesConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>DateTimeOffset → short "MM-dd HH:mm" for Files row metadata.</summary>
+public sealed class ModifiedConverter : IValueConverter
+{
+    public static readonly ModifiedConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is DateTimeOffset d
+            ? d.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) : "";
+
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
 /// <summary>IsDirectory → dir names get a blue tint, files stay near-white.</summary>
 public sealed class DirNameConverter : IValueConverter
 {
@@ -81,12 +105,44 @@ public sealed class StringNotEmptyConverter : IValueConverter
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>FileEntry.FullPath (+ " → target" for symlinks) as the row tooltip.</summary>
+public sealed class FileTooltipConverter : IMultiValueConverter
+{
+    public static readonly FileTooltipConverter Instance = new();
+
+    public object Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var path = values.Count > 0 ? values[0] as string : null;
+        var target = values.Count > 1 ? values[1] as string : null;
+        if (string.IsNullOrEmpty(path)) return "";
+        return string.IsNullOrEmpty(target) ? path : $"{path}\n→ {target}";
+    }
+}
+
 /// <summary>bool → accent brush when true, muted gray when false (e.g. split-toggle state).</summary>
 public sealed class BoolBrushConverter : IValueConverter
 {
     public static readonly BoolBrushConverter Instance = new();
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is true ? ThemeManager.Brush("Accent") : ThemeManager.Brush("Muted");
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
+/// <summary>IsSymlink → " →" tail run text or "" (kept inline so long names ellipsize).</summary>
+public sealed class BoolToSymlinkMarkConverter : IValueConverter
+{
+    public static readonly BoolToSymlinkMarkConverter Instance = new();
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? " →" : "";
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
+
+/// <summary>bool → error brush when true, muted when false (status lines mixing info + errors).</summary>
+public sealed class BoolToErrorBrushConverter : IValueConverter
+{
+    public static readonly BoolToErrorBrushConverter Instance = new();
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? ThemeManager.Brush("Bad") : ThemeManager.Brush("Muted");
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
 

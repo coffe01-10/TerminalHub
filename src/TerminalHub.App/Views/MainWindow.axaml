@@ -11,7 +11,7 @@
         x:Class="TerminalHub.App.Views.MainWindow"
         x:Name="Root"
         x:DataType="vm:MainWindowViewModel"
-        Title="Terminal Hub · 终端控制中心"
+        Title="{Binding WindowTitle}"
         Icon="avares://TerminalHub/Assets/terminal-hub-icon.ico"
         Width="1440" Height="900" MinWidth="1100" MinHeight="680"
         Background="{DynamicResource UiCanvas}" FontFamily="Segoe UI, Microsoft YaHei UI, sans-serif"
@@ -169,11 +169,11 @@
           </Grid>
           <ListBox x:Name="SessionShelf" Grid.Row="1" ItemsSource="{Binding ShelfItems}"
                    SelectedItem="{Binding ActiveCard, Mode=OneWay}" Background="Transparent" BorderThickness="0"
-                   Padding="14,14,10,16" ClipToBounds="False"
+                   Padding="14,14,10,16" ClipToBounds="False" DoubleTapped="OnShelfBackgroundDoubleTapped"
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                    ScrollViewer.VerticalScrollBarVisibility="Auto">
             <ListBox.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="16"/></ItemsPanelTemplate>
+              <ItemsPanelTemplate><StackPanel Spacing="{x:Static vm:SessionCardViewModel.ShelfSpacing}"/></ItemsPanelTemplate>
             </ListBox.ItemsPanel>
             <ListBox.ItemContainerTheme>
               <!-- A complete theme: no Fluent pointer/selection rectangle behind the tilted card. -->
@@ -197,6 +197,7 @@
               <DataTemplate x:DataType="vm:SessionCardViewModel">
                 <ctl:StageCard IsActive="{Binding IsActive}" StageDistance="{Binding StageDistance}"
                                Classes.active="{Binding IsActive}" Height="{Binding #Root.ThumbnailHeight}"
+                               Margin="{Binding ShelfTopMargin}"
                                ToolTip.Tip="{Binding WorkingDirectory}" DoubleTapped="OnRenameCard">
                   <ctl:StageCard.Styles>
                     <Style Selector="ctl|StageCard > Border">
@@ -212,7 +213,7 @@
                     </Style>
                     <Style Selector="ctl|StageCard.active > Border">
                       <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
-                      <Setter Property="BorderThickness" Value="2"/>
+                      <Setter Property="BorderThickness" Value="{DynamicResource ActiveCardBorderThickness}"/>
                       <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource ActiveCardShadow}"/>
                     </Style>
@@ -225,13 +226,25 @@
                     </Transitions>
                   </Border.Transitions>
                   <Grid RowDefinitions="24,*,Auto">
-                    <Grid ColumnDefinitions="*,Auto" Margin="3,0,3,4">
+                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="3,0,3,4">
                       <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="0,0,7,0">
                         <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" Margin="0,0,7,0"/>
                         <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource UiInk}"/>
                       </Grid>
+                      <Border Grid.Column="1" IsVisible="{Binding ShowTagPill}" Background="{Binding TagPillBrush}"
+                              CornerRadius="5" Padding="6,1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TagText}" FontSize="9" Foreground="{Binding TagBrush}"/>
+                      </Border>
                       <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
-                                 FontSize="9" VerticalAlignment="Center"/>
+                                 IsVisible="{Binding !ShowTagPill}" FontSize="9" VerticalAlignment="Center"/>
+                      <Button Grid.Column="2" VerticalAlignment="Center" Padding="5,0" Margin="2,0,0,0"
+                              Background="Transparent" BorderThickness="0" Cursor="Hand"
+                              ToolTip.Tip="会话操作" AutomationProperties.Name="会话卡操作">
+                        <Button.Flyout>
+                          <MenuFlyout Opening="OnCardMenuOpening"/>
+                        </Button.Flyout>
+                        <TextBlock Text="⋯" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource UiMuted}"/>
+                      </Button>
                     </Grid>
                     <Border Grid.Row="1" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="3" ClipToBounds="True">
                       <ctl:StagePreview Emulator="{Binding Model.Emulator}"/>
@@ -263,70 +276,72 @@
                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding NewSessionCommand}">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <TextBlock Text="＋" Foreground="{DynamicResource UiAccent}" FontSize="17"/>
-              <TextBlock Grid.Column="1" Text="新建终端" Foreground="{DynamicResource UiInk}" Margin="8,2,0,0" FontSize="12"/>
+              <TextBlock Grid.Column="1" Text="新建会话" Foreground="{DynamicResource UiInk}" Margin="8,2,0,0" FontSize="12"/>
               <TextBlock Grid.Column="2" Text="Ctrl ⇧ N" Foreground="{DynamicResource UiMuted}" FontSize="10" VerticalAlignment="Center"/>
             </Grid>
           </Button>
         </Grid>
 
+        <!-- right-edge drag handle for the session shelf (18px gutter column) -->
+        <Border x:Name="ShelfResizeHandle" Grid.Column="1" Background="Transparent"
+                Cursor="SizeWestEast" ToolTip.Tip="拖拽调整会话架宽度"/>
+
         <!-- ===== CENTER ===== -->
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                 BoxShadow="{DynamicResource SurfaceShadow}">
-          <Grid RowDefinitions="44,40,*,Auto" Margin="8">
+          <Grid x:Name="StageContentGrid" RowDefinitions="46,*,Auto" Margin="8">
 
-            <!-- The active window has one title; other sessions live on the shelf. -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,0,4,4">
-              <Border Width="27" Height="27" CornerRadius="7" Background="{DynamicResource UiRaised}" Margin="0,0,10,0">
-                <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
-              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,12,0">
+            <!-- Single-row chrome like the mockup: icon · name · status · cwd | nav · actions -->
+            <Grid x:Name="TerminalChrome" Grid.Row="0" ColumnDefinitions="Auto,*,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,4,4">
+              <StackPanel x:Name="TerminalChromeIcon" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Ellipse Width="9" Height="9" Fill="#FF5F57" Margin="0,0,5,0"/>
+                <Ellipse Width="9" Height="9" Fill="#FEBC2E" Margin="0,0,5,0"/>
+                <Ellipse Width="9" Height="9" Fill="#28C840" Margin="0,0,10,0"/>
+                <Border Width="27" Height="27" CornerRadius="7" Background="{DynamicResource UiRaised}">
+                  <TextBlock Text="›_" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource UiAccent}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+              </StackPanel>
+              <Grid x:Name="TerminalChromeTitle" Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0" MaxWidth="360">
                 <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
                   <StackPanel Spacing="2"><TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/><TextBlock Text="{Binding ActiveCard.CommandStatusText}" FontSize="9" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding ActiveCard.CommandStatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/></StackPanel>
                 </Border>
               </Grid>
-              <Button Grid.Column="2" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建终端 · Ctrl+Shift+N" AutomationProperties.Name="新建终端">
-                <PathIcon Data="{StaticResource ToolAdd}"/>
+              <Button x:Name="ChromeDirectory" Grid.Column="2" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
+                      HorizontalContentAlignment="Left" Margin="6,0,10,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
+                <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" FontSize="11"/>
               </Button>
-              <Button Grid.Column="3" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
-                <PathIcon Data="{StaticResource ToolClose}"/>
-              </Button>
-            </Grid>
-
-            <!-- Toolbar: ← back / ⟳ refresh CWD / → forward + path -->
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="4,0">
-              <Button Classes="terminal-tool"
+              <Button x:Name="ChromeBack" Grid.Column="3" Classes="terminal-tool"
                       Command="{Binding CwdBackCommand}" IsEnabled="{Binding CanCwdBack}"
                       ToolTip.Tip="后退目录历史" AutomationProperties.Name="后退目录历史">
                 <PathIcon Data="{StaticResource ToolBack}"/>
               </Button>
-              <Button Grid.Column="1" Classes="terminal-tool"
+              <Button x:Name="ChromeRefresh" Grid.Column="4" Classes="terminal-tool"
                       Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新当前目录" AutomationProperties.Name="刷新当前目录">
                 <PathIcon Data="{StaticResource ToolRefresh}"/>
               </Button>
-              <Button Grid.Column="2" Classes="terminal-tool"
+              <Button x:Name="ChromeForward" Grid.Column="5" Classes="terminal-tool"
                       Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
                       ToolTip.Tip="前进目录历史" AutomationProperties.Name="前进目录历史">
                 <PathIcon Data="{StaticResource ToolForward}"/>
               </Button>
-              <Button Grid.Column="3" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
-                      HorizontalContentAlignment="Left" Margin="6,0,10,0" ToolTip.Tip="{Binding ActiveWorkingDirectory}">
-                <TextBlock Text="{Binding ActiveWorkingDirectory}" TextTrimming="CharacterEllipsis" FontSize="11"/>
-              </Button>
-              <Button Grid.Column="4" Classes="terminal-tool" Classes.selected="{Binding IsSplit}" Margin="0,0,4,0"
+              <Button x:Name="ChromeSplit" Grid.Column="6" Classes="terminal-tool" Classes.selected="{Binding IsSplit}"
                       Command="{Binding ToggleSplitCommand}"
-                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。">
-                <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSplit}"/><TextBlock Text="分屏" VerticalAlignment="Center"/></StackPanel>
+                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。" AutomationProperties.Name="分屏">
+                <PathIcon Data="{StaticResource ToolSplit}"/>
               </Button>
-              <Button Grid.Column="5" Classes="terminal-tool" Margin="0,0,4,0"
+              <Button x:Name="ChromePopout" Grid.Column="7" Classes="terminal-tool"
                       Command="{Binding OpenInNewWindowCommand}"
-                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）">
-                <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolPopout}"/><TextBlock Text="弹出" VerticalAlignment="Center"/></StackPanel>
+                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）" AutomationProperties.Name="弹出">
+                <PathIcon Data="{StaticResource ToolPopout}"/>
               </Button>
-              <Button x:Name="SessionMenuButton" Grid.Column="6" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
+              <Button x:Name="ChromeNew" Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建会话 · Ctrl+Shift+N" AutomationProperties.Name="新建会话">
+                <PathIcon Data="{StaticResource ToolAdd}"/>
+              </Button>
+              <Button x:Name="SessionMenuButton" Grid.Column="9" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
                 <PathIcon Data="{StaticResource ToolMore}"/>
                 <Button.Flyout>
                   <MenuFlyout Opening="OnSessionMenuOpening">
@@ -342,6 +357,7 @@
                     <MenuItem Header="关闭会话        Ctrl+Shift+W" Command="{Binding CloseActiveSessionCommand}"/>
                     <MenuItem Header="{Binding NextSessionMenuText}" Command="{Binding CycleSessionNextCommand}"/>
                     <MenuItem Header="{Binding PreviousSessionMenuText}" Command="{Binding CycleSessionPrevCommand}"/>
+                    <MenuItem x:Name="PopoutSessionsMenu" Header="弹出窗口"/>
                     <Separator/>
                     <MenuItem Header="复制 CWD" Command="{Binding CopyActiveCwdCommand}"/>
                     <Separator/>
@@ -355,10 +371,19 @@
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
+              <Button x:Name="ChromeClose" Grid.Column="10" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
+                <PathIcon Data="{StaticResource ToolClose}"/>
+              </Button>
             </Grid>
 
             <!-- Terminal viewport -->
-            <Border Grid.Row="2" x:Name="TerminalViewport" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="10,8" Margin="2,6" ClipToBounds="True">
+            <Border Grid.Row="1" x:Name="TerminalViewport" CornerRadius="{DynamicResource TerminalCorner}" Background="{DynamicResource UiInset}" Padding="10,8" Margin="2,6" ClipToBounds="True"
+                    BorderBrush="Transparent" BorderThickness="1">
+              <Border.Styles>
+                <Style Selector="Border:focus-within">
+                  <Setter Property="BorderBrush" Value="{DynamicResource UiAccentSoft}"/>
+                </Style>
+              </Border.Styles>
               <Panel>
                 <!-- empty stage: no sessions left -->
                 <StackPanel IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNull}}"
@@ -367,7 +392,7 @@
                              HorizontalAlignment="Center"/>
                   <TextBlock Text="没有活动终端" FontSize="13" Foreground="{DynamicResource UiMuted}"
                              HorizontalAlignment="Center"/>
-                  <TextBlock Text="Ctrl+Shift+N 或点击左侧「新建终端」" FontSize="11" Foreground="{DynamicResource UiFaint}"
+                  <TextBlock Text="Ctrl+Shift+N 或点击左侧「新建会话」" FontSize="11" Foreground="{DynamicResource UiFaint}"
                              HorizontalAlignment="Center"/>
                 </StackPanel>
                 <!-- single view -->
@@ -375,7 +400,7 @@
                   <ctl:TerminalView x:Name="MainTerminal"
                                     Emulator="{Binding ActiveSession.Emulator}"
                                     WorkingDirectory="{Binding ActiveWorkingDirectory}" ShellCommand="{Binding ActiveSession.Shell}" IsRemote="{Binding ActiveSession.IsRemote}"
-                                    TerminalFontSize="{Binding FontSize}"
+                                    TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                     TerminalFontFamily="{Binding TerminalFont}"
                                     SearchQuery="{Binding Dashboard.SearchQuery}"/>
                   <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"
@@ -384,6 +409,12 @@
                           Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                           IsVisible="{Binding #MainTerminal.IsScrolledUp}"
                           ToolTip.Tip="回到实时输出底部"/>
+                  <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                             HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                             Minimum="0" Maximum="{Binding #MainTerminal.ScrollbackSize}"
+                             ViewportSize="{Binding #MainTerminal.ViewportRows}"
+                             Value="{Binding #MainTerminal.ScrollPosition, Mode=TwoWay}"
+                             Visibility="{Binding #MainTerminal.OverlayScrollBarVisibility}"/>
                 </Panel>
                 <!-- split view: two independent sessions + draggable divider -->
                 <Grid IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*">
@@ -405,7 +436,7 @@
                       <Panel Grid.Row="1" Margin="6,7,6,4">
                       <ctl:TerminalView x:Name="LeftTerminal" Emulator="{Binding LeftPane.Emulator}"
                                         WorkingDirectory="{Binding LeftPane.WorkingDirectory}" ShellCommand="{Binding LeftPane.Shell}" IsRemote="{Binding LeftPane.IsRemote}"
-                                        TerminalFontSize="{Binding FontSize}"
+                                        TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"/>
                       <Button Content="⬇" HorizontalAlignment="Right" VerticalAlignment="Bottom"
@@ -414,6 +445,12 @@
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #LeftTerminal.IsScrolledUp}"
                               ToolTip.Tip="回到实时输出底部"/>
+                      <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                 Minimum="0" Maximum="{Binding #LeftTerminal.ScrollbackSize}"
+                                 ViewportSize="{Binding #LeftTerminal.ViewportRows}"
+                                 Value="{Binding #LeftTerminal.ScrollPosition, Mode=TwoWay}"
+                                 Visibility="{Binding #LeftTerminal.OverlayScrollBarVisibility}"/>
                     </Panel>
                     </Grid>
                   </Border>
@@ -437,7 +474,7 @@
                       <Panel Grid.Row="1" Margin="6,7,6,4" Background="Transparent">
                       <ctl:TerminalView x:Name="RightTerminal" Emulator="{Binding RightPane.Emulator}"
                                         WorkingDirectory="{Binding RightPane.WorkingDirectory}" ShellCommand="{Binding RightPane.Shell}" IsRemote="{Binding RightPane.IsRemote}"
-                                        TerminalFontSize="{Binding FontSize}"
+                                        TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"
                                         IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
@@ -451,6 +488,12 @@
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #RightTerminal.IsScrolledUp}"
                               ToolTip.Tip="回到实时输出底部"/>
+                      <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                 Minimum="0" Maximum="{Binding #RightTerminal.ScrollbackSize}"
+                                 ViewportSize="{Binding #RightTerminal.ViewportRows}"
+                                 Value="{Binding #RightTerminal.ScrollPosition, Mode=TwoWay}"
+                                 Visibility="{Binding #RightTerminal.OverlayScrollBarVisibility}"/>
                     </Panel>
                     </Grid>
                   </Border>
@@ -459,9 +502,15 @@
             </Border>
 
             <!-- Bottom panel: Output / Debug / Problems / Search -->
-            <Border x:Name="OutputPanel" Grid.Row="3" Height="170" Margin="0,6,0,0"
+            <Border x:Name="OutputPanel" Grid.Row="2" Height="170" Margin="0,6,0,0"
+                    KeyDown="OnPanelEscapeKeyDown"
                     IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
+              <Panel>
+              <!-- top-edge drag handle: resize the bottom panel -->
+              <Border x:Name="OutputResizeHandle" Height="8" VerticalAlignment="Top" Margin="0,-4,0,0"
+                      Background="Transparent" Cursor="SizeNorthSouth" ZIndex="10"
+                      ToolTip.Tip="拖拽调整底栏高度"/>
               <Grid RowDefinitions="30,*">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="4,0">
                   <ListBox SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
@@ -517,6 +566,7 @@
                     <!-- Output -->
                     <ListBox x:Name="OutputList" IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                              ItemsSource="{Binding Dashboard.VisibleOutput}"
+                             DoubleTapped="OnOutputEntryDoubleTapped"
                              Background="Transparent" BorderThickness="0" Padding="6">
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">
@@ -598,11 +648,12 @@
                     </DockPanel>
 
                     <!-- Search: filter active-session scrollback+screen, matched terms highlighted -->
-                    <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
+                    <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter={x:Static vm:DashboardViewModel.SearchTabIndex}}"
                           RowDefinitions="Auto,Auto,*">
                       <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="8,6,8,0">
-                        <TextBox Text="{Binding Dashboard.SearchQuery}"
-                                 Watermark="在当前会话中搜索…" FontSize="11"
+                        <TextBox x:Name="FindBox" Text="{Binding Dashboard.SearchQuery}"
+                                 Watermark="在当前会话中搜索… · Enter 下一处" FontSize="11"
+                                 KeyDown="OnSearchBoxKeyDown"
                                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                                  CornerRadius="6" Padding="8,4"/>
                         <Button Grid.Column="1" Content="▲" Padding="8,2" Margin="6,0,0,0" FontSize="10"
@@ -641,17 +692,42 @@
                         </ListBox.ItemTemplate>
                       </ListBox>
                     </Grid>
+
+                    <!-- empty states: Output / Debug (Problems + Search carry their own hints) -->
+                    <TextBlock Text="暂无输出" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static vm:TabEmptyConverter.Instance}" ConverterParameter="0">
+                          <Binding Path="Dashboard.SelectedBottomTab"/>
+                          <Binding Path="Dashboard.VisibleOutput.Count"/>
+                        </MultiBinding>
+                      </TextBlock.IsVisible>
+                    </TextBlock>
+                    <TextBlock Text="暂无调试行" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static vm:TabEmptyConverter.Instance}" ConverterParameter="1">
+                          <Binding Path="Dashboard.SelectedBottomTab"/>
+                          <Binding Path="Dashboard.DebugLog.Count"/>
+                        </MultiBinding>
+                      </TextBlock.IsVisible>
+                    </TextBlock>
                   </Panel>
                 </Border>
               </Grid>
+              </Panel>
             </Border>
           </Grid>
         </ctl:StageSurface>
 
+        <!-- left-edge drag handle for the inspector rail (12px gutter column) -->
+        <Border x:Name="InspectorResizeHandle" Grid.Column="3" Background="Transparent"
+                Cursor="SizeWestEast" ToolTip.Tip="拖拽调整右栏宽度"/>
+
         <!-- ===== RIGHT: Processes/Files/Logs/SSH ===== -->
         <Border Grid.Column="4" CornerRadius="{DynamicResource SurfaceCorner}" IsVisible="{Binding InspectorVisible}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
-                BoxShadow="{DynamicResource SurfaceShadow}">
+                BoxShadow="{DynamicResource SurfaceShadow}" KeyDown="OnPanelEscapeKeyDown">
           <Grid RowDefinitions="42,*" Margin="9">
 
             <ListBox Grid.Row="0" SelectedIndex="{Binding SelectedRightTab}"
@@ -688,31 +764,81 @@
                     RowDefinitions="*,Auto">
                 <Grid RowDefinitions="Auto,*">
                   <Grid ColumnDefinitions="50,*,70,70" Margin="6,4">
-                    <TextBlock Text="PID" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="1" Text="NAME" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="2" Text="CPU" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-                    <TextBlock Grid.Column="3" Text="MEM" FontSize="10" Foreground="{DynamicResource UiFaint}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                    <Button Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="pid"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="PID"/>
+                        <TextBlock Text="{Binding Dashboard.PidMark}" Foreground="{DynamicResource UiAccent}"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="name"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="NAME"/>
+                        <TextBlock Text="{Binding Dashboard.NameMark}" Foreground="{DynamicResource UiAccent}"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="cpu"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="{Binding Dashboard.CpuMark}" Foreground="{DynamicResource UiAccent}"/>
+                        <TextBlock Text="CPU"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Background="Transparent" BorderThickness="0" Padding="0" FontSize="10"
+                            FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Cursor="Hand"
+                            Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="mem"
+                            ToolTip.Tip="点击切换排序">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="{Binding Dashboard.MemMark}" Foreground="{DynamicResource UiAccent}"/>
+                        <TextBlock Text="MEM"/>
+                      </StackPanel>
+                    </Button>
                   </Grid>
-                  <ListBox Grid.Row="1" ItemsSource="{Binding Dashboard.Processes}"
+                  <Panel Grid.Row="1">
+                    <TextBlock Text="{Binding Dashboard.ProcessesEmptyText}" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding Dashboard.Processes.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                    <ListBox ItemsSource="{Binding Dashboard.Processes}"
                            Background="Transparent" BorderThickness="0">
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,3"/>
                         <Setter Property="Margin" Value="0,1"/>
                         <Setter Property="CornerRadius" Value="6"/>
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                         <Setter Property="FontSize" Value="10.5"/>
                       </Style>
+                      <Style Selector="ListBoxItem:pointerover">
+                        <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
+                      </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="mon:ProcessInfo">
                         <Grid ColumnDefinitions="50,*,70,70">
+                          <Grid.ContextMenu>
+                            <ContextMenu>
+                              <MenuItem Header="结束进程"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Dashboard.KillProcessCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </ContextMenu>
+                          </Grid.ContextMenu>
                           <TextBlock Text="{Binding Pid}" Foreground="{DynamicResource UiMuted}"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource UiInk}"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource UiInk}"/>
                           <TextBlock Grid.Column="2" Text="{Binding CpuPercent, StringFormat='{}{0:0.0}%'}"
                                      Foreground="{DynamicResource UiGood}" HorizontalAlignment="Right"/>
                           <TextBlock Grid.Column="3" Text="{Binding MemoryBytes, Converter={x:Static vm:BytesConverter.Instance}}"
@@ -720,7 +846,8 @@
                         </Grid>
                       </DataTemplate>
                     </ListBox.ItemTemplate>
-                  </ListBox>
+                    </ListBox>
+                  </Panel>
                 </Grid>
 
                 <!-- System Monitor widgets -->
@@ -787,11 +914,11 @@
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                     RowDefinitions="Auto,Auto,5*,Auto,4*">
                 <!-- toolbar: up + breadcrumb + open-in-terminal + copy-path + refresh + session dir -->
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,2,0,4">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="0,2,0,4">
                   <Button Content="↑" Padding="8,2" CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           IsEnabled="{Binding Files.CanGoUp}"
-                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级"/>
+                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级 · Backspace / Alt+↑"/>
                   <ScrollViewer x:Name="CrumbScroll" Grid.Column="1" Margin="6,0" VerticalAlignment="Center"
                                 HorizontalScrollBarVisibility="Auto"
                                 VerticalScrollBarVisibility="Disabled">
@@ -829,12 +956,25 @@
                           ToolTip.Tip="复制路径"/>
                   <Button Grid.Column="4" Content="⟳" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
-                          Command="{Binding Files.RefreshCommand}" ToolTip.Tip="刷新"/>
+                          Command="{Binding Files.RefreshCommand}" ToolTip.Tip="刷新 (F5)"/>
                   <Button Grid.Column="5" Content="⌂" Padding="8,2" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="会话目录"/>
+                  <ToggleButton Grid.Column="6" Content=".*" Padding="7,2" Margin="6,0,0,0" CornerRadius="6"
+                                Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiFaint}"
+                                BorderBrush="{DynamicResource UiBorder}" FontSize="10"
+                                IsChecked="{Binding Files.ShowHidden}"
+                                ToolTip.Tip="显示隐藏文件（.* 开头或系统隐藏属性）· Ctrl+H">
+                    <ToggleButton.Styles>
+                      <Style Selector="ToggleButton:checked">
+                        <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
+                      </Style>
+                    </ToggleButton.Styles>
+                  </ToggleButton>
                 </Grid>
-                <TextBlock Grid.Row="1" Text="{Binding Files.StatusText}" Foreground="{DynamicResource UiBad}"
+                <TextBlock Grid.Row="1" Text="{Binding Files.StatusText}"
+                           Foreground="{Binding Files.StatusIsError, Converter={x:Static vm:BoolToErrorBrushConverter.Instance}}"
                            FontSize="9.5" Margin="2,0,0,2"
                            IsVisible="{Binding Files.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
 
@@ -844,8 +984,16 @@
                   <ListBox x:Name="FilesList" ItemsSource="{Binding Files.Entries}"
                            SelectedItem="{Binding Files.SelectedEntry}"
                            Background="Transparent" BorderThickness="0" Padding="4"
+                           DragDrop.AllowDrop="True"
                            DoubleTapped="OnFileEntryDoubleTapped"
                            KeyDown="OnFilesListKeyDown">
+                    <ListBox.ContextMenu>
+                      <ContextMenu Opened="OnFilesContextMenuOpened">
+                        <MenuItem Header="新建文件夹" Click="OnFilesNewFolderClick"/>
+                        <MenuItem Header="新建文本文件" Click="OnFilesNewTextFileClick"/>
+                        <MenuItem x:Name="PasteMenuItem" Header="粘贴" Click="OnFilesPasteClick" ToolTip.Tip="把剪贴板中的文件复制到当前目录 (Ctrl+V)"/>
+                      </ContextMenu>
+                    </ListBox.ContextMenu>
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,3"/>
@@ -855,20 +1003,32 @@
                         <Setter Property="FontSize" Value="10.5"/>
                       </Style>
                       <Style Selector="ListBoxItem:pointerover">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
+                      </Style>
+                      <!-- OS files hovering a directory row: import lands inside it -->
+                      <Style Selector="ListBoxItem.drop-hot">
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="files:FileEntry">
-                        <Grid ColumnDefinitions="14,*,Auto">
+                        <Grid ColumnDefinitions="14,*,Auto,Auto">
                           <Grid.ContextMenu>
                             <ContextMenu>
+                              <MenuItem Header="用默认应用打开"
+                                        IsVisible="{Binding !IsDirectory}"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenExternallyCommand}"
+                                        CommandParameter="{Binding}"/>
                               <MenuItem Header="在此打开终端"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenInTerminalCommand}"
                                         CommandParameter="{Binding}"/>
+                              <MenuItem Header="在文件管理器中显示"
+                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.RevealInFileManagerCommand}"
+                                        CommandParameter="{Binding}"/>
+                              <MenuItem Header="重命名 (F2)" Click="OnFilesRenameClick"/>
                               <MenuItem Header="复制路径"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.CopyPathCommand}"
                                         CommandParameter="{Binding}"/>
@@ -876,11 +1036,25 @@
                           </Grid.ContextMenu>
                           <TextBlock Text="▸" Foreground="{DynamicResource UiAccent}" IsVisible="{Binding IsDirectory}"/>
                           <TextBlock Text="·" Foreground="{DynamicResource UiFaint}" IsVisible="{Binding !IsDirectory}"/>
-                          <TextBlock Grid.Column="1" Margin="2,0,0,0" Text="{Binding Name}"
-                                     Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
+                          <TextBlock Grid.Column="1" Margin="2,0,0,0" TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource UiInk}">
+                            <ToolTip.Tip>
+                              <MultiBinding Converter="{x:Static vm:FileTooltipConverter.Instance}">
+                                <Binding Path="FullPath"/>
+                                <Binding Path="LinkTarget"/>
+                              </MultiBinding>
+                            </ToolTip.Tip>
+                            <Run Text="{Binding Name}"
+                                 Foreground="{Binding IsDirectory, Converter={x:Static vm:DirNameConverter.Instance}}"/>
+                            <Run Text="{Binding IsSymlink, Converter={x:Static vm:BoolToSymlinkMarkConverter.Instance}}"
+                                 FontSize="9" Foreground="{DynamicResource UiFaint}"/>
+                          </TextBlock>
                           <TextBlock Grid.Column="2" Text="{Binding SizeBytes, Converter={x:Static vm:BytesConverter.Instance}}"
                                      Foreground="{DynamicResource UiFaint}" FontSize="9.5" HorizontalAlignment="Right"
                                      IsVisible="{Binding !IsDirectory}"/>
+                          <TextBlock Grid.Column="3" Text="{Binding Modified, Converter={x:Static vm:ModifiedConverter.Instance}}"
+                                     Foreground="{DynamicResource UiFaint}" FontSize="9.5" Margin="8,0,0,0"
+                                     HorizontalAlignment="Right"/>
                         </Grid>
                       </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -891,7 +1065,8 @@
                 <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="2,6,2,2"
                       IsVisible="{Binding Files.HasPreview}">
                   <TextBlock Text="{Binding Files.PreviewTitle}" FontSize="10.5" FontWeight="SemiBold"
-                             Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                             Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"
+                             ToolTip.Tip="{Binding Files.PreviewPath}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Files.PreviewMeta}" FontSize="9"
                              Foreground="{DynamicResource UiFaint}" VerticalAlignment="Center"/>
                 </Grid>
@@ -900,18 +1075,27 @@
                 <Border Grid.Row="4" CornerRadius="8" Background="{DynamicResource UiCanvas}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Padding="4"
                         IsVisible="{Binding Files.HasPreview}">
-                  <TextBox Text="{Binding Files.PreviewText}" IsReadOnly="True"
-                           AcceptsReturn="True" TextWrapping="NoWrap" BorderThickness="0"
-                           Background="Transparent" Foreground="{DynamicResource UiMuted}" FontSize="9.5"
-                           FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
-                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                           ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                  <Panel>
+                    <Image Source="{Binding Files.PreviewImage}" Stretch="Uniform"
+                           IsVisible="{Binding Files.PreviewIsImage}"/>
+                    <TextBox Text="{Binding Files.PreviewText}" IsReadOnly="True"
+                             AcceptsReturn="True" TextWrapping="NoWrap" BorderThickness="0"
+                             Background="Transparent" Foreground="{DynamicResource UiMuted}" FontSize="9.5"
+                             FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
+                             IsVisible="{Binding !Files.PreviewIsImage}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                  </Panel>
                 </Border>
                 <Border Grid.Row="4" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                         IsVisible="{Binding !Files.HasPreview}">
-                  <TextBlock Text="双击文件查看预览" Foreground="{DynamicResource UiFaint}" FontSize="10"
-                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Files.PreviewHint}" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="拖到终端可粘贴路径" Foreground="{DynamicResource UiFaint}" FontSize="9"
+                               HorizontalAlignment="Center" Margin="0,3,0,0" Opacity="0.7"/>
+                  </StackPanel>
                 </Border>
               </Grid>
 
@@ -1152,6 +1336,9 @@
                         </DataTemplate>
                       </ListBox.ItemTemplate>
                     </ListBox>
+                    <TextBlock Text="暂无日志行" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding Logs.Entries.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <!-- follow paused: floats over the list until resumed -->
                     <Button Content="⬇ 跟随" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                             Margin="0,0,10,10" Padding="10,4" CornerRadius="8"
@@ -1175,9 +1362,19 @@
 
               <!-- ===== SSH ===== -->
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"
-                    RowDefinitions="Auto,*,Auto">
+                    RowDefinitions="Auto,Auto,*,Auto">
+                <!-- list-first header: the edit form only opens on demand once hosts exist -->
+                <Grid ColumnDefinitions="*,Auto" Margin="2,0,0,4" IsVisible="{Binding Ssh.HasHosts}">
+                  <TextBlock Text="已保存连接" FontSize="10.5" FontWeight="SemiBold"
+                             Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
+                  <Button Grid.Column="1" Content="＋" Padding="8,1" FontSize="12"
+                          CornerRadius="6" Background="{DynamicResource UiRaised}"
+                          Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
+                          ToolTip.Tip="新建 / 收起连接表单" Command="{Binding Ssh.ToggleEditingCommand}" IsVisible="{Binding Ssh.CanToggleEditing}"/>
+                </Grid>
                 <!-- edit form -->
-                <Border CornerRadius="8" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}"
+                <Border Grid.Row="1" IsVisible="{Binding Ssh.Editing}" KeyDown="OnSshFormKeyDown"
+                        CornerRadius="8" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}"
                         BorderThickness="1" Padding="8" Margin="0,2,0,6">
                   <StackPanel Spacing="6">
                     <TextBlock Text="新建 / 编辑连接" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiMuted}"/>
@@ -1208,10 +1405,16 @@
                 </Border>
 
                 <!-- saved hosts -->
-                <Border Grid.Row="1" CornerRadius="8" Background="{DynamicResource UiSurface}"
+                <Border Grid.Row="2" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
-                  <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
-                           Background="Transparent" BorderThickness="0" Padding="4">
+                  <Panel>
+                    <TextBlock Text="暂无保存的连接 · 点上方 ＋ 添加" Foreground="{DynamicResource UiFaint}"
+                               FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding Ssh.Hosts.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                    <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
+                           Background="Transparent" BorderThickness="0" Padding="4"
+                           Tapped="OnSshRowTapped" DoubleTapped="OnSshRowDoubleTapped"
+                           KeyDown="OnSshListKeyDown">
                     <ListBox.Styles>
                       <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="6,4"/>
@@ -1220,37 +1423,39 @@
                         <Setter Property="Background" Value="Transparent"/>
                       </Style>
                       <Style Selector="ListBoxItem:pointerover">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
                       </Style>
                       <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="ssh:SshHost">
                         <Grid ColumnDefinitions="*,Auto,Auto">
                           <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding DisplayName}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                            <TextBlock Text="{Binding CommandLine}" FontSize="9" Foreground="{DynamicResource UiFaint}"
+                            <TextBlock Text="{Binding DisplayName}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding CommandLine}" FontSize="9" Foreground="{DynamicResource UiFaint}" TextTrimming="CharacterEllipsis"
                                        FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                           </StackPanel>
                           <Button Grid.Column="1" Content="连接" Padding="8,2" Margin="6,0,0,0"
+                                  ToolTip.Tip="连接 (Enter / 双击)"
                                   CornerRadius="5" Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}"
-                                  BorderBrush="{DynamicResource UiBorder}" FontSize="10"
+                                  BorderBrush="{DynamicResource UiBorder}" FontSize="10" ClickMode="Press"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Ssh.ConnectCommand}"
                                   CommandParameter="{Binding}"/>
                           <Button Grid.Column="2" Content="✕" Padding="6,2" Margin="4,0,0,0"
                                   CornerRadius="5" Background="Transparent" Foreground="{DynamicResource UiFaint}"
-                                  BorderThickness="0" FontSize="10"
+                                  BorderThickness="0" FontSize="10" ClickMode="Press"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Ssh.RemoveCommand}"
                                   CommandParameter="{Binding}"/>
                         </Grid>
                       </DataTemplate>
                     </ListBox.ItemTemplate>
                   </ListBox>
+                  </Panel>
                 </Border>
 
-                <TextBlock Grid.Row="2" FontSize="9" Foreground="{DynamicResource UiFaint}" Margin="2,6,2,0"
+                <TextBlock Grid.Row="3" FontSize="9" Foreground="{DynamicResource UiFaint}" Margin="2,6,2,0"
                            TextWrapping="Wrap"
                            Text="连接使用本机 ssh 命令:密码 / 密钥确认直接在终端会话中完成;密钥建议用 ssh-agent 或 ~/.ssh/config。"/>
               </Grid>
@@ -1265,7 +1470,11 @@
                   <Button Content="保存为文本" Margin="0,0,6,6" Click="OnSaveCommandRecord"
                           ToolTip.Tip="把选中的命令和输出保存为 UTF-8 .txt"/>
                 </WrapPanel>
-                <ListBox Grid.Row="1" ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
+                <Panel Grid.Row="1">
+                  <TextBlock Text="暂无命令记录 · 需终端输出带命令标记" Foreground="{DynamicResource UiFaint}"
+                             FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                             IsVisible="{Binding CommandRecords.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                  <ListBox ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
                          Background="Transparent" BorderThickness="0" DoubleTapped="OnCommandDoubleTapped">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:CommandRecordViewModel">
@@ -1276,7 +1485,8 @@
                       </StackPanel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
-                </ListBox>
+                  </ListBox>
+                </Panel>
                 <StackPanel Grid.Row="2" Spacing="4" Margin="2,6,2,0">
                   <TextBlock Text="{Binding CommandNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
                   <TextBlock Text="只记录带命令开始/完成标记的终端。历史被裁掉后不能定位，也不会复制到别的命令。" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiFaint}"/>
@@ -1352,14 +1562,28 @@
           <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
           <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
         </Style>
+        <!-- Mockup: New Session is the primary CTA — a filled accent pill with
+             an inline label, kept accent-filled even when dock-active. -->
+        <Style Selector="Button.dock.dock-primary">
+          <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
+          <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
+          <Setter Property="Padding" Value="18,10"/>
+        </Style>
+        <Style Selector="Button.dock.dock-primary:pointerover">
+          <Setter Property="RenderTransform" Value="translateY(-2px)"/>
+          <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
+          <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
+        </Style>
       </ctl:DropletDock.Styles>
       <StackPanel Orientation="Horizontal" Spacing="2">
-        <Button x:Name="NewDockButton" Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
+        <Button x:Name="NewDockButton" Classes="dock dock-primary" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                 Command="{Binding DockSelectCommand}" CommandParameter="0"
-                ToolTip.Tip="新建终端">
-          <StackPanel>
-            <PathIcon Data="{StaticResource ToolAdd}" HorizontalAlignment="Center"/>
-            <TextBlock Text="新建" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                ToolTip.Tip="新建会话" AutomationProperties.Name="新建会话">
+          <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+            <!-- Local Foreground outranks every style, including the window-level
+                 dock rules (UiMuted at rest / UiAccent in dock-active → invisible). -->
+            <PathIcon Data="{StaticResource ToolAdd}" Foreground="{DynamicResource UiOnAccent}"/>
+            <TextBlock Text="新建会话" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"

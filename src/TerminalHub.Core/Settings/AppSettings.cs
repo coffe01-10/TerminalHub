@@ -78,12 +78,25 @@ public sealed class AppSettings
         set => _sessionShortcuts = value ?? SessionShortcutBinding.Defaults();
     }
     private List<SessionShortcutBinding> _sessionShortcuts = SessionShortcutBinding.Defaults();
-    public bool InspectorVisible { get; set; }
-    public bool OutputVisible { get; set; } = true;
+    /// <summary>Right inspector visibility. null = never chosen → Windows closed, Linux visible.
+    /// An explicit persisted choice wins.
+    /// Null must never be serialized: old builds typed this as plain bool and a
+    /// written "null" would throw on deserialize, failing their whole settings
+    /// load and disabling persistence.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(
+        Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? InspectorVisible { get; set; }
+    public bool OutputVisible { get; set; } = !OperatingSystem.IsWindows();
+    /// <summary>Bottom panel height in px; 0 = default 170.</summary>
+    public double OutputHeight { get; set; }
+    /// <summary>Right inspector rail width in px; 0 = responsive default.</summary>
+    public double InspectorWidth { get; set; }
+    /// <summary>Left session shelf width in px; 0 = responsive default.</summary>
+    public double ShelfWidth { get; set; }
     /// <summary>Output tab level filter: 0 全部 · 1 info · 2 warn · 3 error.</summary>
     public int OutputLevelFilter { get; set; }
     /// <summary>0: reveal near bottom, 1: always visible, 2: hidden.</summary>
-    public int DockVisibilityMode { get; set; } = 1;
+    public int DockVisibilityMode { get; set; } = OperatingSystem.IsWindows() ? 0 : 1;
     public string WorkspaceName { get; set; } = "MangaFlow";
     public List<WorkspaceTemplate> WorkspaceTemplates { get; set; } = [];
     public List<SessionGroup> SessionGroups { get; set; } = [];
@@ -112,6 +125,9 @@ public sealed class AppSettings
 
     /// <summary>Logs panel: ring-buffer capacity (UI presets 500 / 2000 / 5000; default 2000). Survives restarts.</summary>
     public int LogsBufferCapacity { get; set; } = 2000;
+
+    /// <summary>Files panel: Windows retains the unfiltered listing; Linux defaults to hiding dotfiles.</summary>
+    public bool FilesShowHidden { get; set; } = OperatingSystem.IsWindows();
 
     /// <summary>Logs panel: per-session filter memory keyed by session name — each named
     /// session's last filter combo. 「全部会话」(dropdown index 0) is NOT in the map;

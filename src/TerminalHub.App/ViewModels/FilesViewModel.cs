@@ -15,7 +15,15 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private readonly Action<string>? _openTerminalAt;
     private readonly Func<string, Task>? _copyTextAsync;
     private readonly Func<bool>? _hasActiveSession;
+    private readonly Action<string> _revealInFileManager;
+    private readonly Action<string> _openExternal;
     private bool _initialized;
+    private int _previewRequest;
+    private readonly Func<string, Avalonia.Media.Imaging.Bitmap> _imageLoader;
+    private readonly bool _previewOnSelection;
+    /// <summary>The current image load; text previews complete synchronously.</summary>
+    public Task PreviewLoading { get; private set; } = Task.CompletedTask;
+    public string PreviewHint => _previewOnSelection ? "选中文件即可预览" : "Enter 或双击文件查看预览";
 
     /// <summary>One clickable breadcrumb segment.</summary>
     public sealed record Crumb(string Label, string Path);
@@ -26,32 +34,66 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _currentPath = "";
     [ObservableProperty] private FileEntry? _selectedEntry;
     [ObservableProperty] private string _statusText = "";
+    /// <summary>true → status line paints as an error (UiBad); false → info (UiMuted).</summary>
+    [ObservableProperty] private bool _statusIsError;
     [ObservableProperty] private string _previewTitle = "";
+    /// <summary>Absolute path of the previewed file (title tooltip).</summary>
+    [ObservableProperty] private string _previewPath = "";
     [ObservableProperty] private string _previewMeta = "";
     [ObservableProperty] private string _previewText = "";
+    /// <summary>Decoded image for raster previews; null for text/binary.</summary>
+    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _previewImage;
+    [ObservableProperty] private bool _previewIsImage;
     [ObservableProperty] private bool _hasPreview;
     [ObservableProperty] private bool _canGoUp;
+    [ObservableProperty] private bool _showHidden;
 
     /// <param name="sessionCwd">Returns the active session's working dir (may be null/empty).</param>
     /// <param name="openTerminalAt">Sends a real `cd` into the active terminal session.</param>
     /// <param name="copyTextAsync">Best-effort clipboard copy (owned by the shell VM).</param>
     /// <param name="hasActiveSession">Whether a live session exists to receive `cd`.</param>
+    /// <param name="revealInFileManager">Opens the OS file manager at a path
+    /// (tests inject a capture; null → platform default).</param>
+    /// <param name="showHidden">Include dot-prefixed/OS-hidden entries; Windows
+    /// keeps its unfiltered listing, Linux hides them by default.</param>
+    /// <param name="openExternal">Launches a file with the OS default app
+    /// (tests inject a capture; null → platform default).</param>
     public FilesViewModel(Func<string?>? sessionCwd = null,
                           Action<string>? openTerminalAt = null,
                           Func<string, Task>? copyTextAsync = null,
-                          Func<bool>? hasActiveSession = null)
+                          Func<bool>? hasActiveSession = null,
+                          Action<string>? revealInFileManager = null,
+                          Action<string>? openExternal = null,
+                          bool? showHidden = null,
+                          Func<string, Avalonia.Media.Imaging.Bitmap>? imageLoader = null,
+                          bool? previewOnSelection = null)
     {
         _sessionCwd = sessionCwd ?? (() => null);
         _openTerminalAt = openTerminalAt;
         _copyTextAsync = copyTextAsync;
         _hasActiveSession = hasActiveSession;
+        _revealInFileManager = revealInFileManager ?? RevealDefault;
+        _openExternal = openExternal ?? OpenDefault;
+        _showHidden = showHidden ?? OperatingSystem.IsWindows();
+        _previewOnSelection = previewOnSelection ?? !OperatingSystem.IsWindows();
+        _imageLoader = imageLoader ?? (path => new Avalonia.Media.Imaging.Bitmap(path));
     }
 
-    /// <summary>Selection change arms/disarms the entry commands.</summary>
+    /// <summary>Toggling dotfile visibility refilters the current directory.</summary>
+    partial void OnShowHiddenChanged(bool value) => NavigateTo(CurrentPath);
+
+    /// <summary>Selection change arms/disarms the entry commands and keeps the
+    /// preview pane tracking the selected file (single-click preview); a dir or
+    /// no selection clears it.</summary>
     partial void OnSelectedEntryChanged(FileEntry? value)
     {
         OpenInTerminalCommand.NotifyCanExecuteChanged();
         CopyPathCommand.NotifyCanExecuteChanged();
+        RevealInFileManagerCommand.NotifyCanExecuteChanged();
+        OpenExternallyCommand.NotifyCanExecuteChanged();
+        if (!_previewOnSelection) return; // Windows previews only on Open / Enter / double-click.
+        if (value is { IsDirectory: false }) PreviewFile(value.FullPath);
+        else ClearPreview();
     }
 
     /// <summary>Active-session churn also gates 「在此打开终端」 — the shell VM
@@ -85,7 +127,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(path)) path = Home();
         try
         {
-            var entries = LocalFileBrowser.ListDirectory(path);
+            var entries = LocalFileBrowser.ListDirectory(path, ShowHidden);
             var selection = SelectedEntry?.FullPath;
             Entries.Clear();
             foreach (var e in entries) Entries.Add(e);
@@ -93,11 +135,13 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             CurrentPath = Path.GetFullPath(path);
             WatchDirectory();
             RebuildCrumbs();
-            StatusText = entries.Count == 0 ? "空目录" : "";
+            StatusIsError = false;
+            StatusText = entries.Count == 0 ? "空目录" : $"{entries.Count} 项";
             CanGoUp = Directory.GetParent(CurrentPath) is not null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
+            StatusIsError = true;
             StatusText = $"无法打开目录: {ex.Message}";
         }
     }
@@ -143,8 +187,10 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         {
             Interlocked.Exchange(ref _refreshPending, 0);
             if (_disposed) return;
+            var request = _previewRequest;
             NavigateTo(CurrentPath);
-            if (HasPreview && SelectedEntry is { IsDirectory: false } entry) PreviewFile(entry.FullPath);
+            if (request == _previewRequest && HasPreview && SelectedEntry is { IsDirectory: false } entry)
+                PreviewFile(entry.FullPath);
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
@@ -152,6 +198,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     {
         _disposed = true;
         _watcher?.Dispose();
+        ClearPreview();
     }
 
     private void RebuildCrumbs()
@@ -174,23 +221,54 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Open an entry (double-click / Enter): dir → navigate, file → preview.</summary>
+    /// <summary>Open an entry (double-click / Enter): dir → navigate,
+    /// file → in-app preview on Windows, default app on Linux.</summary>
     public void Open(FileEntry? entry)
     {
         if (entry is null) return;
         if (entry.IsDirectory) NavigateTo(entry.FullPath);
-        else PreviewFile(entry.FullPath);
+        else if (OperatingSystem.IsWindows()) PreviewFile(entry.FullPath);
+        else OpenExternally(entry);
     }
 
     /// <summary>Open the currently selected entry (keyboard).</summary>
     public void OpenSelected() => Open(SelectedEntry);
 
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+        { ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico" };
+
+    /// <summary>Bitmaps beyond this size fall through to the binary notice.</summary>
+    public const long MaxImagePreviewBytes = 16 * 1024 * 1024;
+
+    private void ClearPreview()
+    {
+        _previewRequest++;
+        var previous = PreviewImage;
+        PreviewImage = null;
+        PreviewIsImage = false;
+        HasPreview = false;
+        previous?.Dispose();
+        PreviewLoading = Task.CompletedTask;
+    }
+
     private void PreviewFile(string path)
     {
+        ClearPreview();
+        if (ImageExtensions.Contains(Path.GetExtension(path)))
+        {
+            PreviewTitle = Path.GetFileName(path);
+            PreviewPath = Path.GetFullPath(path);
+            PreviewMeta = "";
+            PreviewText = "正在加载图片…";
+            HasPreview = true;
+            PreviewLoading = PreviewImageAsync(path, _previewRequest);
+            return;
+        }
         try
         {
             var p = LocalFileBrowser.ReadPreview(path);
             PreviewTitle = Path.GetFileName(path);
+            PreviewPath = Path.GetFullPath(path);
             var meta = $"{MainWindowViewModel.FmtBytes(p.SizeBytes)} · {p.Modified:yyyy-MM-dd HH:mm}";
             switch (p.Kind)
             {
@@ -211,8 +289,57 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            StatusText = $"无法读取文件: {ex.Message}";
+            ReportPreviewError(ex);
         }
+    }
+
+    private async Task PreviewImageAsync(string path, int request)
+    {
+        try
+        {
+            // File I/O and bitmap decode stay off the dispatcher, including slow shares.
+            var (image, meta, notice) = await Task.Run(() =>
+            {
+                var info = new FileInfo(path);
+                var meta = $"{MainWindowViewModel.FmtBytes(info.Length)} · {info.LastWriteTime:yyyy-MM-dd HH:mm}";
+                if (info.Length > MaxImagePreviewBytes)
+                    return ((Avalonia.Media.Imaging.Bitmap?)null,
+                        $"{meta} · 超过 {MainWindowViewModel.FmtBytes(MaxImagePreviewBytes)}",
+                        "〔图片过大 — 不提供预览〕");
+                var image = TryLoadImage(path);
+                return image is not null ? (image, $"{meta} · 图片", "")
+                    : (image, $"{meta} · 二进制文件", "〔二进制文件 — 不提供文本预览〕");
+            });
+            // A slow decode must never overwrite a later selection or survive disposal.
+            if (_disposed || request != _previewRequest)
+            {
+                image?.Dispose();
+                return;
+            }
+            PreviewImage = image;
+            PreviewIsImage = image is not null;
+            PreviewMeta = meta;
+            PreviewText = notice;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (!_disposed && request == _previewRequest) ReportPreviewError(ex);
+        }
+    }
+
+    private void ReportPreviewError(Exception ex)
+    {
+        HasPreview = false;
+        StatusIsError = true;
+        StatusText = $"无法读取文件: {ex.Message}";
+    }
+
+    private Avalonia.Media.Imaging.Bitmap? TryLoadImage(string path)
+    {
+        try { return _imageLoader(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or InvalidOperationException)
+        { return null; }
     }
 
     [RelayCommand]
@@ -238,6 +365,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         var dir = e.IsDirectory ? e.FullPath : Path.GetDirectoryName(e.FullPath);
         if (string.IsNullOrEmpty(dir)) return;
         _openTerminalAt(dir);
+        StatusIsError = false;
         StatusText = $"终端已 cd → {dir}";
     }
 
@@ -251,7 +379,298 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         var e = entry ?? SelectedEntry;
         if (e is null) return;
         if (_copyTextAsync is not null) await _copyTextAsync(e.FullPath);
+        StatusIsError = false;
         StatusText = $"已复制 {e.FullPath}";
+    }
+
+    /// <summary>「在文件管理器中显示」: Windows Explorer selects the file / opens
+    /// the dir; elsewhere xdg-open on the dir (a file resolves to its parent).</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void RevealInFileManager(FileEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e is null) return;
+        try
+        {
+            _revealInFileManager(e.FullPath);
+            StatusIsError = false;
+            StatusText = $"已在文件管理器中显示 {e.FullPath}";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException
+                                     or System.ComponentModel.Win32Exception
+                                     or IOException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法打开文件管理器: {ex.Message}";
+        }
+    }
+
+    private static void RevealDefault(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var arg = Directory.Exists(path) ? $"\"{path}\"" : $"/select,\"{path}\"";
+            System.Diagnostics.Process.Start("explorer.exe", arg);
+        }
+        else
+        {
+            var dir = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
+            if (dir is null) return;
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{dir}\"")
+                { UseShellExecute = false });
+        }
+    }
+
+    /// <summary>「用默认应用打开」: shell-associated handler for the file
+    /// (preview stays the in-app double-click path). Files only.</summary>
+    [RelayCommand(CanExecute = nameof(IsFileSelection))]
+    private void OpenExternally(FileEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e is null || e.IsDirectory) return;
+        try
+        {
+            _openExternal(e.FullPath);
+            StatusIsError = false;
+            StatusText = $"已打开 {e.Name}";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException
+                                     or System.ComponentModel.Win32Exception
+                                     or IOException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法打开文件: {ex.Message}";
+        }
+    }
+
+    private static void OpenDefault(string path)
+    {
+        if (OperatingSystem.IsWindows())
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        else
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{path}\"")
+                { UseShellExecute = false });
+    }
+
+    private bool IsFileSelection(FileEntry? entry)
+        => (entry ?? SelectedEntry) is { IsDirectory: false };
+
+    /// <summary>Reject separators / traversal / OS-invalid chars in a name typed
+    /// into a create-or-rename field. Returns true and reports when invalid.</summary>
+    private bool RejectBadName(string name)
+    {
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+            && !name.Contains('/') && !name.Contains('\\')
+            && name is not "." and not "..") return false;
+        StatusIsError = true;
+        StatusText = $"名称无效: {name}";
+        return true;
+    }
+
+    /// <summary>Create a folder under CurrentPath. Null/blank name → auto
+    /// 「新建文件夹」「新建文件夹 2」…; the new entry gets selected.</summary>
+    public void NewFolder(string? name)
+    {
+        try
+        {
+            var final = string.IsNullOrWhiteSpace(name) ? UniqueName("新建文件夹") : name.Trim();
+            if (RejectBadName(final)) return;
+            final = UniqueName(final);   // explicit names dedupe too — never a silent no-op
+            var path = Path.Combine(CurrentPath, final);
+            Directory.CreateDirectory(path);
+            NavigateTo(CurrentPath);
+            var full = Path.GetFullPath(path);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == full);
+            StatusIsError = false;
+            StatusText = $"已创建 {final}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法创建文件夹: {ex.Message}";
+        }
+    }
+
+    /// <summary>Create an empty UTF-8 text file under CurrentPath; same
+    /// unique-naming and selection rules as <see cref="NewFolder"/>.</summary>
+    public void NewTextFile(string? name)
+    {
+        try
+        {
+            var baseName = string.IsNullOrWhiteSpace(name) ? "新建文本.txt" : name.Trim();
+            if (RejectBadName(baseName)) return;
+            if (!baseName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
+                && !baseName.Contains('.')) baseName += ".txt";
+            var final = UniqueName(baseName);
+            var path = Path.Combine(CurrentPath, final);
+            File.WriteAllText(path, "");
+            NavigateTo(CurrentPath);
+            var full = Path.GetFullPath(path);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == full);
+            StatusIsError = false;
+            StatusText = $"已创建 {final}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法创建文件: {ex.Message}";
+        }
+    }
+
+    /// <summary>Rename <paramref name="entry"/> to <paramref name="newName"/>
+    /// in place; the renamed entry stays selected. Null/blank → no-op.</summary>
+    public void Rename(FileEntry? entry, string? newName)
+    {
+        if (entry is null || string.IsNullOrWhiteSpace(newName)) return;
+        newName = newName.Trim();
+        if (newName == entry.Name || RejectBadName(newName)) return;
+        try
+        {
+            var dest = Path.Combine(CurrentPath, newName);
+            if (entry.IsDirectory) Directory.Move(entry.FullPath, dest);
+            else File.Move(entry.FullPath, dest);
+            NavigateTo(CurrentPath);
+            var full = Path.GetFullPath(dest);
+            SelectedEntry = Entries.FirstOrDefault(e => e.FullPath == full);
+            StatusIsError = false;
+            StatusText = $"已重命名 → {newName}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                     or ArgumentException or NotSupportedException)
+        {
+            StatusIsError = true;
+            StatusText = $"无法重命名: {ex.Message}";
+        }
+    }
+
+    /// <summary>Copy OS-dropped files/dirs into <paramref name="targetDir"/>
+    /// (defaults to CurrentPath), off the UI thread. Skips items inside /
+    /// equal to / ancestors of the target (a drop back onto its own directory
+    /// or a parent dragged in from Explorer would recurse into the destination
+    /// forever). Returns the number actually copied.</summary>
+    public async Task<int> ImportPathsAsync(IEnumerable<string> paths, string? targetDir = null)
+    {
+        var list = paths.ToList();
+        if (list.Count == 0) return 0;
+        var cur = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetDir ?? CurrentPath));
+        StatusIsError = false;
+        StatusText = "导入中…";
+        var (copied, skipped, linksSkipped, error) = await Task.Run(() => DoImport(cur, list));
+        if (_disposed) return copied;
+        if (copied > 0) NavigateTo(CurrentPath);   // refresh first — it rewrites StatusText
+        if (error is not null)
+        {
+            StatusIsError = true;
+            StatusText = error;
+        }
+        else
+        {
+            StatusIsError = false;
+            var cmp = OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var sameDir = string.Equals(cur,
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(CurrentPath)), cmp);
+            StatusText = copied > 0
+                ? (skipped > 0 ? $"已导入 {copied} 项，跳过 {skipped} 项" : $"已导入 {copied} 项")
+                : sameDir ? "已在当前目录中，跳过" : "已在目标目录中，跳过";
+        }
+        if (linksSkipped > 0) StatusText += $" · 跳过 {linksSkipped} 个目录链接";
+        return copied;
+    }
+
+    private static (int copied, int skipped, int linksSkipped, string? error) DoImport(string cur, List<string> paths)
+    {
+        var copied = 0; var skipped = 0; var linksSkipped = 0;
+        foreach (var raw in paths)
+        {
+            try
+            {
+                var src = Path.TrimEndingDirectorySeparator(Path.GetFullPath(raw));
+                if (!Directory.Exists(src) && !File.Exists(src)) { skipped++; continue; }
+                // Resolve BOTH paths, including linked parent components. A destination
+                // junction into the source otherwise makes CopyDirectory copy itself.
+                var actualTarget = ResolvePath(cur);
+                var actualSource = ResolvePath(src);
+                if (PathContains(actualTarget, actualSource) || PathContains(actualSource, actualTarget))
+                {
+                    skipped++;
+                    continue;
+                }
+                var dest = Path.Combine(cur, UniqueNameIn(cur, Path.GetFileName(src)));
+                if (Directory.Exists(src)) linksSkipped += CopyDirectory(src, dest);
+                else if (File.Exists(src)) File.Copy(src, dest);
+                else { skipped++; continue; }
+                copied++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                         or ArgumentException or NotSupportedException)
+            {
+                return (copied, skipped, linksSkipped, $"无法导入 {Path.GetFileName(raw)}: {ex.Message}");
+            }
+        }
+        return (copied, skipped, linksSkipped, null);
+    }
+
+    private static string ResolvePath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var resolved = Path.GetPathRoot(full)!;
+        var relative = full[resolved.Length..];
+        foreach (var part in relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            resolved = Path.Combine(resolved, part);
+            FileSystemInfo info = Directory.Exists(resolved)
+                ? new DirectoryInfo(resolved) : new FileInfo(resolved);
+            resolved = info.ResolveLinkTarget(true)?.FullName ?? resolved;
+        }
+        return Path.TrimEndingDirectorySeparator(resolved);
+    }
+
+    /// <summary>dir contains path (or is equal to it). Case-insensitive on
+    /// Windows where the filesystem is; root contains everything under it.</summary>
+    private static bool PathContains(string dir, string path)
+    {
+        var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase
+                                              : StringComparison.Ordinal;
+        var d = Path.TrimEndingDirectorySeparator(dir);
+        if (d == Path.GetPathRoot(d)) return path.StartsWith(d, cmp);
+        return string.Equals(d, path, cmp)
+            || path.StartsWith(d + Path.DirectorySeparatorChar, cmp);
+    }
+
+    private static int CopyDirectory(string src, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        var skippedLinks = 0;
+        foreach (var dir in Directory.EnumerateDirectories(src))
+        {
+            var info = new DirectoryInfo(dir);
+            if (info.LinkTarget is not null) { skippedLinks++; continue; }
+            skippedLinks += CopyDirectory(dir, Path.Combine(dest, info.Name));
+        }
+        foreach (var file in Directory.EnumerateFiles(src))
+            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
+        return skippedLinks;
+    }
+
+    private string UniqueName(string baseName) => UniqueNameIn(CurrentPath, baseName);
+
+    private static string UniqueNameIn(string dir, string baseName)
+    {
+        var stem = Path.GetFileNameWithoutExtension(baseName);
+        var ext = Path.GetExtension(baseName);
+        var name = baseName;
+        var i = 1;
+        while (Directory.Exists(Path.Combine(dir, name))
+               || File.Exists(Path.Combine(dir, name)))
+            name = $"{stem} {++i}{ext}";
+        return name;
     }
 
     private bool HasSelection(FileEntry? entry) => (entry ?? SelectedEntry) is not null;

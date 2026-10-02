@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using TerminalHub.App.Views;
@@ -31,6 +32,13 @@ public class TestApp
 
 public class UiSmokeTests
 {
+    private static async Task Until(Func<bool> condition, string? message = null)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(25);
+        Assert.True(condition(), message ?? "Timed out waiting for the UI to settle.");
+    }
+
     private static void FeedDemoOutput(TerminalHub.App.ViewModels.MainWindowViewModel vm)
     {
         // Push realistic ANSI-colored output through the real parser pipeline.
@@ -60,10 +68,8 @@ public class UiSmokeTests
 
         var window = new MainWindow { Width = 1440, Height = 900 };
         window.Show();
-        await Task.Delay(500); // startup sessions spawn
-
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
-        Assert.True(vm.SessionCards.Count >= 3);
+        await Until(() => vm.SessionCards.Count >= 3, "startup sessions never spawned");
 
         FeedDemoOutput(vm);
         await Task.Delay(300);
@@ -95,6 +101,41 @@ public class UiSmokeTests
     }
 
     [AvaloniaFact]
+    public async Task F2_OnFilesList_OpensFileRename_NotSessionRename()
+    {
+        PtySessionFactory.UseMock = true;
+        var window = new MainWindow { Width = 1200, Height = 800 };
+        window.Show();
+        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        vm.SelectedRightTab = 1;
+        await Until(() => vm.Files.Entries.Count > 0, "files listing never populated");
+        vm.Files.SelectedEntry = vm.Files.Entries.First();
+
+        var filesList = window.FindControl<Avalonia.Controls.ListBox>("FilesList")!;
+        filesList.RaiseEvent(new Avalonia.Input.KeyEventArgs
+        {
+            RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent,
+            Key = Avalonia.Input.Key.F2,
+            Source = filesList,
+        });
+        await Task.Delay(200);
+
+        // The tunneling session-shortcut handler must not steal F2: the dialog
+        // that opens is the Files rename prompt (「重命名」), not 「重命名终端」.
+        var dialogs = window.OwnedWindows.Where(w => w.IsVisible).ToList();
+        try
+        {
+            var dialog = Assert.Single(dialogs);
+            Assert.Equal("重命名", dialog.Title);
+        }
+        finally
+        {
+            foreach (var d in dialogs) d.Close();
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task DockSelect_Deploy_ReportsArtifactsOrInstructions()
     {
         PtySessionFactory.UseMock = true;
@@ -120,8 +161,8 @@ public class UiSmokeTests
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1200, Height = 800 };
         window.Show();
-        await Task.Delay(400);
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        await Until(() => vm.ActiveSession is not null, "startup session never activated");
 
         FeedDemoOutput(vm);
         await Task.Delay(300);
@@ -172,8 +213,7 @@ public class UiSmokeTests
         // New Session adds a session.
         var before = vm.SessionCards.Count;
         vm.DockSelectCommand.Execute(0);
-        await Task.Delay(400);
-        Assert.Equal(before + 1, vm.SessionCards.Count);
+        await Until(() => vm.SessionCards.Count == before + 1, "new session card never appeared");
         window.Close();
     }
 
@@ -206,9 +246,8 @@ public class UiSmokeTests
 
             var window = new MainWindow(store) { Width = 1200, Height = 800 };
             window.Show();
-            await Task.Delay(600);
-
             var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+            await Until(() => vm.ActiveSession is not null, "startup session never activated");
             Assert.True(vm.SessionCards.Count > 0,
                 $"no cards; shellSetup={vm.ShellSetupOpen} '{vm.ShellSetupMessage}'; log=" +
                 string.Join(" | ", vm.Dashboard.OutputLog.Select(l => l.Message)));
@@ -249,8 +288,8 @@ public class UiSmokeTests
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1200, Height = 800 };
         window.Show();
-        await Task.Delay(400);
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        await Until(() => vm.ActiveSession is not null, "startup session never activated");
 
         Assert.Equal(0, vm.Dashboard.ProblemCount);
         Assert.False(vm.Dashboard.HasProblems);

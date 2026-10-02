@@ -93,7 +93,14 @@ public static class ThemeManager
             "Black" => "0 5 10 0 #90000000",
             _ => "0 10 20 -3 #80000000, 0 1 0 0 #305EB6FF"
         });
-        app.Resources["ActiveCardShadow"] = BoxShadows.Parse(Current switch
+        app.Resources["ActiveCardBorderThickness"] = new Thickness(OperatingSystem.IsWindows() ? 1 : 2);
+        app.Resources["ActiveCardShadow"] = BoxShadows.Parse(OperatingSystem.IsWindows() ? Current switch
+        {
+            "Paper" => "0 2 3 0 #28816D50",
+            "White" => "0 3 8 0 #20314766",
+            "Black" => "0 1 4 0 #60000000",
+            _ => "0 3 12 0 #40258ED6"
+        } : Current switch
         {
             // Active shelf card: bright accent ring + soft halo + drop, so the
             // live session reads at a glance like the ui-ref mockups.

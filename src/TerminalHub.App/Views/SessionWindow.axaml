@@ -46,6 +46,12 @@
                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                 Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                 IsVisible="{Binding #PopoutTerminal.IsScrolledUp}"/>
+        <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                   HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                   Minimum="0" Maximum="{Binding #PopoutTerminal.ScrollbackSize}"
+                   ViewportSize="{Binding #PopoutTerminal.ViewportRows}"
+                   Value="{Binding #PopoutTerminal.ScrollPosition, Mode=TwoWay}"
+                   Visibility="{Binding #PopoutTerminal.OverlayScrollBarVisibility}"/>
       </Panel>
     </Border>
   </Grid>

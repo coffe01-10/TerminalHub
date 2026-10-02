@@ -36,7 +36,11 @@ public class ProductIterationTests
             await fixture.Vm.NewSessionCommand.ExecuteAsync(null);
             await Task.Delay(40);
         }
-        await Task.Delay(50);
+        // Cold-start runs can lag on session spawn; wait for all 11 cards
+        // instead of a fixed delay so the index below is always in range.
+        var spawnDeadline = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.Vm.SessionCards.Count < 11 && DateTime.UtcNow < spawnDeadline)
+            await Task.Delay(25);
         var target = fixture.Vm.SessionCards[10];
         fixture.Vm.RenameSession((target, "后端服务"));
         var terminal = fixture.Window.FindControl<TerminalView>("MainTerminal")!;
