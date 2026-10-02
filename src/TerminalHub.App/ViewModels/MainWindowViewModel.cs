@@ -52,6 +52,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _settingsOpen;
     [ObservableProperty] private bool _inspectorVisible;
     [ObservableProperty] private bool _outputVisible;
+    [ObservableProperty] private double _outputHeight = 170;   // bottom panel, drag-resizable
     [ObservableProperty] private int _dockVisibilityMode;
     [ObservableProperty] private string _activeWorkingDirectory = "";
     public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? "未选择会话" :

@@ -98,6 +98,12 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         FilesList.AddHandler(DragDrop.DragOverEvent, OnFilesDragOver, RoutingStrategies.Bubble);
         FilesList.AddHandler(DragDrop.DropEvent, OnFilesDrop, RoutingStrategies.Bubble);
+        OutputResizeHandle.AddHandler(InputElement.PointerPressedEvent, OnOutputResizePressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        OutputResizeHandle.AddHandler(InputElement.PointerMovedEvent, OnOutputResizeMoved,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        OutputResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnOutputResizeReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += async (_, _) =>
         {
             try
@@ -948,6 +954,33 @@ public partial class MainWindow : Window
             _ => [],
         };
         if (paths.Count > 0) _ = Vm.Files.ImportPathsAsync(paths);
+    }
+
+    // Bottom-panel height: capture the pointer on the 8px top-edge handle and
+    // drag — up grows the panel. Clamped between a readable minimum and 60%
+    // of the window so the terminal never disappears entirely.
+    private double _outputDragStartY, _outputDragStartH;
+
+    private void OnOutputResizePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(OutputResizeHandle).Properties.IsLeftButtonPressed) return;
+        _outputDragStartY = e.GetPosition(this).Y;
+        _outputDragStartH = Vm.OutputHeight;
+        e.Pointer.Capture(OutputResizeHandle);
+        e.Handled = true;
+    }
+
+    private void OnOutputResizeMoved(object? sender, PointerEventArgs e)
+    {
+        if (!Equals(e.Pointer.Captured, OutputResizeHandle)) return;
+        var delta = _outputDragStartY - e.GetPosition(this).Y;
+        Vm.OutputHeight = Math.Clamp(_outputDragStartH + delta, 90, Math.Max(140, Bounds.Height * 0.6));
+        e.Handled = true;
+    }
+
+    private void OnOutputResizeReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (Equals(e.Pointer.Captured, OutputResizeHandle)) e.Pointer.Capture(null);
     }
 
 
