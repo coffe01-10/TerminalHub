@@ -43,6 +43,38 @@ public partial class TerminalView : Control
     private bool _isScrolledUp;
     public bool IsScrolledUp => _isScrolledUp;
 
+    /// <summary>Lines scrolled up into scrollback — TwoWay-bound by the overlay
+    /// scrollbar thumb.</summary>
+    public static readonly DirectProperty<TerminalView, int> ScrollPositionProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ScrollPosition),
+            v => v.ScrollPosition, (v, value) => v.ScrollToOffset(value));
+    public int ScrollPosition => _viewOffset;
+
+    /// <summary>Scrollable backlog size — the scrollbar's Maximum.</summary>
+    public static readonly DirectProperty<TerminalView, int> ScrollbackSizeProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ScrollbackSize), v => v.ScrollbackSize);
+    private int _scrollbackSize;
+    public int ScrollbackSize => _scrollbackSize;
+
+    /// <summary>Visible rows — the scrollbar's ViewportSize.</summary>
+    public static readonly DirectProperty<TerminalView, int> ViewportRowsProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, int>(nameof(ViewportRows), v => v.ViewportRows);
+    private int _viewportRows;
+    public int ViewportRows => _viewportRows;
+
+    /// <summary>True while scrollback exists — shows the overlay scrollbar.</summary>
+    public static readonly DirectProperty<TerminalView, bool> HasScrollbackProperty =
+        AvaloniaProperty.RegisterDirect<TerminalView, bool>(nameof(HasScrollback), v => v.HasScrollback);
+    private bool _hasScrollback;
+    public bool HasScrollback => _hasScrollback;
+
+    /// <summary>Scrollbar drag → same clamp/notify path as wheel scrolling.</summary>
+    public void ScrollToOffset(int linesUp)
+    {
+        SetViewOffset(linesUp);
+        InvalidateVisual();
+    }
+
     private TerminalEmulator? _emulator;
     private int _dirty = 1;
     private long _lastBlink;
@@ -147,12 +179,21 @@ public partial class TerminalView : Control
             SynchronizeCoordinates();
         if (drift != 0 && buf is not null)
         {
-            _viewOffset = _viewOffset > 0
+            SetViewOffset(_viewOffset > 0
                 ? Math.Clamp(_viewOffset + drift, 0, buf.ScrollbackCount)
-                : 0;
-            SetScrolledUp(_viewOffset > 0);
+                : 0);
             dirty = true;
         }
+        // Keep the scrollbar's extent in sync with the live buffer.
+        var scrollback = buf?.ScrollbackCount ?? 0;
+        if (scrollback != _scrollbackSize)
+            SetAndRaise(ScrollbackSizeProperty, ref _scrollbackSize, scrollback);
+        var rows = buf?.Rows ?? 0;
+        if (rows != _viewportRows)
+            SetAndRaise(ViewportRowsProperty, ref _viewportRows, rows);
+        var hasScrollback = scrollback > 0 && buf?.OnAlternateScreen != true;
+        if (hasScrollback != _hasScrollback)
+            SetAndRaise(HasScrollbackProperty, ref _hasScrollback, hasScrollback);
         var blink = !IsPreview && IsFocused
             && Environment.TickCount64 - _lastBlink >= 530;
         if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
@@ -1322,19 +1363,27 @@ public partial class TerminalView : Control
         e.Handled = true;
     }
 
+    /// <summary>Single write path for the scroll offset — clamps to the live
+    /// scrollback, raises <see cref="ScrollPosition"/> for the scrollbar, and
+    /// keeps the scrolled-up flag consistent.</summary>
+    private void SetViewOffset(int value)
+    {
+        var max = _emulator?.Buffer.ScrollbackCount ?? 0;
+        SetAndRaise(ScrollPositionProperty, ref _viewOffset, Math.Clamp(value, 0, max));
+        SetScrolledUp(_viewOffset > 0);
+    }
+
     private void ScrollBy(int delta)
     {
         if (_emulator is null) return;
-        _viewOffset = Math.Clamp(_viewOffset + delta, 0, _emulator.Buffer.ScrollbackCount);
-        SetScrolledUp(_viewOffset > 0);
+        SetViewOffset(_viewOffset + delta);
         InvalidateVisual();
     }
 
     /// <summary>Back to the live bottom; also clears the scrolled-up flag.</summary>
     private void ResetScroll()
     {
-        _viewOffset = 0;
-        SetScrolledUp(false);
+        SetViewOffset(0);
     }
 
     /// <summary>Snap the viewport back to the live bottom (the "回到底部" affordance).</summary>
@@ -1712,8 +1761,7 @@ public partial class TerminalView : Control
         var firstVisible = buf.ScrollbackCount - _viewOffset;
         if (line >= firstVisible && line < firstVisible + buf.Rows) { InvalidateVisual(); return; }
         // visual row v shows abs (scrollback - offset + v); aim for v ≈ Rows/3
-        _viewOffset = Math.Clamp(buf.ScrollbackCount - line + buf.Rows / 3, 0, buf.ScrollbackCount);
-        SetScrolledUp(_viewOffset > 0);
+        SetViewOffset(buf.ScrollbackCount - line + buf.Rows / 3);
         InvalidateVisual();
     }
 

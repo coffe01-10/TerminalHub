@@ -408,6 +408,12 @@
                           Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                           IsVisible="{Binding #MainTerminal.IsScrolledUp}"
                           ToolTip.Tip="回到实时输出底部"/>
+                  <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                             HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                             Minimum="0" Maximum="{Binding #MainTerminal.ScrollbackSize}"
+                             ViewportSize="{Binding #MainTerminal.ViewportRows}"
+                             Value="{Binding #MainTerminal.ScrollPosition, Mode=TwoWay}"
+                             IsVisible="{Binding #MainTerminal.HasScrollback}"/>
                 </Panel>
                 <!-- split view: two independent sessions + draggable divider -->
                 <Grid IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*">
@@ -438,6 +444,12 @@
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #LeftTerminal.IsScrolledUp}"
                               ToolTip.Tip="回到实时输出底部"/>
+                      <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                 Minimum="0" Maximum="{Binding #LeftTerminal.ScrollbackSize}"
+                                 ViewportSize="{Binding #LeftTerminal.ViewportRows}"
+                                 Value="{Binding #LeftTerminal.ScrollPosition, Mode=TwoWay}"
+                                 IsVisible="{Binding #LeftTerminal.HasScrollback}"/>
                     </Panel>
                     </Grid>
                   </Border>
@@ -475,6 +487,12 @@
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #RightTerminal.IsScrolledUp}"
                               ToolTip.Tip="回到实时输出底部"/>
+                      <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                 Minimum="0" Maximum="{Binding #RightTerminal.ScrollbackSize}"
+                                 ViewportSize="{Binding #RightTerminal.ViewportRows}"
+                                 Value="{Binding #RightTerminal.ScrollPosition, Mode=TwoWay}"
+                                 IsVisible="{Binding #RightTerminal.HasScrollback}"/>
                     </Panel>
                     </Grid>
                   </Border>
