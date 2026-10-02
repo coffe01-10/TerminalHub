@@ -956,6 +956,13 @@ public partial class MainWindow : Window
         _filesDragStart = null;
         _filesDragEntry = null;
         var point = e.GetCurrentPoint(FilesList);
+        // Explorer convention: mouse back button navigates to the parent dir.
+        if (point.Properties.IsXButton1Pressed)
+        {
+            Vm.Files.UpCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
         if (e.Source is Control { DataContext: TerminalHub.Core.Files.FileEntry entry })
         {
             // Explorer convention: right-click selects the row before its menu.
