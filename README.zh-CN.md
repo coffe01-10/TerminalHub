@@ -18,6 +18,7 @@
 <p align="center">
   <a href="#quick-start">开始使用</a> &nbsp; · &nbsp;
   <a href="https://github.com/coffe01-10/TerminalHub/releases">下载发布包</a> &nbsp; · &nbsp;
+  <a href="#themes">主题风格</a> &nbsp; · &nbsp;
   <a href="#docs">深入了解</a>
 </p>
 
@@ -40,6 +41,25 @@ Claude Code、Codex CLI 和日常 Shell 可以各自运行。AI CLI 由你自行
 </p>
 
 <p align="center"><sub>工作方式的概念图，不依赖具体页面布局。</sub></p>
+
+<a id="themes"></a>
+
+## 选择你的主题
+
+深蓝玻璃、深黑、亮白与纸张，保留四种不同的配色与质感。
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/readme/theme-glass.svg"><img src="docs/readme/theme-glass.svg" width="580" alt="深蓝玻璃：高光与层次"></a><p align="center"><strong>深蓝玻璃</strong></p></td>
+    <td width="50%"><a href="docs/readme/theme-black.svg"><img src="docs/readme/theme-black.svg" width="580" alt="深黑：克制与专注"></a><p align="center"><strong>深黑</strong></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/readme/theme-white.svg"><img src="docs/readme/theme-white.svg" width="580" alt="亮白：轻盈与留白"></a><p align="center"><strong>亮白</strong></p></td>
+    <td width="50%"><a href="docs/readme/theme-paper.svg"><img src="docs/readme/theme-paper.svg" width="580" alt="纸张：暖色与叠页"></a><p align="center"><strong>纸张</strong></p></td>
+  </tr>
+</table>
+
+<p align="center"><sub>SVG 主题配色示意。</sub></p>
 
 <a id="quick-start"></a>
 

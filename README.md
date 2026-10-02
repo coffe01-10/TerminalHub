@@ -18,6 +18,7 @@
 <p align="center">
   <a href="#quick-start">Get started</a> &nbsp; · &nbsp;
   <a href="https://github.com/coffe01-10/TerminalHub/releases">Downloads</a> &nbsp; · &nbsp;
+  <a href="#themes">Themes</a> &nbsp; · &nbsp;
   <a href="#docs">Documentation</a>
 </p>
 
@@ -40,6 +41,25 @@ Claude Code, Codex CLI, and everyday shells run in their own sessions. Install a
 </p>
 
 <p align="center"><sub>A workflow illustration, independent of the application's page layout.</sub></p>
+
+<a id="themes"></a>
+
+## Find your theme
+
+Dark Glass, Black, White, and Paper: four distinct palettes and textures.
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/readme/theme-glass.svg"><img src="docs/readme/theme-glass.svg" width="580" alt="Dark Glass: depth and light"></a><p align="center"><strong>Dark Glass</strong></p></td>
+    <td width="50%"><a href="docs/readme/theme-black.svg"><img src="docs/readme/theme-black.svg" width="580" alt="Black: quiet focus"></a><p align="center"><strong>Black</strong></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/readme/theme-white.svg"><img src="docs/readme/theme-white.svg" width="580" alt="White: room to breathe"></a><p align="center"><strong>White</strong></p></td>
+    <td width="50%"><a href="docs/readme/theme-paper.svg"><img src="docs/readme/theme-paper.svg" width="580" alt="Paper: a warmer workspace"></a><p align="center"><strong>Paper</strong></p></td>
+  </tr>
+</table>
+
+<p align="center"><sub>SVG theme palette illustrations.</sub></p>
 
 <a id="quick-start"></a>
 
