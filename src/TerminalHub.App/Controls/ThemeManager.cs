@@ -34,13 +34,28 @@ public static class ThemeManager
             brush.Color = Color.Parse(colors[i]);
             app.Resources["Ui" + roles[i]] = brush;
         }
+        var layered = Current switch
+        {
+            "Paper" => new[] { "#F1E9DB", "#FFFCF5", "#FFFCF5" },
+            "White" => new[] { "#E4EBF5", "#FFFFFF", "#FFFFFF" },
+            "Black" => new[] { "#191C22", "#252932", "#292E38" },
+            _ => new[] { "#162437", "#22354C", "#243B55" }
+        };
+        var layerRoles = new[] { "Panel", "Card", "Floating" };
+        for (var i = 0; i < layerRoles.Length; i++)
+        {
+            if (!Brushes.TryGetValue(layerRoles[i], out var brush)) Brushes[layerRoles[i]] = brush = new SolidColorBrush();
+            brush.Color = Color.Parse(layered[i]);
+            app.Resources["Ui" + layerRoles[i]] = brush;
+        }
+        app.Resources["FloatingShadow"] = BoxShadows.Parse(IsLight ? "0 12 30 0 #40314766" : "0 12 30 0 #A0000000");
         // Fluent popup/hover templates use their own resource keys. Map those
         // keys too, otherwise a Paper menu reverts to a cold grey Windows panel.
         void Map(string role, params string[] keys)
         {
             foreach (var key in keys) app.Resources[key] = Brushes[role];
         }
-        Map("Surface", "MenuFlyoutPresenterBackground", "ComboBoxDropDownBackground");
+        Map("Floating", "MenuFlyoutPresenterBackground", "ComboBoxDropDownBackground");
         Map("Border", "MenuFlyoutPresenterBorderBrush", "ComboBoxDropDownBorderBrush");
         Map("Ink", "MenuFlyoutItemForeground", "MenuFlyoutItemForegroundPointerOver", "MenuFlyoutItemForegroundPressed",
             "ComboBoxItemForeground", "ComboBoxItemForegroundSelected", "ComboBoxItemForegroundSelectedPointerOver",

@@ -103,6 +103,23 @@ public partial class MainWindow
         }
     }
 
+    private async void OnDownloadUpdate(object? sender, RoutedEventArgs e)
+    {
+        if (Vm.SelectedUpdateAsset is not { } asset) { Vm.UpdateMessage = "先检查更新并选择下载版本。"; return; }
+        if (Vm.IsDownloadingUpdate) return;
+        try
+        {
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "保存 " + asset.Label,
+                SuggestedFileName = Path.GetFileName(asset.Name),
+                ShowOverwritePrompt = true
+            });
+            if (file?.TryGetLocalPath() is { } path) await Vm.DownloadUpdateAsync(path);
+        }
+        catch (Exception ex) { Vm.UpdateMessage = "无法选择下载位置：" + ex.Message; }
+    }
+
     private string DefaultOutputName(string kind)
     {
         var session = Vm.ActiveSession?.Name ?? "terminal";

@@ -146,7 +146,7 @@ public partial class MainWindowViewModel
         }
         if (IsSplit)
         {
-            if (!ReferenceEquals(FocusedPane == 0 ? LeftPane : RightPane, session))
+            if (!ReferenceEquals(GetPane(FocusedPane), session))
                 AssignToPane(FocusedPane, session);
             if (!ReferenceEquals(_sessions.Active, session))
                 _sessions.Activate(session);

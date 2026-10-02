@@ -1,11 +1,15 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:TerminalHub.App.Controls"
              x:Class="TerminalHub.App.App"
              RequestedThemeVariant="Dark">
   <Application.Styles>
     <FluentTheme />
     <Style Selector="Button">
-      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="ctl:DropletMotion.Enabled" Value="True"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="FontSize" Value="12"/>
     </Style>
     <Style Selector="Button:focus-visible /template/ ContentPresenter">
@@ -18,11 +22,18 @@
       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
     </Style>
     <Style Selector="MenuFlyoutPresenter">
-      <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+      <Setter Property="ctl:DropletExpansion.AnimatePopup" Value="True"/>
+      <Setter Property="Background" Value="{DynamicResource UiFloating}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
       <Setter Property="CornerRadius" Value="10"/>
       <Setter Property="Padding" Value="6"/>
     </Style>
+    <Style Selector="ToolTip">
+      <Setter Property="Background" Value="{DynamicResource UiFloating}"/>
+      <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
+    </Style>
+    <Style Selector="Button:disabled /template/ ContentPresenter"><Setter Property="Opacity" Value="0.45"/></Style>
     <Style Selector="MenuItem">
       <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
       <Setter Property="FontSize" Value="12"/>

@@ -237,7 +237,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnActiveCardChanged(SessionCardViewModel? value)
     {
         OnPropertyChanged(nameof(WindowTitle));
-        if (_rebuildingShelf || value is null) return;
+        if (_rebuildingShelf || _syncingActive || value is null) return;
         if (IsSplit && value.Model is { } picked)
         {
             AssignToPane(FocusedPane, picked);
@@ -256,25 +256,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Files.NotifySessionAvailability();
     }
 
-    /// <summary>Assign a session to a pane, keeping the two panes distinct.
-    /// One remaining session exits split instead of occupying both panes.</summary>
-    private void AssignToPane(int pane, TerminalSessionModel s)
+    private void AssignToPane(int pane, TerminalSessionModel session)
     {
-        if (!IsSplit) return;
-        if (pane == 0)
-        {
-            LeftPane = s;
-            if (ReferenceEquals(RightPane, s))
-                RightPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, s));
-        }
-        else
-        {
-            RightPane = s;
-            if (ReferenceEquals(LeftPane, s))
-                LeftPane = _sessions.Sessions.FirstOrDefault(o => !ReferenceEquals(o, s));
-        }
-        if (LeftPane is null || RightPane is null || ReferenceEquals(LeftPane, RightPane))
-            ExitSplit();
+        if (!IsSplit || pane < 0 || pane >= PaneCount) return;
+        var previous = GetPane(pane);
+        // Selecting a session already visible swaps panes, preserving all PTYs.
+        for (var i = 0; i < PaneCount; i++)
+            if (i != pane && ReferenceEquals(GetPane(i), session)) SetPane(i, previous);
+        SetPane(pane, session);
     }
 
     private readonly SparklineBuffer _statusCpu = new(40);
@@ -362,6 +351,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Dashboard = new DashboardViewModel(_monitor);
         Dashboard.BufferSource = () => ActiveSession?.Emulator.Buffer;
+        Dashboard.SearchSessionSource = () => Dashboard.SearchScope == 1
+            ? SessionCards.Select(c => c.Model).Concat(DetachedSessions).ToArray()
+            : ActiveSession is { } active ? new[] { active } : [];
         Dashboard.OutputLevelFilter = _settings.OutputLevelFilter;
         Dashboard.PropertyChanged += (_, e) =>
         {
@@ -500,23 +492,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (ws.IsSplit
-            && byIndex.TryGetValue(ws.LeftIndex, out var left)
-            && byIndex.TryGetValue(ws.RightIndex, out var right)
-            && !ReferenceEquals(left, right))
+        var indices = new[] { ws.LeftIndex, ws.RightIndex, ws.BottomLeftIndex, ws.BottomRightIndex };
+        var panes = indices.Select(i => byIndex.GetValueOrDefault(i)).Where(p => p is not null)
+            .Cast<TerminalSessionModel>().Distinct().ToList();
+        ExitSplit();
+        if (ws.IsSplit && panes.Count >= 2)
         {
-            LeftPane = left;
-            RightPane = right;
-            FocusedPane = ws.FocusedPane == 1 ? 1 : 0;
+            SplitLayout = ws.SplitLayout == SplitLayout.Quad && panes.Count < 4 ? SplitLayout.Horizontal : ws.SplitLayout;
+            for (var i = 0; i < PaneCount; i++) SetPane(i, panes[i]);
+            ColumnRatio = Math.Clamp(ws.ColumnRatio, .15, .85);
+            RowRatio = Math.Clamp(ws.RowRatio, .15, .85);
+            FocusedPane = Math.Clamp(ws.FocusedPane, 0, PaneCount - 1);
             IsSplit = true;
-            _sessions.Activate(FocusedPane == 1 ? right : left);
+            _sessions.Activate(GetPane(FocusedPane)!);
         }
-        else if (byIndex.TryGetValue(ws.ActiveIndex, out var active))
-        {
-            IsSplit = false;
-            LeftPane = RightPane = null;
-            _sessions.Activate(active);
-        }
+        else _sessions.Activate(byIndex.GetValueOrDefault(ws.ActiveIndex) ?? byIndex.Values.First());
     }
 
     private static SessionTag ParseTag(string tag) => tag switch
@@ -618,90 +608,122 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         await CreateSessionAsync(null, tag, "");
     }
 
-    /// <summary>Toolbar「◫ 分屏」: side-by-side panes, each with its own PTY/Emulator.
-    /// Left pane = the session that was active when split opened; right pane =
-    /// the next session (a new one is spawned if only one exists). Pane clicks
-    /// move focus (and thus ActiveSession/Output/Search) to that pane's session;
-    /// clicking a sidebar card assigns it to the focused pane.</summary>
     [ObservableProperty] private bool _isSplit;
     [ObservableProperty] private TerminalSessionModel? _leftPane;
     [ObservableProperty] private TerminalSessionModel? _rightPane;
-    /// <summary>0 = left pane focused, 1 = right.</summary>
+    [ObservableProperty] private TerminalSessionModel? _bottomLeftPane;
+    [ObservableProperty] private TerminalSessionModel? _bottomRightPane;
     [ObservableProperty] private int _focusedPane;
+    [ObservableProperty] private SplitLayout _splitLayout;
+    [ObservableProperty] private bool _paneMaximized;
+    [ObservableProperty] private double _columnRatio = .5;
+    [ObservableProperty] private double _rowRatio = .5;
+    private bool _changingLayout;
+    public int PaneCount => SplitLayout == SplitLayout.Quad ? 4 : 2;
     public string LeftPaneName => LeftPane?.Name ?? "未分配会话";
     public string RightPaneName => RightPane?.Name ?? "未分配会话";
-    partial void OnLeftPaneChanged(TerminalSessionModel? value)
+    public string BottomLeftPaneName => BottomLeftPane?.Name ?? "未分配会话";
+    public string BottomRightPaneName => BottomRightPane?.Name ?? "未分配会话";
+    public TerminalSessionModel? GetPane(int pane) => pane switch
+    { 0 => LeftPane, 1 => RightPane, 2 => BottomLeftPane, 3 => BottomRightPane, _ => null };
+    private void SetPane(int pane, TerminalSessionModel? session)
     {
-        OnPropertyChanged(nameof(LeftPaneName));
-        UpdateDisplayedCards();
+        switch (pane)
+        { case 0: LeftPane = session; break; case 1: RightPane = session; break;
+          case 2: BottomLeftPane = session; break; case 3: BottomRightPane = session; break; }
     }
-    partial void OnRightPaneChanged(TerminalSessionModel? value)
-    {
-        OnPropertyChanged(nameof(RightPaneName));
-        UpdateDisplayedCards();
-    }
+    partial void OnLeftPaneChanged(TerminalSessionModel? value) { OnPropertyChanged(nameof(LeftPaneName)); UpdateDisplayedCards(); }
+    partial void OnRightPaneChanged(TerminalSessionModel? value) { OnPropertyChanged(nameof(RightPaneName)); UpdateDisplayedCards(); }
+    partial void OnBottomLeftPaneChanged(TerminalSessionModel? value) { OnPropertyChanged(nameof(BottomLeftPaneName)); UpdateDisplayedCards(); }
+    partial void OnBottomRightPaneChanged(TerminalSessionModel? value) { OnPropertyChanged(nameof(BottomRightPaneName)); UpdateDisplayedCards(); }
     partial void OnIsSplitChanged(bool value) => UpdateDisplayedCards();
+    partial void OnPaneMaximizedChanged(bool value) => UpdateDisplayedCards();
+    partial void OnFocusedPaneChanged(int value) => UpdateDisplayedCards();
 
-    [RelayCommand]
-    private void ToggleSplit()
+    [RelayCommand] private void ToggleSplit()
     {
-        if (IsSplit) { ExitSplit(); return; }
-        _ = EnterSplitAsync();
+        if (IsSplit) ExitSplit();
+        else _ = SetSplitLayoutAsync("Horizontal");
     }
-
-    private async Task EnterSplitAsync()
+    [RelayCommand] public async Task SetSplitLayoutAsync(string layout)
     {
-        // Read _sessions.Active directly — the ActiveSession property lags one
-        // UI-thread post behind Activate() and would give us the stale session.
-        var left = _sessions.Active ?? _sessions.Sessions.FirstOrDefault();
-        var other = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, left));
-        if (left is null)
+        if (_changingLayout) return;
+        if (layout == "Single") { ExitSplit(); return; }
+        if (!Enum.TryParse<SplitLayout>(layout, out var requested)) return;
+        _changingLayout = true;
+        try
         {
-            await NewSession();
-            left = _sessions.Active ?? _sessions.Sessions.FirstOrDefault();
+            var focused = _sessions.Active;
+            var panes = (IsSplit ? Enumerable.Range(0, PaneCount).Select(GetPane) : new[] { _sessions.Active })
+                .Where(s => s is not null && _sessions.Sessions.Contains(s)).Cast<TerminalSessionModel>().Distinct().ToList();
+            var count = requested == SplitLayout.Quad ? 4 : 2;
+            foreach (var session in _sessions.Sessions)
+                if (!panes.Contains(session)) panes.Add(session);
+            while (panes.Count < count)
+            {
+                var created = await CreateSessionAsync(null, SessionTag.Dev, ActiveWorkingDirectory);
+                if (created is null) return;
+                panes.Add(created);
+            }
+            panes = panes.Where(s => _sessions.Sessions.Contains(s)).ToList();
+            if (panes.Count < count) return;
+            var focusedIndex = panes.IndexOf(focused!);
+            if (focusedIndex >= count) (panes[count - 1], panes[focusedIndex]) = (panes[focusedIndex], panes[count - 1]);
+            // Finish the assignment before showing the new arrangement.
+            SplitLayout = requested;
+            for (var i = 0; i < 4; i++) SetPane(i, i < count ? panes[i] : null);
+            PaneMaximized = false;
+            FocusedPane = Math.Clamp(panes.IndexOf(focused!), 0, count - 1);
+            IsSplit = true;
+            _sessions.Activate(GetPane(FocusedPane)!);
         }
-        if (other is null && left is not null)
-        {
-            Dashboard.AppendOutput("info", "分屏: 只有一个会话,为右栏新建一个…", "split");
-            await NewSession();                       // activates the new session
-            // Re-pick from the list instead of trusting _sessions.Active: during
-            // the await the user can activate/close sessions, so Active may still
-            // be `left` (→ both panes one session) or a dead session.
-            other = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, left));
-            if (_sessions.Sessions.Contains(left)) _sessions.Activate(left); // keep focus on the left pane
-        }
-        // Both panes must be live, distinct sessions — captured values can be
-        // closed mid-await, and a null left would leave a dead pane behind.
-        if (left is null || other is null
-            || !_sessions.Sessions.Contains(left) || !_sessions.Sessions.Contains(other))
-        {
-            Dashboard.AppendOutput("warn", "分屏: 无法创建第二个会话", "split");
-            return;
-        }
-        LeftPane = left;
-        RightPane = other;
-        FocusedPane = 0;
-        IsSplit = true;
-        Dashboard.AppendOutput("info",
-            $"分屏: 左 {left.Name} ｜ 右 {other.Name} · 点击窗格聚焦,点会话卡分配到该窗格", "split");
+        finally { _changingLayout = false; }
     }
-
+    [RelayCommand] private void TogglePaneMaximized()
+    { if (IsSplit) PaneMaximized = !PaneMaximized; }
     private void ExitSplit()
     {
         IsSplit = false;
-        LeftPane = RightPane = null;
+        PaneMaximized = false;
+        LeftPane = RightPane = BottomLeftPane = BottomRightPane = null;
         FocusedPane = 0;
-        Dashboard.AppendOutput("info", "分屏: 已退出,回到单视图", "split");
     }
-
-    /// <summary>Pane pointer-press → that pane's session becomes active (its
-    /// output feeds Output/Logs/Search; the middle input targets it too).</summary>
     public void FocusPane(int pane)
     {
+        if (!IsSplit || pane < 0 || pane >= PaneCount) return;
         FocusedPane = pane;
-        var s = pane == 0 ? LeftPane : RightPane;
-        if (s is not null && !ReferenceEquals(s, _sessions.Active))
-            _sessions.Activate(s);
+        if (GetPane(pane) is { } session && !ReferenceEquals(session, _sessions.Active)) _sessions.Activate(session);
+    }
+    public void ActivateSearchSession(TerminalSessionModel session)
+    {
+        if (IsSplit)
+        {
+            var visible = Enumerable.Range(0, PaneCount).FirstOrDefault(i => ReferenceEquals(GetPane(i), session), -1);
+            if (visible >= 0) FocusPane(visible);
+            else AssignToPane(FocusedPane, session);
+        }
+        if (!ReferenceEquals(_sessions.Active, session)) _sessions.Activate(session);
+    }
+    private void ReplaceRemovedPane(TerminalSessionModel removed)
+    {
+        for (var i = 0; i < PaneCount; i++)
+        {
+            if (!ReferenceEquals(GetPane(i), removed)) continue;
+            var replacement = _sessions.Sessions.FirstOrDefault(s => !ReferenceEquals(s, removed)
+                && !Enumerable.Range(0, PaneCount).Any(j => ReferenceEquals(GetPane(j), s)));
+            SetPane(i, replacement);
+        }
+        var remaining = Enumerable.Range(0, PaneCount).Select(GetPane).Where(s => s is not null).Distinct().ToList();
+        if (remaining.Count < 2) { ExitSplit(); return; }
+        if (remaining.Count < PaneCount)
+        {
+            var focused = GetPane(FocusedPane);
+            SplitLayout = SplitLayout.Horizontal;
+            LeftPane = remaining[0]; RightPane = remaining[1];
+            BottomLeftPane = BottomRightPane = null;
+            FocusedPane = ReferenceEquals(focused, RightPane) ? 1 : 0;
+        }
+        _sessions.Activate(GetPane(FocusedPane)!);
     }
 
     [RelayCommand]
@@ -980,6 +1002,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.RefreshSessions();
         OnPropertyChanged(nameof(LeftPaneName));
         OnPropertyChanged(nameof(RightPaneName));
+        OnPropertyChanged(nameof(BottomLeftPaneName));
+        OnPropertyChanged(nameof(BottomRightPaneName));
         OnPropertyChanged(nameof(WindowTitle));
     }
 
@@ -1795,6 +1819,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ws.LeftIndex = IndexOf(LeftPane);
         ws.RightIndex = IndexOf(RightPane);
         ws.FocusedPane = FocusedPane;
+        ws.SplitLayout = SplitLayout;
+        ws.BottomLeftIndex = IndexOf(BottomLeftPane);
+        ws.BottomRightIndex = IndexOf(BottomRightPane);
+        ws.ColumnRatio = ColumnRatio;
+        ws.RowRatio = RowRatio;
         return ws;
         int IndexOf(TerminalSessionModel? m) => m is null ? -1 : ordered.IndexOf(m);
     }
@@ -2048,17 +2077,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            if (IsSplit)
-            {
-                if (ReferenceEquals(RightPane, s))
-                    RightPane = PaneFallbackFor(s, LeftPane);
-                if (ReferenceEquals(LeftPane, s))
-                    LeftPane = PaneFallbackFor(s, RightPane);
-                // A null side used to stay split; the later active-card sync then
-                // assigned the only remaining session to both panes.
-                if (LeftPane is null || RightPane is null || ReferenceEquals(LeftPane, RightPane))
-                    ExitSplit();
-            }
+            if (IsSplit) ReplaceRemovedPane(s);
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
             if (vm is not null) SessionCards.Remove(vm);
             if (!detached)
@@ -2074,42 +2093,32 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         });
     }
 
-    /// <summary>Pane fallback after a session closes: prefer the removed card's
-    /// shelf neighbor; never hand both panes the same session.</summary>
-    private TerminalSessionModel? PaneFallbackFor(TerminalSessionModel removed, TerminalSessionModel? otherPane)
-    {
-        var card = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, removed));
-        var idx = card is null ? -1 : SessionCards.IndexOf(card);
-        for (var i = idx + 1; i < SessionCards.Count; i++)
-            if (!ReferenceEquals(SessionCards[i].Model, otherPane))
-                return SessionCards[i].Model;
-        for (var i = idx - 1; i >= 0; i--)
-            if (!ReferenceEquals(SessionCards[i].Model, otherPane))
-                return SessionCards[i].Model;
-        return _sessions.Sessions.FirstOrDefault(o =>
-            !ReferenceEquals(o, removed) && !ReferenceEquals(o, otherPane));
-    }
-
+    private bool _syncingActive;
     private void SyncActive()
     {
-        ActiveSession = _sessions.Active;
-        var target = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, ActiveSession));
-        var activeIndex = target is null ? 0 : SessionCards.IndexOf(target);
-        for (var i = 0; i < SessionCards.Count; i++)
+        _syncingActive = true;
+        try
         {
-            SessionCards[i].IsActive = ReferenceEquals(SessionCards[i], target);
-            SessionCards[i].StageDistance = i - activeIndex;
+            ActiveSession = _sessions.Active;
+            var target = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, ActiveSession));
+            var activeIndex = target is null ? 0 : SessionCards.IndexOf(target);
+            for (var i = 0; i < SessionCards.Count; i++)
+            {
+                SessionCards[i].IsActive = ReferenceEquals(SessionCards[i], target);
+                SessionCards[i].StageDistance = i - activeIndex;
+            }
+            if (!ReferenceEquals(ActiveCard, target))
+                ActiveCard = target;
+            BindCommandSession(ActiveSession);
+            UpdateDisplayedCards();
+            Dashboard.RefreshSearch();
+            UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
+            if (InspectorVisible && SelectedRightTab == 1
+                && ActiveSession?.Tag != SessionTag.Ssh)
+                Files.NavigateTo(ActiveWorkingDirectory);
+            UpdateCwdNavFlags();
         }
-        if (!ReferenceEquals(ActiveCard, target))
-            ActiveCard = target;
-        BindCommandSession(ActiveSession);
-        UpdateDisplayedCards();
-        Dashboard.RefreshSearch();
-        UpdateBreadcrumbFrom(ActiveSession?.WorkingDirectory);
-        if (InspectorVisible && SelectedRightTab == 1
-            && ActiveSession?.Tag != SessionTag.Ssh)
-            Files.NavigateTo(ActiveWorkingDirectory);
-        UpdateCwdNavFlags();
+        finally { _syncingActive = false; }
     }
 
     private void RefreshCounts()
@@ -2126,7 +2135,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         foreach (var card in SessionCards)
             card.SetDisplayed(IsSplit
-                ? ReferenceEquals(card.Model, LeftPane) || ReferenceEquals(card.Model, RightPane)
+                ? PaneMaximized ? ReferenceEquals(card.Model, GetPane(FocusedPane))
+                    : Enumerable.Range(0, PaneCount).Any(i => ReferenceEquals(card.Model, GetPane(i)))
                 : ReferenceEquals(card.Model, ActiveSession));
     }
 
@@ -2183,6 +2193,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _disposed = true;   // popout Closed handlers must not reattach anymore
+        _updateDownloadCancellation?.Cancel();
         StopTemplatePreview();
         BindCommandSession(null);
         StopPublishElapsedTimer();
@@ -2202,6 +2213,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _cancelPendingStart = false;
         }
         PersistSettings();
+        Dashboard.ClearSearchResults();
         Logs.Dispose();
         Files.Dispose();
         _sessionLog.Dispose();

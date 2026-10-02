@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
+using Avalonia.Media;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -36,6 +38,15 @@ public class ThemeWorkspaceTests
         Assert.Equal(5, fixture.Window.GetVisualDescendants().OfType<StagePreview>().Count());
         Assert.Equal(ThemeManager.Names[theme], vm.Settings.Theme);
         Assert.Equal(ThemeManager.IsLight, theme is 2 or 3);
+        // Header tabs previously kept Fluent's blue selection in Paper and Black.
+        foreach (var name in new[] { "OutputTabs", "InspectorTabs" })
+        {
+            var tabs = fixture.Window.FindControl<ListBox>(name)!;
+            var selected = tabs.GetVisualDescendants().OfType<ListBoxItem>().First(i => i.IsSelected);
+            var surface = selected.GetVisualDescendants().OfType<ContentPresenter>().First();
+            Assert.Equal(((ISolidColorBrush)ThemeManager.Brush("AccentSoft")).Color,
+                ((ISolidColorBrush)surface.Background!).Color);
+        }
         // The session menu used to keep Fluent's grey background in Paper.
         var menuButton = fixture.Window.FindControl<Button>("SessionMenuButton")!;
         var menu = (MenuFlyout)menuButton.Flyout!;
@@ -43,7 +54,7 @@ public class ThemeWorkspaceTests
         await Task.Delay(80);
         var presenter = ((MenuItem)menu.Items[0]!).FindAncestorOfType<MenuFlyoutPresenter>()!;
         Assert.NotNull(presenter);
-        Assert.Same(ThemeManager.Brush("Surface"), presenter.Background);
+        Assert.Same(ThemeManager.Brush("Floating"), presenter.Background);
         menu.Hide();
         var output = Environment.GetEnvironmentVariable("TERMINALHUB_STAGE_CAPTURES");
         if (output is not null)

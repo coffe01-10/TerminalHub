@@ -3,10 +3,30 @@ using System.Collections.ObjectModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using TerminalHub.Core.Monitoring;
+using TerminalHub.Core.Terminal;
+using TerminalHub.Core.Sessions;
 
 namespace TerminalHub.App.ViewModels;
 
-/// <summary>Bottom-panel log entry (Output tab). Source is the session name, "deploy" for publish output, or "" for app events.</summary>
+/// <summary>A search snapshot with its source session and a reflow-aware buffer anchor.</summary>
+public sealed record SessionSearchResult(TerminalSessionModel? Session, ScreenBuffer Buffer, ScreenBuffer.SearchHit Hit, BufferAnchor Anchor, string Query)
+{
+    public string SessionName => Session?.Name ?? "当前会话";
+    public int Line => Hit.Line + 1;
+    public string Text => Hit.Text;
+    public bool CanLocate()
+    {
+        lock (Buffer.SyncRoot)
+        {
+            if (Buffer.ResolveAnchor(Anchor) is not { } line) return false;
+            // A live screen row may be repainted even without trimming history.
+            var end = Math.Min(Buffer.TotalLines - 1, line + Query.Length * 2 / Buffer.Columns + 1);
+            return Buffer.ExtractText(line, Anchor.Column, end, int.MaxValue).StartsWith(Query, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}
+
+/// <summary>Bottom-panel log entry. Source is a session name, "deploy", or empty for app events.</summary>
 public sealed record LogEntry(DateTime Time, string Level, string Message, string Source = "");
 
 /// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
@@ -29,8 +49,8 @@ public partial class DashboardViewModel : ViewModelBase
     public ObservableCollection<LogEntry> Problems { get; } = [];
     /// <summary>Raw (pre-ANSI-strip, escaped) session lines for the Debug tab.</summary>
     public ObservableCollection<LogEntry> DebugLog { get; } = [];
-    /// <summary>Search hits over the active session's scrollback+screen.</summary>
-    public ObservableCollection<TerminalHub.Core.Terminal.ScreenBuffer.SearchHit> SearchHits { get; } = [];
+    /// <summary>Search hits over the selected session scope, including retained history.</summary>
+    public ObservableCollection<SessionSearchResult> SearchHits { get; } = [];
 
     /// <summary>Process table sort keys (column headers cycle asc/desc).</summary>
     public enum ProcSort { Pid, Name, Cpu, Mem }
@@ -52,6 +72,18 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Supplies the buffer to search (active session); set by the shell VM.</summary>
     public Func<TerminalHub.Core.Terminal.ScreenBuffer?>? BufferSource { get; set; }
 
+    public Func<IEnumerable<TerminalSessionModel>>? SearchSessionSource { get; set; }
+    [ObservableProperty] private int _searchScope;
+    public bool SearchNavigationInProgress { get; set; }
+    partial void OnSearchScopeChanged(int value) => RefreshSearch();
+
+    public void ClearSearchResults()
+    {
+        foreach (var hit in SearchHits)
+            lock (hit.Buffer.SyncRoot) hit.Buffer.Anchors.Remove(hit.Anchor);
+        SearchHits.Clear();
+    }
+
     partial void OnSearchQueryChanged(string value) => RefreshSearch();
     partial void OnSelectedBottomTabChanged(int value)
     {
@@ -60,23 +92,25 @@ public partial class DashboardViewModel : ViewModelBase
 
     public void RefreshSearch()
     {
-        SearchHits.Clear();
-        var buf = BufferSource?.Invoke();
-        var q = SearchQuery;
-        if (buf is null)
+        if (SearchNavigationInProgress) return;
+        ClearSearchResults();
+        var q = SearchQuery.Trim();
+        if (q.Length == 0) { SearchStatus = ""; return; }
+        var sources = SearchSessionSource?.Invoke().Select(s => (Session: (TerminalSessionModel?)s, Buffer: s.Emulator.Buffer))
+            ?? (BufferSource?.Invoke() is { } buffer ? new[] { (Session: (TerminalSessionModel?)null, Buffer: buffer) } : []);
+        foreach (var source in sources)
         {
-            SearchStatus = "无活动会话";
-            return;
+            var buf = source.Buffer;
+            lock (buf.SyncRoot)
+                foreach (var hit in buf.SearchLines(q, 200))
+                {
+                    var flattened = ScreenBuffer.FlattenRow(buf.GetLine(hit.Line));
+                    var offset = flattened.Text.IndexOf(q, StringComparison.OrdinalIgnoreCase);
+                    var column = offset >= 0 ? flattened.Cols[offset] : 0;
+                    SearchHits.Add(new(source.Session, buf, hit, buf.CreateAnchor(hit.Line, column), q));
+                }
         }
-        if (string.IsNullOrWhiteSpace(q))
-        {
-            SearchStatus = "";
-            return;
-        }
-        List<TerminalHub.Core.Terminal.ScreenBuffer.SearchHit> hits;
-        lock (buf.SyncRoot) hits = buf.SearchLines(q.Trim());
-        foreach (var h in hits) SearchHits.Add(h);
-        SearchStatus = SearchHits.Count == 0 ? "无匹配" : $"{SearchHits.Count} 处匹配";
+        SearchStatus = SearchHits.Count == 0 ? "无匹配" : $"{SearchHits.Count} 行匹配（每会话最多 200 行）";
     }
 
     public bool HasProblems => ProblemCount > 0;

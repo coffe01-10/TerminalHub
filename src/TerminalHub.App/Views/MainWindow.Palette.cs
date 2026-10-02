@@ -46,6 +46,9 @@ public partial class MainWindow
             () => { OpenBookmarks(); return Task.CompletedTask; });
         Add("新建终端", "打开新的 Shell", "Ctrl+Shift+N", () => Vm.NewSessionCommand.ExecuteAsync(null));
         Add("切换分屏", "并排查看终端", "", () => { Vm.ToggleSplitCommand.Execute(null); return Task.CompletedTask; });
+        Add("上下分屏", "上下查看两个终端", "", () => Vm.SetSplitLayoutAsync("Vertical"));
+        Add("四窗格", "同时查看四个终端", "", () => Vm.SetSplitLayoutAsync("Quad"));
+        Add("最大化 / 恢复当前窗格", "暂时聚焦一个终端", "", () => { Vm.TogglePaneMaximizedCommand.Execute(null); return Task.CompletedTask; });
         Add("重命名当前终端", "修改终端名称", "F2", async () =>
         { if (Vm.ActiveCard is { } card) await RenameSessionAsync(card); });
         Add("打开设置", "主题、字体、快捷键", "", () => { Vm.SettingsOpen = true; return Task.CompletedTask; });

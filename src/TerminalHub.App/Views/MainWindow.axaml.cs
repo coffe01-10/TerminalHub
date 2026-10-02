@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private int _selectionGeneration;
     private readonly DispatcherTimer _dockHideTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private bool _stageReady;
+    private Control? _lastPanelTrigger;
     private MainWindowViewModel Vm => (MainWindowViewModel)DataContext!;
 
     /// <summary>Inner ScrollViewer of the Logs list; drives the follow-tail state machine.</summary>
@@ -42,6 +43,11 @@ public partial class MainWindow : Window
             DockHint.Opacity = Math.Clamp(1 - ActionDock.Reveal * 4, 0, 1);
             DockHint.IsHitTestVisible = ActionDock.Reveal < .65;
         };
+        AddHandler(InputElement.PointerPressedEvent, (_, e) =>
+        {
+            if (e.Source is Visual source)
+                _lastPanelTrigger = source.GetSelfAndVisualAncestors().OfType<Button>().FirstOrDefault();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
         DataContext = new MainWindowViewModel(settingsStore: settingsStore, openFolder: openFolder, shellAvailable: shellAvailable);
         if (OperatingSystem.IsWindows()) ApplyWindowsChrome();
         Vm.PaletteRequested += OpenPalette;
@@ -76,10 +82,23 @@ public partial class MainWindow : Window
             RoutingStrategies.Tunnel);
         // TerminalView marks its PointerPressed handled (drag selection), so pane
         // focus taps need handledEventsToo to still reach these pane wrappers.
-        LeftPaneBox.AddHandler(InputElement.PointerPressedEvent,
-            (_, _) => Vm.FocusPane(0), RoutingStrategies.Bubble, handledEventsToo: true);
-        RightPaneBox.AddHandler(InputElement.PointerPressedEvent,
-            (_, _) => Vm.FocusPane(1), RoutingStrategies.Bubble, handledEventsToo: true);
+        var boxes = new[] { LeftPaneBox, RightPaneBox, BottomLeftPaneBox, BottomRightPaneBox };
+        for (var i = 0; i < boxes.Length; i++)
+        {
+            var pane = i;
+            new[] { LeftTerminal, RightTerminal, BottomLeftTerminal, BottomRightTerminal }[i].GotFocus += (_, _) => Vm.FocusPane(pane);
+            boxes[i].AddHandler(InputElement.PointerPressedEvent,
+                (_, _) => Vm.FocusPane(pane), RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+        SplitGrid.AddHandler(InputElement.PointerReleasedEvent, (_, _) => SavePaneRatios(),
+            RoutingStrategies.Bubble, handledEventsToo: true);
+        Vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MainWindowViewModel.IsSplit) or nameof(MainWindowViewModel.SplitLayout)
+                or nameof(MainWindowViewModel.PaneMaximized) or nameof(MainWindowViewModel.FocusedPane)
+                or nameof(MainWindowViewModel.ColumnRatio) or nameof(MainWindowViewModel.RowRatio)) UpdateSplitLayout();
+        };
+        UpdateSplitLayout();
         // Shelf drag reorder — threshold-gated so plain clicks still just select.
         SessionShelf.AddHandler(InputElement.PointerPressedEvent, OnShelfPointerPressed,
             RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -283,6 +302,8 @@ public partial class MainWindow : Window
 
     private void OnStageSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainWindowViewModel.SettingsOpen) && Vm.SettingsOpen)
+            DropletExpansion.SetOrigin(SettingsPanel, _lastPanelTrigger);
         if (e.PropertyName == nameof(MainWindowViewModel.InspectorVisible)) UpdateStageLayout();
         if (e.PropertyName == nameof(MainWindowViewModel.DockVisibilityMode)) UpdateDockMode();
         if (e.PropertyName == nameof(MainWindowViewModel.IsSplit) && Vm.IsSplit)
@@ -314,7 +335,7 @@ public partial class MainWindow : Window
                 StageWindow.ActivateFrom(new Rect(left - StageWindow.Bounds.X, top - StageWindow.Bounds.Y,
                     corners.Max(p => p.X) - left, corners.Max(p => p.Y) - top));
             }
-            if (IsActive && !Vm.IsSplit && Vm.ActiveSession is not null) MainTerminal.Focus();
+            if (IsActive && Vm.ActiveSession is not null) ActiveTerminal()?.Focus();
         });
     }
 
@@ -545,7 +566,8 @@ public partial class MainWindow : Window
     /// <summary>The terminal showing the session Search/Output follows — the
     /// focused split pane, or the single main view outside split mode.</summary>
     private TerminalView? ActiveTerminal()
-        => Vm.IsSplit ? (Vm.FocusedPane == 0 ? LeftTerminal : RightTerminal) : MainTerminal;
+        => Vm.IsSplit ? Vm.FocusedPane switch
+        { 0 => LeftTerminal, 1 => RightTerminal, 2 => BottomLeftTerminal, _ => BottomRightTerminal } : MainTerminal;
 
     private void OnScrollToBottomClick(object? sender, RoutedEventArgs e)
     {
@@ -553,26 +575,62 @@ public partial class MainWindow : Window
             panel.Children.OfType<TerminalView>().FirstOrDefault()?.ScrollToBottom();
     }
 
-    private void OnSearchPrevMatch(object? sender, RoutedEventArgs e) => ActiveTerminal()?.GoToMatch(-1);
-    private void OnSearchNextMatch(object? sender, RoutedEventArgs e) => ActiveTerminal()?.GoToMatch(+1);
-
-    /// <summary>Enter in the find box jumps to the next hit; Shift+Enter goes back.</summary>
+    private void OnSearchPrevMatch(object? sender, RoutedEventArgs e) => StepSearch(-1);
+    private void OnSearchNextMatch(object? sender, RoutedEventArgs e) => StepSearch(1);
+    private void StepSearch(int direction)
+    {
+        var count = SearchResults.ItemCount;
+        if (count == 0) { Vm.Dashboard.RefreshSearch(); count = SearchResults.ItemCount; }
+        if (count == 0) return;
+        var index = SearchResults.SelectedIndex;
+        SearchResults.SelectedIndex = index < 0 ? direction > 0 ? 0 : count - 1 : (index + direction + count) % count;
+        SearchResults.ScrollIntoView(SearchResults.SelectedItem!);
+        if (SearchResults.SelectedItem is SessionSearchResult result) _ = LocateSearchResultAsync(result);
+    }
     private void OnSearchBoxKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
-        ActiveTerminal()?.GoToMatch(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : +1);
+        StepSearch(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1);
         e.Handled = true;
     }
-
-    /// <summary>Double-click a search result row → scroll the terminal to that
-    /// absolute buffer line (keeps the scrolled-up state, no snap to bottom).</summary>
     private void OnSearchHitDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (e.Source is Control c && c.DataContext is ScreenBuffer.SearchHit hit)
+        if (e.Source is Control c && c.DataContext is SessionSearchResult result) _ = LocateSearchResultAsync(result);
+    }
+    public async Task<bool> LocateSearchResultAsync(SessionSearchResult result)
+    {
+        if (Vm.Dashboard.SearchNavigationInProgress) return false;
+        var buffer = result.Buffer;
+        if (!result.CanLocate())
+        { Vm.Dashboard.SearchStatus = "原输出已被裁剪、覆盖或屏幕已切换，请重新搜索。"; return false; }
+        Vm.Dashboard.SearchNavigationInProgress = true;
+        try
         {
-            ActiveTerminal()?.RevealSearchHit(hit);
-            Vm.Dashboard.RefreshSearch();
+            if (result.Session is { } session)
+            {
+                if (Vm.DetachedSessions.Contains(session))
+                {
+                    Vm.Popouts.FirstOrDefault(w => ((SessionWindowViewModel?)w.DataContext)?.Model == session)?.Close();
+                    var reattached = new TaskCompletionSource();
+                    Dispatcher.UIThread.Post(() => reattached.SetResult());
+                    await reattached.Task;
+                }
+                if (!Vm.SessionCards.Any(c => ReferenceEquals(c.Model, session)))
+                { Vm.Dashboard.SearchStatus = "原会话已关闭，请重新搜索。"; return false; }
+                Vm.ActivateSearchSession(session);
+            }
+            var located = new TaskCompletionSource<bool>();
+            Dispatcher.UIThread.Post(() =>
+            {
+                UpdateLayout();
+                var view = ActiveTerminal();
+                var revealed = ReferenceEquals(view?.Emulator?.Buffer, buffer) && result.CanLocate() && view.TryRevealAnchor(result.Anchor);
+                Vm.Dashboard.SearchStatus = revealed ? $"已定位到 {result.SessionName}" : "原输出已被裁剪、覆盖或屏幕已切换，请重新搜索。";
+                located.SetResult(revealed);
+            });
+            return await located.Task;
         }
+        finally { Vm.Dashboard.SearchNavigationInProgress = false; }
     }
 
     // Preview slot changes during the drag; commit collection order on release.
@@ -897,6 +955,7 @@ public partial class MainWindow : Window
     /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
+        _lastPanelTrigger = null;
         if (PalettePanel.IsVisible) { HandlePaletteKey(e); return; }
         if (BookmarkPanel.IsVisible) { HandleBookmarkKey(e); return; }
         if (e.Source is ShortcutEditor) return;

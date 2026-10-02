@@ -38,6 +38,8 @@ public sealed record WorkspaceSession
 
 /// <summary>Saved workspace layout: session order + active session + split panes.
 /// Indices point into <see cref="Sessions"/>; -1 = none.</summary>
+public enum SplitLayout { Horizontal, Vertical, Quad }
+
 public sealed class WorkspaceState
 {
     public List<WorkspaceSession> Sessions { get; set; } = [];
@@ -46,6 +48,11 @@ public sealed class WorkspaceState
     public int LeftIndex { get; set; } = -1;
     public int RightIndex { get; set; } = -1;
     public int FocusedPane { get; set; }
+    public SplitLayout SplitLayout { get; set; }
+    public int BottomLeftIndex { get; set; } = -1;
+    public int BottomRightIndex { get; set; } = -1;
+    public double ColumnRatio { get; set; } = .5;
+    public double RowRatio { get; set; } = .5;
 }
 
 /// <summary>Logs panel: one named session's remembered filter combo (per-session filter memory).</summary>

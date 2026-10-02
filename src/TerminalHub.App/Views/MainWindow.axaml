@@ -66,7 +66,7 @@
       <Setter Property="Opacity" Value="0.4"/>
     </Style>
     <Style Selector="Button.terminal-tool.selected">
-      <Setter Property="Background" Value="{DynamicResource UiRaised}"/>
+      <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
       <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
     </Style>
     <Style Selector="Button.terminal-tool PathIcon">
@@ -201,7 +201,7 @@
                                ToolTip.Tip="{Binding WorkingDirectory}" DoubleTapped="OnRenameCard">
                   <ctl:StageCard.Styles>
                     <Style Selector="ctl|StageCard > Border">
-                      <Setter Property="Background" Value="{DynamicResource UiSurface}"/>
+                      <Setter Property="Background" Value="{DynamicResource UiCard}"/>
                       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
                       <Setter Property="BorderThickness" Value="1"/>
                       <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}"/>
@@ -330,8 +330,17 @@
               </Button>
               <Button x:Name="ChromeSplit" Grid.Column="6" Classes="terminal-tool" Classes.selected="{Binding IsSplit}"
                       Command="{Binding ToggleSplitCommand}"
-                      ToolTip.Tip="并排显示两个会话;点击窗格聚焦,点会话卡分配到该窗格。再点退出。" AutomationProperties.Name="分屏">
+                      ToolTip.Tip="点击切换左右分屏；右键选择上下、四窗格及最大化。点击窗格聚焦，点击会话卡分配。" AutomationProperties.Name="分屏">
                 <PathIcon Data="{StaticResource ToolSplit}"/>
+                <Button.ContextFlyout>
+                  <MenuFlyout>
+                    <MenuItem Header="左右分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Horizontal"/>
+                    <MenuItem Header="上下分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Vertical"/>
+                    <MenuItem Header="四窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Quad"/>
+                    <MenuItem Header="最大化 / 恢复当前窗格" Command="{Binding TogglePaneMaximizedCommand}" IsEnabled="{Binding IsSplit}"/>
+                    <MenuItem Header="回到单窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Single"/>
+                  </MenuFlyout>
+                </Button.ContextFlyout>
               </Button>
               <Button x:Name="ChromePopout" Grid.Column="7" Classes="terminal-tool"
                       Command="{Binding OpenInNewWindowCommand}"
@@ -345,6 +354,12 @@
                 <PathIcon Data="{StaticResource ToolMore}"/>
                 <Button.Flyout>
                   <MenuFlyout Opening="OnSessionMenuOpening">
+                  <MenuItem Header="左右分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Horizontal"/>
+                  <MenuItem Header="上下分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Vertical"/>
+                  <MenuItem Header="四窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Quad"/>
+                  <MenuItem Header="最大化 / 恢复当前窗格" Command="{Binding TogglePaneMaximizedCommand}" IsEnabled="{Binding IsSplit}"/>
+                  <MenuItem Header="回到单窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Single"/>
+                    <Separator/>
                     <MenuItem Header="重命名会话       F2" Click="OnRenameActive"/>
                     <MenuItem x:Name="PinSessionItem" Header="置顶" Command="{Binding TogglePinActiveCommand}"/>
                     <MenuItem Header="移出分组" Command="{Binding RemoveActiveFromGroupCommand}"/>
@@ -417,11 +432,11 @@
                              Visibility="{Binding #MainTerminal.OverlayScrollBarVisibility}"/>
                 </Panel>
                 <!-- split view: two independent sessions + draggable divider -->
-                <Grid IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*">
+                <Grid x:Name="SplitGrid" IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*" RowDefinitions="*,5,*">
                   <Border x:Name="LeftPaneBox" BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
                           Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
                     <Border.Styles>
-                      <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
+                      <Style Selector="Border"><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
                       <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
                     </Border.Styles>
                     <Grid RowDefinitions="32,*">
@@ -454,12 +469,12 @@
                     </Panel>
                     </Grid>
                   </Border>
-                  <GridSplitter Grid.Column="1" Width="5" Background="{DynamicResource UiRaised}"
-                                ResizeBehavior="BasedOnAlignment"/>
+                  <GridSplitter x:Name="ColumnDivider" Grid.Column="1" Grid.RowSpan="3" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{DynamicResource UiBorder}" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"/>
+                  <GridSplitter x:Name="RowDivider" Grid.Row="1" Grid.ColumnSpan="3" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{DynamicResource UiBorder}" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"/>
                   <Border x:Name="RightPaneBox" Grid.Column="2" BorderThickness="1.5" CornerRadius="6" Margin="3,0,0,0"
                           Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}">
                     <Border.Styles>
-                      <Style Selector="Border"><Setter Property="BorderBrush" Value="Transparent"/></Style>
+                      <Style Selector="Border"><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
                       <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
                     </Border.Styles>
                     <Grid RowDefinitions="32,*">
@@ -497,6 +512,78 @@
                     </Panel>
                     </Grid>
                   </Border>
+                  <Border x:Name="BottomLeftPaneBox" BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
+                          Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}">
+                    <Border.Styles>
+                      <Style Selector="Border"><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
+                      <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
+                    </Border.Styles>
+                    <Grid RowDefinitions="32,*">
+                      <Border Background="{DynamicResource UiRaised}" CornerRadius="5,5,0,0" Padding="10,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock x:Name="BottomLeftPaneTitle" Text="{Binding BottomLeftPaneName}" FontSize="11" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                                     IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"/>
+                        </Grid>
+                      </Border>
+                      <Panel Grid.Row="1" Margin="6,7,6,4">
+                      <ctl:TerminalView x:Name="BottomLeftTerminal" Emulator="{Binding BottomLeftPane.Emulator}"
+                                        WorkingDirectory="{Binding BottomLeftPane.WorkingDirectory}" ShellCommand="{Binding BottomLeftPane.Shell}" IsRemote="{Binding BottomLeftPane.IsRemote}"
+                                        TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
+                                        TerminalFontFamily="{Binding TerminalFont}"
+                                        SearchQuery="{Binding Dashboard.SearchQuery}"/>
+                      <Button Content="⬇" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                              Margin="0,0,6,6" Padding="8,3" CornerRadius="8" FontSize="10"
+                              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                              Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
+                              IsVisible="{Binding #BottomLeftTerminal.IsScrolledUp}"
+                              ToolTip.Tip="回到实时输出底部"/>
+                      <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                 Minimum="0" Maximum="{Binding #BottomLeftTerminal.ScrollbackSize}"
+                                 ViewportSize="{Binding #BottomLeftTerminal.ViewportRows}"
+                                 Value="{Binding #BottomLeftTerminal.ScrollPosition, Mode=TwoWay}"
+                                 Visibility="{Binding #BottomLeftTerminal.OverlayScrollBarVisibility}"/>
+                    </Panel>
+                    </Grid>
+                  </Border>
+                  <Border x:Name="BottomRightPaneBox" BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
+                          Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}">
+                    <Border.Styles>
+                      <Style Selector="Border"><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
+                      <Style Selector="Border.pane-focus"><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
+                    </Border.Styles>
+                    <Grid RowDefinitions="32,*">
+                      <Border Background="{DynamicResource UiRaised}" CornerRadius="5,5,0,0" Padding="10,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock x:Name="BottomRightPaneTitle" Text="{Binding BottomRightPaneName}" FontSize="11" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                                     IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"/>
+                        </Grid>
+                      </Border>
+                      <Panel Grid.Row="1" Margin="6,7,6,4">
+                      <ctl:TerminalView x:Name="BottomRightTerminal" Emulator="{Binding BottomRightPane.Emulator}"
+                                        WorkingDirectory="{Binding BottomRightPane.WorkingDirectory}" ShellCommand="{Binding BottomRightPane.Shell}" IsRemote="{Binding BottomRightPane.IsRemote}"
+                                        TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
+                                        TerminalFontFamily="{Binding TerminalFont}"
+                                        SearchQuery="{Binding Dashboard.SearchQuery}"/>
+                      <Button Content="⬇" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                              Margin="0,0,6,6" Padding="8,3" CornerRadius="8" FontSize="10"
+                              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
+                              Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
+                              IsVisible="{Binding #BottomRightTerminal.IsScrolledUp}"
+                              ToolTip.Tip="回到实时输出底部"/>
+                      <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                 Minimum="0" Maximum="{Binding #BottomRightTerminal.ScrollbackSize}"
+                                 ViewportSize="{Binding #BottomRightTerminal.ViewportRows}"
+                                 Value="{Binding #BottomRightTerminal.ScrollPosition, Mode=TwoWay}"
+                                 Visibility="{Binding #BottomRightTerminal.OverlayScrollBarVisibility}"/>
+                    </Panel>
+                    </Grid>
+                  </Border>
                 </Grid>
               </Panel>
             </Border>
@@ -504,7 +591,7 @@
             <!-- Bottom panel: Output / Debug / Problems / Search -->
             <Border x:Name="OutputPanel" Grid.Row="2" Height="170" Margin="0,6,0,0"
                     KeyDown="OnPanelEscapeKeyDown"
-                    IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiSurface}"
+                    IsVisible="{Binding OutputVisible}" CornerRadius="8" Background="{DynamicResource UiPanel}"
                     BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
               <Panel>
               <!-- top-edge drag handle: resize the bottom panel -->
@@ -513,7 +600,7 @@
                       ToolTip.Tip="拖拽调整底栏高度"/>
               <Grid RowDefinitions="30,*">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="4,0">
-                  <ListBox SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
+                  <ListBox x:Name="OutputTabs" SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                            ScrollViewer.VerticalScrollBarVisibility="Disabled"
                            Background="Transparent" BorderThickness="0">
@@ -532,6 +619,10 @@
                       <Style Selector="ListBoxItem:selected">
                         <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
                         <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
+                      </Style>
+                      <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
                       </Style>
                     </ListBox.Styles>
                     <ListBoxItem>Output</ListBoxItem>
@@ -650,9 +741,9 @@
                     <!-- Search: filter active-session scrollback+screen, matched terms highlighted -->
                     <Grid IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter={x:Static vm:DashboardViewModel.SearchTabIndex}}"
                           RowDefinitions="Auto,Auto,*">
-                      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="8,6,8,0">
+                      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="8,6,8,0">
                         <TextBox x:Name="FindBox" Text="{Binding Dashboard.SearchQuery}"
-                                 Watermark="在当前会话中搜索… · Enter 下一处" FontSize="11"
+                                 Watermark="搜索保留输出… · Enter 下一处" FontSize="11"
                                  KeyDown="OnSearchBoxKeyDown"
                                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                                  CornerRadius="6" Padding="8,4"/>
@@ -664,14 +755,17 @@
                                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}"
                                 Foreground="{DynamicResource UiMuted}" CornerRadius="6" VerticalAlignment="Center"
                                 Click="OnSearchNextMatch" ToolTip.Tip="下一处匹配（终端视口跟随）"/>
-                        <TextBlock Grid.Column="3" Text="{Binding Dashboard.SearchStatus}"
+                        <ComboBox Grid.Column="3" SelectedIndex="{Binding Dashboard.SearchScope}" Margin="6,0" MinWidth="108" FontSize="11">
+                          <ComboBoxItem Content="当前会话"/><ComboBoxItem Content="全部会话"/>
+                        </ComboBox>
+                        <TextBlock Grid.Column="4" Text="{Binding Dashboard.SearchStatus}"
                                    Foreground="{DynamicResource UiFaint}" FontSize="10" Margin="10,0"
                                    VerticalAlignment="Center" MinWidth="70"/>
                       </Grid>
-                      <TextBlock Grid.Row="1" Text="作用域: 当前活动会话 scrollback + 屏幕 · 双击结果行定位到终端"
+                      <TextBlock Grid.Row="1" Text="点击结果切换会话并定位 · 仅搜索仍保留的历史与屏幕输出"
                                  Foreground="{DynamicResource UiFaint}" FontSize="9" Margin="10,4,0,2"/>
-                      <ListBox Grid.Row="2" ItemsSource="{Binding Dashboard.SearchHits}"
-                               DoubleTapped="OnSearchHitDoubleTapped"
+                      <ListBox Grid.Row="2" x:Name="SearchResults" ItemsSource="{Binding Dashboard.SearchHits}"
+                               Tapped="OnSearchHitDoubleTapped"
                                Background="Transparent" BorderThickness="0" Padding="6">
                         <ListBox.Styles>
                           <Style Selector="ListBoxItem">
@@ -684,6 +778,7 @@
                         <ListBox.ItemTemplate>
                           <DataTemplate>
                             <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Text="{Binding SessionName}" Foreground="{DynamicResource UiAccent}" MinWidth="90" MaxWidth="180" TextTrimming="CharacterEllipsis"/>
                               <TextBlock Text="{Binding Line, StringFormat='L{0}'}" Foreground="{DynamicResource UiFaint}" MinWidth="40"/>
                               <ctl:HighlightTextBlock LineText="{Binding Text}" Foreground="{DynamicResource UiMuted}"
                                                     Query="{Binding $parent[ListBox].DataContext.Dashboard.SearchQuery}"/>
@@ -730,7 +825,7 @@
                 BoxShadow="{DynamicResource SurfaceShadow}" KeyDown="OnPanelEscapeKeyDown">
           <Grid RowDefinitions="42,*" Margin="9">
 
-            <ListBox Grid.Row="0" SelectedIndex="{Binding SelectedRightTab}"
+            <ListBox x:Name="InspectorTabs" Grid.Row="0" SelectedIndex="{Binding SelectedRightTab}"
                      Background="Transparent" BorderThickness="0"
                      ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                      ScrollViewer.VerticalScrollBarVisibility="Disabled">
@@ -750,6 +845,10 @@
                   <Setter Property="Background" Value="{DynamicResource UiAccent}"/>
                   <Setter Property="Foreground" Value="{DynamicResource UiInk}"/>
                 </Style>
+                      <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                        <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
+                      </Style>
               </ListBox.Styles>
               <ListBoxItem>Processes</ListBoxItem>
               <ListBoxItem>Files</ListBoxItem>
@@ -1688,10 +1787,10 @@
     </Border>
 
     <!-- Floating, grouped preferences; header and actions stay visible when scrolling. -->
-    <Border x:Name="SettingsPanel" IsVisible="{Binding SettingsOpen}" ZIndex="200"
+    <Border x:Name="SettingsPanel" IsVisible="False" ctl:DropletExpansion.IsOpen="{Binding SettingsOpen}" ZIndex="200"
             HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="440" Margin="16"
             Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
-            BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="18" ClipToBounds="True">
+            BoxShadow="{DynamicResource FloatingShadow}" CornerRadius="18" ClipToBounds="True">
       <Grid RowDefinitions="76,*,66">
         <Grid ColumnDefinitions="Auto,*,Auto" Margin="22,16">
           <Border Width="38" Height="38" Background="{DynamicResource UiAccentSoft}" CornerRadius="10">
@@ -1849,7 +1948,16 @@
               <Button Content="检查更新" Command="{Binding CheckForUpdatesCommand}"/>
               <Button Content="打开 GitHub 发布页" Command="{Binding OpenProjectReleasesCommand}"/>
               <TextBlock Text="{Binding UpdateMessage}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-              <Button Content="下载新版" Command="{Binding OpenUpdateDownloadCommand}" IsEnabled="{Binding HasUpdate}"/>
+              <ComboBox ItemsSource="{Binding UpdateAssets}" SelectedItem="{Binding SelectedUpdateAsset}" IsEnabled="{Binding !IsDownloadingUpdate}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="settings:ReleaseAsset"><StackPanel Spacing="3"><TextBlock Text="{Binding Label}"/><TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource UiMuted}"/></StackPanel></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Content="下载所选版本…" Click="OnDownloadUpdate" IsEnabled="{Binding !IsDownloadingUpdate}"/>
+              <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdateDownloadPercent}" IsIndeterminate="{Binding UpdateDownloadIndeterminate}" IsVisible="{Binding IsDownloadingUpdate}"/>
+              <Button Content="取消下载" Command="{Binding CancelUpdateDownloadCommand}" IsVisible="{Binding IsDownloadingUpdate}"/>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDownloadedUpdate}"><Button Content="打开下载文件" Command="{Binding OpenDownloadedUpdateCommand}"/><Button Content="打开所在目录" Command="{Binding OpenUpdateFolderCommand}"/></StackPanel>
+              <TextBlock Text="新版发行说明" Foreground="{DynamicResource UiInk}"/>
+              <TextBox Text="{Binding UpdateNotes}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="200"/>
+              <Button Content="在浏览器查看发行说明" Command="{Binding OpenUpdateDownloadCommand}"/>
             </StackPanel>
             </ScrollViewer>
           </TabItem>
@@ -1894,7 +2002,7 @@
     <Border x:Name="PalettePanel" IsVisible="False" ZIndex="300" Width="620" MaxHeight="500"
             HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24,90,24,24" Padding="20"
             Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
-            BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="14">
+            BoxShadow="{DynamicResource FloatingShadow}" CornerRadius="14">
       <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
         <TextBlock Text="查找终端与操作" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold"/>
         <TextBox x:Name="PaletteSearch" Grid.Row="1" Watermark="输入终端名、目录或操作…" TextChanged="OnPaletteTextChanged"/>
@@ -1923,7 +2031,7 @@
     <Border x:Name="BookmarkPanel" IsVisible="False" ZIndex="300" Width="760" MaxHeight="620"
             HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24,80,24,24" Padding="20"
             Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
-            BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="14">
+            BoxShadow="{DynamicResource FloatingShadow}" CornerRadius="14">
       <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="10">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Text="输出书签" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
