@@ -85,6 +85,8 @@ public partial class TerminalView : Control
     private double _cellW = 8, _cellH = 16;
     private int _viewOffset;          // lines scrolled up into scrollback
     private int _scrollDrift;         // scrollback lines appended while scrolled up
+    private long _bellFlashUntil;     // TickCount64 deadline written on the parser thread
+    private bool _bellFlashOn;        // UI-thread mirror flipped by the refresh tick
     private bool _cursorOn = true;
     private readonly DispatcherTimer _blink;
     private readonly Dictionary<Color, IBrush> _brushCache = new();
@@ -204,6 +206,10 @@ public partial class TerminalView : Control
         var blink = !IsPreview && IsFocused
             && Environment.TickCount64 - _lastBlink >= 530;
         if (blink) { _lastBlink = Environment.TickCount64; _cursorOn = !_cursorOn; }
+        // Visual bell: _bellFlashUntil is written on the parser thread; flip
+        // _bellFlashOn here so the overlay paints/expires on the UI thread.
+        var flash = Environment.TickCount64 < Interlocked.Read(ref _bellFlashUntil);
+        if (flash != _bellFlashOn) { _bellFlashOn = flash; dirty = true; }
         if (_selecting) DragScrollStep();
         var sync = buf?.SynchronizedOutput == true;
         if (!IsPreview && IsFocused)
@@ -248,6 +254,7 @@ public partial class TerminalView : Control
         {
             old.Changed -= OnBufferChanged;
             old.Buffer.ScrollbackChanged -= OnScrollbackChanged;
+            old.Bell -= OnBell;
         }
         _applicationPointer?.Capture(null);
         _selectionPointer?.Capture(null);
@@ -274,7 +281,7 @@ public partial class TerminalView : Control
         _wordSelection = false;
         _hits = null;
         _hitLine = -1;
-        if (next is not null && _attached) next.Changed += OnBufferChanged;
+        if (next is not null && _attached) { next.Changed += OnBufferChanged; next.Bell += OnBell; }
         if (next is not null)
         {
             // The PTY belongs to the session, so previews and split/popout views
@@ -292,6 +299,9 @@ public partial class TerminalView : Control
     }
 
     private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
+
+    // Parser-thread hook: the refresh tick turns this deadline into the overlay.
+    private void OnBell() => Interlocked.Exchange(ref _bellFlashUntil, Environment.TickCount64 + 140);
 
     private void OnScrollbackChanged(int delta) => Interlocked.Add(ref _scrollDrift, delta);
 
@@ -345,6 +355,7 @@ public partial class TerminalView : Control
         OnThemeChanged(); // A detached pane may have missed a theme change.
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
+        if (_emulator is not null) _emulator.Bell += OnBell;
         ThemeManager.Changed += OnThemeChanged;
         // A hidden ancestor flip (single↔split, pop-out dock) arranges us again
         // without touching Bounds/IsVisible — recheck the emulator size on every
@@ -368,6 +379,7 @@ public partial class TerminalView : Control
         // buffer's delegate list until the session closes — repeated popout/
         // reattach accumulates dead visual subtrees (and their text caches).
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged -= OnScrollbackChanged;
+        if (_emulator is not null) _emulator.Bell -= OnBell;
         ThemeManager.Changed -= OnThemeChanged;
         base.OnDetachedFromVisualTree(e);
     }
@@ -643,6 +655,13 @@ public partial class TerminalView : Control
                 ctx.DrawLine(new Pen(accent, 2),
                     new Point(caretX, py + 2), new Point(caretX, py + _cellH - 3));
             }
+        }
+
+        // Visual bell (xterm visualBell): brief translucent wash over the pane.
+        if (_bellFlashOn)
+        {
+            var bc = _colors.Cursor;
+            ctx.DrawRectangle(Brush(Color.FromArgb(46, bc.R, bc.G, bc.B)), null, new Rect(Bounds.Size));
         }
     }
 
