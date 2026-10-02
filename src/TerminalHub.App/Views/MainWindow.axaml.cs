@@ -683,10 +683,18 @@ public partial class MainWindow : Window
             return;
         }
         if (_dragCard is null) return;
+        // Dragging a card well past the shelf's right edge (onto the stage)
+        // pops it out — the browser "drag a tab off the strip" convention.
+        // Vertical reorder keeps working; only clear horizontal overflow detaches.
+        var pos = e.GetPosition(SessionShelf);
+        var detach = _cardDragging
+            && (pos.X > SessionShelf.Bounds.Width + 24 || pos.X < -24);
         var clicked = _cardDragging ? null : _dragCard;
-        EndShelfDrag(commit: true);
+        var dragged = _dragCard;
+        EndShelfDrag(commit: !detach);
         e.Pointer.Capture(null);
-        if (clicked is not null) Vm.ActiveCard = clicked;
+        if (detach) Vm.OpenInNewWindowCommand.Execute(dragged);
+        else if (clicked is not null) Vm.ActiveCard = clicked;
         e.Handled = true;
     }
 
