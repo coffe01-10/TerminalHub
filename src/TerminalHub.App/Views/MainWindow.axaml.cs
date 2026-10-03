@@ -1615,7 +1615,7 @@ public partial class MainWindow : Window
             await using var stream = await file.OpenWriteAsync();
             await using var writer = new StreamWriter(stream);
             await writer.WriteAsync(json);
-            Vm.TemplateMessage = "已导出模板。";
+            Vm.TemplateMessage = "已导出模板。SSH 连接参数不会写入模板；分享前请自行检查终端名称、目录和启动命令。";
         }
         catch (Exception ex)
         {
