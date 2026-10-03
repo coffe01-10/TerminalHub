@@ -29,4 +29,4 @@
 
 ## 本地产物
 
-Windows 便携包、Linux x64 构建包及插件 SDK 包在 `artifacts/v0.4.0` 更新；源码、文档与回归随本次提交交付。本地产物未上传 GitHub Release，Windows 安装包仍未生成。
+Windows 便携包、Linux x64 构建包及插件 SDK 包在 `artifacts/v0.4.0` 更新；源码、文档与回归已提交推送。三个包已上传 [v0.4.0 GitHub Release](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0)，Windows 安装包仍未生成。

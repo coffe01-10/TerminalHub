@@ -67,7 +67,7 @@ Dark Glass, Black, White, and Paper: four distinct palettes and textures.
 
 ### Download a release
 
-Visit [GitHub Releases](https://github.com/coffe01-10/TerminalHub/releases) for the Windows installer, Windows portable package, or Linux x64 archive. Release packages include the .NET runtime; see each release's notes for platform dependencies and changes.
+Visit [v0.4.0](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0) for the Windows portable package, Linux x64 archive, and plugin SDK. This release does not include a Windows installer. Release packages include the .NET runtime; see each release's notes for platform dependencies and changes.
 
 ### Run from source
 
@@ -142,6 +142,6 @@ Suggestions are welcome in [Issues](https://github.com/coffe01-10/TerminalHub/is
 [MIT License](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
 
 
-## v0.4.0 workbench extensions (local build)
+## v0.4.0 workbench extensions
 
-Adds nested splits, cross-workspace session moves, recent-session switching, Chinese/English UI, layout undo/redo and workspace tools in a reusable independent window. Native .NET/Avalonia plugins have a public SDK and independently built examples; see [plugin development](docs/plugin-sdk.md) and [delivery notes](docs/workbench-2026-10-03.md). The tools window and new modules have received a UI refinement; see [current UI and acceptance](docs/ui-refinement-2026-10-03.md). The published release remains v0.3.4.
+Adds nested splits, cross-workspace session moves, recent-session switching, Chinese/English UI, layout undo/redo and workspace tools in a reusable independent window. Native .NET/Avalonia plugins have a public SDK and independently built examples; see [plugin development](docs/plugin-sdk.md) and [delivery notes](docs/workbench-2026-10-03.md). The tools window and new modules have received a UI refinement; see [current UI and acceptance](docs/ui-refinement-2026-10-03.md). [v0.4.0 is available](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0).

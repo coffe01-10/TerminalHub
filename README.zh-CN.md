@@ -67,7 +67,7 @@ Claude Code、Codex CLI 和日常 Shell 可以各自运行。AI CLI 由你自行
 
 ### 下载发布包
 
-到 [GitHub Releases](https://github.com/coffe01-10/TerminalHub/releases) 选择 Windows 安装版、Windows 便携包或 Linux x64 包。发布包包含 .NET 运行时；平台依赖与版本变更见对应发行说明。
+到 [v0.4.0](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0) 下载 Windows 便携包、Linux x64 包或插件 SDK。本版未提供 Windows 安装包。发布包包含 .NET 运行时；平台依赖与版本变更见对应发行说明。
 
 ### 从源码启动
 
@@ -142,6 +142,6 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 [MIT License](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
 
 
-## v0.4.0 工作台扩展（本地构建）
+## v0.4.0 工作台扩展
 
-支持任意嵌套分屏、跨工作区拖动、最近使用切换、中英文切换、布局撤销/重做及保留状态的独立工作区工具窗口。新增本地 .NET/Avalonia 插件机制，开发与导入见 [插件 SDK](docs/plugin-sdk.md)，交付边界见 [本轮记录](docs/workbench-2026-10-03.md)。工具窗口和新增模块已精修界面，见 [当前界面与验收](docs/ui-refinement-2026-10-03.md)。已发布版仍为 v0.3.4。
+支持任意嵌套分屏、跨工作区拖动、最近使用切换、中英文切换、布局撤销/重做及保留状态的独立工作区工具窗口。新增本地 .NET/Avalonia 插件机制，开发与导入见 [插件 SDK](docs/plugin-sdk.md)，交付边界见 [本轮记录](docs/workbench-2026-10-03.md)。工具窗口和新增模块已精修界面，见 [当前界面与验收](docs/ui-refinement-2026-10-03.md)。[v0.4.0 已发布](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0)。
