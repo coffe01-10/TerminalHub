@@ -27,7 +27,7 @@ public class WorkbenchExtensionAcceptanceTests
     [AvaloniaFact]
     public async Task SixPaneTree_RatioMaximizeRemoveUndoAndWorkspaceRoundtrip_KeepProcessesAndViews()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         await f.Vm.SetSplitLayoutAsync("Quad");
         await f.Vm.SplitPaneAsync(3, true); await f.Vm.SplitPaneAsync(4, false); await Task.Delay(120);
         Assert.Equal(6, f.Vm.PaneCount); Assert.Equal(6, Views(f.Window).Length);
@@ -64,7 +64,7 @@ public class WorkbenchExtensionAcceptanceTests
     [AvaloniaFact]
     public async Task NativePaneDrop_EdgeSplitsCenterSwaps_AndOneUndoRestoresGesture()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         await f.Vm.SetSplitLayoutAsync("Horizontal"); await Task.Delay(100);
         var original = f.Vm.PaneTree!.Leaves.Select(l => l.Session).ToArray(); var moving = f.Vm.SessionCards[3];
         var thumbnail = f.Window.GetVisualDescendants().OfType<StageCard>().Single(c => c.DataContext == moving);
@@ -84,7 +84,7 @@ public class WorkbenchExtensionAcceptanceTests
     [AvaloniaFact]
     public async Task IndependentTools_AllFivePagesKeepEditsAcrossSelectionCloseAndWorkspaceSwitch()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var terminalHeight = f.Window.FindControl<Border>("TerminalViewport")!.Bounds.Height;
         Call(f.Window, "ToggleProjectTools"); await Task.Delay(80);
         var toolsWindow = Field<ProjectToolsWindow>(f.Window, "_projectToolsWindow");
@@ -114,7 +114,7 @@ public class WorkbenchExtensionAcceptanceTests
     [AvaloniaFact]
     public async Task PublishedExamples_EnableTogether_ConfigureTranslateSwitchAndDisableIndividually()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var manager = Field<PluginManager>(f.Window, "_plugins"); var styles = f.Window.Styles.Count;
         var existing = f.Vm.SessionCards.Select(c => (c.Model, c.Model.Pty)).ToArray();
         try
@@ -163,7 +163,7 @@ public class WorkbenchExtensionAcceptanceTests
     [AvaloniaFact]
     public async Task PluginLifecycle_CancelsTimersSubscriptionsStylesResourcesAndFailedActivation()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var directory = Path.Combine(Path.GetTempPath(), "terminalhub-plugin-probe-" + Guid.NewGuid());
         using var manager = new PluginManager(f.Vm, directory, f.Window.Styles);
         try

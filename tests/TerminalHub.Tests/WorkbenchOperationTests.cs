@@ -20,7 +20,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task TransferAndUndoRestoreBothWorkspacesWithoutReplacingProcesses()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var source = f.Vm.ActiveWorkspace;
         await f.Vm.SetSplitLayoutAsync("Quad");
         f.Vm.FocusPane(2); f.Vm.ColumnRatio = .37; f.Vm.RowRatio = .62;
@@ -52,7 +52,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task TransferFromTwoPaneWorkspaceFallsBackToSingle_AndUndoRestoresSplit()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         foreach (var card in f.Vm.SessionCards.Skip(2).ToArray()) f.Vm.CloseSessionCommand.Execute(card);
         await Task.Delay(100); await f.Vm.SetSplitLayoutAsync("Vertical");
         var source = f.Vm.ActiveWorkspace; var moved = f.Vm.SessionCards[0];
@@ -68,7 +68,7 @@ public class WorkbenchOperationTests
     [InlineData(false)] [InlineData(true)]
     public async Task NativeDragCanHoverThenCancel_OrDropBeforeAnotherCard(bool autoHide)
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var source = f.Vm.ActiveWorkspace; var original = source.Cards.ToArray();
         f.Vm.ShelfAutoHide = autoHide;
         await f.Vm.NewProjectWorkspaceCommand.ExecuteAsync(null); await Task.Delay(150);
@@ -100,7 +100,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task LayoutGestureIsOneStep_AndNewOperationDropsRedo()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         await f.Vm.SetSplitLayoutAsync("Horizontal");
         f.Vm.BeginLayoutGesture("调整分屏比例"); f.Vm.ColumnRatio = .4; f.Vm.ColumnRatio = .3;
         f.Vm.CompleteLayoutGesture();
@@ -115,7 +115,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task SplitterDragAndPaneSwapCanBeUndoneWithoutLosingInput()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         await f.Vm.SetSplitLayoutAsync("Horizontal"); await Task.Delay(120);
         var left = f.Vm.LeftPane; var right = f.Vm.RightPane;
         var divider = f.Window.GetVisualDescendants().OfType<GridSplitter>().Single(d => d.IsEffectivelyVisible);
@@ -139,7 +139,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task ConfiguredRecentShortcutReversesAndWorksFromPopout()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var recent = f.Vm.SessionShortcuts.Single(s => s.Binding.Action == SessionShortcutAction.Recent);
         recent.Gesture = "Ctrl+Alt+F8";
         var conflicting = f.Vm.SessionShortcuts.Single(s => s.Binding.Action == SessionShortcutAction.UndoLayout);
@@ -176,7 +176,7 @@ public class WorkbenchOperationTests
     [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
     public async Task EnglishNavigationFitsNarrowWindowsAcrossThemes(int theme)
     {
-        using var f = new StageLayoutTests.StageFixture(width: 1100, height: 680); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(width: 1100, height: 680); await f.ReadyAsync();
         f.Vm.ThemeIndex = theme; f.Vm.LanguageIndex = 2; f.Vm.SettingsOpen = true; await Task.Delay(450);
         var tabs = f.Window.FindControl<TabControl>("SettingsTabs")!;
         var panel = f.Window.FindControl<Border>("SettingsPanel")!;
@@ -218,7 +218,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task RecentPreviewDoesNotSwitchOrType_ReleaseConfirmsAndEscapeCancels()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var source = f.Vm.ActiveWorkspace; var first = f.Vm.SessionCards[0];
         f.Vm.ActivateSearchSession(first.Model); await Task.Delay(100);
         await f.Vm.NewProjectWorkspaceCommand.ExecuteAsync(null); await Task.Delay(100);
@@ -245,7 +245,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task RecentCandidatesDropClosedSessions_AndCanFocusSeparateWindows()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var closed = f.Vm.SessionCards[0]; var detached = f.Vm.SessionCards[1];
         f.Vm.OpenInNewWindowCommand.Execute(detached); await Task.Delay(100);
         f.Vm.HandleRecentKeyDown(new KeyEventArgs { Key = Key.F6, KeyModifiers = KeyModifiers.Control });
@@ -290,7 +290,7 @@ public class WorkbenchOperationTests
     [AvaloniaFact]
     public async Task LanguageSwitchUpdatesOpenMenusAndWindows_WhileUserTextAndProcessesStayIntact()
     {
-        using var f = new StageLayoutTests.StageFixture(width: 1100, firstSessionName: "设置"); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(width: 1100, firstSessionName: "设置"); await f.ReadyAsync();
         var card = f.Vm.SessionCards[0]; var emulator = card.Model.Emulator;
         f.Vm.ActivateSearchSession(card.Model); await Task.Delay(80);
         emulator.Parser.Feed("\r\n原始输出：设置，命令，工作区\r\n");

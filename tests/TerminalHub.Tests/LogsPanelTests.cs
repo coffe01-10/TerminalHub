@@ -31,7 +31,9 @@ public class LogsPanelTests
         public void Dispose() { }
     }
 
-    /// <summary>Polls until <paramref name="condition"/> holds (OutputLog appends arrive via the UI dispatcher).</summary>
+    /// <summary>Polls until <paramref name="condition"/> holds (OutputLog appends
+    /// arrive via the UI dispatcher); timing out fails here instead of deferring
+    /// to whatever assertion — if any — comes next.</summary>
     private static async Task Until(Func<bool> condition, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(8));
@@ -40,6 +42,7 @@ public class LogsPanelTests
             if (condition()) return;
             await Task.Delay(25);
         }
+        Assert.True(condition(), "Timed out waiting for the logs UI state.");
     }
 
     private static (DashboardViewModel dash, LogsViewModel logs, SessionLogFile file) MakeLogs(

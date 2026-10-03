@@ -22,6 +22,9 @@ public class DeployDockTests
     private static async Task FlushUi() =>
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
+    /// <summary>Polls (pumping the UI dispatcher) until <paramref name="pred"/>
+    /// holds; timing out fails here instead of deferring to whatever assertion
+    /// — if any — comes next.</summary>
     private static async Task WaitFor(Func<bool> pred, int ms = 3000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(ms);
@@ -32,6 +35,7 @@ public class DeployDockTests
             await Task.Delay(30);
         }
         await FlushUi();
+        Assert.True(pred(), $"Timed out after {ms}ms waiting for the deploy dock state.");
     }
 
     private static string TempRepo(bool withScript, bool withArtifact)

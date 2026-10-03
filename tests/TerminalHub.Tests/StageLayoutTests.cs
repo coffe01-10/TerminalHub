@@ -49,6 +49,16 @@ public class StageLayoutTests
             Window.Show();
         }
 
+        /// <summary>Waits until the five startup sessions have spawned — replaces
+        /// fixed boot sleeps that flake when session startup outruns them.</summary>
+        public async Task ReadyAsync()
+        {
+            var deadline = Environment.TickCount64 + 5000;
+            while (Vm.SessionCards.Count < 5 && Environment.TickCount64 < deadline)
+                await Task.Delay(20);
+            Assert.True(Vm.SessionCards.Count >= 5, "startup sessions never spawned");
+        }
+
         public void Dispose()
         {
             Window.Close();

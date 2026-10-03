@@ -223,30 +223,23 @@ public class CodeReviewFixTests
         using var word = new TerminalEmulator(columns: 20, rows: 3);
         word.Parser.Feed("a b");
         var wordView = new TerminalView { Emulator = word, Width = 400, Height = 80 };
-        SetCell(wordView, 10, 20);
         var pointer = new Avalonia.Input.Pointer(1, PointerType.Mouse, true);
-        Press(wordView, pointer, 1, new Point(5, 10));
-        Release(wordView, pointer, new Point(5, 10));
+        // Cell (0,0)'s center: the constructor's glyph measurement guarantees
+        // cellW >= 4 and cellH >= 8, so (1,1) always lands there.
+        Press(wordView, pointer, 1, new Point(1, 1));
+        Release(wordView, pointer, new Point(1, 1));
         Assert.Null(wordView.GetSelectedText());
 
-        Press(wordView, pointer, 2, new Point(5, 10));
-        Release(wordView, pointer, new Point(5, 10));
+        Press(wordView, pointer, 2, new Point(1, 1));
+        Release(wordView, pointer, new Point(1, 1));
         Assert.Equal("a", wordView.GetSelectedText());
 
         using var wrapped = new TerminalEmulator(columns: 4, rows: 3);
         wrapped.Parser.Feed("abcdefgh");
         var wrapView = new TerminalView { Emulator = wrapped, Width = 200, Height = 80 };
-        SetCell(wrapView, 10, 20);
-        Press(wrapView, pointer, 3, new Point(5, 10));
-        Release(wrapView, pointer, new Point(5, 10));
+        Press(wrapView, pointer, 3, new Point(1, 1));
+        Release(wrapView, pointer, new Point(1, 1));
         Assert.Equal("abcdefgh", wrapView.GetSelectedText());
-    }
-
-    private static void SetCell(TerminalView view, double width, double height)
-    {
-        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        typeof(TerminalView).GetField("_cellW", flags)!.SetValue(view, width);
-        typeof(TerminalView).GetField("_cellH", flags)!.SetValue(view, height);
     }
 
     [AvaloniaFact]

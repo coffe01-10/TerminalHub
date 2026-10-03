@@ -18,9 +18,11 @@ public class TerminalInputTests
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1200, Height = 800 };
         window.Show();
-        await Task.Delay(500);
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
-        Assert.True(vm.SessionCards.Count >= 3);
+        var deadline = Environment.TickCount64 + 5000;
+        while (vm.SessionCards.Count < 3 && Environment.TickCount64 < deadline)
+            await Task.Delay(20);
+        Assert.True(vm.SessionCards.Count >= 3, "startup sessions never spawned");
         return (window, vm);
     }
 
@@ -38,9 +40,14 @@ public class TerminalInputTests
         await Task.Delay(300);
 
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        await Task.Delay(400);
-
-        var text = vm.ActiveSession!.Emulator.Buffer.TailText(10);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        string text = "";
+        while (DateTime.UtcNow < deadline)
+        {
+            text = vm.ActiveSession!.Emulator.Buffer.TailText(10);
+            if (text.Contains("mock: dir")) break;
+            await Task.Delay(25);
+        }
         Assert.Contains("mock: dir", text);
         window.Close();
     }
@@ -81,9 +88,15 @@ public class TerminalInputTests
         var pty = (TerminalHub.Core.Pty.MockPtySession)vm.ActiveSession!.Emulator.Pty;
 
         window.KeyPressQwerty(PhysicalKey.E, RawInputModifiers.Control);
-        await Task.Delay(150);
-
-        Assert.Contains("\x05", pty.RawInput.ToString());
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        var raw = "";
+        while (DateTime.UtcNow < deadline)
+        {
+            raw = pty.RawInput.ToString();
+            if (raw.Contains("\x05")) break;
+            await Task.Delay(25);
+        }
+        Assert.Contains("\x05", raw);
         window.Close();
     }
 }
