@@ -92,7 +92,12 @@ public sealed class SessionManager
         SessionRemoved?.Invoke(session);
         if (ReferenceEquals(Active, session))
             Activate(Sessions.LastOrDefault());
-        session.Dispose();
+        // Pty.Dispose blocks for seconds (ConPTY WaitForExit + read-loop join);
+        // running it off the caller's thread keeps closing sessions — or many at
+        // once — from freezing the UI. List updates and SessionRemoved above stay
+        // synchronous, and the Pty Dispose paths are idempotent, so an app-shutdown
+        // dispose racing this task cannot double-release.
+        Task.Run(session.Dispose);
     }
 
     /// <summary>Detach a session without killing it: leaves the list, fires
