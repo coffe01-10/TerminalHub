@@ -1,4 +1,10 @@
 using Avalonia.Controls;
+using Avalonia;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+using TerminalHub.App.Plugins;
+using TerminalHub.Extensibility;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -12,10 +18,25 @@ public partial class ProjectToolsView : UserControl
 {
     public static readonly FuncValueConverter<int, bool> IsEmpty = new(count => count == 0);
     private readonly MainWindow? _main;
+    private readonly TabItem[] _builtinTabs;
+    private readonly ListBoxItem[] _builtinNavigation;
+    private readonly Dictionary<string, (ModuleRegistration Module, TabItem Tab, ListBoxItem Navigation)> _extraModules = [];
+    private bool _updatingModules;
+    private string? _selectedModuleId;
     private MainWindowViewModel Vm => (MainWindowViewModel)DataContext!;
     public ProjectToolsView()
     {
         InitializeComponent();
+        _builtinTabs = ToolsTabs.Items.Cast<TabItem>().ToArray();
+        _builtinNavigation = ToolNavigation.Items.Cast<ListBoxItem>().ToArray();
+        for (var i = 0; i < _builtinNavigation.Length; i++) _builtinNavigation[i].Tag = "builtin:tools-" + i;
+        ToolNavigation.SelectionChanged += (_, _) =>
+        {
+            if (_updatingModules || ToolNavigation.SelectedItem is not ListBoxItem item) return;
+            _selectedModuleId = item.Tag as string;
+            if (_selectedModuleId is not null && _extraModules.TryGetValue(_selectedModuleId, out var extra))
+                extra.Tab.Content ??= extra.Module.GetView();
+        };
         SizeChanged += (_, _) => ToolsLayout.ColumnDefinitions[0].Width = new(Bounds.Width < 680 ? 112 : 156);
     }
     public ProjectToolsView(MainWindow main, MainWindowViewModel vm) : this()
@@ -24,21 +45,61 @@ public partial class ProjectToolsView : UserControl
         AddHandler(InputElement.KeyDownEvent, (_, e) => { if (vm.BroadcastEnabled && e.Key == Key.Escape) { vm.StopBroadcast(); e.Handled = true; } }, RoutingStrategies.Tunnel);
     }
     public void SelectModule(int index) => ToolsTabs.SelectedIndex = index;
-    public Control? DetachModule(int index)
+    public Control GetBuiltinPage(int index) => (Control)_builtinTabs[index].Content!;
+    public void UpdateModules(PluginManager manager)
     {
-        if (ToolsTabs.Items[index] is not TabItem tab || tab.Content is not Control page) return null;
-        tab.Content = null;
-        // Detached pages need their original style scope in the embedded module host.
-        var host = new UserControl { Content = page, FontFamily = FontFamily, FontSize = FontSize };
-        host.Bind(ForegroundProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("UiInk"));
-        host.Bind(BackgroundProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("UiCanvas"));
-        foreach (var original in Styles.OfType<Avalonia.Styling.Style>())
+        if (_updatingModules) return;
+        var modules = manager.Visible(ExtensionSurface.WorkspaceTools).ToArray();
+        _updatingModules = true;
+        try
         {
-            var style = new Avalonia.Styling.Style(_ => original.Selector!);
-            foreach (var setter in original.Setters) style.Setters.Add(setter);
-            host.Styles.Add(style);
+            _selectedModuleId = (ToolNavigation.SelectedItem as ListBoxItem)?.Tag as string ?? _selectedModuleId;
+            foreach (var id in _extraModules.Keys.Where(id => !modules.Any(m => m.Id == id)).ToArray())
+            { _extraModules[id].Tab.Content = null; _extraModules.Remove(id); }
+            ToolNavigation.Items.Clear(); ToolsTabs.Items.Clear();
+            foreach (var module in modules)
+            {
+                if (module.Owner == "builtin" && int.TryParse(module.Definition.Id.Replace("tools-", ""), out var index))
+                {
+                    ToolsTabs.Items.Add(_builtinTabs[index]); ToolNavigation.Items.Add(_builtinNavigation[index]);
+                    continue;
+                }
+                if (!_extraModules.TryGetValue(module.Id, out var extra))
+                {
+                    var heading = new Grid { ColumnDefinitions = new("16,*"), ColumnSpacing = 12 };
+                    Control icon = new TextBlock { Text = "◇", FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
+                    if (module.Definition.IconSvg is { } svg)
+                    {
+                        try
+                        {
+                            var vector = svg.TrimStart().StartsWith('<') ? new SvgIcon(svg)
+                                : SvgIcon.FromFile(Path.Combine(manager.Plugins.First(p => p.Manifest.Id == module.Owner).Directory, svg));
+                            vector.Width = vector.Height = 16;
+                            vector.Bind(SvgIcon.ForegroundProperty, new DynamicResourceExtension("UiInk"));
+                            icon = vector;
+                        }
+                        catch (Exception ex) { ToolTip.SetTip(icon, ex.Message); }
+                    }
+                    heading.Children.Add(icon);
+                    var title = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+                    Grid.SetColumn(title, 1); heading.Children.Add(title);
+                    extra = (module, new TabItem(), new ListBoxItem { Tag = module.Id, Content = heading });
+                    _extraModules[module.Id] = extra;
+                }
+                ((TextBlock)((Grid)extra.Navigation.Content!).Children[1]).Text = module.ToString();
+                extra.Tab.Header = module.ToString();
+                ToolsTabs.Items.Add(extra.Tab); ToolNavigation.Items.Add(extra.Navigation);
+            }
+            var selected = ToolNavigation.Items.Cast<ListBoxItem>().ToList().FindIndex(n => Equals(n.Tag, _selectedModuleId));
+            ToolNavigation.SelectedIndex = modules.Length == 0 ? -1 : Math.Max(0, selected);
+            if (ToolNavigation.SelectedItem is ListBoxItem current)
+            {
+                _selectedModuleId = current.Tag as string;
+                if (_selectedModuleId is not null && _extraModules.TryGetValue(_selectedModuleId, out var extra))
+                    extra.Tab.Content ??= extra.Module.GetView();
+            }
         }
-        return host;
+        finally { _updatingModules = false; }
     }
     private async void OnRuleLocate(object? sender, TappedEventArgs e)
     { if ((e.Source as Control)?.DataContext is OutputRuleResult result && _main is not null) { await _main.LocateSearchResultAsync(result.Result); _main.CollapseProjectTools(); _main.Activate(); } }

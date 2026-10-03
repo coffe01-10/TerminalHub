@@ -73,7 +73,7 @@ public sealed class MyPlugin : IWorkbenchPlugin
 
 ## 界面扩展
 
-`RegisterView(ModuleDefinition, Func<Control>)` 延迟创建并缓存控件。收起工具区域、切换模块或隐藏视图保留控件状态，禁用插件才移除缓存。控件可使用现有 `UiInk`、`UiMuted`、`UiPanel`、`UiBorder`、`UiAccent` 等动态资源，随 DarkGlass / Black / White / Paper 切换。
+`RegisterView(ModuleDefinition, Func<Control>)` 延迟创建并缓存控件。关闭工作区工具窗口、切换模块或隐藏视图保留控件状态，禁用插件才移除缓存。控件可使用现有 `UiInk`、`UiMuted`、`UiPanel`、`UiBorder`、`UiAccent` 等动态资源，随 DarkGlass / Black / White / Paper 切换。
 
 | Surface | 宿主入口 |
 | --- | --- |
@@ -84,7 +84,7 @@ public sealed class MyPlugin : IWorkbenchPlugin
 | Menu | 当前终端菜单 |
 | SidePanel | 主窗口右侧扩展区域 |
 | BottomPanel | 主窗口底部扩展区域 |
-| WorkspaceTools | 主窗口工作区工具的模块导航 |
+| WorkspaceTools | 独立工作区工具窗口的左侧模块导航 |
 | Settings | 插件管理器的设置页 |
 | ToolWindow | 宿主提供的独立工具窗口 |
 

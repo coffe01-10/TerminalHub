@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Presenters;
+using Avalonia.Styling;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -88,27 +90,40 @@ public partial class MainWindow
         terminal.WorkingDirectory = session.WorkingDirectory;
         if (card is not null) terminal.Bind(TerminalView.WorkingDirectoryProperty,
             new Binding(nameof(card.WorkingDirectory)) { Source = card });
-        var box = new Border { BorderThickness = new(1.5), CornerRadius = new(6), Margin = new(2), ClipToBounds = true };
+        var box = new Border { Name = "PaneFrame", BorderThickness = new(1), CornerRadius = new(8), Margin = new(2), ClipToBounds = true };
         box.Bind(Border.BorderBrushProperty, new DynamicResourceExtension(Vm.GetPane(Vm.FocusedPane) == session ? "UiAccent" : "UiBorder"));
         box.AddHandler(PointerPressedEvent, (_, _) => FocusTreePane(session), RoutingStrategies.Bubble, true);
-        var content = new Grid { RowDefinitions = new("30,*") };
-        var title = new TextBlock { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        var content = new Grid { RowDefinitions = new("34,*") };
+        var title = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         title.Bind(TextBlock.TextProperty, new Binding(nameof(session.Name)) { Source = (object?)card ?? session });
         title.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("UiInk"));
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
         Button Action(string glyph, string hint, Action callback)
         {
-            var button = new Button { Content = glyph, Padding = new(6,2), FontSize = 11 };
+            var button = new Button { Content = glyph, Classes = { "pane-action" }, Width = 26, Height = 24,
+                CornerRadius = new(5), Padding = new(3), FontSize = 14, BorderThickness = new(0), Background = Brushes.Transparent };
             button.Bind(ToolTip.TipProperty, UiText.Binding(hint));
+            button.Bind(Avalonia.Automation.AutomationProperties.NameProperty, UiText.Binding(hint));
             button.Click += (_, _) => { FocusTreePane(session); callback(); }; actions.Children.Add(button); return button;
         }
-        Action("↔", "左右拆分窗格", () => _ = Vm.SplitFocusedPaneAsync("Horizontal"));
-        Action("↕", "上下拆分窗格", () => _ = Vm.SplitFocusedPaneAsync("Vertical"));
         Action("□", "最大化／恢复窗格", () => Vm.TogglePaneMaximizedCommand.Execute(null));
-        Action("−", "移除窗格（保留会话）", Vm.RemoveFocusedPane);
-        Action("×", "关闭会话", () => Vm.CloseSessionCommand.Execute(Vm.SessionCards.FirstOrDefault(c => c.Model == session)));
-        var header = new Grid { ColumnDefinitions = new("*,Auto"), Margin = new(8,0,4,0) };
+        var more = Action("⋯", "窗格操作", () => { });
+        var menu = new MenuFlyout();
+        void Item(string label, Action callback)
+        {
+            var item = new MenuItem { [!MenuItem.HeaderProperty] = UiText.Binding(label) };
+            item.Click += (_, _) => { FocusTreePane(session); callback(); }; menu.Items.Add(item);
+        }
+        Item("左右拆分窗格", () => _ = Vm.SplitFocusedPaneAsync("Horizontal"));
+        Item("上下拆分窗格", () => _ = Vm.SplitFocusedPaneAsync("Vertical"));
+        menu.Items.Add(new Separator());
+        Item("移除窗格（保留会话）", Vm.RemoveFocusedPane);
+        Item("关闭会话", () => Vm.CloseSessionCommand.Execute(Vm.SessionCards.FirstOrDefault(c => c.Model == session)));
+        more.Flyout = menu;
+        var header = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 8, Margin = new(10,0,6,0) };
         header.Children.Add(title); Grid.SetColumn(actions,1); header.Children.Add(actions); content.Children.Add(header);
+        header.Styles.Add(new Avalonia.Styling.Style(x => x.OfType<Button>().Class("pane-action").Class(":pointerover").Template().OfType<ContentPresenter>())
+            { Setters = { new Setter(ContentPresenter.BackgroundProperty, new DynamicResourceExtension("UiRaised")) } });
         var viewport = new Panel { Children = { terminal } }; Grid.SetRow(viewport,1); content.Children.Add(viewport);
         var bottom = new Button { Content = "↓", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new(4), Padding = new(6,2) };
         bottom.Bind(IsVisibleProperty, new Binding(nameof(TerminalView.IsScrolledUp)) { Source = terminal });

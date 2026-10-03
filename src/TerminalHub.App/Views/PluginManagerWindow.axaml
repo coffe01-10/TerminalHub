@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:TerminalHub.App.Localization" x:Class="TerminalHub.App.Views.PluginManagerWindow"
+        Width="940" Height="700" MinWidth="680" MinHeight="500" WindowStartupLocation="CenterOwner"
+        Title="{loc:Text Workbench3}" Background="{DynamicResource UiCanvas}" Foreground="{DynamicResource UiInk}"
+        FontFamily="Segoe UI, Microsoft YaHei UI, sans-serif" FontSize="13">
+  <Window.Styles>
+    <Style Selector="Button"><Setter Property="Padding" Value="14,9"/><Setter Property="CornerRadius" Value="7"/><Setter Property="FontSize" Value="12"/><Setter Property="Background" Value="{DynamicResource UiRaised}"/><Setter Property="Foreground" Value="{DynamicResource UiInk}"/><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="Opacity" Value="0.88"/></Style>
+    <Style Selector="Button.danger"><Setter Property="Foreground" Value="{DynamicResource UiBad}"/><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.module-card"><Setter Property="Background" Value="{DynamicResource UiSurface}"/><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="18"/></Style>
+    <Style Selector="CheckBox"><Setter Property="FontSize" Value="12"/><Setter Property="MinHeight" Value="32"/><Setter Property="Foreground" Value="{DynamicResource UiInk}"/></Style>
+    <Style Selector="CheckBox /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource UiInk}"/></Style>
+    <Style Selector="CheckBox /template/ Border#NormalRectangle"><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
+    <Style Selector="CheckBox:checked /template/ Border#NormalRectangle, CheckBox:checked:pointerover /template/ Border#NormalRectangle, CheckBox:checked:pressed /template/ Border#NormalRectangle"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
+    <Style Selector="CheckBox:checked /template/ Path#CheckGlyph, CheckBox:checked:pointerover /template/ Path#CheckGlyph, CheckBox:checked:pressed /template/ Path#CheckGlyph"><Setter Property="Fill" Value="{DynamicResource UiOnAccent}"/></Style>
+    <Style Selector="NumericUpDown"><Setter Property="CornerRadius" Value="6"/><Setter Property="MinHeight" Value="34"/></Style>
+    <Style Selector="TabControl"><Setter Property="Padding" Value="0"/></Style>
+    <Style Selector="TabItem"><Setter Property="Padding" Value="16,10"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/></Style>
+    <Style Selector="TabItem:selected"><Setter Property="Foreground" Value="{DynamicResource UiAccent}"/></Style>
+    <Style Selector="TextBlock.caption"><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/><Setter Property="FontSize" Value="12"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+  </Window.Styles>
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="24" RowSpacing="18">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+      <StackPanel Spacing="7">
+        <TextBlock Text="WORKBENCH" FontSize="10" LetterSpacing="2" Foreground="{DynamicResource UiFaint}"/>
+        <TextBlock Text="{loc:Text Workbench3}" FontSize="24" FontWeight="SemiBold"/>
+        <TextBlock Text="{loc:Text UiPolish02}" Classes="caption"/>
+      </StackPanel>
+      <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="8" Padding="12,8" VerticalAlignment="Center">
+        <TextBlock x:Name="PluginCount" FontSize="12" Foreground="{DynamicResource UiMuted}"/>
+      </Border>
+    </Grid>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+      <Button Classes="primary" Content="{loc:Text Workbench4}" Click="OnImport"/>
+      <Button Content="{loc:Text UiPolish03}" Click="OnRefresh"/>
+      <Button Content="{loc:Text Workbench5}" Click="OnOpenDirectory"/>
+    </StackPanel>
+    <TabControl x:Name="ManagerTabs" Grid.Row="2">
+      <TabItem Header="{loc:Text Workbench0}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="PluginCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
+      <TabItem Header="{loc:Text Workbench1}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="ModuleCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
+      <TabItem Header="{loc:Text Workbench2}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="SettingCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
+    </TabControl>
+    <Border x:Name="ErrorNotice" Grid.Row="3" IsVisible="False" BorderBrush="{DynamicResource UiBad}" BorderThickness="1" CornerRadius="8" Padding="12">
+      <TextBlock x:Name="ErrorText" TextWrapping="Wrap" Foreground="{DynamicResource UiBad}" MaxHeight="72"/>
+    </Border>
+  </Grid>
+</Window>

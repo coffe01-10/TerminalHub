@@ -260,7 +260,6 @@ public partial class MainWindow : Window
         shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
         // Clamp locally so a transient window shrink cannot overwrite the
         // user's persisted height — the panel regrows with the window.
-        ProjectToolsRegion.Height = Math.Clamp(Bounds.Height * .34,180,360);
         OutputPanel.Height = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
@@ -1679,6 +1678,7 @@ public partial class MainWindow : Window
     {
         EndWorkspaceTabDrag(commit: false);
         _pluginManagerWindow?.Close();
+        _projectToolsWindow?.Close();
         _plugins.Changed -= RefreshExtensionUi;
         _closingPluginWindows = true;
         foreach (var window in _pluginWindows.Values.ToArray()) window.Close();

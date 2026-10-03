@@ -144,4 +144,4 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 
 ## v0.4.0 工作台扩展（本地构建）
 
-支持任意嵌套分屏、跨工作区拖动、最近使用切换、中英文切换、布局撤销/重做及嵌入式工作区工具。新增本地 .NET/Avalonia 插件机制，开发与导入见 [插件 SDK](docs/plugin-sdk.md)，交付边界见 [本轮记录](docs/workbench-2026-10-03.md)。已发布版仍为 v0.3.4。
+支持任意嵌套分屏、跨工作区拖动、最近使用切换、中英文切换、布局撤销/重做及保留状态的独立工作区工具窗口。新增本地 .NET/Avalonia 插件机制，开发与导入见 [插件 SDK](docs/plugin-sdk.md)，交付边界见 [本轮记录](docs/workbench-2026-10-03.md)。工具窗口和新增模块已精修界面，见 [当前界面与验收](docs/ui-refinement-2026-10-03.md)。已发布版仍为 v0.3.4。

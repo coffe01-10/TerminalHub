@@ -82,24 +82,28 @@ public class WorkbenchExtensionAcceptanceTests
     }
 
     [AvaloniaFact]
-    public async Task EmbeddedTools_AllFivePagesKeepEditsAcrossSelectionCollapseAndWorkspaceSwitch()
+    public async Task IndependentTools_AllFivePagesKeepEditsAcrossSelectionCloseAndWorkspaceSwitch()
     {
         using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        var terminalHeight = f.Window.FindControl<Border>("TerminalViewport")!.Bounds.Height;
         Call(f.Window, "ToggleProjectTools"); await Task.Delay(80);
+        var toolsWindow = Field<ProjectToolsWindow>(f.Window, "_projectToolsWindow");
+        var toolsView = (ProjectToolsView)toolsWindow.Content!;
+        Assert.Equal(terminalHeight, f.Window.FindControl<Border>("TerminalViewport")!.Bounds.Height);
         var manager = Field<PluginManager>(f.Window, "_plugins");
         var pages = manager.Modules.Where(m => m.Owner == "builtin").Select(m => m.GetView()).ToArray(); Assert.Equal(5, pages.Length);
-        var list = Field<ListBox>(f.Window, "_toolModulesList"); var content = Field<ContentControl>(f.Window, "_toolModulePage");
+        var list = toolsView.FindControl<ListBox>("ToolNavigation")!; var content = toolsView.FindControl<TabControl>("ToolsTabs")!;
         f.Vm.NewOutputRuleCommand.Execute(null); f.Vm.SelectedOutputRule!.Name = "保留规则"; f.Vm.SelectedOutputRule.Pattern = "error";
         f.Vm.NewProjectTaskCommand.Execute(null); f.Vm.SelectedProjectTask!.Command = "echo acceptance";
         for (var i = 0; i < 5; i++)
         {
             list.SelectedIndex = i; await Task.Delay(40);
-            Assert.Same(pages[i], content.Content); Assert.True(pages[i].IsEffectivelyVisible); Assert.True(pages[i].Bounds.Width > 400);
+            Assert.Same(pages[i], content.SelectedContent); Assert.True(pages[i].IsEffectivelyVisible); Assert.True(pages[i].Bounds.Width > 400);
             foreach (var card in pages[i].GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("card")))
                 Assert.Equal(new CornerRadius(12), card.CornerRadius);
         }
-        f.Window.CollapseProjectTools(); Assert.False(f.Window.FindControl<Border>("ProjectToolsRegion")!.IsVisible);
-        Call(f.Window, "ToggleProjectTools"); Assert.Same(pages[4], content.Content);
+        f.Window.CollapseProjectTools(); Assert.Null(Field<ProjectToolsWindow?>(f.Window, "_projectToolsWindow"));
+        Call(f.Window, "ToggleProjectTools"); Assert.Same(toolsView, Field<ProjectToolsWindow>(f.Window, "_projectToolsWindow").Content); Assert.Same(pages[4], content.SelectedContent);
         var source = f.Vm.ActiveWorkspace; await f.Vm.NewProjectWorkspaceCommand.ExecuteAsync(null); await Task.Delay(80);
         f.Vm.SwitchProjectWorkspace(source); await Task.Delay(80);
         Assert.Contains(f.Vm.OutputRules, r => r.Name == "保留规则" && r.Pattern == "error");
@@ -127,13 +131,17 @@ public class WorkbenchExtensionAcceptanceTests
             Assert.True(f.Vm.ActiveSession!.Name == selectedName, $"Sidebar selected {selectedName}, active {f.Vm.ActiveSession.Name}, error {manager.LastError}");
             Call(f.Window, "ToggleProjectTools");
             var overview = manager.Modules.Single(m => m.Owner == "example.session-panel" && m.Definition.Id == "sessions");
+            var toolView = (ProjectToolsView)Field<ProjectToolsWindow>(f.Window, "_projectToolsWindow").Content!;
+            var navigation = toolView.FindControl<ListBox>("ToolNavigation")!;
+            navigation.SelectedItem = navigation.Items.Cast<ListBoxItem>().Single(item => Equals(item.Tag, overview.Id));
+            await Task.Delay(60);
             var page = overview.GetView(); var config = manager.Modules.Single(m => m.Owner == "example.session-panel" && m.Definition.Surface == ExtensionSurface.Settings);
             var checkbox = Assert.IsType<CheckBox>(config.GetView()); checkbox.IsChecked = false;
             Assert.Contains("false", f.Vm.PluginPreferences["example.session-panel"].Configuration);
             f.Vm.LanguageIndex = 2; await Task.Delay(40); Assert.Equal("Session overview", overview.ToString()); Assert.Equal("Show directories", checkbox.Content);
             f.Window.KeyPressQwerty(PhysicalKey.F8, RawInputModifiers.Control | RawInputModifiers.Shift); await Task.Delay(100);
             Assert.Equal(6, f.Vm.SessionCards.Count); Assert.Equal(6, sidebar.ItemCount);
-            var summary = page.GetVisualDescendants().OfType<TextBlock>().Single(); Assert.Contains(f.Vm.SessionCards[^1].Name, summary.Text);
+            Assert.Contains(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == f.Vm.SessionCards[^1].Name);
             var source = f.Vm.ActiveWorkspace; await f.Vm.NewProjectWorkspaceCommand.ExecuteAsync(null); await Task.Delay(100);
             manager.Settings(overview).Workspaces[f.Vm.ActiveWorkspace.Id] = false; manager.SaveModules();
             Assert.DoesNotContain(overview, manager.Visible(ExtensionSurface.WorkspaceTools)); Assert.Single(sidebar.Items);

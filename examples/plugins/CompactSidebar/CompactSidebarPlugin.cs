@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
+using Avalonia.Controls.Templates;
 using Avalonia.Media;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Styling;
@@ -21,11 +22,26 @@ public sealed class CompactSidebarPlugin : IWorkbenchPlugin
             { Setters = { new Setter(TemplatedControl.PaddingProperty,new Thickness(4)) } });
         context.RegisterView(new("compact", "Compact sessions", ExtensionSurface.Sidebar, Replace:true), () =>
         {
-            var list = new ListBox();
-            void Refresh() => list.ItemsSource = context.Host.Sessions.Where(s => s.WorkspaceId == context.Host.ActiveWorkspaceId)
-                .Select(s => new SessionRow(s.Id,s.Name)).ToArray();
-            list.SelectionChanged += (_, _) => { if (list.SelectedItem is SessionRow row) context.Host.ActivateSession(row.Id); };
-            context.Subscribe(e => { if (e.Kind is WorkbenchEventKind.SessionCreated or WorkbenchEventKind.SessionClosed or WorkbenchEventKind.WorkspaceChanged) Refresh(); });
+            var list = new ListBox { Name = "CompactSessionList", Background = Brushes.Transparent, BorderThickness = new(0), Padding = new(4), HorizontalAlignment = HorizontalAlignment.Stretch };
+            list.Styles.Add(new Style(x => x.OfType<ListBoxItem>()) { Setters = { new Setter(TemplatedControl.PaddingProperty,new Thickness(12,10)), new Setter(TemplatedControl.MarginProperty,new Thickness(0,3)), new Setter(TemplatedControl.CornerRadiusProperty,new CornerRadius(7)), new Setter(ContentControl.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch) } });
+            list.ItemTemplate = new FuncDataTemplate<SessionRow>((row, _) =>
+            {
+                var label = new TextBlock { Text = row?.Name, TextTrimming = TextTrimming.CharacterEllipsis, FontSize = 12 };
+                label.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("UiInk")); return label;
+            });
+            var refreshing = false;
+            void Refresh()
+            {
+                refreshing = true;
+                try
+                {
+                    var rows = context.Host.Sessions.Where(s => s.WorkspaceId == context.Host.ActiveWorkspaceId).Select(s => new SessionRow(s.Id, s.Name)).ToArray();
+                    list.ItemsSource = rows; list.SelectedItem = rows.FirstOrDefault(s => s.Id == context.Host.ActiveSessionId);
+                }
+                finally { refreshing = false; }
+            }
+            list.SelectionChanged += (_, _) => { if (!refreshing && list.SelectedItem is SessionRow row) context.Host.ActivateSession(row.Id); };
+            context.Subscribe(e => { if (e.Kind is WorkbenchEventKind.SessionCreated or WorkbenchEventKind.SessionClosed or WorkbenchEventKind.WorkspaceChanged or WorkbenchEventKind.ActiveSessionChanged) Refresh(); });
             Refresh(); return list;
         });
     }

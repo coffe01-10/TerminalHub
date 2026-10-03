@@ -54,13 +54,30 @@ public sealed partial class MeasurementApplication
             foreach (var name in new[] { "Minimal", "CompactSidebar", "SessionPanel" }) manager.Import(Path.Combine(repo, "examples", "plugins", name, "bin", "Release", "net8.0"));
             Check(manager.Plugins.Count == 3 && manager.Plugins.All(p => p.Enabled && p.Error.Length == 0), "Three real plugin DLLs enable together");
             Check(!window.FindControl<ListBox>("SessionShelf")!.IsVisible && window.Styles.Count == baseStyles + 2, "Sidebar replacement and plugin styles apply");
+            var terminalHeight = window.FindControl<Border>("TerminalViewport")!.Bounds.Height;
             typeof(MainWindow).GetMethod("ToggleProjectTools", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, null);
             await Task.Delay(200);
-            var list = (ListBox)typeof(MainWindow).GetField("_toolModulesList", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+            var toolsWindow = (ProjectToolsWindow)typeof(MainWindow).GetField("_projectToolsWindow", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+            var list = ((ProjectToolsView)toolsWindow.Content!).FindControl<ListBox>("ToolNavigation")!;
             for (var i = 0; i < list.ItemCount; i++) { list.SelectedIndex = i; await Task.Delay(60); }
-            Check(list.ItemCount == 7, "Five built-in tools and two plugin tools render in the embedded region");
+            Check(list.ItemCount == 7, "Five built-in tools and two plugin tools render in the independent tools window");
+            var toolsView = toolsWindow.Content;
+            window.CollapseProjectTools();
+            typeof(MainWindow).GetMethod("ToggleProjectTools", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, null);
+            var reopened = (ProjectToolsWindow)typeof(MainWindow).GetField("_projectToolsWindow", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+            Check(ReferenceEquals(toolsView, reopened.Content) && list.SelectedIndex == 6 && window.FindControl<Border>("TerminalViewport")!.Bounds.Height == terminalHeight, "Reopening tools retains the selected page without shrinking the terminal");
             window.CollapseProjectTools();
             vm.LanguageIndex = 2; await Task.Delay(100);
+            typeof(MainWindow).GetMethod("OpenPluginManager", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, null);
+            var pluginWindow = (PluginManagerWindow)typeof(MainWindow).GetField("_pluginManagerWindow", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+            pluginWindow.Width = pluginWindow.MinWidth; pluginWindow.Height = pluginWindow.MinHeight;
+            pluginWindow.FindControl<TabControl>("ManagerTabs")!.SelectedIndex = 1; await Task.Delay(120);
+            var order = pluginWindow.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.IsEffectivelyVisible);
+            order.Focus(); order.Value = 47;
+            Check(pluginWindow.GetVisualDescendants().OfType<NumericUpDown>().Contains(order) && order.Value == 47, "Module ordering keeps its editor in the native minimum-size manager window");
+            using (var bitmap = new RenderTargetBitmap(new((int)pluginWindow.Bounds.Width, (int)pluginWindow.Bounds.Height)))
+            { bitmap.Render(pluginWindow); bitmap.Save(Path.Combine(Path.GetDirectoryName(Program.Report)!, "native-ui-manager.png")); }
+            pluginWindow.Close();
             var snapshot = Path.ChangeExtension(Program.Report, ".png");
             using (var bitmap = new RenderTargetBitmap(new((int)window.Bounds.Width, (int)window.Bounds.Height))) { bitmap.Render(window); bitmap.Save(snapshot); }
             manager.Disable(manager.Plugins.Single(p => p.Manifest.Id == "example.compact-sidebar"));

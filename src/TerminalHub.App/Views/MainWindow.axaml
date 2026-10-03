@@ -160,7 +160,7 @@
 
   <Panel>
     <ctl:WorkspaceBackdrop/>
-    <Grid RowDefinitions="64,42,*,Auto,Auto,Auto,32">
+    <Grid RowDefinitions="64,42,*,Auto,Auto,32">
 
       <!-- ============ Title bar ============ -->
       <Border Grid.Row="0" Background="Transparent" Padding="26,0" PointerPressed="OnTitleBarPointerPressed">
@@ -1687,21 +1687,8 @@
 
       <StackPanel x:Name="PluginSidePanel" Grid.Row="2" IsVisible="False" Width="300" HorizontalAlignment="Right" Margin="12" Background="{DynamicResource UiPanel}" ZIndex="70"/>
       <StackPanel x:Name="PluginBottomPanel" Grid.Row="4" IsVisible="False" MaxHeight="220" Background="{DynamicResource UiPanel}"/>
-      <Border x:Name="ProjectToolsRegion" Grid.Row="5" IsVisible="False" Height="300" MinHeight="180"
-              Background="{DynamicResource UiPanel}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,1,0,0">
-        <Grid RowDefinitions="32,*">
-          <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,0">
-            <TextBlock Text="{loc:Text M0463}" VerticalAlignment="Center" Foreground="{DynamicResource UiInk}"/>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-              <Button Content="−" Click="OnCollapseProjectTools" ToolTip.Tip="{loc:Text Workbench18}"/>
-              <Button Content="×" Click="OnCloseProjectTools" ToolTip.Tip="{loc:Text Workbench19}"/>
-            </StackPanel>
-          </Grid>
-          <ContentControl x:Name="ProjectToolsContent" Grid.Row="1"/>
-        </Grid>
-      </Border>
       <!-- ============ Status bar ============ -->
-      <Border Grid.Row="6" Background="{DynamicResource UiCanvas}" Padding="26,0">
+      <Border Grid.Row="5" Background="{DynamicResource UiCanvas}" Padding="26,0">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel x:Name="StatusContents" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
             <TextBlock x:Name="PluginNotice" Foreground="{DynamicResource UiBad}" MaxWidth="280" TextTrimming="CharacterEllipsis" IsVisible="False"/>
@@ -1876,22 +1863,22 @@
       <TextBlock x:Name="SessionTransferText" Foreground="{DynamicResource UiAccent}" TextTrimming="CharacterEllipsis" MaxWidth="700"/>
     </Border>
     <Border x:Name="RecentSwitcherPanel" IsVisible="{Binding RecentSwitcherOpen}" ZIndex="230" HorizontalAlignment="Center" VerticalAlignment="Center"
-            Width="560" MaxHeight="620" Margin="24" Padding="20" CornerRadius="18"
+            Width="520" MaxHeight="580" Margin="24" Padding="22" CornerRadius="18"
             Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
             BoxShadow="{DynamicResource FloatingShadow}">
       <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
         <TextBlock Text="{loc:Text M0601}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
         <ListBox x:Name="RecentSessionList" Grid.Row="1" MaxHeight="480" ItemsSource="{Binding RecentCandidates}"
-                 SelectedItem="{Binding SelectedRecent}" DoubleTapped="OnRecentDoubleTapped">
+                 Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedRecent}" DoubleTapped="OnRecentDoubleTapped">
           <ListBox.Styles>
-            <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="CornerRadius" Value="8"/></Style>
+            <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="10,8"/><Setter Property="Margin" Value="0,3"/></Style>
             <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
             <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
           </ListBox.Styles>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:RecentSessionEntry">
-              <Grid ColumnDefinitions="150,*" ColumnSpacing="16" Margin="4">
-                <Border Height="80" ClipToBounds="True" Background="{DynamicResource UiInset}" CornerRadius="6">
+              <Grid ColumnDefinitions="116,*" ColumnSpacing="16" Margin="2">
+                <Border Height="64" ClipToBounds="True" Background="{DynamicResource UiInset}" CornerRadius="7" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
                   <ctl:StagePreview Emulator="{Binding Emulator}"/>
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">

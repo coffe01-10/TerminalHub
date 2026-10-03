@@ -19,9 +19,12 @@ public class TestApp
         // Isolate default-path settings: each SettingsStore created without an
         // explicit path gets its own temp file, so a workspace saved by one
         // test can't be "restored" into the next test's window.
-        Environment.SetEnvironmentVariable(
-            "TERMINALHUB_SETTINGS_DIR",
-            Path.Combine(Path.GetTempPath(), "TerminalHub.Tests", Guid.NewGuid().ToString("N")));
+        var testSettingsDirectory = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "TerminalHub.Tests", Guid.NewGuid().ToString("N")));
+        Environment.SetEnvironmentVariable("TERMINALHUB_SETTINGS_DIR", testSettingsDirectory);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            if (Directory.Exists(testSettingsDirectory)) Directory.Delete(testSettingsDirectory, true);
+        };
         return AppBuilder.Configure<TerminalHub.App.App>()
             .UseSkia()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })

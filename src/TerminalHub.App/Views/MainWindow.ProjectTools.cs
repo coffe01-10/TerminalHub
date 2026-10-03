@@ -9,22 +9,23 @@ namespace TerminalHub.App.Views;
 public partial class MainWindow
 {
     private ProjectToolsView? _projectToolsView;
+    private ProjectToolsWindow? _projectToolsWindow;
     private void OnProjectTools(object? sender, RoutedEventArgs e) => ToggleProjectTools();
     public void CollapseProjectTools()
     {
         Vm.SaveProjectToolsCommand.Execute(null);
-        ProjectToolsRegion.IsVisible = false;
+        _projectToolsWindow?.Close();
         ActiveTerminal()?.Focus();
     }
     private void ToggleProjectTools()
     {
-        if (ProjectToolsRegion.IsVisible) { CollapseProjectTools(); return; }
         EnsureToolModules();
-        ProjectToolsRegion.IsVisible = true;
-        RefreshToolModules();
+        if (_projectToolsWindow is not null) { _projectToolsWindow.Activate(); return; }
+        var window = new ProjectToolsWindow(this, Vm, _projectToolsView!);
+        window.Closed += (_, _) => _projectToolsWindow = null;
+        _projectToolsWindow = window;
+        window.Show(this);
     }
-    private void OnCollapseProjectTools(object? sender, RoutedEventArgs e) => CollapseProjectTools();
-    private void OnCloseProjectTools(object? sender, RoutedEventArgs e) => CollapseProjectTools();
     private void OnSwitchWorkspace(object? sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.Tag is not LiveWorkspace workspace) return;

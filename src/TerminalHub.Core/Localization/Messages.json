@@ -4183,5 +4183,95 @@
     "id": "Workbench28",
     "zh": "插件目录不在安装目录中",
     "en": "The plugin directory is outside the install directory"
+  },
+  {
+    "id": "UiPolish01",
+    "zh": "当前工作区没有显示的工具模块，可在插件管理器中调整。",
+    "en": "No tools are visible in this workspace. Adjust visibility in the plugin manager."
+  },
+  {
+    "id": "UiPolish02",
+    "zh": "管理扩展、显示范围与插件设置。",
+    "en": "Manage extensions, module visibility, and plugin settings."
+  },
+  {
+    "id": "UiPolish03",
+    "zh": "刷新",
+    "en": "Refresh"
+  },
+  {
+    "id": "UiPolish04",
+    "zh": "已启用 / 已安装",
+    "en": "Enabled / installed"
+  },
+  {
+    "id": "UiPolish05",
+    "zh": "让工作台更合你的习惯",
+    "en": "Make this workbench your own"
+  },
+  {
+    "id": "UiPolish06",
+    "zh": "导入本地插件，添加工具或调整工作台界面。",
+    "en": "Import a local plugin to add tools or customize the workbench."
+  },
+  {
+    "id": "UiPolish07",
+    "zh": "加载失败",
+    "en": "Failed to load"
+  },
+  {
+    "id": "UiPolish08",
+    "zh": "已启用",
+    "en": "Enabled"
+  },
+  {
+    "id": "UiPolish09",
+    "zh": "已停用",
+    "en": "Disabled"
+  },
+  {
+    "id": "UiPolish10",
+    "zh": "显示模块",
+    "en": "Show module"
+  },
+  {
+    "id": "UiPolish11",
+    "zh": "当前工作区",
+    "en": "Current workspace"
+  },
+  {
+    "id": "UiPolish12",
+    "zh": "排序",
+    "en": "Order"
+  },
+  {
+    "id": "UiPolish13",
+    "zh": "暂无可用模块",
+    "en": "No modules available"
+  },
+  {
+    "id": "UiPolish14",
+    "zh": "启用插件后，可在这里调整模块的显示范围和顺序。",
+    "en": "Enable a plugin to adjust module visibility and order here."
+  },
+  {
+    "id": "UiPolish15",
+    "zh": "暂无插件设置",
+    "en": "No plugin settings"
+  },
+  {
+    "id": "UiPolish16",
+    "zh": "支持设置的插件启用后，会在这里显示配置选项。",
+    "en": "Settings appear here when an enabled plugin provides them."
+  },
+  {
+    "id": "UiPolish17",
+    "zh": "窗格操作",
+    "en": "Pane actions"
+  },
+  {
+    "id": "UiPolish18",
+    "zh": "内置工具",
+    "en": "Built-in tools"
   }
 ]

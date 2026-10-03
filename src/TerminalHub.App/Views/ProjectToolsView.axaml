@@ -48,20 +48,21 @@
   </UserControl.Styles>
   <Grid x:Name="ToolsLayout" ColumnDefinitions="156,*" RowDefinitions="*,64">
     <Border Grid.RowSpan="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,0,1,0">
-      <Grid RowDefinitions="Auto,Auto,*,Auto">
+      <Grid RowDefinitions="Auto,*,Auto">
         <StackPanel Spacing="8" Margin="24,28,20,24">
           <TextBlock Text="TERMINAL HUB" FontSize="10" LetterSpacing="2" Foreground="{DynamicResource UiMuted}"/>
           <TextBlock Text="{loc:Text M0463}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
           <TextBlock Text="{Binding ActiveWorkspace.Name}" FontSize="12" Foreground="{DynamicResource UiAccent}" TextTrimming="CharacterEllipsis"/>
         </StackPanel>
         <ListBox x:Name="ToolNavigation" Grid.Row="1" SelectedIndex="{Binding SelectedIndex, ElementName=ToolsTabs, Mode=TwoWay}" AutomationProperties.Name="{loc:Text M0695}">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
           <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource RulesIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0696}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
           <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource BroadcastIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0697}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
           <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource TaskIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0698}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
           <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource FolderIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0699}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
           <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource RecordIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0700}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
         </ListBox>
-        <StackPanel Grid.Row="3" Margin="24,16,20,24" Spacing="5"><TextBlock Text="{loc:Text M0701}" FontSize="11" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="{loc:Text M0702}" TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource UiFaint}"/></StackPanel>
+        <StackPanel Grid.Row="2" Margin="24,16,20,24" Spacing="5"><TextBlock Text="{loc:Text M0701}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="{loc:Text M0702}" TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource UiFaint}"/></StackPanel>
       </Grid>
     </Border>
     <TabControl x:Name="ToolsTabs" Grid.Column="1" Margin="12,16,12,0" SelectedIndex="0">
@@ -172,6 +173,7 @@
         </StackPanel></ScrollViewer>
       </TabItem>
     </TabControl>
+    <TextBlock Grid.Column="1" Text="{loc:Text UiPolish01}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="340" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding #ToolsTabs.ItemCount, Converter={x:Static views:ProjectToolsView.IsEmpty}}"/>
     <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,Auto" Margin="12,8,12,8"><TextBlock Text="{loc:Text M0770}" Classes="caption" VerticalAlignment="Center"/><Button Grid.Column="1" Content="{loc:Text M0771}" Classes="primary" Command="{Binding SaveProjectToolsCommand}" VerticalAlignment="Center"/></Grid>
   </Grid>
 </UserControl>

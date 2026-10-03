@@ -144,4 +144,4 @@ Suggestions are welcome in [Issues](https://github.com/coffe01-10/TerminalHub/is
 
 ## v0.4.0 workbench extensions (local build)
 
-Adds nested splits, cross-workspace session moves, recent-session switching, Chinese/English UI, layout undo/redo and embedded workspace tools. Native .NET/Avalonia plugins have a public SDK and independently built examples; see [plugin development](docs/plugin-sdk.md) and [delivery notes](docs/workbench-2026-10-03.md). The published release remains v0.3.4.
+Adds nested splits, cross-workspace session moves, recent-session switching, Chinese/English UI, layout undo/redo and workspace tools in a reusable independent window. Native .NET/Avalonia plugins have a public SDK and independently built examples; see [plugin development](docs/plugin-sdk.md) and [delivery notes](docs/workbench-2026-10-03.md). The tools window and new modules have received a UI refinement; see [current UI and acceptance](docs/ui-refinement-2026-10-03.md). The published release remains v0.3.4.

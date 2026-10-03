@@ -7,6 +7,11 @@ public partial class ProjectToolsWindow : Window
 {
     public static readonly FuncValueConverter<int, bool> IsEmpty = ProjectToolsView.IsEmpty;
     public ProjectToolsWindow() { InitializeComponent(); }
-    public ProjectToolsWindow(MainWindow owner, MainWindowViewModel vm) : this()
-    { DataContext = vm; Content = new ProjectToolsView(owner, vm); Closed += (_, _) => vm.SaveProjectToolsCommand.Execute(null); }
+    public ProjectToolsWindow(MainWindow owner, MainWindowViewModel vm)
+        : this(owner, vm, new ProjectToolsView(owner, vm)) { }
+    public ProjectToolsWindow(MainWindow owner, MainWindowViewModel vm, ProjectToolsView view) : this()
+    {
+        DataContext = vm; Content = view;
+        Closed += (_, _) => { vm.SaveProjectToolsCommand.Execute(null); Content = null; };
+    }
 }
