@@ -26,6 +26,7 @@
 <article class="plugin" id="watch"><div class="symbol">03</div><div><h3>命令看板</h3><div class="tag">official.command-watch</div><p>集中看各终端最近一次命令的状态、耗时和退出码。默认只看当前工作区，取消筛选可看全部会话，点击卡片回到相应终端。</p><p>只使用 Shell 集成标记。无标记显示「尚未收到命令标记」，缺少退出码显示未知。0 为完成，非 0 为失败。启用前不补录，不推断 AI 完成状态，不发送命令，不保存输出；某些 Shell 或 TUI 没有标记时无状态可显示。</p></div></article>
 </section>
 <section id="develop"><span class="number">03 / BUILD YOUR FIRST PLUGIN</span><h2>开发第一个插件</h2>
+<p><a href="development-tutorial.en.html#start" lang="en">English plugin development tutorial →</a></p>
 <p class="note"><a href="development-tutorial.html#start">完整开发教程：从零写一个命令草稿工具 →</a><br>包含完整工程、清单、全部源码、逐段讲解，以及配置、事件、主题、多语言、打包和调试步骤。</p>
 <p>开发需要 .NET 8 SDK，安装插件的用户只需要宿主。可以从仓库的 <code>examples/plugins/Minimal</code> 开始，或从 <a href="https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0">v0.4.0 Release ↗</a> 下载 API 1 SDK，用下面的独立项目引用。</p>
 <h3>1. 创建类库</h3><pre>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;

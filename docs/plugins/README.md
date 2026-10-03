@@ -2,6 +2,8 @@
 
 [安装](#安装官方插件) · [官方插件](#三个官方插件) · [插件开发教程](development-tutorial.md) · [API 参考](../plugin-sdk.md#命令事件和宿主操作) · [源码](../../plugins) · [离线页面](index.html)
 
+开发教程提供[中文](development-tutorial.md)和[English](development-tutorial.en.md)，离线页面也可切换；「开发文档」入口随应用当前中英文界面打开对应版本。
+
 Terminal Hub 插件是运行在原生应用内的 .NET 8 / Avalonia 11 类库。需要 Terminal Hub v0.4.0 或更新版本，当前宿主 API 为 1。官方插件与第三方插件使用同一套公开接口，没有依赖应用私有代码。
 
 新版插件管理窗口提供「开发文档 ↗」和「官方插件 ↗」入口，打开随应用附带的离线页面，直接跳转到相应章节。源码和 API 参考外链需要联网。旧版 v0.4.0 没有这两个新按钮，但可以按下方步骤导入插件。

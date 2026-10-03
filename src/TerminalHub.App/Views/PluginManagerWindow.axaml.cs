@@ -145,9 +145,12 @@ public partial class PluginManagerWindow : Window
         try
         {
             var development = section == "develop";
-            var path = Path.Combine(AppContext.BaseDirectory, "docs", "plugins", development ? "development-tutorial.html" : "index.html");
+            var tutorial = Localizer.Current.Language == "en" ? "development-tutorial.en" : "development-tutorial";
+            var path = Path.Combine(AppContext.BaseDirectory, "docs", "plugins", development ? tutorial + ".html" : "index.html");
             var uri = File.Exists(path) ? new Uri(new Uri(path).AbsoluteUri + "#" + (development ? "start" : section))
-                : new Uri("https://github.com/coffe01-10/TerminalHub/blob/main/docs/plugin-sdk.md");
+                : new Uri(development
+                    ? "https://github.com/coffe01-10/TerminalHub/blob/main/docs/plugins/" + tutorial + ".md"
+                    : "https://github.com/coffe01-10/TerminalHub/blob/main/docs/plugins/README.md");
             if (!await Launcher.LaunchUriAsync(uri)) Notice(uri.AbsoluteUri);
         }
         catch (Exception ex) { Notice(ex.Message); }

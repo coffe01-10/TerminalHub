@@ -1,5 +1,7 @@
 # Terminal Hub 插件开发教程：从零写一个命令草稿工具
 
+中文 · [English](development-tutorial.en.md)
+
 这篇教程面向插件开发者。完成后，你会得到一个真正可以导入 Terminal Hub 的 .NET 插件：显示活动终端、编辑命令草稿、点击粘贴、保存配置，并在切换会话时更新界面。后半部分教你添加设置页、多语言和后台任务。
 
 [准备环境](#prepare) · [创建工程](#project) · [编写清单](#manifest) · [实现插件](#implementation) · [理解代码](#explain) · [构建导入](#run) · [扩展功能](#extend) · [打包调试](#distribute) · [常见问题](#troubleshooting)

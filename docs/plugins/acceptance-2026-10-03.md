@@ -63,3 +63,7 @@ Windows 原生验收依赖 `powershell.exe` 与 ConPTY；它用已知测试输�
 新增[完整教程](development-tutorial.md)与 `examples/plugins/CommandDraft`。配套工程分别使用仓库 ProjectReference 和 v0.4.0 发行 SDK DLL 编译通过，均为 0 警告、0 错误。`PluginTutorialTests` 实际导入示例 DLL，核对输入字节未追加回车、激活另一个会话后的标签和输入目标、保存后停用重启的配置恢复，验证通过。结果 `artifacts/official-plugins/acceptance/plugin-tutorial.trx`。此示例本轮未做原生系统输入法或真实 Shell 操作验收。
 
 离线教程在内置浏览器加载，完整实现章节跳转到 `#implementation`，全部源码、工程与清单块可阅读；应用「开发文档」入口改为打开 `development-tutorial.html#start`。
+
+## 英文开发教程
+
+补齐九章英文开发教程和离线 HTML，中英文页面可互相切换。插件管理器的开发文档入口按当前界面语言选择教程；应用和官方插件打包清单均包含两种语言。直接提取英文页的 csproj、清单与完整 C# 示例，引用已发布 v0.4.0 SDK 构建成功（0 警告、0 错误），临时工程已删除。App Release 构建通过（0 警告、0 错误），输出包含中英文离线教程；内置浏览器已核对英文页面、实现章节跳转、中英互切和首页排版。系统默认浏览器启动仍未做 OS 点击验收。现有发行附件尚未更新。

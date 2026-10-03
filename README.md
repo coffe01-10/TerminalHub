@@ -134,7 +134,7 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 - [Development guide](AGENTS.md): code entry points, known pitfalls, and relevant checks.
 - [CLI interaction compatibility](docs/cli-compatibility.md): tools, protocols, and real CLI verification.
 - [Workspace tools](docs/project-features-2026-10-02.md): usage details for tasks, output rules, broadcast, remote files, and recording.
-- [Plugin development tutorial](docs/plugins/development-tutorial.md): build a complete Command Draft plugin from scratch, with a runnable sample, configuration, events and UI extensions.
+- [Plugin development tutorial](docs/plugins/development-tutorial.en.md) ([中文](docs/plugins/development-tutorial.md)): build a complete Command Draft plugin from scratch, with a runnable sample, configuration, events and UI extensions.
 - [Plugin guide and official plugins](docs/plugins/README.md): install Workspace Notes, Screen Clips and Command Watch; see the [SDK reference](docs/plugin-sdk.md) for API details.
 - [Roadmap](docs/TODO.md): upcoming development.
 - [README assets](docs/readme/README.md): SVG sources and generation.

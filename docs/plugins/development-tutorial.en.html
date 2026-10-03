@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Plugin Development Tutorial · Terminal Hub</title><style>
+:root{--paper:#f4f1e9;--ink:#202b26;--muted:#606b64;--line:#cbd2c9;--accent:#246147;--wash:#e9eee5}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:26px}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.8 "Microsoft YaHei UI","PingFang SC",sans-serif}a{color:var(--accent);text-underline-offset:4px}a:hover{color:#102e22}a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:5px}.shell{max-width:1180px;margin:auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:58px;padding:48px 36px}aside{position:sticky;top:42px;align-self:start}.brand{font:600 17px/1.4 Consolas,monospace;letter-spacing:-.5px;margin-bottom:8px}.edition{color:var(--muted);font-size:12px}nav{margin-top:32px;display:grid;gap:13px}nav a{text-decoration:none;font-size:14px}.tiny{font:12px/1.7 Consolas,monospace;color:var(--muted)}.rule{border-top:1px solid var(--line);margin:28px 0}main{min-width:0}header{padding:10px 0 35px;border-bottom:2px solid var(--ink)}.eyebrow{font:12px Consolas,monospace;color:var(--accent);letter-spacing:2px}h1{font:600 clamp(32px,5vw,52px)/1.25 Georgia,"Microsoft YaHei UI",serif;letter-spacing:-1px;margin:20px 0}h2{font-size:26px;margin:0 0 20px}h3{font-size:19px;margin:0 0 8px}p{margin:12px 0}.lead{color:var(--muted);max-width:660px;font-size:17px}section{padding:42px 0;border-bottom:1px solid var(--line)}.number{font:12px Consolas,monospace;color:var(--accent);display:block;margin-bottom:10px}.plugin{padding:22px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px}.plugin:first-of-type{border-top:0}.symbol{font:22px Consolas,monospace;color:var(--accent)}.tag{font:12px Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}.note{border-left:3px solid var(--accent);padding:12px 18px;background:var(--wash);font-size:14px}.steps{padding-left:24px}.steps li{padding:4px 0}pre{background:#202b26;color:#e8eee5;padding:20px;border-radius:5px;overflow:auto;font:13px/1.8 Consolas,monospace}code{font-family:Consolas,monospace;font-size:.9em;overflow-wrap:anywhere}td,th{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}table{width:100%;border-collapse:collapse}details{padding:15px 0;border-bottom:1px solid var(--line)}summary{cursor:pointer;font-weight:600}footer{padding:30px 0;color:var(--muted);font-size:12px}@media(max-width:780px){.shell{grid-template-columns:1fr;padding:24px;gap:24px}aside{position:static}nav{display:flex;flex-wrap:wrap;gap:12px 20px;margin-top:18px}aside .rule,aside .tiny{display:none}section{padding:32px 0}table{display:block;overflow:auto}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+h1{font-size:38px}h2{margin:48px 0 18px;border-top:1px solid var(--line);padding-top:28px}h3{margin:32px 0 14px}</style></head><body><div class="shell"><aside><div class="brand">&gt;_ Terminal Hub</div><div class="edition">Build your first plugin / API 1</div><p><a href="development-tutorial.html#start" lang="zh-CN">中文</a> · English</p><nav aria-label="Tutorial contents"><a href="#prepare">01 / Requirements</a><a href="#project">02 / Project</a><a href="#manifest">03 / Manifest</a><a href="#implementation">04 / Implementation</a><a href="#explain">05 / Code walkthrough</a><a href="#run">06 / Build and import</a><a href="#extend">07 / Extensions</a><a href="#distribute">08 / Packaging and debugging</a><a href="#troubleshooting">09 / Troubleshooting</a></nav><div class="rule"></div><a href="index.html#official">Official plugins and installation (Chinese) ↗</a></aside><main id="start"><h1>Terminal Hub Plugin Development Tutorial: Build a Command Draft Tool</h1>
+<p><a href="development-tutorial.html">中文</a> · English</p>
+<p>This tutorial is for plugin developers. You will build a .NET plugin that loads into Terminal Hub, displays the active terminal, lets you edit and paste a command draft, saves configuration, and updates its target when you switch sessions. The later sections explain settings pages, localization, and background work.</p>
+<p><a href="#prepare">Requirements</a> · <a href="#project">Project</a> · <a href="#manifest">Manifest</a> · <a href="#implementation">Implementation</a> · <a href="#explain">Code walkthrough</a> · <a href="#run">Build and import</a> · <a href="#extend">Extensions</a> · <a href="#distribute">Packaging and debugging</a> · <a href="#troubleshooting">Troubleshooting</a></p>
+<p><a href="https://github.com/coffe01-10/TerminalHub/tree/main/examples/plugins/CommandDraft">Complete sample project</a> · <a href="https://github.com/coffe01-10/TerminalHub/blob/main/docs/plugin-sdk.md">SDK reference, Chinese</a> · <a href="https://github.com/coffe01-10/TerminalHub/tree/main/plugins">Official plugin source</a></p>
+<a id="prepare"></a>
+<h2>1. Prepare your environment</h2>
+<p>You need the .NET 8 SDK, a code editor, and Terminal Hub v0.4.0 or later. Use Avalonia 11.3.2 and host API 1. A plugin is a class library loaded by Terminal Hub; it does not run independently with <code>dotnet run</code>.</p>
+<p>Run <code>dotnet --list-sdks</code> and check that an <code>8.0.xxx</code> SDK is installed. Download <code>TerminalHub-PluginSDK-1.zip</code> from the <a href="https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0">v0.4.0 release</a> and extract it. Its <code>sdk/</code> directory contains <code>TerminalHub.Extensibility.dll</code> and <code>TerminalHub.Core.dll</code>.</p>
+<p>If you have cloned the repository, you can build the accompanying sample directly:</p>
+<pre><code class="language-powershell">dotnet build examples/plugins/CommandDraft/CommandDraft.csproj -c Release</code></pre>
+<p>The following steps use the standalone SDK. You do not need to reference or build the App project. The repository sample uses Chinese display labels; the complete code on this page uses English labels with the same IDs and behavior.</p>
+<a id="project"></a>
+<h2>2. Create a project and reference the SDK</h2>
+<p>Run these commands in your development directory:</p>
+<pre><code class="language-powershell">dotnet new classlib -n CommandDraft -f net8.0
+cd CommandDraft</code></pre>
+<p>Delete the generated <code>Class1.cs</code>. Create a <code>sdk</code> directory and copy the two DLLs listed above into it. Replace <code>CommandDraft.csproj</code> with:</p>
+<pre><code class="language-xml">&lt;Project Sdk=&quot;Microsoft.NET.Sdk&quot;&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;AssemblyName&gt;TerminalHub.Example.CommandDraft&lt;/AssemblyName&gt;
+  &lt;/PropertyGroup&gt;
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include=&quot;Avalonia&quot; Version=&quot;11.3.2&quot; /&gt;
+    &lt;Reference Include=&quot;TerminalHub.Extensibility&quot;&gt;
+      &lt;HintPath&gt;sdk/TerminalHub.Extensibility.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+    &lt;Reference Include=&quot;TerminalHub.Core&quot;&gt;
+      &lt;HintPath&gt;sdk/TerminalHub.Core.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+    &lt;None Update=&quot;plugin.json&quot; CopyToOutputDirectory=&quot;PreserveNewest&quot; /&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Project&gt;</code></pre>
+<p><code>Avalonia</code> provides the native controls. <code>Extensibility</code> defines the plugin interfaces; <code>Core</code> supplies types used by those interfaces, including terminal frames and command state. <code>Private=false</code> prevents the two host-provided SDK DLLs from being copied into your plugin output. <code>AssemblyName</code> determines the generated DLL filename.</p>
+<p>Your project should now look like this:</p>
+<pre><code class="language-text">CommandDraft/
+  CommandDraft.csproj
+  CommandDraftPlugin.cs
+  plugin.json
+  sdk/
+    TerminalHub.Extensibility.dll
+    TerminalHub.Core.dll</code></pre>
+<a id="manifest"></a>
+<h2>3. Write the plugin manifest</h2>
+<p>Create <code>plugin.json</code> at the project root:</p>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;tutorial.command-draft&quot;,
+  &quot;name&quot;: &quot;Command Draft (tutorial sample)&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;entry&quot;: &quot;TerminalHub.Example.CommandDraft.dll&quot;,
+  &quot;entryType&quot;: &quot;TerminalHub.Example.CommandDraft.CommandDraftPlugin&quot;,
+  &quot;hostApi&quot;: 1
+}</code></pre>
+<table><thead><tr><th>Field</th><th>Meaning in this example</th></tr></thead><tbody><tr><td><code>id</code></td><td>Unique plugin ID, also used as its installation directory name and configuration namespace. Use your own ID when publishing your plugin.</td></tr><tr><td><code>name</code></td><td>Name shown in the plugin manager.</td></tr><tr><td><code>version</code></td><td>Your plugin&#x27;s version, independent of the host version.</td></tr><tr><td><code>entry</code></td><td>Entry DLL inside the plugin directory; it must match the project&#x27;s <code>AssemblyName</code>.</td></tr><tr><td><code>entryType</code></td><td>Fully qualified class name implementing <code>IWorkbenchPlugin</code>, including its namespace.</td></tr><tr><td><code>hostApi</code></td><td>This tutorial targets host API 1.</td></tr></tbody></table>
+<p>The project&#x27;s <code>CopyToOutputDirectory</code> setting places this manifest next to the DLL. Without it, compilation may succeed while importing the output directory fails because the manifest is missing.</p>
+<a id="implementation"></a>
+<h2>4. Implement the complete plugin</h2>
+<p>Create <code>CommandDraftPlugin.cs</code> and copy all of the following code. It constructs controls in C#, so no separate XAML file is needed.</p>
+<pre><code class="language-csharp">using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+using TerminalHub.Extensibility;
+
+namespace TerminalHub.Example.CommandDraft;
+
+public sealed class CommandDraftPlugin : IWorkbenchPlugin
+{
+    public sealed record Options(string Draft = &quot;echo hello&quot;);
+
+    private IPluginContext _context = null!;
+    private Options _options = new();
+    private TextBlock? _sessionLabel;
+    private TextBox? _editor;
+    private Button? _pasteButton, _saveButton;
+
+    public void Initialize(IPluginContext context)
+    {
+        _context = context;
+        _options = context.ReadConfiguration&lt;Options&gt;() ?? new();
+
+        context.RegisterView(new(&quot;draft&quot;, &quot;Command draft&quot;, ExtensionSurface.WorkspaceTools), CreateView);
+        context.RegisterCommand(new(&quot;paste-draft&quot;, &quot;Paste command draft&quot;, () =&gt;
+        {
+            PasteDraft();
+            return Task.CompletedTask;
+        }));
+        context.Subscribe(e =&gt;
+        {
+            if (e.Kind is WorkbenchEventKind.ActiveSessionChanged
+                or WorkbenchEventKind.WorkspaceChanged
+                or WorkbenchEventKind.SessionCreated
+                or WorkbenchEventKind.SessionClosed)
+                RefreshSession();
+        });
+    }
+
+    private Control CreateView()
+    {
+        var panel = new StackPanel { Margin = new(20), Spacing = 12 };
+        var title = new TextBlock { Text = &quot;Command draft&quot;, FontSize = 22 };
+        title.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension(&quot;UiInk&quot;));
+        panel.Children.Add(title);
+
+        _sessionLabel = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        _sessionLabel.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension(&quot;UiMuted&quot;));
+        panel.Children.Add(_sessionLabel);
+
+        _editor = new TextBox { Text = _options.Draft, Watermark = &quot;For example: echo hello&quot; };
+        _editor.Bind(TextBox.ForegroundProperty, new DynamicResourceExtension(&quot;UiInk&quot;));
+        _editor.Bind(TextBox.BackgroundProperty, new DynamicResourceExtension(&quot;UiInset&quot;));
+        _editor.Bind(TextBox.BorderBrushProperty, new DynamicResourceExtension(&quot;UiBorder&quot;));
+        panel.Children.Add(_editor);
+
+        var actions = new WrapPanel();
+        _pasteButton = ActionButton(&quot;Paste into active terminal&quot;, PasteDraft);
+        _saveButton = ActionButton(&quot;Save draft&quot;, SaveDraft);
+        actions.Children.Add(_pasteButton); actions.Children.Add(_saveButton);
+        panel.Children.Add(actions);
+
+        var hint = new TextBlock { Text = &quot;Pasting does not send Enter. Save the draft to restore it after re-enabling the plugin.&quot;, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        hint.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension(&quot;UiMuted&quot;));
+        panel.Children.Add(hint);
+        RefreshSession();
+        return panel;
+    }
+
+    private Button ActionButton(string title, Action action)
+    {
+        var button = new Button { Content = title, Padding = new(12, 8), Margin = new(0, 0, 8, 8), CornerRadius = new(6) };
+        button.Bind(Button.ForegroundProperty, new DynamicResourceExtension(&quot;UiInk&quot;));
+        button.Bind(Button.BackgroundProperty, new DynamicResourceExtension(&quot;UiRaised&quot;));
+        button.Bind(Button.BorderBrushProperty, new DynamicResourceExtension(&quot;UiBorder&quot;));
+        button.Click += (_, _) =&gt;
+        {
+            try { action(); }
+            catch (Exception ex) { _context.ReportError(ex); }
+        };
+        return button;
+    }
+
+    private void RefreshSession()
+    {
+        var session = _context.Host.Sessions.FirstOrDefault(s =&gt; s.Id == _context.Host.ActiveSessionId);
+        if (_sessionLabel is not null)
+            _sessionLabel.Text = session is null ? &quot;No active session&quot; : $&quot;Target: {session.Name}\n{session.WorkingDirectory}&quot;;
+        if (_pasteButton is not null) _pasteButton.IsEnabled = session?.Running == true;
+    }
+
+    private void PasteDraft()
+    {
+        var session = _context.Host.Sessions.FirstOrDefault(s =&gt; s.Id == _context.Host.ActiveSessionId);
+        if (session?.Running != true) return;
+        _context.Host.SendInput(session.Id, _editor?.Text ?? _options.Draft, submit: false);
+    }
+
+    private void SaveDraft()
+    {
+        _options = new(_editor?.Text ?? _options.Draft);
+        _context.SaveConfiguration(_options);
+    }
+
+    public void Deactivate() { }
+}</code></pre>
+<a id="explain"></a>
+<h2>5. Walk through the code</h2>
+<h3>Initialization and view creation</h3>
+<p>When enabled, the host creates a <code>CommandDraftPlugin</code> instance and calls <code>Initialize(context)</code>. The plugin reads its configuration and registers a module, a command, and an event subscription.</p>
+<p><code>RegisterView(..., CreateView)</code> receives a factory. The controls are created when the user selects the module. <code>WorkspaceTools</code> places it in the independent workspace tools window&#x27;s navigation. The host caches the view, so closing and reopening that window preserves the draft.</p>
+<p><code>Deactivate()</code> runs when the plugin is disabled. Closing the tools window does not deactivate it. The host removes registrations from that activation, so this sample does not dispose them individually. This sample restores drafts saved with <strong>Save draft</strong>; unsaved edits last only until the plugin is disabled.</p>
+<h3>The button and command palette share an action</h3>
+<p><code>RegisterCommand</code> adds <strong>Paste command draft</strong> to the command palette and terminal menu. Both the button and command call <code>PasteDraft()</code>, using the same target and input logic. The command can paste a saved draft even before you open the tools page.</p>
+<p><code>ActiveSessionId</code> is queried when the action runs, so input follows the currently active session. If there is no running active session, the button is disabled and the command returns. <code>SendInput(..., submit: false)</code> does not append Enter. The sample uses a single-line editor; the user can inspect the pasted command and press Enter in the terminal.</p>
+<p><code>submit: false</code> does not make arbitrary multiline text safe from execution. If you change the editor to accept multiple lines, newline characters in the text may submit commands to the shell. Design and explain that interaction separately.</p>
+<h3>Configuration belongs to the host</h3>
+<p><code>Options</code> is a JSON-serializable configuration type. <code>ReadConfiguration&lt;Options&gt;()</code> restores it during initialization; <code>SaveConfiguration(_options)</code> writes it when the user saves. Configuration is isolated by plugin ID. You do not need to locate settings.json yourself or write user configuration into the plugin&#x27;s installation directory.</p>
+<p>New configuration fields can have defaults so older saved values still load. Keep the same plugin ID during upgrades to retain access to existing configuration; changing the ID creates a separate plugin.</p>
+<h3>Subscribe to relevant events</h3>
+<p>The subscription updates the target label when sessions or workspaces change, or when a session is created or closed. These host events avoid the need to poll.</p>
+<p>This example does not display terminal output, so it does not subscribe to output events. For an output view, subscribe to <code>OutputBatch</code>, read changed session IDs from <code>e.Data is Guid[] ids</code>, and request <code>Host.ReadFrame(id)</code> only when needed. Avoid rebuilding the whole UI for every output character.</p>
+<h3>Follow the host theme</h3>
+<p><code>DynamicResourceExtension(&quot;UiInk&quot;)</code> and the other dynamic resources resolve again when the theme changes. Text, editors, and buttons use the host palette, while the tools window supplies their font and layout context.</p>
+<p><code>UiInk</code> is the main text color, <code>UiMuted</code> is secondary text, <code>UiInset</code> is an editor background, <code>UiRaised</code> is a button background, and <code>UiBorder</code> is the border color. An accent button can use <code>UiAccent</code> and <code>UiOnAccent</code>. Prefix your own resource keys with the plugin ID to avoid overriding another module&#x27;s resources.</p>
+<a id="run"></a>
+<h2>6. Build, import, and run</h2>
+<p>From the project root, run:</p>
+<pre><code class="language-powershell">dotnet build -c Release</code></pre>
+<p>The output should include:</p>
+<pre><code class="language-text">bin/Release/net8.0/
+  plugin.json
+  TerminalHub.Example.CommandDraft.dll
+  TerminalHub.Example.CommandDraft.deps.json</code></pre>
+<p>In Terminal Hub, open <strong>Plugins → Import plugin</strong> and select this <code>net8.0</code> directory. Import copies the files and enables the plugin. Open <strong>Workspace tools</strong> and select <strong>Command draft</strong> in the navigation.</p>
+<p>You should see a heading, the active session name and directory, a draft editor, and two buttons:</p>
+<ol><li>Enter <code>echo tutorial</code> and click <strong>Paste into active terminal</strong>. The text appears in the terminal input area; press Enter there to execute it.</li><li>Switch to another terminal. The target label updates, and the next paste goes to that session.</li><li>Click <strong>Save draft</strong>, disable the plugin, and enable it again. The editor restores <code>echo tutorial</code>.</li><li>Exit and reopen Terminal Hub normally. Enabled plugins load again, and the saved draft remains available.</li></ol>
+<p>If your host UI is Chinese, the import controls are 「插件」→「导入插件」 and the tools window is 「工作区工具」.</p>
+<a id="extend"></a>
+<h2>7. Extend your plugin</h2>
+<h3>Add a settings page</h3>
+<p>Register a Settings module inside <code>Initialize</code>. This example reuses <code>SaveDraft</code> to demonstrate where the page appears; actual settings can use CheckBox, ComboBox, or other controls.</p>
+<pre><code class="language-csharp">context.RegisterView(
+    new(&quot;settings&quot;, &quot;Command draft settings&quot;, ExtensionSurface.Settings),
+    () =&gt; ActionButton(&quot;Save current draft&quot;, SaveDraft));</code></pre>
+<p>The module appears under <strong>Plugin settings</strong> in the plugin manager. Create separate controls for the tools and settings pages: a Button cannot belong to two parent containers at once.</p>
+<h3>Add a keyboard shortcut</h3>
+<p>Replace the original <code>RegisterCommand</code> call with one that supplies a gesture:</p>
+<pre><code class="language-csharp">context.RegisterCommand(new(&quot;paste-draft&quot;, &quot;Paste command draft&quot;, () =&gt;
+{
+    PasteDraft();
+    return Task.CompletedTask;
+}, Gesture: &quot;Ctrl+Shift+F9&quot;));</code></pre>
+<p>Do not register a second command with the same ID. Check the host&#x27;s common shortcuts and enabled plugins when choosing a gesture, so the key does not trigger another action.</p>
+<h3>Add English and Chinese localization</h3>
+<p>Register language resources before the views and commands:</p>
+<pre><code class="language-csharp">context.RegisterLocalization(&quot;en&quot;,
+    new Dictionary&lt;string, IReadOnlyDictionary&lt;string, string&gt;&gt;
+    {
+        [&quot;en&quot;] = new Dictionary&lt;string, string&gt;
+        {
+            [&quot;draft&quot;] = &quot;Command draft&quot;,
+            [&quot;paste-draft&quot;] = &quot;Paste command draft&quot;,
+            [&quot;paste-button&quot;] = &quot;Paste into active terminal&quot;
+        },
+        [&quot;zh-CN&quot;] = new Dictionary&lt;string, string&gt;
+        {
+            [&quot;draft&quot;] = &quot;命令草稿&quot;,
+            [&quot;paste-draft&quot;] = &quot;粘贴命令草稿&quot;,
+            [&quot;paste-button&quot;] = &quot;粘贴到活动终端&quot;
+        }
+    });</code></pre>
+<p>The host reads titles using the module ID <code>draft</code> and command ID <code>paste-draft</code>. Your existing custom controls must also update. Create the paste button with <code>context.Text(&quot;paste-button&quot;, &quot;Paste into active terminal&quot;)</code>, then handle language changes in the existing subscription:</p>
+<pre><code class="language-csharp">if (e.Kind == WorkbenchEventKind.LanguageChanged &amp;&amp; _pasteButton is not null)
+    _pasteButton.Content = context.Text(&quot;paste-button&quot;, &quot;Paste into active terminal&quot;);</code></pre>
+<p>For a fully bilingual page, add keys for its heading, save button, hints, and empty states. Translate your UI messages; retain user drafts, session names, commands, and paths as entered.</p>
+<h3>Create a terminal or adjust the layout</h3>
+<p>Use the public Host interface for terminal operations:</p>
+<pre><code class="language-csharp">var id = await context.Host.CreateSessionAsync(
+    new NewSessionRequest(Name: &quot;Build&quot;, WorkingDirectory: &quot;/your/project&quot;));
+if (id is { } sessionId)
+    context.Host.ActivateSession(sessionId);</code></pre>
+<p>Replace the directory with a real path on your system, such as <code>D:/Projects/MyApp</code> on Windows. <code>SplitAsync(vertical: false, sessionId: id)</code> splits the focused pane left/right; <code>vertical: true</code> splits top/bottom. Removing a pane view retains its session process.</p>
+<h3>Add timers and asynchronous work</h3>
+<p>Use a host-managed timer for periodic updates:</p>
+<pre><code class="language-csharp">context.Schedule(TimeSpan.FromSeconds(1), RefreshSession);</code></pre>
+<p>It runs on the UI thread and stops when the plugin is disabled. If host events already provide the updates you need, a timer is unnecessary. Use async for slow work rather than blocking the UI inside the timer callback.</p>
+<p>For example, register an asynchronous command that reads a bundled resource:</p>
+<pre><code class="language-csharp">context.RegisterCommand(new(&quot;load-draft&quot;, &quot;Load preset draft&quot;, async () =&gt;
+{
+    var path = Path.Combine(context.Directory, &quot;default-command.txt&quot;);
+    var text = await File.ReadAllTextAsync(path, context.Lifetime);
+    context.Lifetime.ThrowIfCancellationRequested();
+    _options = new(text.TrimEnd(&#x27;\r&#x27;, &#x27;\n&#x27;));
+    if (_editor is not null) _editor.Text = _options.Draft;
+}));</code></pre>
+<p>This command starts on the UI thread and resumes on its UI context after await. Add <code>default-command.txt</code> to the project with <code>CopyToOutputDirectory</code> so it ships with the plugin. Its content should be a single line for this editor. Registered command exceptions are handled by the host. For your own async Click handlers, catch exceptions and call <code>ReportError(ex)</code>, treating lifetime cancellation separately. Code running on a background thread must use <code>Avalonia.Threading.Dispatcher.UIThread</code> before changing controls or invoking Host operations.</p>
+<a id="distribute"></a>
+<h2>8. Package, update, and debug</h2>
+<p>A plugin is distributed as a directory containing its manifest, entry DLL, <code>.deps.json</code>, and any additional dependencies or resources. The host provides Extensibility, Core, and Avalonia. Include your own extra third-party libraries with the plugin.</p>
+<p>For this example without extra resources or dependencies, run the following from the project root:</p>
+<pre><code class="language-powershell">Compress-Archive -Path bin/Release/net8.0/plugin.json,bin/Release/net8.0/TerminalHub.Example.CommandDraft.dll,bin/Release/net8.0/TerminalHub.Example.CommandDraft.deps.json -DestinationPath CommandDraft-1.0.0.zip -Force</code></pre>
+<p>Add any resources or extra dependencies to that file list as you extend the plugin. Users extract the ZIP and import its directory; the plugin manager does not import ZIP files directly. Do not include user settings.json or SSH records.</p>
+<p>After editing the code, rebuild and import the new output directory. Keep the same ID and increment the plugin version to update it while retaining saved configuration. Managed DLLs are loaded from streams and can be replaced. Native libraries may still hold files open, requiring a normal host exit before replacement.</p>
+<p>In Visual Studio or Rider, attach to the running <code>TerminalHub</code> process and place breakpoints in <code>Initialize</code>, <code>CreateView</code>, or <code>PasteDraft</code>. Keep the Release PDB in your debugging directory. Reimport creates a new plugin instance; editing source files alone does not replace a loaded DLL.</p>
+<a id="troubleshooting"></a>
+<h2>9. Troubleshooting and next steps</h2>
+<table><thead><tr><th>Symptom</th><th>Where to look</th></tr></thead><tbody><tr><td>IPluginContext or TerminalFrame is missing at compilation</td><td>Check both SDK HintPath values and the Avalonia 11.3.2 package reference.</td></tr><tr><td>Import cannot find plugin.json</td><td>Select bin/Release/net8.0 and check the manifest&#x27;s None Update copy setting.</td></tr><tr><td>Entry type cannot be found</td><td>Use the complete class name, including its namespace, in entryType.</td></tr><tr><td>Plugin is enabled but its tool is missing</td><td>Open Workspace tools and check global/current-workspace visibility in module management.</td></tr><tr><td>Draft is not restored</td><td>Save it first, keep the same plugin ID on update, and use Disable rather than Remove.</td></tr><tr><td>An old version still appears</td><td>Rebuild and reimport. After modifying the host itself, exit the previous single instance normally before launching the new build.</td></tr><tr><td>Plugin reports an error and disables itself</td><td>Read the error on its plugin card and attach a debugger to inspect the plugin code.</td></tr></tbody></table>
+<p>For further examples, see <a href="https://github.com/coffe01-10/TerminalHub/blob/main/plugins/WorkspaceNotes/WorkspaceNotesPlugin.cs">Workspace Notes</a> for workspace-scoped configuration, <a href="https://github.com/coffe01-10/TerminalHub/blob/main/plugins/ScreenClips/ScreenClipsPlugin.cs">Screen Clips</a> for stable frames and export, and <a href="https://github.com/coffe01-10/TerminalHub/blob/main/plugins/CommandWatch/CommandWatchPlugin.cs">Command Watch</a> for shell events. Full signatures are in the <a href="https://github.com/coffe01-10/TerminalHub/blob/main/src/TerminalHub.Extensibility/PluginApi.cs">public interfaces</a>. The <a href="https://github.com/coffe01-10/TerminalHub/blob/main/docs/plugin-sdk.md">SDK reference, Chinese</a> describes extension surfaces and lifecycle details.</p>
+<p>The accompanying sample has been built against the repository SDK and the released v0.4.0 API 1 DLLs. Its DLL import, single-line paste without an appended Enter, session targeting, and saved draft restoration have passed Headless verification in <code>PluginTutorialTests</code>. This English page translates its display strings; the complete English implementation above has also been compiled against the released SDK with no warnings or errors. The tutorial and sample are in the repository; they have not been added to the existing Release attachments.</p><footer>Offline tutorial · Source: development-tutorial.en.md · The SDK reference and source links require an internet connection.</footer></main></div></body></html>
