@@ -20,12 +20,14 @@ public static class ThemeManager
         var app = Application.Current;
         if (app is null) return;
         app.RequestedThemeVariant = IsLight ? ThemeVariant.Light : ThemeVariant.Dark;
+        // Border stays at >= 3:1 (WCAG 2.1 non-text) against Canvas and Raised in
+        // every theme, so pane outlines and hairlines remain perceivable.
         var colors = Current switch
         {
-            "Black" => new[] { "#08090B", "#101114", "#1B1D21", "#050607", "#303238", "#E8E9ED", "#A0A3AC", "#757985", "#A9C8F5", "#242D3A", "#0A1423", "#67C69C", "#F17C82", "#DDAD62", "#B29BD9" },
-            "White" => new[] { "#E9EEF4", "#FFFFFF", "#F0F4F9", "#FAFCFF", "#CCD6E2", "#1E2D41", "#526278", "#64758B", "#245AB5", "#E2EDFF", "#FFFFFF", "#19734B", "#B3293A", "#8A5A12", "#7755AA" },
-            "Paper" => new[] { "#E7E0D1", "#F8F3E8", "#EEE6D7", "#FCF8EE", "#B4A58C", "#3C352B", "#625545", "#72634F", "#8C5132", "#EBDAC4", "#FFFAF0", "#466035", "#A44234", "#82621F", "#766184" },
-            _ => new[] { "#0B111E", "#F0111926", "#1C2C3F", "#0C1018", "#52657B", "#E2E8F0", "#A8B9CC", "#7C91AA", "#65ACED", "#243E59", "#0A1524", "#34D399", "#F87171", "#FBBF24", "#A78BFA" }
+            "Black" => new[] { "#08090B", "#101114", "#1B1D21", "#050607", "#6E7380", "#E8E9ED", "#A0A3AC", "#757985", "#A9C8F5", "#242D3A", "#0A1423", "#67C69C", "#F17C82", "#DDAD62", "#B29BD9" },
+            "White" => new[] { "#E9EEF4", "#FFFFFF", "#F0F4F9", "#FAFCFF", "#6D819B", "#1E2D41", "#526278", "#64758B", "#245AB5", "#E2EDFF", "#FFFFFF", "#19734B", "#B3293A", "#8A5A12", "#7755AA" },
+            "Paper" => new[] { "#E7E0D1", "#F8F3E8", "#EEE6D7", "#FCF8EE", "#7E6E52", "#3C352B", "#625545", "#72634F", "#8C5132", "#EBDAC4", "#FFFAF0", "#466035", "#A44234", "#82621F", "#766184" },
+            _ => new[] { "#0B111E", "#F0111926", "#1C2C3F", "#0C1018", "#647D9C", "#E2E8F0", "#A8B9CC", "#7C91AA", "#65ACED", "#243E59", "#0A1524", "#34D399", "#F87171", "#FBBF24", "#A78BFA" }
         };
         string[] roles = ["Canvas", "Surface", "Raised", "Inset", "Border", "Ink", "Muted", "Faint", "Accent", "AccentSoft", "OnAccent", "Good", "Bad", "Warm", "Violet"];
         for (var i = 0; i < roles.Length; i++)
