@@ -30,7 +30,7 @@ public sealed record PluginCommand(string Id, string Title, Func<Task> Execute, 
 public sealed record SessionInfo(Guid Id, string Name, string WorkingDirectory, string Shell, string WorkspaceId, bool Running, bool Detached);
 public sealed record WorkspaceInfo(string Id, string Name, bool Active, int Sessions);
 public sealed record NewSessionRequest(string? Name = null, string WorkingDirectory = "", string? Shell = null, string? Arguments = null);
-public enum WorkbenchEventKind { SessionCreated, SessionClosed, ActiveSessionChanged, WorkspaceChanged, CommandStarted, CommandCompleted, OutputBatch, LanguageChanged }
+public enum WorkbenchEventKind { SessionCreated, SessionClosed, ActiveSessionChanged, WorkspaceChanged, CommandStarted, CommandCompleted, OutputBatch, LanguageChanged, WorkspaceRemoved }
 public sealed record WorkbenchEvent(WorkbenchEventKind Kind, Guid? SessionId = null, string? WorkspaceId = null, object? Data = null);
 
 /// <summary>All operations run on the UI thread. The host retains ownership of terminal processes.</summary>

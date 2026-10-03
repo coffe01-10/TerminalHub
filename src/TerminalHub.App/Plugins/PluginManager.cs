@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -58,6 +59,7 @@ public sealed class PluginManager : IDisposable
         _styleTarget = styles ?? Application.Current!.Styles;
         _vm = vm; DirectoryPath = directory ?? Path.Combine(Path.GetDirectoryName(SettingsStore.DefaultPath())!, "plugins");
         _vm.WorkbenchChanged += Publish;
+        _vm.ProjectWorkspaces.CollectionChanged += WorkspacesChanged;
         _outputTimer.Tick += (_, _) => _vm.FlushPluginOutput(); _outputTimer.Start();
         Localizer.Current.LanguageChanged += LanguageChanged;
         Dispatcher.UIThread.UnhandledException += OnPluginException;
@@ -103,15 +105,28 @@ public sealed class PluginManager : IDisposable
         var existing = Plugins.FirstOrDefault(p => p.Manifest.Id == manifest.Id);
         if (existing is not null) { Disable(existing); Plugins.Remove(existing); }
         Directory.CreateDirectory(target);
+        // An overwrite must drop files the new build no longer ships; the load context still
+        // probes the plugin directory for same-name DLLs, so leftovers keep loading.
+        foreach (var file in Directory.GetFiles(target,"*",SearchOption.AllDirectories))
+            if (!IsUserData(target,file)) File.Delete(file);
+        foreach (var folder in Directory.GetDirectories(target,"*",SearchOption.AllDirectories).OrderByDescending(path => path.Length))
+            if (!Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
         foreach (var file in Directory.GetFiles(origin,"*",SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(origin,file);
-            if (Path.GetFileName(file).Equals("settings.json", StringComparison.OrdinalIgnoreCase)
-                || Path.GetFileName(file).StartsWith("settings-", StringComparison.OrdinalIgnoreCase)
-                || relative.Split(Path.DirectorySeparatorChar).Contains(".ssh")) continue;
-            var destination = Path.Combine(target,relative); Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(file,destination,true);
+            if (IsUserData(origin,file)) continue;
+            var destination = Path.Combine(target,Path.GetRelativePath(origin,file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(file,destination,true);
         }
         Discover(); if (Plugins.FirstOrDefault(p => p.Manifest.Id == manifest.Id) is { } imported) Enable(imported);
+    }
+    // User files are excluded in both directions of an import: never copied from a build
+    // directory, never deleted from an installed one.
+    private static bool IsUserData(string root, string file)
+    {
+        var relative = Path.GetRelativePath(root,file);
+        return Path.GetFileName(file).Equals("settings.json", StringComparison.OrdinalIgnoreCase)
+            || Path.GetFileName(file).StartsWith("settings-", StringComparison.OrdinalIgnoreCase)
+            || relative.Split(Path.DirectorySeparatorChar).Contains(".ssh");
     }
     public void Enable(PluginEntry plugin)
     {
@@ -202,6 +217,13 @@ public sealed class PluginManager : IDisposable
         foreach (var callback in Event?.GetInvocationList().Cast<Action<WorkbenchEvent>>() ?? []) callback(notification);
         if (notification.Kind == WorkbenchEventKind.WorkspaceChanged) Refresh();
     }
+    private void WorkspacesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // Workspace deletion lives in the view model; forwarding removals lets plugins drop per-workspace data.
+        if (e.Action != NotifyCollectionChangedAction.Remove) return;
+        foreach (var workspace in e.OldItems!.OfType<LiveWorkspace>())
+            Publish(new(WorkbenchEventKind.WorkspaceRemoved, WorkspaceId: workspace.Id));
+    }
     private void LanguageChanged() { Publish(new(WorkbenchEventKind.LanguageChanged)); Refresh(); }
     public bool HandleShortcut(KeyEventArgs e)
     {
@@ -214,7 +236,7 @@ public sealed class PluginManager : IDisposable
     public void Dispose()
     {
         if (_disposed) return; _disposed = true;
-        _outputTimer.Stop(); _vm.WorkbenchChanged -= Publish; Localizer.Current.LanguageChanged -= LanguageChanged;
+        _outputTimer.Stop(); _vm.WorkbenchChanged -= Publish; _vm.ProjectWorkspaces.CollectionChanged -= WorkspacesChanged; Localizer.Current.LanguageChanged -= LanguageChanged;
         Dispatcher.UIThread.UnhandledException -= OnPluginException;
         // Shutdown clears registrations without changing the saved enabled preference.
         foreach (var plugin in Plugins.Where(p => p.Enabled).ToArray())

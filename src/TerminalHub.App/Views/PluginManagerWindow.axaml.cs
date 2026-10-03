@@ -157,7 +157,11 @@ public partial class PluginManagerWindow : Window
     }
     private void OnOpenDirectory(object? sender, RoutedEventArgs e)
     {
-        Directory.CreateDirectory(_manager!.DirectoryPath);
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_manager.DirectoryPath) { UseShellExecute = true });
+        try
+        {
+            Directory.CreateDirectory(_manager!.DirectoryPath);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_manager.DirectoryPath) { UseShellExecute = true });
+        }
+        catch (Exception ex) { Notice(ex.Message); }
     }
 }

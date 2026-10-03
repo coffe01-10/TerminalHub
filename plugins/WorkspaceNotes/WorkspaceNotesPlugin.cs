@@ -26,6 +26,9 @@ public sealed class WorkspaceNotesPlugin : IWorkbenchPlugin
         context.Schedule(TimeSpan.FromSeconds(1), Save);
         context.Subscribe(e =>
         {
+            if (e.Kind == WorkbenchEventKind.WorkspaceRemoved && e.WorkspaceId is { Length: > 0 } removed
+                && _options.Notes.Remove(removed))
+                context.SaveConfiguration(_options);
             if (e.Kind == WorkbenchEventKind.WorkspaceChanged && _workspaceId != context.Host.ActiveWorkspaceId)
             {
                 Save(); _workspaceId = context.Host.ActiveWorkspaceId;
