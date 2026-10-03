@@ -121,7 +121,10 @@ public sealed class VtParser
     {
         // Anywhere transitions. OSC/DCS/SOS handlers must see ESC themselves
         // (ESC \ is the ST terminator), so only intercept here for other states.
-        if (b == 0x1B && _state is State.Ground or State.Csi or State.EscIntermediate or State.CharsetDesignate)
+        // In the escape state itself a second ESC restarts the sequence
+        // (vt500) — tmux's nested "ESC ESC \" must not print the backslash.
+        if (b == 0x1B && _state is State.Ground or State.Escape or State.Csi
+            or State.EscIntermediate or State.CharsetDesignate)
         {
             Enter(State.Escape);
             return;
@@ -200,13 +203,7 @@ public sealed class VtParser
         switch (b)
         {
             case 0x00: case 0x7F: break;                        // NUL/DEL ignored
-            case 0x07: Bell?.Invoke(); break;                   // BEL → visual bell
-            case 0x08: _afterZwj = false; _buffer.Backspace(); break;
-            case 0x09: _afterZwj = false; _buffer.Tab(); break;
-            case 0x0A: case 0x0B: case 0x0C: _afterZwj = false; _buffer.LineFeed(); break;
-            case 0x0D: _afterZwj = false; _buffer.CarriageReturn(); break;
-            case 0x0E: _afterZwj = false; _buffer.ShiftOut(); break;
-            case 0x0F: _afterZwj = false; _buffer.ShiftIn(); break;
+            case >= 0x07 and <= 0x0F: ExecuteControl(b); break;
             case 0x9B: Enter(State.Csi); break;                 // 8-bit CSI
             case 0x9D: Enter(State.Osc); break;
             case >= 0x80 and < 0xC0: _afterZwj = false; _buffer.PutChar('\uFFFD'); break;
@@ -214,6 +211,24 @@ public sealed class VtParser
             case >= 0xE0 and < 0xF0: _utf8Value = b & 0x0F; _utf8Remaining = 2; _utf8Min = 0x800; break;
             case >= 0xF0: _utf8Value = b & 0x07; _utf8Remaining = 3; _utf8Min = 0x10000; break;
             default: _afterZwj = false; _buffer.PutChar((char)b); break;
+        }
+    }
+
+    /// <summary>
+    /// C0 execution shared by the ground and CSI states — vt500 semantics run
+    /// these controls without discarding an accumulating CSI sequence.
+    /// </summary>
+    private void ExecuteControl(byte b)
+    {
+        switch (b)
+        {
+            case 0x07: Bell?.Invoke(); break;                   // BEL → visual bell
+            case 0x08: _afterZwj = false; _buffer.Backspace(); break;
+            case 0x09: _afterZwj = false; _buffer.Tab(); break;
+            case 0x0A: case 0x0B: case 0x0C: _afterZwj = false; _buffer.LineFeed(); break;
+            case 0x0D: _afterZwj = false; _buffer.CarriageReturn(); break;
+            case 0x0E: _afterZwj = false; _buffer.ShiftOut(); break;
+            case 0x0F: _afterZwj = false; _buffer.ShiftIn(); break;
         }
     }
 
@@ -343,6 +358,16 @@ public sealed class VtParser
 
     private void CsiByte(byte b)
     {
+        // vt500: a C0 control inside a CSI sequence executes at once and the
+        // sequence keeps accumulating (CAN/SUB cancel it); DEL is ignored.
+        // ESC was already intercepted as an anywhere-transition in FeedByte.
+        if (b < 0x20)
+        {
+            if (b is 0x18 or 0x1A) Enter(State.Ground);
+            else ExecuteControl(b);
+            return;
+        }
+        if (b == 0x7F) return;
         if (b is >= (byte)'0' and <= (byte)'9')
         {
             _currentParam = Math.Min(_currentParam * 10 + (b - '0'), 0xFFFFFF);

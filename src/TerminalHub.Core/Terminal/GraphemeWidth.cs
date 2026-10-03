@@ -32,6 +32,10 @@ public static class GraphemeWidth
         if (rune is 0x200D or 0xFE0E or 0xFE0F) return true;         // ZWJ, VS15/VS16
         if (rune is >= 0xFE00 and <= 0xFE0F) return true;           // VS1..VS16
         if (rune is >= 0xE0100 and <= 0xE01EF) return true;         // VS17..VS256
+        // Emoji skin-tone modifiers are category Sk, outside the mark
+        // categories below — but UAX #29 classifies them as Extend: they join
+        // the base emoji as one cluster instead of taking 2 cells of their own.
+        if (rune is >= 0x1F3FB and <= 0x1F3FF) return true;
         // U+00AD SOFT HYPHEN is category Format but renders as a visible
         // hyphen in terminals — wcwidth treats it as 1 cell, not zero.
         if (rune is 0x00AD) return false;
@@ -49,9 +53,11 @@ public static class GraphemeWidth
 
     /// <summary>
     /// True when this mark turns the base char into emoji presentation (VS16,
-    /// enclosing keycap). The buffer widens the cell in place when possible.
+    /// enclosing keycap, skin-tone modifier). The buffer widens the cell in
+    /// place when possible.
     /// </summary>
-    public static bool EmojiWidthTrigger(int rune) => rune is 0xFE0F or 0x20E3;
+    public static bool EmojiWidthTrigger(int rune)
+        => rune is 0xFE0F or 0x20E3 || rune is >= 0x1F3FB and <= 0x1F3FF;
 
     /// <summary>Chars that take emoji (2-cell) presentation when followed by VS16.</summary>
     public static bool IsEmojiBase(char ch) =>

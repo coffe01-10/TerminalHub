@@ -365,6 +365,21 @@ public sealed class ScreenBuffer
         }
     }
 
+    /// <summary>
+    /// Zero-width runes join the glyph immediately left of the cursor, not the
+    /// cell written before an explicit reposition — a combining mark or VS16
+    /// sent after CUU/CUD/CUP/CR/Tab must land on the glyph the cursor now
+    /// follows, never on a stale cell elsewhere on the screen.
+    /// </summary>
+    private void ReanchorLastGlyph()
+    {
+        var col = CursorX - 1;
+        while (col >= 0 && CellAt(CursorY, col).IsWideContinuation) col--;
+        if (col < 0) { _lastGlyphRow = -1; return; }
+        _lastGlyphRow = CursorY;
+        _lastGlyphCol = col;
+    }
+
     /// <summary>Grow the 1-cell glyph at (row,col) into 2 cells when the cell to
     /// its right is free; nudges the cursor past the widened glyph.</summary>
     private void TryWidenCell(int row, int col)
@@ -506,6 +521,7 @@ public sealed class ScreenBuffer
     {
         _pendingWrap = false;
         CursorX = 0;
+        ReanchorLastGlyph();
     }
 
     public void Backspace()
@@ -516,12 +532,14 @@ public sealed class ScreenBuffer
         if (CursorX > 0) CursorX--;
         if (OperatingSystem.IsWindows() && CellAt(CursorY, CursorX).IsWideContinuation && CursorX > 0)
             CursorX--;
+        ReanchorLastGlyph();
     }
 
     public void Tab()
     {
         _pendingWrap = false;
         CursorX = Math.Min(Columns - 1, (CursorX + 8) / 8 * 8);
+        ReanchorLastGlyph();
     }
 
     /// <summary>LF/VT/FF: move down; scroll at region bottom.</summary>
@@ -532,6 +550,7 @@ public sealed class ScreenBuffer
             ScrollUpRegion(_scrollTop, _scrollBottom, 1);
         else if (CursorY < Rows - 1)
             CursorY++;
+        ReanchorLastGlyph();
     }
 
     /// <summary>Reverse index: move up; scroll down at region top.</summary>
@@ -542,6 +561,7 @@ public sealed class ScreenBuffer
             ScrollDownRegion(_scrollTop, _scrollBottom, 1);
         else if (CursorY > 0)
             CursorY--;
+        ReanchorLastGlyph();
     }
 
     public void Index() => LineFeed();
@@ -561,20 +581,29 @@ public sealed class ScreenBuffer
         // runaway "CSI 999999S" cannot loop full-screen copies for minutes.
         n = Math.Min(n, bottom - top + 1);
         _lastGlyphRow = -1;
+        // Only a full-screen scroll on the primary screen feeds history; the
+        // per-line row capture is pure waste for every other region (vim, less,
+        // htop scroll their inner regions constantly).
+        var feedsHistory = !OnAlternateScreen && top == 0 && bottom == Rows - 1;
         for (var i = 0; i < n; i++)
         {
-            var rowArr = new TerminalCell[Columns];
-            Array.Copy(_screen, top * Columns, rowArr, 0, Columns);
             var leavingWrapped = _wrapped[top];
+            TerminalCell[]? leaving = null;
+            if (feedsHistory)
+            {
+                // Capture before the shift below overwrites the top row.
+                leaving = new TerminalCell[Columns];
+                Array.Copy(_screen, top * Columns, leaving, 0, Columns);
+            }
             Array.Copy(_screen, (top + 1) * Columns, _screen, top * Columns, (bottom - top) * Columns);
             Array.Copy(_wrapped, top + 1, _wrapped, top, bottom - top);
             _wrapped[bottom] = false;
             var blank = TerminalCell.Blank(CurrentBg);
             for (var c = 0; c < Columns; c++) _screen[bottom * Columns + c] = blank;
 
-            if (!OnAlternateScreen && top == 0 && bottom == Rows - 1)
+            if (leaving is not null)
             {
-                _scrollback.Add(rowArr);
+                _scrollback.Add(leaving);
                 _scrollWrapped.Add(leavingWrapped);
                 TrimScrollbackIfNeeded();
                 ScrollbackChanged?.Invoke(1);
@@ -608,6 +637,7 @@ public sealed class ScreenBuffer
         // above the top can move to the screen edge without being pulled down.
         var min = CursorY >= _scrollTop ? _scrollTop : 0;
         CursorY = Math.Max(min, CursorY - Math.Max(1, n));
+        ReanchorLastGlyph();
     }
 
     public void CursorDown(int n)
@@ -615,13 +645,14 @@ public sealed class ScreenBuffer
         _pendingWrap = false;
         var max = CursorY <= _scrollBottom ? _scrollBottom : Rows - 1;
         CursorY = Math.Min(max, CursorY + Math.Max(1, n));
+        ReanchorLastGlyph();
     }
-    public void CursorForward(int n) { _pendingWrap = false; CursorX = Math.Min(Columns - 1, CursorX + Math.Max(1, n)); }
-    public void CursorBack(int n) { _pendingWrap = false; CursorX = Math.Max(0, CursorX - Math.Max(1, n)); }
-    public void CursorNextLine(int n) { CursorDown(n); CursorX = 0; }
-    public void CursorPrevLine(int n) { CursorUp(n); CursorX = 0; }
-    public void CursorHorizontalAbsolute(int col) { _pendingWrap = false; CursorX = Math.Clamp(col - 1, 0, Columns - 1); }
-    public void CursorVerticalAbsolute(int row) { _pendingWrap = false; CursorY = Math.Clamp((OriginMode ? row + _scrollTop : row) - 1, 0, RegionBottom()); }
+    public void CursorForward(int n) { _pendingWrap = false; CursorX = Math.Min(Columns - 1, CursorX + Math.Max(1, n)); ReanchorLastGlyph(); }
+    public void CursorBack(int n) { _pendingWrap = false; CursorX = Math.Max(0, CursorX - Math.Max(1, n)); ReanchorLastGlyph(); }
+    public void CursorNextLine(int n) { CursorDown(n); CursorX = 0; ReanchorLastGlyph(); }
+    public void CursorPrevLine(int n) { CursorUp(n); CursorX = 0; ReanchorLastGlyph(); }
+    public void CursorHorizontalAbsolute(int col) { _pendingWrap = false; CursorX = Math.Clamp(col - 1, 0, Columns - 1); ReanchorLastGlyph(); }
+    public void CursorVerticalAbsolute(int row) { _pendingWrap = false; CursorY = Math.Clamp((OriginMode ? row + _scrollTop : row) - 1, 0, RegionBottom()); ReanchorLastGlyph(); }
 
     public void CursorPosition(int row, int col)
     {
@@ -629,6 +660,7 @@ public sealed class ScreenBuffer
         var top = OriginMode ? _scrollTop : 0;
         CursorY = Math.Clamp(row - 1 + top, top, RegionBottom());
         CursorX = Math.Clamp(col - 1, 0, Columns - 1);
+        ReanchorLastGlyph();
     }
 
     private int RegionTop() => OriginMode ? _scrollTop : 0;
@@ -656,6 +688,7 @@ public sealed class ScreenBuffer
         CurrentBg = slot.Bg;
         OriginMode = slot.OriginMode;
         _pendingWrap = slot.PendingWrap;
+        ReanchorLastGlyph();
     }
 
     private ref SavedCursor ActiveSavedCursor()
@@ -694,8 +727,9 @@ public sealed class ScreenBuffer
             case 0: Fill(CursorY, CursorX, Rows - 1, Columns - 1, blank); break;
             case 1: Fill(0, 0, CursorY, CursorX, blank); break;
             case 2:
-                var all = NewBlankScreen(Columns, Rows);
-                Array.Copy(all, _screen, all.Length);
+                // BCE like modes 0/1: erase with the current background, not the
+                // default one — apps relying on bce keep their clear color.
+                Array.Fill(_screen, blank);
                 Array.Clear(_wrapped);
                 TouchAll();
                 break;
