@@ -1,5 +1,44 @@
 # Terminal Hub 插件 SDK（宿主 API 1）
 
+[插件开发教程](plugins/development-tutorial.md) · [安装与使用](plugins/README.md) · [官方插件](plugins/README.md#三个官方插件) · [清单与工程](#构建和导入) · [生命周期](#生命周期和配置) · [宿主 API](#命令事件和宿主操作)
+
+## 从零开发一个插件
+
+逐步操作、完整源码和配套工程见[插件开发实操教程](plugins/development-tutorial.md)。下面仅为最小接口示意。
+
+需要 .NET 8 SDK；安装用户只需宿主，不需要 SDK。可以克隆仓库修改 `examples/plugins/Minimal`，或下载 [API 1 SDK](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0)，按下方「构建和导入」创建独立类库。
+
+1. 创建 .NET 8 类库，引用 Extensibility、Core 与 Avalonia 11.3.2。不要引用 App。
+2. 增加 `plugin.json`，并复制到构建输出目录；`entryType` 填完整类名（含命名空间）。
+3. 实现 `IWorkbenchPlugin`，在 `Initialize` 注册视图和命令。
+4. `dotnet build -c Release` 后，导入包含清单的 `bin/Release/net8.0`。
+5. 工具模块在独立工作区工具窗口左侧显示；命令在命令面板显示。
+6. 禁用、重新启用并检查注册清理与配置恢复，再分发构建目录。ZIP 解压后导入。
+
+```csharp
+using Avalonia.Controls;
+using TerminalHub.Extensibility;
+
+namespace MyPlugin;
+public sealed class Plugin : IWorkbenchPlugin
+{
+    public void Initialize(IPluginContext context)
+    {
+        context.RegisterView(new("hello", "我的工具"),
+            () => new TextBlock { Text = "Hello Terminal Hub" });
+        context.RegisterCommand(new("paste", "粘贴示例文本", () =>
+        {
+            if (context.Host.ActiveSessionId is { } id)
+                context.Host.SendInput(id, "echo hello"); // 仅粘贴，不回车
+            return Task.CompletedTask;
+        }));
+    }
+    public void Deactivate() { }
+}
+```
+
+该类的清单应使用 `entryType: "MyPlugin.Plugin"`，`entry` 与生成的 DLL 文件名相同。视图由宿主缓存，不要在每个 OutputBatch 里重新注册。示例不会创建或结束终端进程。
+
 首版插件是独立的 .NET 8 / Avalonia 11.3.2 类库。公开契约位于 `src/TerminalHub.Extensibility`，不需要引用 App 项目，也不需要复制或创建终端进程实现。插件运行在宿主进程中；适合自己编写或信任的本地扩展，首版不提供脚本隔离和在线插件市场。
 
 ## 构建和导入
@@ -44,7 +83,7 @@ dotnet build examples/plugins/SessionPanel/SessionPanel.csproj -c Release
     <PackageReference Include="Avalonia" Version="11.3.2" />
     <Reference Include="TerminalHub.Extensibility"><HintPath>sdk/TerminalHub.Extensibility.dll</HintPath></Reference>
     <Reference Include="TerminalHub.Core"><HintPath>sdk/TerminalHub.Core.dll</HintPath></Reference>
-    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
 ```

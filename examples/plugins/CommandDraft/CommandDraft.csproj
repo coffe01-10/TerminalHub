@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TerminalHub.Example.CommandDraft</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TerminalHubSdkPath)' == ''">
+    <ProjectReference Include="../../../src/TerminalHub.Extensibility/TerminalHub.Extensibility.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TerminalHubSdkPath)' != ''">
+    <PackageReference Include="Avalonia" Version="11.3.2" />
+    <Reference Include="TerminalHub.Extensibility"><HintPath>$(TerminalHubSdkPath)/TerminalHub.Extensibility.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TerminalHub.Core"><HintPath>$(TerminalHubSdkPath)/TerminalHub.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

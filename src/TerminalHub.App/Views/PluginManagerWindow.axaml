@@ -32,11 +32,13 @@
         <TextBlock x:Name="PluginCount" FontSize="12" Foreground="{DynamicResource UiMuted}"/>
       </Border>
     </Grid>
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-      <Button Classes="primary" Content="{loc:Text Workbench4}" Click="OnImport"/>
-      <Button Content="{loc:Text UiPolish03}" Click="OnRefresh"/>
-      <Button Content="{loc:Text Workbench5}" Click="OnOpenDirectory"/>
-    </StackPanel>
+    <WrapPanel Grid.Row="1">
+      <Button Classes="primary" Content="{loc:Text Workbench4}" Click="OnImport" Margin="0,0,8,8"/>
+      <Button Content="{loc:Text UiPolish03}" Click="OnRefresh" Margin="0,0,8,8"/>
+      <Button Content="{loc:Text Workbench5}" Click="OnOpenDirectory" Margin="0,0,8,8"/>
+      <Button x:Name="PluginDevelopmentLink" Content="{loc:Text PluginDocs0}" Click="OnDevelopmentDocs" Margin="0,0,8,8"/>
+      <Button x:Name="OfficialPluginsLink" Content="{loc:Text PluginDocs1}" Click="OnOfficialPlugins" Margin="0,0,8,8"/>
+    </WrapPanel>
     <TabControl x:Name="ManagerTabs" Grid.Row="2">
       <TabItem Header="{loc:Text Workbench0}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="PluginCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
       <TabItem Header="{loc:Text Workbench1}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="ModuleCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>

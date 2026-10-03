@@ -742,3 +742,7 @@
 - 用户随后要求恢复独立工作区工具窗口并精修新增模块 UI：恢复左导航、缓存页面状态；统一插件管理卡片、模块来源、空状态及主题控件；精简分屏标题操作，完善会话概览与最近终端切换器。修复广播/远程文件页操作区重叠及排序编辑失焦。见 [界面精修记录](ui-refinement-2026-10-03.md)。
 
 - 已提交推送工作台功能与界面精修；按用户要求发布 [v0.4.0](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0)，目标提交 `d466fd9`，上传 Windows 便携包、Linux x64 包和插件 SDK。Windows 安装包未生成。
+
+- 补齐插件安装/开发教程和离线跳转入口，开发 WorkspaceNotes、ScreenClips、CommandWatch 三个官方插件，交付可导入目录及独立 ZIP。修复快速切换工作区漏存笔记、摘录重建列表丢失选择和窄窗口英文导航碎行；相关回归与真实 Windows ConPTY 插件验收通过。见[插件手册](plugins/README.md)与[验收记录](plugins/acceptance-2026-10-03.md)。源码与文档随本次 Git 提交交付，插件 ZIP 尚未上传 Release。
+
+- 用户进一步明确要开发者实操教程：新增[从零开发命令草稿插件](plugins/development-tutorial.md)，包括完整项目文件、清单、源码、逐段解释及设置页/快捷键/多语言/后台任务/打包调试。配套 `examples/plugins/CommandDraft` 使用仓库 SDK 和已发行 API 1 DLL 均编译通过，实际导入、目标会话切换、无回车粘贴与配置恢复通过 Headless 验证。开发文档按钮直接跳转完整离线教程。

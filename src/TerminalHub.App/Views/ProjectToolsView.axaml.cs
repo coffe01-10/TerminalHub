@@ -34,10 +34,10 @@ public partial class ProjectToolsView : UserControl
         {
             if (_updatingModules || ToolNavigation.SelectedItem is not ListBoxItem item) return;
             _selectedModuleId = item.Tag as string;
+            ToolsSaveBar.IsVisible = _selectedModuleId?.StartsWith("builtin:", StringComparison.Ordinal) == true;
             if (_selectedModuleId is not null && _extraModules.TryGetValue(_selectedModuleId, out var extra))
                 extra.Tab.Content ??= extra.Module.GetView();
         };
-        SizeChanged += (_, _) => ToolsLayout.ColumnDefinitions[0].Width = new(Bounds.Width < 680 ? 112 : 156);
     }
     public ProjectToolsView(MainWindow main, MainWindowViewModel vm) : this()
     {
@@ -95,6 +95,7 @@ public partial class ProjectToolsView : UserControl
             if (ToolNavigation.SelectedItem is ListBoxItem current)
             {
                 _selectedModuleId = current.Tag as string;
+                ToolsSaveBar.IsVisible = _selectedModuleId?.StartsWith("builtin:", StringComparison.Ordinal) == true;
                 if (_selectedModuleId is not null && _extraModules.TryGetValue(_selectedModuleId, out var extra))
                     extra.Tab.Content ??= extra.Module.GetView();
             }

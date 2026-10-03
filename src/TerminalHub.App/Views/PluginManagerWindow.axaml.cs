@@ -138,6 +138,20 @@ public partial class PluginManagerWindow : Window
         catch (Exception ex) { Notice(ex.Message); }
     }
     private void OnRefresh(object? sender, RoutedEventArgs e) => _manager!.Discover();
+    private async void OnDevelopmentDocs(object? sender, RoutedEventArgs e) => await OpenDocumentation("develop");
+    private async void OnOfficialPlugins(object? sender, RoutedEventArgs e) => await OpenDocumentation("official");
+    private async Task OpenDocumentation(string section)
+    {
+        try
+        {
+            var development = section == "develop";
+            var path = Path.Combine(AppContext.BaseDirectory, "docs", "plugins", development ? "development-tutorial.html" : "index.html");
+            var uri = File.Exists(path) ? new Uri(new Uri(path).AbsoluteUri + "#" + (development ? "start" : section))
+                : new Uri("https://github.com/coffe01-10/TerminalHub/blob/main/docs/plugin-sdk.md");
+            if (!await Launcher.LaunchUriAsync(uri)) Notice(uri.AbsoluteUri);
+        }
+        catch (Exception ex) { Notice(ex.Message); }
+    }
     private void OnOpenDirectory(object? sender, RoutedEventArgs e)
     {
         Directory.CreateDirectory(_manager!.DirectoryPath);

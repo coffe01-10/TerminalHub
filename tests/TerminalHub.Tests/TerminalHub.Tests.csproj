@@ -26,13 +26,19 @@
     <ProjectReference Include="..\..\examples\plugins\Minimal\Minimal.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\examples\plugins\CompactSidebar\CompactSidebar.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\examples\plugins\SessionPanel\SessionPanel.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\examples\plugins\CommandDraft\CommandDraft.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\WorkspaceNotes\WorkspaceNotes.csproj" />
+    <ProjectReference Include="..\..\plugins\ScreenClips\ScreenClips.csproj" />
+    <ProjectReference Include="..\..\plugins\CommandWatch\CommandWatch.csproj" />
   </ItemGroup>
 
   <Target Name="CopyAcceptancePlugins" AfterTargets="Build">
     <ItemGroup>
       <AcceptancePlugin Include="..\..\examples\plugins\**\bin\$(Configuration)\net8.0\TerminalHub.Example.*.dll;..\..\examples\plugins\**\bin\$(Configuration)\net8.0\plugin.json" />
+      <OfficialPlugin Include="..\..\plugins\**\bin\$(Configuration)\net8.0\TerminalHub.Official.*.dll;..\..\plugins\**\bin\$(Configuration)\net8.0\plugin.json" />
     </ItemGroup>
     <Copy SourceFiles="@(AcceptancePlugin)" DestinationFolder="$(OutDir)AcceptancePlugins\%(AcceptancePlugin.RecursiveDir)" />
+    <Copy SourceFiles="@(OfficialPlugin)" DestinationFolder="$(OutDir)OfficialPlugins\%(OfficialPlugin.RecursiveDir)" />
   </Target>
 
 </Project>

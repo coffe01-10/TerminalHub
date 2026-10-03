@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>TerminalHub.Official.WorkspaceNotes</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/TerminalHub.Extensibility/TerminalHub.Extensibility.csproj" />
+    <Compile Include="../Shared/PluginUi.cs" Link="PluginUi.cs" />
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

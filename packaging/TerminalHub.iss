@@ -54,6 +54,8 @@ Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\QUICKSTART.zh-CN.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\CHANGES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\PERFORMANCE.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\docs\plugins\index.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
+Source: "{#SourceDir}\docs\plugins\development-tutorial.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}";      Filename: "{app}\{#AppExe}"

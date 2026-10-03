@@ -32,7 +32,7 @@ trap 'rm -f "$archive"' EXIT
 TAR=${TAR:-tar}
 if [[ "$OSTYPE" == msys* && "$TAR" == tar ]]; then TAR=/usr/bin/tar; fi
 "$TAR" -cf "$archive" --mode=0755 -C artifacts/publish/linux-x64 TerminalHub
-"$TAR" -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 LICENSE QUICKSTART.linux.zh-CN.txt
+"$TAR" -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 LICENSE QUICKSTART.linux.zh-CN.txt docs/plugins/index.html docs/plugins/development-tutorial.html
 gzip -f "$archive"
 
 echo "==> artifacts/TerminalHub-linux-x64.tar.gz"

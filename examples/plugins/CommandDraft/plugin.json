@@ -1,0 +1,8 @@
+{
+  "id": "tutorial.command-draft",
+  "name": "命令草稿（教程示例）",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Example.CommandDraft.dll",
+  "entryType": "TerminalHub.Example.CommandDraft.CommandDraftPlugin",
+  "hostApi": 1
+}

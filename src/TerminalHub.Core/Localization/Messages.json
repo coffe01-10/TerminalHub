@@ -4273,5 +4273,7 @@
     "id": "UiPolish18",
     "zh": "内置工具",
     "en": "Built-in tools"
-  }
+  },
+  { "id": "PluginDocs0", "zh": "开发文档 ↗", "en": "Developer guide ↗" },
+  { "id": "PluginDocs1", "zh": "官方插件 ↗", "en": "Official plugins ↗" }
 ]

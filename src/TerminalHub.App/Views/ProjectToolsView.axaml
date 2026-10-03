@@ -34,7 +34,7 @@
     <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
     <Style Selector="ListBox#ToolNavigation"><Setter Property="Padding" Value="12,0"/></Style>
     <Style Selector="ListBox#ToolNavigation ListBoxItem">
-      <Setter Property="Padding" Value="14,13"/><Setter Property="Margin" Value="0,3"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+      <Setter Property="Padding" Value="10,13"/><Setter Property="Margin" Value="0,3"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
       <Setter Property="Template"><ControlTemplate><Border x:Name="NavigationBackground" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Stretch"/></Border></ControlTemplate></Setter>
     </Style>
     <Style Selector="ListBox#ToolNavigation ListBoxItem:pointerover /template/ Border#NavigationBackground"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
@@ -46,7 +46,7 @@
     <Style Selector="StackPanel.empty TextBlock"><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="TextAlignment" Value="Center"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
     <Style Selector="PathIcon.empty-icon"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Foreground" Value="{DynamicResource UiFaint}"/><Setter Property="Margin" Value="0,0,0,7"/></Style>
   </UserControl.Styles>
-  <Grid x:Name="ToolsLayout" ColumnDefinitions="156,*" RowDefinitions="*,64">
+  <Grid x:Name="ToolsLayout" ColumnDefinitions="184,*" RowDefinitions="*,Auto">
     <Border Grid.RowSpan="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,0,1,0">
       <Grid RowDefinitions="Auto,*,Auto">
         <StackPanel Spacing="8" Margin="24,28,20,24">
@@ -174,6 +174,6 @@
       </TabItem>
     </TabControl>
     <TextBlock Grid.Column="1" Text="{loc:Text UiPolish01}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="340" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding #ToolsTabs.ItemCount, Converter={x:Static views:ProjectToolsView.IsEmpty}}"/>
-    <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,Auto" Margin="12,8,12,8"><TextBlock Text="{loc:Text M0770}" Classes="caption" VerticalAlignment="Center"/><Button Grid.Column="1" Content="{loc:Text M0771}" Classes="primary" Command="{Binding SaveProjectToolsCommand}" VerticalAlignment="Center"/></Grid>
+    <Grid x:Name="ToolsSaveBar" Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,Auto" Margin="12,8,12,8"><TextBlock Text="{loc:Text M0770}" Classes="caption" VerticalAlignment="Center"/><Button Grid.Column="1" Content="{loc:Text M0771}" Classes="primary" Command="{Binding SaveProjectToolsCommand}" VerticalAlignment="Center"/></Grid>
   </Grid>
 </UserControl>

@@ -51,7 +51,8 @@ public sealed partial class MeasurementApplication : TerminalHub.App.App
     {
         Dispatcher.UIThread.Post(async () =>
         {
-            if (Environment.GetCommandLineArgs().Contains("--workbench-acceptance")) await AcceptWorkbenchAsync();
+            if (Environment.GetCommandLineArgs().Contains("--official-plugin-acceptance")) await AcceptOfficialPluginsAsync();
+            else if (Environment.GetCommandLineArgs().Contains("--workbench-acceptance")) await AcceptWorkbenchAsync();
             else if (Environment.GetCommandLineArgs().Contains("--workspace-switch")) await MeasureWorkspaceSwitchAsync();
             else await MeasureAsync();
         });
