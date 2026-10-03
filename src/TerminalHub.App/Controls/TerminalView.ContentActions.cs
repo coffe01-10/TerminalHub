@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Terminal;
 
@@ -29,6 +30,9 @@ public partial class TerminalView
             var paths = e.Data.GetFiles()?.Select(file => file.TryGetLocalPath()).OfType<string>().ToArray() ?? [];
             e.Handled = InsertDroppedPaths(paths);
         });
+        // The open-failure hint is transient: drop it with the pointer, do not
+        // replay the stale error on every later hover.
+        AddHandler(PointerExitedEvent, (_, _) => ClearLinkFailureTip());
     }
 
     public bool InsertDroppedPaths(IEnumerable<string> paths)
@@ -44,6 +48,7 @@ public partial class TerminalView
     private bool OpenContentAt(Point point)
     {
         if (_emulator is null) return false;
+        ClearLinkFailureTip();   // a new attempt supersedes the previous error
         var (line, col) = PointToCell(point);
         var buffer = _emulator.Buffer;
         TerminalContentLink? link;
@@ -57,7 +62,31 @@ public partial class TerminalView
         if (link is null) return false;
         try { TerminalLinkOpener.Open(link); }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        { Avalonia.Controls.ToolTip.SetTip(this, $"无法打开：{ex.Message}"); }
+        { ShowLinkFailureTip($"无法打开：{ex.Message}"); }
         return true;
+    }
+
+    private DispatcherTimer? _linkFailureTipTimer;
+
+    /// <summary>Show the open-failure hint right at the failed click, then drop
+    /// it (timeout or pointer leave). Leaving the Tip attached would replay the
+    /// expired error on every later hover.</summary>
+    private void ShowLinkFailureTip(string message)
+    {
+        Avalonia.Controls.ToolTip.SetTip(this, message);
+        Avalonia.Controls.ToolTip.SetIsOpen(this, true);
+        _linkFailureTipTimer?.Stop();
+        _linkFailureTipTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _linkFailureTipTimer.Tick += (_, _) => ClearLinkFailureTip();
+        _linkFailureTipTimer.Start();
+    }
+
+    private void ClearLinkFailureTip()
+    {
+        _linkFailureTipTimer?.Stop();
+        _linkFailureTipTimer = null;
+        if (Avalonia.Controls.ToolTip.GetTip(this) is null) return;
+        if (Avalonia.Controls.ToolTip.GetIsOpen(this)) Avalonia.Controls.ToolTip.SetIsOpen(this, false);
+        Avalonia.Controls.ToolTip.SetTip(this, null);
     }
 }
