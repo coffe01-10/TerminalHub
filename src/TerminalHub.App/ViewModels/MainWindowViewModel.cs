@@ -372,6 +372,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             if (e.PropertyName == nameof(DashboardViewModel.OutputLevelFilter))
                 _settings.OutputLevelFilter = Dashboard.OutputLevelFilter;
+            // Sticky: once the Debug tab has been opened, raw-line capture stays
+            // on so the tab's history survives switching away and back.
+            if (e.PropertyName == nameof(DashboardViewModel.SelectedBottomTab)
+                && Dashboard.SelectedBottomTab == 1)
+                Dashboard.DebugCaptureEnabled = true;
         };
         Files = new FilesViewModel(
             // Files browses the LOCAL filesystem — an ssh session's remote cwd
@@ -540,6 +545,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _ => SessionTag.None,
     };
 
+    /// <summary>Local spawn dir for respawn/split entries. An ssh session's
+    /// <see cref="TerminalSessionModel.WorkingDirectory"/> holds the REMOTE path
+    /// reported via OSC 7 — spawning a local terminal there fails, so ssh falls
+    /// back to the platform default dir (same guard as the workspace snapshot).</summary>
+    private static string LocalSpawnCwd(TerminalSessionModel session)
+        => session.Tag == SessionTag.Ssh ? "" : session.WorkingDirectory;
+
     private async Task<TerminalSessionModel?> CreateSessionAsync(
         string? name, SessionTag tag, string cwd,
         ShellKind? shell = null, string? shellCommand = null, string? arguments = null)
@@ -689,7 +701,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (!panes.Contains(session)) panes.Add(session);
             while (panes.Count < count)
             {
-                var created = await CreateSessionAsync(null, SessionTag.Dev, ActiveWorkingDirectory);
+                var created = await CreateSessionAsync(null, SessionTag.Dev,
+                    ActiveSession is { } spawnFrom ? LocalSpawnCwd(spawnFrom) : ActiveWorkingDirectory);
                 if (workspace != ActiveWorkspace) return;
                 if (created is null) return;
                 panes.Add(created);
@@ -801,7 +814,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // Capture before CloseSession — Dispose may invalidate the emulator.
         var (pinned, groupId, scheme) = (m.Pinned, m.GroupId, m.Emulator.ColorScheme);
         CloseSession(card);
-        var model = await CreateSessionAsync(m.Name, m.Tag, m.WorkingDirectory,
+        var model = await CreateSessionAsync(m.Name, m.Tag, LocalSpawnCwd(m),
             shellCommand: m.Shell, arguments: m.ShellArguments);
         if (model is null) return;
         model.Pinned = pinned;
@@ -2097,9 +2110,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _sessionLog.Write(name, level, line);
             };
             d.RawLineReceived += raw =>
+            {
+                // Per-line escape conversion + DebugLog append are pure overhead
+                // until the Debug tab has ever been opened.
+                if (!Dashboard.DebugCaptureEnabled) return;
                 Dashboard.AppendDebug(
                     TerminalHub.Core.Logging.AnsiText.DebugEscape(raw),
                     _sessionNames.GetValueOrDefault(id, "session"));
+            };
             return d;
         });
         dec.Feed(data.Span);
@@ -2267,6 +2285,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // The probe reads the local process's cwd — for ssh that is the ssh
             // client's dir and would stomp the remote path reported via OSC 7.
             if (s.Tag == SessionTag.Ssh) continue;
+            // An exited session keeps its old pid; probing it (worse, a reused
+            // pid) would write an unrelated process's dir into WorkingDirectory
+            // and the cwd history.
+            if (!s.IsRunning) continue;
             var probed = ProcessCwd.TryRead(s.Pty);
             if (string.IsNullOrEmpty(probed)) continue;
             var norm = CwdHistory.Normalize(probed);
@@ -2323,6 +2345,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.Dispose();
         Files.Dispose();
         _sessionLog.Dispose();
+        // Unsubscribe before disposing the monitor — a tick that was already
+        // running would otherwise re-enter PollCwdChanges/RefreshCounts after
+        // the sessions below are disposed.
+        _monitor.Sampled -= OnSampled;
         _monitor.Dispose();
         // SessionCards lags _sessions.Sessions for a session whose posted
         // card-add hasn't run yet — dispose the union so no PTY leaks.

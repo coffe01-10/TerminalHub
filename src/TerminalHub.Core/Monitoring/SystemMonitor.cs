@@ -34,20 +34,32 @@ public sealed class SystemMonitor : ISystemMonitor
 
     public void Dispose()
     {
-        _timer?.Dispose();
+        Interlocked.Exchange(ref _disposed, 1);
+        var timer = _timer;
         _timer = null;
+        timer?.Dispose();
+        // Wait out an in-flight tick: its Sampled callbacks must not run after
+        // the subscriber's own Dispose has torn its sessions and UI down.
+        while (Volatile.Read(ref _ticking) != 0)
+            Thread.Sleep(1);
     }
 
     /// <summary>Timer callbacks are not serialized — a slow sample (process list on a
     /// loaded box) must not let a second Tick run concurrently and corrupt the deltas.</summary>
     private int _ticking;
+    /// <summary>Set by Dispose — a queued-but-unstarted callback must not sample
+    /// (or raise Sampled) after the subscriber has begun tearing down.</summary>
+    private int _disposed;
 
     private void Tick()
     {
+        if (Volatile.Read(ref _disposed) != 0) return;
         if (Interlocked.Exchange(ref _ticking, 1) != 0) return;
         try
         {
-            TickCore();
+            // Dispose may have run between the first check and acquiring the latch.
+            if (Volatile.Read(ref _disposed) == 0)
+                TickCore();
         }
         finally
         {

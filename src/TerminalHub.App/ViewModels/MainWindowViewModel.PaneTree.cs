@@ -60,7 +60,8 @@ public partial class MainWindowViewModel
             session ??= workspace.Cards.Select(c => c.Model).FirstOrDefault(s => s != target.Session && !existing.Contains(s));
             if (session is null)
             {
-                session = await CreateSessionAsync(null, SessionTag.Dev, target.Session.WorkingDirectory);
+                // The target may be an ssh session — its cwd is remote, spawn locally instead.
+                session = await CreateSessionAsync(null, SessionTag.Dev, LocalSpawnCwd(target.Session));
             // SessionAdded posts the card. Its observable metadata must exist before binding the new view.
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Background);
             }

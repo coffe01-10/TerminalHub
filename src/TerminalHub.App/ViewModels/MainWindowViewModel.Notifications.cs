@@ -26,13 +26,22 @@ public partial class MainWindowViewModel
         }, TimeSpan.FromSeconds(8));
     }
 
+    /// <summary>Same visibility rule as UpdateDisplayedCards: with a pane tree
+    /// only the current layout's leaves are on screen (Quad's bottom row,
+    /// arbitrary splits beyond four panes) and a maximized pane hides the
+    /// others — those are the panes a banner must stay quiet for.</summary>
+    private bool IsSessionVisibleOnScreen(TerminalSessionModel session) => IsSplit
+        ? PaneMaximized ? ReferenceEquals(session, GetPane(FocusedPane))
+            : Enumerable.Range(0, PaneCount).Any(i => ReferenceEquals(session, GetPane(i)))
+        : ReferenceEquals(session, ActiveSession);
+
     private void OnCommandCompleted(TerminalSessionModel session, ShellCommandState command)
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             OnProjectTaskCompleted(session, command.ExitCode);
             if (_disposed || !_settings.NotifyCommandCompletion || !session.IsRunning) return;
-            if (IsSplit ? session == LeftPane || session == RightPane : session == ActiveSession) return;
+            if (IsSessionVisibleOnScreen(session)) return;
             ShowNotification(session,
                 $"{session.Name} · {(command.ExitCode is null ? "命令结束" : command.ExitCode == 0 ? "命令完成" : $"命令失败（{command.ExitCode}）")} · {command.Duration.TotalSeconds:0.0}s");
         });
@@ -44,7 +53,7 @@ public partial class MainWindowViewModel
     private void OnSessionBell(TerminalSessionModel s)
     {
         if (_disposed || OperatingSystem.IsWindows()) return;
-        if (IsSplit ? s == LeftPane || s == RightPane : s == ActiveSession) return;
+        if (IsSessionVisibleOnScreen(s)) return;
         ShowNotification(s, $"🔔 {s.Name} · 终端响铃");
         if (SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s)) is { } card)
             card.HasUnreadOutput = true;
