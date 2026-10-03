@@ -1,0 +1,4187 @@
+[
+  {
+    "id": "M0001",
+    "zh": "点击后按快捷键",
+    "en": "Click, then press a shortcut"
+  },
+  {
+    "id": "M0002",
+    "zh": "无法打开：{0}",
+    "en": "Unable to open: {0}"
+  },
+  {
+    "id": "M0003",
+    "zh": "在 Terminal Hub 中打开",
+    "en": "Open in Terminal Hub"
+  },
+  {
+    "id": "M0004",
+    "zh": "Thunar 自定义操作文件格式不正确。",
+    "en": "Invalid Thunar custom actions file."
+  },
+  {
+    "id": "M0005",
+    "zh": "在所选文件夹中打开终端",
+    "en": "Open a terminal in the selected folder"
+  },
+  {
+    "id": "M0006",
+    "zh": "（未标记命令文本）",
+    "en": "(No marked command text)"
+  },
+  {
+    "id": "M0007",
+    "zh": "（空命令）",
+    "en": "(Empty command)"
+  },
+  {
+    "id": "M0008",
+    "zh": "运行中",
+    "en": "Running"
+  },
+  {
+    "id": "M0009",
+    "zh": "命令结束",
+    "en": "Command ended"
+  },
+  {
+    "id": "M0010",
+    "zh": "完成",
+    "en": "Done"
+  },
+  {
+    "id": "M0011",
+    "zh": "失败 ",
+    "en": "Failed "
+  },
+  {
+    "id": "M0012",
+    "zh": "可定位",
+    "en": "Locate"
+  },
+  {
+    "id": "M0013",
+    "zh": "屏幕不同",
+    "en": "Different screen"
+  },
+  {
+    "id": "M0014",
+    "zh": "输出已不在历史中",
+    "en": "Output no longer in history"
+  },
+  {
+    "id": "M0015",
+    "zh": "当前会话",
+    "en": "Current session"
+  },
+  {
+    "id": "M0016",
+    "zh": "采样中…",
+    "en": "Sampling…"
+  },
+  {
+    "id": "M0017",
+    "zh": "无匹配",
+    "en": "No matches"
+  },
+  {
+    "id": "M0018",
+    "zh": "{0} 行匹配（每会话最多 200 行）",
+    "en": "{0} matching lines (up to 200 per session)"
+  },
+  {
+    "id": "M0019",
+    "zh": "已结束进程 {0} (pid {1})",
+    "en": "Terminated {0} (pid {1})"
+  },
+  {
+    "id": "M0020",
+    "zh": "无法结束 {0} (pid {1}): {2}",
+    "en": "Unable to terminate {0} (pid {1}): {2}"
+  },
+  {
+    "id": "M0021",
+    "zh": "暂无进程",
+    "en": "No processes"
+  },
+  {
+    "id": "M0022",
+    "zh": "选中文件即可预览",
+    "en": "Select a file to preview"
+  },
+  {
+    "id": "M0023",
+    "zh": "Enter 或双击文件查看预览",
+    "en": "Press Enter or double-click to preview"
+  },
+  {
+    "id": "M0024",
+    "zh": "空目录",
+    "en": "Empty folder"
+  },
+  {
+    "id": "M0025",
+    "zh": "{0} 项",
+    "en": "{0} items"
+  },
+  {
+    "id": "M0026",
+    "zh": "无法打开目录: {0}",
+    "en": "Unable to open folder: {0}"
+  },
+  {
+    "id": "M0027",
+    "zh": "正在加载图片…",
+    "en": "Loading image…"
+  },
+  {
+    "id": "M0028",
+    "zh": "{0} · 二进制文件",
+    "en": "{0} · binary file"
+  },
+  {
+    "id": "M0029",
+    "zh": "〔二进制文件 — 不提供文本预览〕",
+    "en": "[Binary file — text preview unavailable]"
+  },
+  {
+    "id": "M0030",
+    "zh": "{0} · 超过 {1}",
+    "en": "{0} · exceeds {1}"
+  },
+  {
+    "id": "M0031",
+    "zh": "〔文件过大 — 不提供文本预览〕",
+    "en": "[File too large — text preview unavailable]"
+  },
+  {
+    "id": "M0032",
+    "zh": "{0} · 已截断",
+    "en": "{0} · truncated"
+  },
+  {
+    "id": "M0033",
+    "zh": "〔图片过大 — 不提供预览〕",
+    "en": "[Image too large — preview unavailable]"
+  },
+  {
+    "id": "M0034",
+    "zh": "{0} · 图片",
+    "en": "{0} · image"
+  },
+  {
+    "id": "M0035",
+    "zh": "无法读取文件: {0}",
+    "en": "Unable to read file: {0}"
+  },
+  {
+    "id": "M0036",
+    "zh": "终端已 cd → {0}",
+    "en": "Terminal changed directory → {0}"
+  },
+  {
+    "id": "M0037",
+    "zh": "已复制 {0}",
+    "en": "Copied {0}"
+  },
+  {
+    "id": "M0038",
+    "zh": "已在文件管理器中显示 {0}",
+    "en": "Shown in file manager: {0}"
+  },
+  {
+    "id": "M0039",
+    "zh": "无法打开文件管理器: {0}",
+    "en": "Unable to open file manager: {0}"
+  },
+  {
+    "id": "M0040",
+    "zh": "已打开 {0}",
+    "en": "Opened {0}"
+  },
+  {
+    "id": "M0041",
+    "zh": "无法打开文件: {0}",
+    "en": "Unable to open file: {0}"
+  },
+  {
+    "id": "M0042",
+    "zh": "名称无效: {0}",
+    "en": "Invalid name: {0}"
+  },
+  {
+    "id": "M0043",
+    "zh": "新建文件夹",
+    "en": "New folder"
+  },
+  {
+    "id": "M0044",
+    "zh": "已创建 {0}",
+    "en": "Created {0}"
+  },
+  {
+    "id": "M0045",
+    "zh": "无法创建文件夹: {0}",
+    "en": "Unable to create folder: {0}"
+  },
+  {
+    "id": "M0046",
+    "zh": "新建文本.txt",
+    "en": "New text.txt"
+  },
+  {
+    "id": "M0047",
+    "zh": "无法创建文件: {0}",
+    "en": "Unable to create file: {0}"
+  },
+  {
+    "id": "M0048",
+    "zh": "已重命名 → {0}",
+    "en": "Renamed → {0}"
+  },
+  {
+    "id": "M0049",
+    "zh": "无法重命名: {0}",
+    "en": "Unable to rename: {0}"
+  },
+  {
+    "id": "M0050",
+    "zh": "导入中…",
+    "en": "Importing…"
+  },
+  {
+    "id": "M0051",
+    "zh": "已导入 {0} 项，跳过 {1} 项",
+    "en": "Imported {0} items, skipped {1}"
+  },
+  {
+    "id": "M0052",
+    "zh": "已导入 {0} 项",
+    "en": "Imported {0} items"
+  },
+  {
+    "id": "M0053",
+    "zh": "已在当前目录中，跳过",
+    "en": "Already in current folder, skipped"
+  },
+  {
+    "id": "M0054",
+    "zh": "已在目标目录中，跳过",
+    "en": "Already in destination folder, skipped"
+  },
+  {
+    "id": "M0055",
+    "zh": " · 跳过 {0} 个目录链接",
+    "en": " · skipped {0} directory links"
+  },
+  {
+    "id": "M0056",
+    "zh": "无法导入 {0}: {1}",
+    "en": "Unable to import {0}: {1}"
+  },
+  {
+    "id": "M0057",
+    "zh": "全部会话",
+    "en": "All sessions"
+  },
+  {
+    "id": "M0058",
+    "zh": "全部",
+    "en": "All"
+  },
+  {
+    "id": "M0059",
+    "zh": "缓冲容量 → {0}",
+    "en": "Buffer capacity → {0}"
+  },
+  {
+    "id": "M0060",
+    "zh": "已恢复「{0}」筛选",
+    "en": "Restored filters for “{0}”"
+  },
+  {
+    "id": "M0061",
+    "zh": "正则无效: {0}",
+    "en": "Invalid regex: {0}"
+  },
+  {
+    "id": "M0062",
+    "zh": "写入 {0}",
+    "en": "Writing {0}"
+  },
+  {
+    "id": "M0063",
+    "zh": "日志文件打开失败: {0}",
+    "en": "Unable to open log file: {0}"
+  },
+  {
+    "id": "M0064",
+    "zh": "日志写入失败，已停止: {0}",
+    "en": "Log writing stopped: {0}"
+  },
+  {
+    "id": "M0065",
+    "zh": "没有可复制的行",
+    "en": "No lines to copy"
+  },
+  {
+    "id": "M0066",
+    "zh": "剪贴板不可用",
+    "en": "Clipboard unavailable"
+  },
+  {
+    "id": "M0067",
+    "zh": "已复制 {0} 行",
+    "en": "Copied {0} lines"
+  },
+  {
+    "id": "M0068",
+    "zh": "没有选中的日志行",
+    "en": "No log line selected"
+  },
+  {
+    "id": "M0069",
+    "zh": "已复制选中行",
+    "en": "Copied selected line"
+  },
+  {
+    "id": "M0070",
+    "zh": "已清空 {0} 行",
+    "en": "Cleared {0} lines"
+  },
+  {
+    "id": "M0071",
+    "zh": "匹配 {0}/{1}",
+    "en": "Match {0}/{1}"
+  },
+  {
+    "id": "M0072",
+    "zh": "没有可导出的行",
+    "en": "No lines to export"
+  },
+  {
+    "id": "M0073",
+    "zh": "已取消导出",
+    "en": "Export cancelled"
+  },
+  {
+    "id": "M0074",
+    "zh": "已导出 {0} 行 → {1}",
+    "en": "Exported {0} lines → {1}"
+  },
+  {
+    "id": "M0075",
+    "zh": "导出失败: {0}",
+    "en": "Export failed: {0}"
+  },
+  {
+    "id": "M0076",
+    "zh": "该行没有会话来源",
+    "en": "This line has no session source"
+  },
+  {
+    "id": "M0077",
+    "zh": "无法跳到「{0}」",
+    "en": "Unable to jump to “{0}”"
+  },
+  {
+    "id": "M0078",
+    "zh": "已跳到「{0}」",
+    "en": "Jumped to “{0}”"
+  },
+  {
+    "id": "M0079",
+    "zh": "未找到会话「{0}」",
+    "en": "Session “{0}” not found"
+  },
+  {
+    "id": "M0080",
+    "zh": "原会话已关闭",
+    "en": "Original session closed"
+  },
+  {
+    "id": "M0081",
+    "zh": "重启前保存",
+    "en": "Saved before restart"
+  },
+  {
+    "id": "M0082",
+    "zh": "会话在独立窗口",
+    "en": "Session in another window"
+  },
+  {
+    "id": "M0083",
+    "zh": "书签 ",
+    "en": "Bookmark "
+  },
+  {
+    "id": "M0084",
+    "zh": "已复制书签文字。",
+    "en": "Bookmark text copied."
+  },
+  {
+    "id": "M0085",
+    "zh": "复制失败：剪贴板暂时不可用，请重试。",
+    "en": "Clipboard temporarily unavailable. Please try again."
+  },
+  {
+    "id": "M0086",
+    "zh": "原会话已关闭，只能查看或复制保存的文字。",
+    "en": "Original session closed. Saved text can still be viewed or copied."
+  },
+  {
+    "id": "M0087",
+    "zh": "这是重启前保存的书签，只能查看或复制保存的文字。",
+    "en": "Bookmark saved before restart. Saved text can still be viewed or copied."
+  },
+  {
+    "id": "M0088",
+    "zh": "原会话在独立窗口中，书签文字仍可复制。",
+    "en": "Original session is in another window. Bookmark text can still be copied."
+  },
+  {
+    "id": "M0089",
+    "zh": "书签",
+    "en": "Bookmarks"
+  },
+  {
+    "id": "M0090",
+    "zh": "没有选中的命令。",
+    "en": "No command selected."
+  },
+  {
+    "id": "M0091",
+    "zh": "这个终端还没有命令记录。",
+    "en": "This terminal has no command history yet."
+  },
+  {
+    "id": "M0092",
+    "zh": "后面没有命令。",
+    "en": "No later command."
+  },
+  {
+    "id": "M0093",
+    "zh": "前面没有命令。",
+    "en": "No earlier command."
+  },
+  {
+    "id": "M0094",
+    "zh": "已复制命令和输出。",
+    "en": "Command and output copied."
+  },
+  {
+    "id": "M0095",
+    "zh": "当前屏幕和记录命令时不同，无法定位，也没有改到其他内容。",
+    "en": "The current screen differs from the recorded screen. Unable to locate the output."
+  },
+  {
+    "id": "M0096",
+    "zh": "当前屏幕和记录命令时不同，没有复制其他内容。",
+    "en": "The current screen differs from the recorded screen. No other content was copied."
+  },
+  {
+    "id": "M0097",
+    "zh": "这段输出已被历史缓冲裁掉，无法定位。",
+    "en": "This output has been trimmed from history and cannot be located."
+  },
+  {
+    "id": "M0098",
+    "zh": "这段输出已不在历史中，没有复制其他命令的内容。",
+    "en": "This output is no longer in history. No other command was copied."
+  },
+  {
+    "id": "M0099",
+    "zh": "未选择会话",
+    "en": "No session selected"
+  },
+  {
+    "id": "M0100",
+    "zh": "点击：有产物则打开目录，无产物则按当前配置档开始打包。Ctrl+点击或右键「重新打包」强制重新发布。右键可切换配置档、查看最近产物、打开/复制上次成功产物路径。打包进行中可右键「取消打包」。",
+    "en": "Click to open existing artifacts or build using the current profile. Ctrl+click or choose “Rebuild” to force a new build. Right-click to select profiles, browse recent artifacts, or open/copy the last successful artifact path. Choose “Cancel build” to stop a running build."
+  },
+  {
+    "id": "M0101",
+    "zh": "打包进行中。右键「取消打包 Cancel」终止发布进程组。普通点击不会再次启动。",
+    "en": "Build running. Right-click “Cancel build” to stop the process group. Clicking again will not start another build."
+  },
+  {
+    "id": "M0102",
+    "zh": "打包中",
+    "en": "Building"
+  },
+  {
+    "id": "M0103",
+    "zh": "部署",
+    "en": "Deploy"
+  },
+  {
+    "id": "M0104",
+    "zh": "{0} 已耗时 {1}。",
+    "en": "{0} Elapsed: {1}."
+  },
+  {
+    "id": "M0105",
+    "zh": "\n配置档：",
+    "en": "\nProfile:"
+  },
+  {
+    "id": "M0106",
+    "zh": "尚未打包",
+    "en": "No builds yet"
+  },
+  {
+    "id": "M0107",
+    "zh": "本机",
+    "en": "This computer"
+  },
+  {
+    "id": "M0108",
+    "zh": "终端位置交换",
+    "en": "Swap terminals"
+  },
+  {
+    "id": "M0109",
+    "zh": "未找到 {0}。请选择本机可用的 Shell，或填写已安装程序的路径。",
+    "en": "{0} was not found. Select an available Shell or enter an installed program's path."
+  },
+  {
+    "id": "M0110",
+    "zh": "未找到所选 Shell，请选择可用程序或填写正确的路径。",
+    "en": "Selected Shell not found. Choose an available program or enter a valid path."
+  },
+  {
+    "id": "M0111",
+    "zh": "开发环境",
+    "en": "Development"
+  },
+  {
+    "id": "M0112",
+    "zh": "测试环境",
+    "en": "Testing"
+  },
+  {
+    "id": "M0113",
+    "zh": "部署控制",
+    "en": "Deployment"
+  },
+  {
+    "id": "M0114",
+    "zh": "创建会话失败 / failed to spawn terminal — {0}",
+    "en": "Unable to create terminal — {0}"
+  },
+  {
+    "id": "M0115",
+    "zh": "SSH 连接: {0}",
+    "en": "SSH connection: {0}"
+  },
+  {
+    "id": "M0116",
+    "zh": "SSH 会话创建失败 / failed to spawn ssh — {0}",
+    "en": "Unable to create SSH session — {0}"
+  },
+  {
+    "id": "M0117",
+    "zh": "未分配会话",
+    "en": "Unassigned session"
+  },
+  {
+    "id": "M0118",
+    "zh": "合并分屏",
+    "en": "Merge split panes"
+  },
+  {
+    "id": "M0119",
+    "zh": "调整分屏",
+    "en": "Change split layout"
+  },
+  {
+    "id": "M0120",
+    "zh": "最大化／恢复窗格",
+    "en": "Maximize / restore pane"
+  },
+  {
+    "id": "M0121",
+    "zh": "请使用 Ctrl、Alt 或功能键，避免占用普通输入。",
+    "en": "Use Ctrl, Alt or a function key to preserve normal typing."
+  },
+  {
+    "id": "M0122",
+    "zh": "与复制、粘贴或现有应用操作冲突。",
+    "en": "Conflicts with copy, paste or an existing app command."
+  },
+  {
+    "id": "M0123",
+    "zh": "按住式切换需要 Ctrl、Alt 或 Meta 修饰键。",
+    "en": "Hold switching requires Ctrl, Alt or Meta."
+  },
+  {
+    "id": "M0124",
+    "zh": "Shift 用于反向切换，请勿放入基础快捷键。",
+    "en": "Shift is reserved for reverse switching. Leave it out of the base shortcut."
+  },
+  {
+    "id": "M0125",
+    "zh": "无法识别这个快捷键，请重新按键录入。",
+    "en": "Unrecognized shortcut. Please record it again."
+  },
+  {
+    "id": "M0126",
+    "zh": "与其他终端切换快捷键重复。",
+    "en": "Duplicates another terminal shortcut."
+  },
+  {
+    "id": "M0127",
+    "zh": "Terminal Hub · 终端控制中心",
+    "en": "Terminal Hub · Terminal control center"
+  },
+  {
+    "id": "M0128",
+    "zh": "下一个会话",
+    "en": "Next session"
+  },
+  {
+    "id": "M0129",
+    "zh": "上一个会话",
+    "en": "Previous session"
+  },
+  {
+    "id": "M0130",
+    "zh": "已复制 CWD: {0}",
+    "en": "Working directory copied: {0}"
+  },
+  {
+    "id": "M0131",
+    "zh": "会话「{0}」已弹出为独立窗口（关闭子窗即收回）",
+    "en": "Session “{0}” opened in a separate window (close it to return)"
+  },
+  {
+    "id": "M0132",
+    "zh": "会话「{0}」已收回主窗口",
+    "en": "Session “{0}” returned to the main window"
+  },
+  {
+    "id": "M0133",
+    "zh": "导出 Logs 可见行",
+    "en": "Export visible log lines"
+  },
+  {
+    "id": "M0134",
+    "zh": "日志文件",
+    "en": "Log files"
+  },
+  {
+    "id": "M0135",
+    "zh": "文本文件",
+    "en": "Text files"
+  },
+  {
+    "id": "M0136",
+    "zh": "Deploy: 重新打包 / force republish",
+    "en": "Deploy: force rebuild"
+  },
+  {
+    "id": "M0137",
+    "zh": "使用配置档 / profile",
+    "en": "Using profile"
+  },
+  {
+    "id": "M0138",
+    "zh": "Deploy: 无法读取产物目录 — {0}",
+    "en": "Deploy: unable to read artifact directory — {0}"
+  },
+  {
+    "id": "M0139",
+    "zh": "Deploy: 配置档名称不能为空 / profile name required",
+    "en": "Deploy: a profile name is required"
+  },
+  {
+    "id": "M0140",
+    "zh": "已保存配置档 / profile saved",
+    "en": "Profile saved"
+  },
+  {
+    "id": "M0141",
+    "zh": " 下次 Deploy 使用该配置。",
+    "en": " This profile will be used for the next build."
+  },
+  {
+    "id": "M0142",
+    "zh": "Deploy: 找不到配置档 / profile not found {0}",
+    "en": "Deploy: profile not found {0}"
+  },
+  {
+    "id": "M0143",
+    "zh": "已切换配置档 / profile active",
+    "en": "Active profile changed"
+  },
+  {
+    "id": "M0144",
+    "zh": "Deploy: 已删除配置档 / profile deleted {0}",
+    "en": "Deploy: profile deleted {0}"
+  },
+  {
+    "id": "M0145",
+    "zh": "Deploy: 产物目录不存在 / artifact folder missing",
+    "en": "Deploy: artifact directory missing"
+  },
+  {
+    "id": "M0146",
+    "zh": "Deploy: 上次成功产物不存在 / last successful artifact missing",
+    "en": "Deploy: last successful artifact missing"
+  },
+  {
+    "id": "M0147",
+    "zh": "已复制产物路径 {0}",
+    "en": "Artifact path copied: {0}"
+  },
+  {
+    "id": "M0148",
+    "zh": "已清除上次发布结果",
+    "en": "Last build result cleared"
+  },
+  {
+    "id": "M0149",
+    "zh": "Deploy: 最近产物已刷新 / recent artifacts ({0})",
+    "en": "Deploy: recent artifacts refreshed ({0})"
+  },
+  {
+    "id": "M0150",
+    "zh": "Deploy: 产物目录 {0}",
+    "en": "Deploy: artifact directory {0}"
+  },
+  {
+    "id": "M0151",
+    "zh": "Deploy: 已在文件管理器中打开产物目录",
+    "en": "Deploy: artifact directory opened in file manager"
+  },
+  {
+    "id": "M0152",
+    "zh": "Deploy: 无法打开文件管理器 — 请手动访问上面目录",
+    "en": "Deploy: unable to open file manager — open the directory above manually"
+  },
+  {
+    "id": "M0153",
+    "zh": "Deploy: 重新发布请按住 Ctrl 再点 Deploy，或右键菜单「重新打包」。",
+    "en": "Deploy: Ctrl+click Deploy or choose “Rebuild” to build again."
+  },
+  {
+    "id": "M0154",
+    "zh": "Deploy: 打包进行中 / publish already running — 请等待当前 Publish 会话结束",
+    "en": "Deploy: build already running — wait for the current Publish session"
+  },
+  {
+    "id": "M0155",
+    "zh": "Deploy: 找不到发布脚本 / publish script not found",
+    "en": "Deploy: build script not found"
+  },
+  {
+    "id": "M0156",
+    "zh": "Deploy: 开始打包 / publish start — {0}",
+    "en": "Deploy: build started — {0}"
+  },
+  {
+    "id": "M0157",
+    "zh": "Deploy: 已启动会话 Publish · 标签 部署控制 (Deploy)。结束时 Output 会显示成功或失败。",
+    "en": "Deploy: Publish session started with the Deployment tag. Output will show the result when it finishes."
+  },
+  {
+    "id": "M0158",
+    "zh": "Deploy: 已取消打包 / publish cancelled",
+    "en": "Deploy: build cancelled"
+  },
+  {
+    "id": "M0159",
+    "zh": "Deploy: 启动失败 / publish failed to start — {0}",
+    "en": "Deploy: unable to start build — {0}"
+  },
+  {
+    "id": "M0160",
+    "zh": "Deploy: 没有进行中的打包 / publish is not running",
+    "en": "Deploy: no build running"
+  },
+  {
+    "id": "M0161",
+    "zh": "Deploy: 打包成功 / publish succeeded。再次点击 Deploy 打开产物目录 artifacts/publish。",
+    "en": "Deploy: build succeeded. Click Deploy to open artifacts/publish."
+  },
+  {
+    "id": "M0162",
+    "zh": "Deploy: 打包失败 / publish failed (exit {0})。请查看 Publish 终端输出。",
+    "en": "Deploy: build failed (exit {0}). Check the Publish terminal."
+  },
+  {
+    "id": "M0163",
+    "zh": "  打包 Windows: scripts\\publish-windows.ps1 (需 Inno Setup)",
+    "en": "  Build Windows: scripts\\\\publish-windows.ps1 (requires Inno Setup)"
+  },
+  {
+    "id": "M0164",
+    "zh": "  打包 Linux:   ./scripts/publish-linux.sh  → artifacts/publish/linux-x64/",
+    "en": "  Build Linux:   ./scripts/publish-linux.sh  → artifacts/publish/linux-x64/"
+  },
+  {
+    "id": "M0165",
+    "zh": "  打包 Linux:   ./scripts/publish-linux.sh",
+    "en": "  Build Linux:   ./scripts/publish-linux.sh"
+  },
+  {
+    "id": "M0166",
+    "zh": "  打包 Windows: scripts\\publish-windows.ps1 (需在 Windows + Inno Setup)",
+    "en": "  Build Windows: scripts\\\\publish-windows.ps1 (requires Windows + Inno Setup)"
+  },
+  {
+    "id": "M0167",
+    "zh": "  在仓库根目录运行上述命令，完成后再次点击 Deploy 打开产物目录",
+    "en": "  Run these commands from the repository root, then click Deploy to open artifacts."
+  },
+  {
+    "id": "M0168",
+    "zh": "自定义",
+    "en": "Custom"
+  },
+  {
+    "id": "M0169",
+    "zh": "终端排序",
+    "en": "Reorder terminals"
+  },
+  {
+    "id": "M0170",
+    "zh": "工作空间  {0}      {1} 个终端      {2} 个运行中",
+    "en": "Workspace  {0}      {1} terminals      {2} running"
+  },
+  {
+    "id": "M0171",
+    "zh": "内存 {0} / {1}",
+    "en": "Memory {0} / {1}"
+  },
+  {
+    "id": "M0172",
+    "zh": "新命令",
+    "en": "New command"
+  },
+  {
+    "id": "M0173",
+    "zh": "已添加收藏。填写命令后，从命令面板或快捷键填入当前终端。",
+    "en": "Favorite added. Edit its command, then insert it from the command palette or a shortcut."
+  },
+  {
+    "id": "M0174",
+    "zh": "已删除收藏。",
+    "en": "Favorite deleted."
+  },
+  {
+    "id": "M0175",
+    "zh": "先打开一个终端。",
+    "en": "Open a terminal first."
+  },
+  {
+    "id": "M0176",
+    "zh": "这个终端没有开启括号粘贴，多行命令会逐行执行。本次没有填入。",
+    "en": "Bracketed paste is disabled. Multiline commands would execute line by line, so nothing was inserted."
+  },
+  {
+    "id": "M0177",
+    "zh": "已填入收藏命令，确认后按 Enter 执行。",
+    "en": "Favorite inserted. Press Enter when ready to run it."
+  },
+  {
+    "id": "M0178",
+    "zh": "当前 Shell 与收藏记录的不同，已按原文填入。确认后按 Enter 执行。",
+    "en": "The current Shell differs from the favorite. Original text inserted; press Enter when ready."
+  },
+  {
+    "id": "M0179",
+    "zh": "与其他快捷键重复。",
+    "en": "Duplicates another shortcut."
+  },
+  {
+    "id": "M0180",
+    "zh": "置顶 · ",
+    "en": "Pinned · "
+  },
+  {
+    "id": "M0181",
+    "zh": "在资源管理器文件夹右键中显示 Terminal Hub",
+    "en": "Show Terminal Hub in Explorer's folder context menu"
+  },
+  {
+    "id": "M0182",
+    "zh": "在 Thunar 文件夹右键中显示 Terminal Hub",
+    "en": "Show Terminal Hub in Thunar's folder context menu"
+  },
+  {
+    "id": "M0183",
+    "zh": "本机未安装 Thunar；仍可用 --cwd 指定启动目录。",
+    "en": "Thunar is not installed. You can still specify a directory with --cwd."
+  },
+  {
+    "id": "M0184",
+    "zh": "文件夹右键里已有 Terminal Hub。",
+    "en": "Terminal Hub is already in the folder context menu."
+  },
+  {
+    "id": "M0185",
+    "zh": "右键菜单未添加。",
+    "en": "Context menu entry not installed."
+  },
+  {
+    "id": "M0186",
+    "zh": "找不到程序路径，无法添加右键菜单。",
+    "en": "Unable to locate the app executable to add a context menu entry."
+  },
+  {
+    "id": "M0187",
+    "zh": "添加右键菜单失败：",
+    "en": "Unable to add context menu entry: "
+  },
+  {
+    "id": "M0188",
+    "zh": "移除右键菜单失败：",
+    "en": "Unable to remove context menu entry: "
+  },
+  {
+    "id": "M0189",
+    "zh": "已添加右键菜单。取消勾选即可移除。",
+    "en": "Context menu entry added. Uncheck to remove."
+  },
+  {
+    "id": "M0190",
+    "zh": "已添加右键菜单。取消勾选即可移除；Thunar 需重新打开窗口。",
+    "en": "Context menu entry added. Uncheck to remove; reopen Thunar for changes to appear."
+  },
+  {
+    "id": "M0191",
+    "zh": "已移除右键菜单。",
+    "en": "Context menu entry removed."
+  },
+  {
+    "id": "M0192",
+    "zh": "撤销布局 · ",
+    "en": "Undo layout · "
+  },
+  {
+    "id": "M0193",
+    "zh": "撤销布局",
+    "en": "Undo layout"
+  },
+  {
+    "id": "M0194",
+    "zh": "重做布局 · ",
+    "en": "Redo layout · "
+  },
+  {
+    "id": "M0195",
+    "zh": "重做布局",
+    "en": "Redo layout"
+  },
+  {
+    "id": "M0196",
+    "zh": "跨工作区移动",
+    "en": "Move across workspaces"
+  },
+  {
+    "id": "M0197",
+    "zh": "命令完成",
+    "en": "Command completed"
+  },
+  {
+    "id": "M0198",
+    "zh": "命令失败（{0}）",
+    "en": "Command failed ({0})"
+  },
+  {
+    "id": "M0199",
+    "zh": "🔔 {0} · 终端响铃",
+    "en": "🔔 {0} · terminal bell"
+  },
+  {
+    "id": "M0200",
+    "zh": "工作区 {0}",
+    "en": "Workspace {0}"
+  },
+  {
+    "id": "M0201",
+    "zh": "工作区",
+    "en": "Workspace"
+  },
+  {
+    "id": "M0202",
+    "zh": "选择目标终端后开启广播；Esc 可退出。",
+    "en": "Select target terminals, then enable broadcast. Esc exits."
+  },
+  {
+    "id": "M0203",
+    "zh": "至少选择两个运行中的终端。",
+    "en": "Select at least two running terminals."
+  },
+  {
+    "id": "M0204",
+    "zh": "广播输入 → ",
+    "en": "Broadcast input → "
+  },
+  {
+    "id": "M0205",
+    "zh": "广播已停止；输入只发送到当前终端。",
+    "en": "Broadcast stopped. Input goes to the current terminal."
+  },
+  {
+    "id": "M0206",
+    "zh": "颜色需使用 #RRGGBB 格式。",
+    "en": "Use #RRGGBB for colors."
+  },
+  {
+    "id": "M0207",
+    "zh": "目标终端未运行，请重新选择。",
+    "en": "Target terminal is not running. Select another."
+  },
+  {
+    "id": "M0208",
+    "zh": "请选择 PowerShell 或 Bash Shell 终端，以获取命令完成状态。",
+    "en": "Select a PowerShell or Bash terminal to receive command completion status."
+  },
+  {
+    "id": "M0209",
+    "zh": "请填写任务命令。",
+    "en": "Enter a task command."
+  },
+  {
+    "id": "M0210",
+    "zh": "目标终端已有命令运行，请等待或停止后再运行。",
+    "en": "A command is already running in this terminal. Wait or stop it first."
+  },
+  {
+    "id": "M0211",
+    "zh": "已请求停止，等待 Shell 返回",
+    "en": "Stop requested, waiting for Shell"
+  },
+  {
+    "id": "M0212",
+    "zh": "失败（{0}）",
+    "en": "Failed ({0})"
+  },
+  {
+    "id": "M0213",
+    "zh": "录制当前终端的屏幕、输出和尺寸变化。录制文件可能包含终端中显示的敏感内容。",
+    "en": "Record the current terminal's screen, output and size changes. Recordings may contain sensitive terminal content."
+  },
+  {
+    "id": "M0214",
+    "zh": "正在录制 · ",
+    "en": "Recording · "
+  },
+  {
+    "id": "M0215",
+    "zh": "无法开始录制：",
+    "en": "Unable to start recording: "
+  },
+  {
+    "id": "M0216",
+    "zh": "录制已保存 · ",
+    "en": "Recording saved · "
+  },
+  {
+    "id": "M0217",
+    "zh": "保存录制失败：",
+    "en": "Unable to save recording: "
+  },
+  {
+    "id": "M0218",
+    "zh": "版本 ",
+    "en": "Version "
+  },
+  {
+    "id": "M0219",
+    "zh": "手动检查新版；更新不会关闭运行中的终端。",
+    "en": "Check for updates manually. Updating does not close running terminals."
+  },
+  {
+    "id": "M0220",
+    "zh": "下载 {0}：{1} / {2} MB",
+    "en": "Downloading {0}: {1} / {2} MB"
+  },
+  {
+    "id": "M0221",
+    "zh": "下载 {0}：{1} MB",
+    "en": "Downloading {0}: {1} MB"
+  },
+  {
+    "id": "M0222",
+    "zh": "下载完成，可打开文件或所在目录；升级由你手动执行。",
+    "en": "Download complete. Open the file or its folder; install the update when ready."
+  },
+  {
+    "id": "M0223",
+    "zh": "下载已取消。",
+    "en": "Download cancelled."
+  },
+  {
+    "id": "M0224",
+    "zh": "下载失败：",
+    "en": "Download failed: "
+  },
+  {
+    "id": "M0225",
+    "zh": "正在检查更新…",
+    "en": "Checking for updates…"
+  },
+  {
+    "id": "M0226",
+    "zh": "有新版本 {0}，选择适合本机的安装包下载。",
+    "en": "Version {0} available. Choose a package for this computer."
+  },
+  {
+    "id": "M0227",
+    "zh": "当前无需更新，最新公开版本为 {0}。",
+    "en": "No update needed. Latest public version: {0}."
+  },
+  {
+    "id": "M0228",
+    "zh": "暂时无法检查更新，可在 GitHub 发布页手动下载。",
+    "en": "Unable to check for updates. Download manually from GitHub Releases."
+  },
+  {
+    "id": "M0229",
+    "zh": "请填写模板名称。",
+    "en": "Enter a template name."
+  },
+  {
+    "id": "M0230",
+    "zh": "先打开一个终端，再保存模板。",
+    "en": "Open a terminal before saving a template."
+  },
+  {
+    "id": "M0231",
+    "zh": "已保存当前布局为新模板。",
+    "en": "Current layout saved as a new template."
+  },
+  {
+    "id": "M0232",
+    "zh": "已保存名称与终端配置。",
+    "en": "Name and terminal settings saved."
+  },
+  {
+    "id": "M0233",
+    "zh": "当前没有可保存的终端。",
+    "en": "No terminals to save."
+  },
+  {
+    "id": "M0234",
+    "zh": "已用当前终端及分屏更新模板。",
+    "en": "Template updated with current terminals and split layout."
+  },
+  {
+    "id": "M0235",
+    "zh": "已删除模板，运行中的终端继续保留。",
+    "en": "Template deleted. Running terminals are preserved."
+  },
+  {
+    "id": "M0236",
+    "zh": "已打开 {0}；原有终端继续运行。",
+    "en": "Opened {0}; existing terminals keep running."
+  },
+  {
+    "id": "M0237",
+    "zh": "先选择一个模板。",
+    "en": "Select a template first."
+  },
+  {
+    "id": "M0238",
+    "zh": "已复制模板。启动命令不会执行，可以改目录后再打开。",
+    "en": "Template copied. Startup commands were not run. Edit directories before opening."
+  },
+  {
+    "id": "M0239",
+    "zh": "已导入模板，没有执行启动命令。请检查目录和 Shell，再按预览打开。",
+    "en": "Template imported; no startup commands were run. Check directories and Shells before opening."
+  },
+  {
+    "id": "M0240",
+    "zh": "未运行",
+    "en": "Not running"
+  },
+  {
+    "id": "M0241",
+    "zh": "选择已保存的 SSH 主机。文件传输使用本机 OpenSSH 密钥或代理认证。",
+    "en": "Select a saved SSH host. Transfers use your local OpenSSH keys or agent."
+  },
+  {
+    "id": "M0242",
+    "zh": "操作已取消。",
+    "en": "Operation cancelled."
+  },
+  {
+    "id": "M0243",
+    "zh": " 未确认删除远端临时文件：",
+    "en": " Remote temporary file deletion unconfirmed: "
+  },
+  {
+    "id": "M0244",
+    "zh": "{0} 个条目",
+    "en": "{0} entries"
+  },
+  {
+    "id": "M0245",
+    "zh": "上传 {0} / {1} 字节",
+    "en": "Uploading {0} / {1} bytes"
+  },
+  {
+    "id": "M0246",
+    "zh": "上传完成",
+    "en": "Upload complete"
+  },
+  {
+    "id": "M0247",
+    "zh": "上传完成 · ",
+    "en": "Upload complete · "
+  },
+  {
+    "id": "M0248",
+    "zh": " 个条目",
+    "en": " entries"
+  },
+  {
+    "id": "M0249",
+    "zh": "下载 {0} / {1} 字节",
+    "en": "Downloading {0} / {1} bytes"
+  },
+  {
+    "id": "M0250",
+    "zh": "下载完成",
+    "en": "Download complete"
+  },
+  {
+    "id": "M0251",
+    "zh": "已退出 · {0}",
+    "en": "Exited · {0}"
+  },
+  {
+    "id": "M0252",
+    "zh": "有新输出",
+    "en": "New output"
+  },
+  {
+    "id": "M0253",
+    "zh": "命令运行中",
+    "en": "Command running"
+  },
+  {
+    "id": "M0254",
+    "zh": "命令失败 · {0}",
+    "en": "Command failed · {0}"
+  },
+  {
+    "id": "M0255",
+    "zh": "置顶",
+    "en": "Pinned"
+  },
+  {
+    "id": "M0256",
+    "zh": "有终端已退出",
+    "en": "A terminal has exited"
+  },
+  {
+    "id": "M0257",
+    "zh": "下一个终端",
+    "en": "Next terminal"
+  },
+  {
+    "id": "M0258",
+    "zh": "上一个终端",
+    "en": "Previous terminal"
+  },
+  {
+    "id": "M0259",
+    "zh": "命令面板",
+    "en": "Command palette"
+  },
+  {
+    "id": "M0260",
+    "zh": "最近使用终端（按住）",
+    "en": "Recent terminals (hold)"
+  },
+  {
+    "id": "M0261",
+    "zh": "第 {0} 个终端",
+    "en": "Terminal {0}"
+  },
+  {
+    "id": "M0262",
+    "zh": "{0} · 独立窗口 — Terminal Hub",
+    "en": "{0} · Separate window — Terminal Hub"
+  },
+  {
+    "id": "M0263",
+    "zh": "主机地址不能为空",
+    "en": "Host address is required"
+  },
+  {
+    "id": "M0264",
+    "zh": "端口无效 (1-65535)",
+    "en": "Invalid port (1–65535)"
+  },
+  {
+    "id": "M0265",
+    "zh": "已更新 {0}",
+    "en": "Updated {0}"
+  },
+  {
+    "id": "M0266",
+    "zh": "已添加 {0}",
+    "en": "Added {0}"
+  },
+  {
+    "id": "M0267",
+    "zh": "未检测到 ssh 命令 — 请先安装 openssh-client",
+    "en": "ssh command not found — install openssh-client first"
+  },
+  {
+    "id": "M0268",
+    "zh": "连接 {0} …",
+    "en": "Connecting to {0} …"
+  },
+  {
+    "id": "M0269",
+    "zh": "调整分屏比例",
+    "en": "Resize split panes"
+  },
+  {
+    "id": "M0270",
+    "zh": "分屏",
+    "en": "Split"
+  },
+  {
+    "id": "M0271",
+    "zh": "弹出",
+    "en": "Pop out"
+  },
+  {
+    "id": "M0272",
+    "zh": "终端名称",
+    "en": "Terminal name"
+  },
+  {
+    "id": "M0273",
+    "zh": "保存名称",
+    "en": "Save name"
+  },
+  {
+    "id": "M0274",
+    "zh": "重命名终端",
+    "en": "Rename terminal"
+  },
+  {
+    "id": "M0275",
+    "zh": "原输出已被裁剪、覆盖或屏幕已切换，请重新搜索。",
+    "en": "Original output was trimmed, overwritten or on another screen. Search again."
+  },
+  {
+    "id": "M0276",
+    "zh": "原会话已关闭，请重新搜索。",
+    "en": "Original session closed. Search again."
+  },
+  {
+    "id": "M0277",
+    "zh": "已定位到 {0}",
+    "en": "Located in {0}"
+  },
+  {
+    "id": "M0278",
+    "zh": "移动终端",
+    "en": "Move terminal"
+  },
+  {
+    "id": "M0279",
+    "zh": "取消打包",
+    "en": "Cancel build"
+  },
+  {
+    "id": "M0280",
+    "zh": "打开上次成功产物",
+    "en": "Open last successful artifact"
+  },
+  {
+    "id": "M0281",
+    "zh": "复制上次成功产物路径",
+    "en": "Copy last successful artifact path"
+  },
+  {
+    "id": "M0282",
+    "zh": "清除上次发布结果",
+    "en": "Clear last build result"
+  },
+  {
+    "id": "M0283",
+    "zh": "配置档",
+    "en": "Profiles"
+  },
+  {
+    "id": "M0284",
+    "zh": "删除配置档",
+    "en": "Delete profile"
+  },
+  {
+    "id": "M0285",
+    "zh": "最近产物",
+    "en": "Recent artifacts"
+  },
+  {
+    "id": "M0286",
+    "zh": "（无已存配置）",
+    "en": "(No saved profiles)"
+  },
+  {
+    "id": "M0287",
+    "zh": "cwd（当前目录向上查找）",
+    "en": "cwd (search upward from current folder)"
+  },
+  {
+    "id": "M0288",
+    "zh": "host（当前系统）",
+    "en": "host (current system)"
+  },
+  {
+    "id": "M0289",
+    "zh": "（暂无产物）",
+    "en": "(No artifacts yet)"
+  },
+  {
+    "id": "M0290",
+    "zh": "文件夹名称",
+    "en": "Folder name"
+  },
+  {
+    "id": "M0291",
+    "zh": "新建文本文件",
+    "en": "New text file"
+  },
+  {
+    "id": "M0292",
+    "zh": "文件名称",
+    "en": "File name"
+  },
+  {
+    "id": "M0293",
+    "zh": "重命名",
+    "en": "Rename"
+  },
+  {
+    "id": "M0294",
+    "zh": "新名称",
+    "en": "New name"
+  },
+  {
+    "id": "M0295",
+    "zh": "无法拖出文件: {0}",
+    "en": "Unable to drag file: {0}"
+  },
+  {
+    "id": "M0296",
+    "zh": "自动（适应应用背景）",
+    "en": "Automatic (match app background)"
+  },
+  {
+    "id": "M0297",
+    "zh": "跟随界面",
+    "en": "Follow interface"
+  },
+  {
+    "id": "M0298",
+    "zh": "深色",
+    "en": "Dark"
+  },
+  {
+    "id": "M0299",
+    "zh": "浅色",
+    "en": "Light"
+  },
+  {
+    "id": "M0300",
+    "zh": "取消置顶",
+    "en": "Unpin"
+  },
+  {
+    "id": "M0301",
+    "zh": "展开当前分组",
+    "en": "Expand current group"
+  },
+  {
+    "id": "M0302",
+    "zh": "折叠当前分组",
+    "en": "Collapse current group"
+  },
+  {
+    "id": "M0303",
+    "zh": "还没有分组",
+    "en": "No groups yet"
+  },
+  {
+    "id": "M0304",
+    "zh": "聚焦 {0}",
+    "en": "Focus {0}"
+  },
+  {
+    "id": "M0305",
+    "zh": "无弹出窗口",
+    "en": "No separate windows"
+  },
+  {
+    "id": "M0306",
+    "zh": "设为当前终端",
+    "en": "Activate terminal"
+  },
+  {
+    "id": "M0307",
+    "zh": "重启会话",
+    "en": "Restart session"
+  },
+  {
+    "id": "M0308",
+    "zh": "移入分组",
+    "en": "Move to group"
+  },
+  {
+    "id": "M0309",
+    "zh": "移出分组",
+    "en": "Remove from group"
+  },
+  {
+    "id": "M0310",
+    "zh": "新建分组",
+    "en": "New group"
+  },
+  {
+    "id": "M0311",
+    "zh": "分组名称",
+    "en": "Group name"
+  },
+  {
+    "id": "M0312",
+    "zh": "关闭会话",
+    "en": "Close session"
+  },
+  {
+    "id": "M0313",
+    "zh": "当前终端不在分组中。",
+    "en": "Current terminal is not in a group."
+  },
+  {
+    "id": "M0314",
+    "zh": "重命名分组",
+    "en": "Rename group"
+  },
+  {
+    "id": "M0315",
+    "zh": "导出工作区模板",
+    "en": "Export workspace template"
+  },
+  {
+    "id": "M0316",
+    "zh": "模板",
+    "en": "Templates"
+  },
+  {
+    "id": "M0317",
+    "zh": "工作区模板",
+    "en": "Workspace template"
+  },
+  {
+    "id": "M0318",
+    "zh": "已导出模板。",
+    "en": "Template exported."
+  },
+  {
+    "id": "M0319",
+    "zh": "导出失败：",
+    "en": "Export failed: "
+  },
+  {
+    "id": "M0320",
+    "zh": "导入工作区模板",
+    "en": "Import workspace template"
+  },
+  {
+    "id": "M0321",
+    "zh": "导入失败：",
+    "en": "Import failed: "
+  },
+  {
+    "id": "M0322",
+    "zh": "确定",
+    "en": "OK"
+  },
+  {
+    "id": "M0323",
+    "zh": "当前屏幕没有可复制的内容。",
+    "en": "No visible content to copy."
+  },
+  {
+    "id": "M0324",
+    "zh": "已复制当前屏幕（{0} 行）。",
+    "en": "Current screen copied ({0} lines)."
+  },
+  {
+    "id": "M0325",
+    "zh": "这个终端还没有可复制的输出。",
+    "en": "This terminal has no output to copy."
+  },
+  {
+    "id": "M0326",
+    "zh": "已复制全部保留输出（{0} 行）。",
+    "en": "All retained output copied ({0} lines)."
+  },
+  {
+    "id": "M0327",
+    "zh": "没有可保存的内容。",
+    "en": "No content to save."
+  },
+  {
+    "id": "M0328",
+    "zh": "已保存：{0}",
+    "en": "Saved: {0}"
+  },
+  {
+    "id": "M0329",
+    "zh": "保存失败：",
+    "en": "Save failed: "
+  },
+  {
+    "id": "M0330",
+    "zh": "先检查更新并选择下载版本。",
+    "en": "Check for updates and select a version first."
+  },
+  {
+    "id": "M0331",
+    "zh": "保存 ",
+    "en": "Save "
+  },
+  {
+    "id": "M0332",
+    "zh": "无法选择下载位置：",
+    "en": "Unable to select download location: "
+  },
+  {
+    "id": "M0333",
+    "zh": "保存选区为文本",
+    "en": "Save selection as text"
+  },
+  {
+    "id": "M0334",
+    "zh": "选区",
+    "en": "Selection"
+  },
+  {
+    "id": "M0335",
+    "zh": "保存全部输出",
+    "en": "Save all output"
+  },
+  {
+    "id": "M0336",
+    "zh": "输出",
+    "en": "Output"
+  },
+  {
+    "id": "M0337",
+    "zh": "保存命令记录",
+    "en": "Save command record"
+  },
+  {
+    "id": "M0338",
+    "zh": "命令",
+    "en": "Command"
+  },
+  {
+    "id": "M0339",
+    "zh": "还没有书签 — 选中终端文字后，用「添加书签」保存重要输出。",
+    "en": "No bookmarks yet — select terminal text and choose “Add bookmark” to save important output."
+  },
+  {
+    "id": "M0340",
+    "zh": "没有匹配的书签。",
+    "en": "No matching bookmarks."
+  },
+  {
+    "id": "M0341",
+    "zh": "当前会话没有匹配的书签，可切换到「全部」。",
+    "en": "No matching bookmarks in this session. Switch to “All”."
+  },
+  {
+    "id": "M0342",
+    "zh": "重命名书签",
+    "en": "Rename bookmark"
+  },
+  {
+    "id": "M0343",
+    "zh": "书签名称",
+    "en": "Bookmark name"
+  },
+  {
+    "id": "M0344",
+    "zh": "保存书签为文本",
+    "en": "Save bookmark as text"
+  },
+  {
+    "id": "M0345",
+    "zh": "{0}-书签-{1}-{2}",
+    "en": "{0}-bookmark-{1}-{2}"
+  },
+  {
+    "id": "M0346",
+    "zh": "没有活动终端。",
+    "en": "No active terminal."
+  },
+  {
+    "id": "M0347",
+    "zh": "没有可标记的内容。",
+    "en": "No content to bookmark."
+  },
+  {
+    "id": "M0348",
+    "zh": "添加书签",
+    "en": "Add bookmark"
+  },
+  {
+    "id": "M0349",
+    "zh": "已添加书签「{0}」。",
+    "en": "Bookmark “{0}” added."
+  },
+  {
+    "id": "M0350",
+    "zh": "原输出已被裁剪或不在当前屏幕，书签文字仍可复制。",
+    "en": "Original output was trimmed or is on another screen. Saved text can still be copied."
+  },
+  {
+    "id": "M0351",
+    "zh": "切换 · ",
+    "en": "Switch · "
+  },
+  {
+    "id": "M0352",
+    "zh": "任意 Shell",
+    "en": "Any Shell"
+  },
+  {
+    "id": "M0353",
+    "zh": "收藏 · ",
+    "en": "Favorite · "
+  },
+  {
+    "id": "M0354",
+    "zh": "查看命令记录",
+    "en": "View command history"
+  },
+  {
+    "id": "M0355",
+    "zh": "定位当前终端最近命令的输出",
+    "en": "Locate recent command output in the current terminal"
+  },
+  {
+    "id": "M0356",
+    "zh": "复制当前屏幕",
+    "en": "Copy current screen"
+  },
+  {
+    "id": "M0357",
+    "zh": "复制当前终端可见的文字；浏览历史时为当前视口",
+    "en": "Copy visible terminal text, or the current viewport when browsing history"
+  },
+  {
+    "id": "M0358",
+    "zh": "复制全部输出",
+    "en": "Copy all output"
+  },
+  {
+    "id": "M0359",
+    "zh": "复制缓冲中仍保留的历史与屏幕；已裁剪的旧输出不在其中",
+    "en": "Copy retained history and screen; trimmed output is no longer available"
+  },
+  {
+    "id": "M0360",
+    "zh": "把终端选中的文字保存为 UTF-8 .txt",
+    "en": "Save selected terminal text as UTF-8 .txt"
+  },
+  {
+    "id": "M0361",
+    "zh": "把当前会话保留的全部输出保存为 .txt",
+    "en": "Save all retained output from the current session as .txt"
+  },
+  {
+    "id": "M0362",
+    "zh": "为选中文字或当前视口添加可回看的书签",
+    "en": "Bookmark selected text or the current viewport"
+  },
+  {
+    "id": "M0363",
+    "zh": "打开书签列表",
+    "en": "Open bookmark list"
+  },
+  {
+    "id": "M0364",
+    "zh": "搜索、定位、复制已保存的输出书签",
+    "en": "Search, locate and copy saved output bookmarks"
+  },
+  {
+    "id": "M0365",
+    "zh": "新建终端",
+    "en": "New terminal"
+  },
+  {
+    "id": "M0366",
+    "zh": "打开新的 Shell",
+    "en": "Open a new Shell"
+  },
+  {
+    "id": "M0367",
+    "zh": "收起 / 固定会话栏",
+    "en": "Collapse / pin session sidebar"
+  },
+  {
+    "id": "M0368",
+    "zh": "收起后靠近左边缘呼出；滚轮切换终端",
+    "en": "Reveal from the left edge when collapsed; use the wheel to switch terminals"
+  },
+  {
+    "id": "M0369",
+    "zh": "切换分屏",
+    "en": "Toggle split"
+  },
+  {
+    "id": "M0370",
+    "zh": "并排查看终端",
+    "en": "View terminals side by side"
+  },
+  {
+    "id": "M0371",
+    "zh": "上下分屏",
+    "en": "Stacked split"
+  },
+  {
+    "id": "M0372",
+    "zh": "上下查看两个终端",
+    "en": "View two terminals vertically"
+  },
+  {
+    "id": "M0373",
+    "zh": "四窗格",
+    "en": "Four panes"
+  },
+  {
+    "id": "M0374",
+    "zh": "同时查看四个终端",
+    "en": "View four terminals at once"
+  },
+  {
+    "id": "M0375",
+    "zh": "最大化 / 恢复当前窗格",
+    "en": "Maximize / restore current pane"
+  },
+  {
+    "id": "M0376",
+    "zh": "暂时聚焦一个终端",
+    "en": "Focus on one terminal temporarily"
+  },
+  {
+    "id": "M0377",
+    "zh": "重命名当前终端",
+    "en": "Rename current terminal"
+  },
+  {
+    "id": "M0378",
+    "zh": "修改终端名称",
+    "en": "Change terminal name"
+  },
+  {
+    "id": "M0379",
+    "zh": "打开设置",
+    "en": "Open settings"
+  },
+  {
+    "id": "M0380",
+    "zh": "主题、字体、快捷键",
+    "en": "Theme, font and shortcuts"
+  },
+  {
+    "id": "M0381",
+    "zh": "管理工作区模板",
+    "en": "Manage workspace templates"
+  },
+  {
+    "id": "M0382",
+    "zh": "保存、配置、打开工作区",
+    "en": "Save, configure and open workspaces"
+  },
+  {
+    "id": "M0383",
+    "zh": "保存当前工作区为模板",
+    "en": "Save current workspace as template"
+  },
+  {
+    "id": "M0384",
+    "zh": "保存会话及分屏",
+    "en": "Save sessions and split layout"
+  },
+  {
+    "id": "M0385",
+    "zh": "打开工作区 · ",
+    "en": "Open workspace · "
+  },
+  {
+    "id": "M0386",
+    "zh": "{0} 个终端 · 保留当前会话",
+    "en": "{0} terminals · keep current sessions"
+  },
+  {
+    "id": "M0387",
+    "zh": "保存",
+    "en": "Save"
+  },
+  {
+    "id": "M0388",
+    "zh": "重命名工作区",
+    "en": "Rename workspace"
+  },
+  {
+    "id": "M0389",
+    "zh": "回放 · ",
+    "en": "Playback · "
+  },
+  {
+    "id": "M0390",
+    "zh": "播放",
+    "en": "Play"
+  },
+  {
+    "id": "M0391",
+    "zh": "暂停",
+    "en": "Pause"
+  },
+  {
+    "id": "M0392",
+    "zh": "上传到当前远程目录",
+    "en": "Upload to current remote folder"
+  },
+  {
+    "id": "M0393",
+    "zh": "保存远程文件",
+    "en": "Save remote file"
+  },
+  {
+    "id": "M0394",
+    "zh": "Terminal Hub 录制",
+    "en": "Terminal Hub recording"
+  },
+  {
+    "id": "M0395",
+    "zh": "保存终端录制",
+    "en": "Save terminal recording"
+  },
+  {
+    "id": "M0396",
+    "zh": "打开终端录制",
+    "en": "Open terminal recording"
+  },
+  {
+    "id": "M0397",
+    "zh": "无法打开录制：",
+    "en": "Unable to open recording: "
+  },
+  {
+    "id": "M0398",
+    "zh": "名称不能为空",
+    "en": "Name is required"
+  },
+  {
+    "id": "M0399",
+    "zh": "成功 · {0}",
+    "en": "Succeeded · {0}"
+  },
+  {
+    "id": "M0400",
+    "zh": "已取消 · {0}",
+    "en": "Cancelled · {0}"
+  },
+  {
+    "id": "M0401",
+    "zh": "失败 exit {0} · {1}",
+    "en": "Failed exit {0} · {1}"
+  },
+  {
+    "id": "M0402",
+    "zh": "成功",
+    "en": "Succeeded"
+  },
+  {
+    "id": "M0403",
+    "zh": "已取消",
+    "en": "Cancelled"
+  },
+  {
+    "id": "M0404",
+    "zh": "失败",
+    "en": "Failed"
+  },
+  {
+    "id": "M0405",
+    "zh": "上次结果：{0} · exit {1} · {2}{3}",
+    "en": "Last result: {0} · exit {1} · {2}{3}"
+  },
+  {
+    "id": "M0406",
+    "zh": "打包中 · {0}",
+    "en": "Building · {0}"
+  },
+  {
+    "id": "M0409",
+    "zh": "刚刚",
+    "en": "Just now"
+  },
+  {
+    "id": "M0410",
+    "zh": "昨天 {0}",
+    "en": "Yesterday {0}"
+  },
+  {
+    "id": "M0411",
+    "zh": "命令提示符",
+    "en": "Command Prompt"
+  },
+  {
+    "id": "M0412",
+    "zh": "终端控制中心",
+    "en": "Terminal control center"
+  },
+  {
+    "id": "M0413",
+    "zh": "请在 --cwd 后面写目录。",
+    "en": "Enter a directory after --cwd."
+  },
+  {
+    "id": "M0414",
+    "zh": "没有提供目录。",
+    "en": "No directory specified."
+  },
+  {
+    "id": "M0415",
+    "zh": "目录不存在：",
+    "en": "Directory not found: "
+  },
+  {
+    "id": "M0416",
+    "zh": "无法识别目录：",
+    "en": "Invalid directory: "
+  },
+  {
+    "id": "M0417",
+    "zh": "新规则",
+    "en": "New rule"
+  },
+  {
+    "id": "M0418",
+    "zh": "新任务",
+    "en": "New task"
+  },
+  {
+    "id": "M0419",
+    "zh": "Windows 安装版",
+    "en": "Windows installer"
+  },
+  {
+    "id": "M0420",
+    "zh": "Windows 便携版",
+    "en": "Windows portable"
+  },
+  {
+    "id": "M0421",
+    "zh": "Linux x64 包",
+    "en": "Linux x64 package"
+  },
+  {
+    "id": "M0422",
+    "zh": "模板里没有终端。",
+    "en": "The template has no terminals."
+  },
+  {
+    "id": "M0423",
+    "zh": "导入的模板",
+    "en": "Imported template"
+  },
+  {
+    "id": "M0424",
+    "zh": "无法读取这个模板文件。",
+    "en": "Unable to read this template file."
+  },
+  {
+    "id": "M0425",
+    "zh": "模板复制失败。",
+    "en": "Unable to copy template."
+  },
+  {
+    "id": "M0426",
+    "zh": " 副本",
+    "en": " Copy"
+  },
+  {
+    "id": "M0427",
+    "zh": "将创建 ",
+    "en": "Will create "
+  },
+  {
+    "id": "M0428",
+    "zh": " 个终端：",
+    "en": " terminals:"
+  },
+  {
+    "id": "M0429",
+    "zh": "默认目录",
+    "en": "Default directory"
+  },
+  {
+    "id": "M0430",
+    "zh": "（目录不存在，可修改）",
+    "en": "(directory missing; editable)"
+  },
+  {
+    "id": "M0431",
+    "zh": "默认 Shell",
+    "en": "Default Shell"
+  },
+  {
+    "id": "M0432",
+    "zh": "（未找到 Shell，可修改）",
+    "en": "(Shell not found; editable)"
+  },
+  {
+    "id": "M0433",
+    "zh": " · 启动命令：",
+    "en": " · Startup command: "
+  },
+  {
+    "id": "M0434",
+    "zh": " · 置顶",
+    "en": " · Pinned"
+  },
+  {
+    "id": "M0435",
+    "zh": " · 分组 ",
+    "en": " · Group "
+  },
+  {
+    "id": "M0436",
+    "zh": "无法启动 OpenSSH。",
+    "en": "Unable to start OpenSSH."
+  },
+  {
+    "id": "M0437",
+    "zh": "SFTP 连接失败。请先在 SSH 终端完成主机确认，并配置密钥或 ssh-agent。{0}",
+    "en": "SFTP connection failed. Confirm the host in an SSH terminal and configure a key or ssh-agent. {0}"
+  },
+  {
+    "id": "M0438",
+    "zh": "服务器不支持 SFTP v3。",
+    "en": "Server does not support SFTP v3."
+  },
+  {
+    "id": "M0439",
+    "zh": "服务器返回空数据，传输未完成。",
+    "en": "Server returned no data; transfer incomplete."
+  },
+  {
+    "id": "M0440",
+    "zh": "SFTP 响应序号不匹配。",
+    "en": "SFTP response ID mismatch."
+  },
+  {
+    "id": "M0441",
+    "zh": "SFTP 响应错误：{0}/{1}",
+    "en": "Invalid SFTP response: {0}/{1}"
+  },
+  {
+    "id": "M0442",
+    "zh": "SFTP 数据包过大。",
+    "en": "SFTP packet too large."
+  },
+  {
+    "id": "M0443",
+    "zh": "规则匹配超时，请简化正则表达式。",
+    "en": "Rule matching timed out. Simplify the regular expression."
+  },
+  {
+    "id": "M0444",
+    "zh": "录制文件缺少文件头。",
+    "en": "Recording file header missing."
+  },
+  {
+    "id": "M0445",
+    "zh": "不支持的录制版本。",
+    "en": "Unsupported recording version."
+  },
+  {
+    "id": "M0446",
+    "zh": "录制事件为空。",
+    "en": "Recording event is empty."
+  },
+  {
+    "id": "M0447",
+    "zh": "/   前台调度",
+    "en": "/   Foreground"
+  },
+  {
+    "id": "M0448",
+    "zh": "收起 / 固定左侧会话栏",
+    "en": "Collapse / pin session sidebar"
+  },
+  {
+    "id": "M0449",
+    "zh": "会话",
+    "en": "Sessions"
+  },
+  {
+    "id": "M0450",
+    "zh": "命令面板 · 在快捷键设置中修改按键",
+    "en": "Command palette · customize keys in shortcut settings"
+  },
+  {
+    "id": "M0451",
+    "zh": "查找",
+    "en": "Find"
+  },
+  {
+    "id": "M0452",
+    "zh": "显示 / 隐藏输出 · Ctrl+Shift+J",
+    "en": "Show / hide output · Ctrl+Shift+J"
+  },
+  {
+    "id": "M0453",
+    "zh": "显示 / 隐藏右栏 · Ctrl+Shift+B",
+    "en": "Show / hide inspector · Ctrl+Shift+B"
+  },
+  {
+    "id": "M0454",
+    "zh": "工具",
+    "en": "Tools"
+  },
+  {
+    "id": "M0455",
+    "zh": "设置",
+    "en": "Settings"
+  },
+  {
+    "id": "M0456",
+    "zh": "最小化",
+    "en": "Minimize"
+  },
+  {
+    "id": "M0457",
+    "zh": "最大化 / 还原",
+    "en": "Maximize / restore"
+  },
+  {
+    "id": "M0458",
+    "zh": "关闭应用",
+    "en": "Close app"
+  },
+  {
+    "id": "M0459",
+    "zh": "点击切换 · 拖动排序 · 右键重命名",
+    "en": "Click to switch · drag to reorder · right-click to rename"
+  },
+  {
+    "id": "M0460",
+    "zh": "关闭工作区及其中的终端",
+    "en": "Close workspace and its terminals"
+  },
+  {
+    "id": "M0461",
+    "zh": "关闭工作区",
+    "en": "Close workspace"
+  },
+  {
+    "id": "M0462",
+    "zh": "新建工作区",
+    "en": "New workspace"
+  },
+  {
+    "id": "M0463",
+    "zh": "工作区工具",
+    "en": "Workspace tools"
+  },
+  {
+    "id": "M0464",
+    "zh": "左侧会话栏呼出区域",
+    "en": "Session sidebar reveal area"
+  },
+  {
+    "id": "M0465",
+    "zh": "停止 · Esc",
+    "en": "Stop · Esc"
+  },
+  {
+    "id": "M0466",
+    "zh": "会话空间",
+    "en": "Sessions"
+  },
+  {
+    "id": "M0467",
+    "zh": "固定",
+    "en": "Pin"
+  },
+  {
+    "id": "M0468",
+    "zh": "会话操作",
+    "en": "Session actions"
+  },
+  {
+    "id": "M0469",
+    "zh": "会话卡操作",
+    "en": "Session card actions"
+  },
+  {
+    "id": "M0470",
+    "zh": "当前终端",
+    "en": "Current terminal"
+  },
+  {
+    "id": "M0471",
+    "zh": "新建会话",
+    "en": "New session"
+  },
+  {
+    "id": "M0472",
+    "zh": "拖拽调整会话架宽度",
+    "en": "Drag to resize session sidebar"
+  },
+  {
+    "id": "M0473",
+    "zh": "双击重命名 · 会话列表聚焦时按 F2",
+    "en": "Double-click to rename · F2 when session list is focused"
+  },
+  {
+    "id": "M0474",
+    "zh": "后退目录历史",
+    "en": "Previous directory"
+  },
+  {
+    "id": "M0475",
+    "zh": "刷新当前目录",
+    "en": "Refresh current directory"
+  },
+  {
+    "id": "M0476",
+    "zh": "前进目录历史",
+    "en": "Next directory"
+  },
+  {
+    "id": "M0477",
+    "zh": "点击切换左右分屏；右键选择上下、四窗格及最大化。点击窗格聚焦，点击会话卡分配。",
+    "en": "Click for side-by-side split; right-click for stacked, four panes or maximize. Click a pane to focus; click a session card to assign."
+  },
+  {
+    "id": "M0478",
+    "zh": "左右分屏",
+    "en": "Side-by-side split"
+  },
+  {
+    "id": "M0479",
+    "zh": "回到单窗格",
+    "en": "Single pane"
+  },
+  {
+    "id": "M0480",
+    "zh": "把当前会话弹出为独立窗口（关闭子窗即收回）",
+    "en": "Open current session in a separate window (close it to return)"
+  },
+  {
+    "id": "M0481",
+    "zh": "新建会话 · Ctrl+Shift+N",
+    "en": "New session · Ctrl+Shift+N"
+  },
+  {
+    "id": "M0482",
+    "zh": "重命名会话       F2",
+    "en": "Rename session       F2"
+  },
+  {
+    "id": "M0483",
+    "zh": "重命名当前分组",
+    "en": "Rename current group"
+  },
+  {
+    "id": "M0484",
+    "zh": "查看当前工作区",
+    "en": "View current workspace"
+  },
+  {
+    "id": "M0485",
+    "zh": "终端配色",
+    "en": "Terminal colors"
+  },
+  {
+    "id": "M0486",
+    "zh": "关闭会话        Ctrl+Shift+W",
+    "en": "Close session        Ctrl+Shift+W"
+  },
+  {
+    "id": "M0487",
+    "zh": "弹出窗口",
+    "en": "Separate windows"
+  },
+  {
+    "id": "M0488",
+    "zh": "复制 CWD",
+    "en": "Copy CWD"
+  },
+  {
+    "id": "M0489",
+    "zh": "复制当前可见的终端文字；浏览历史时复制当前视口",
+    "en": "Copy visible terminal text; while browsing history, copy the current viewport"
+  },
+  {
+    "id": "M0490",
+    "zh": "有选区时保存选区文字并定位到选区起点；否则以视口首行定位并保存预览",
+    "en": "Save selected text at its starting position, or save a preview at the viewport's first line"
+  },
+  {
+    "id": "M0491",
+    "zh": "书签列表",
+    "en": "Bookmark list"
+  },
+  {
+    "id": "M0492",
+    "zh": "关闭当前终端 · Ctrl+Shift+W",
+    "en": "Close current terminal · Ctrl+Shift+W"
+  },
+  {
+    "id": "M0493",
+    "zh": "关闭当前终端",
+    "en": "Close current terminal"
+  },
+  {
+    "id": "M0494",
+    "zh": "没有活动终端",
+    "en": "No active terminal"
+  },
+  {
+    "id": "M0495",
+    "zh": "Ctrl+Shift+N 或点击左侧「新建会话」",
+    "en": "Ctrl+Shift+N or click “New session”"
+  },
+  {
+    "id": "M0496",
+    "zh": "⬇ 回到底部",
+    "en": "⬇ Back to bottom"
+  },
+  {
+    "id": "M0497",
+    "zh": "回到实时输出底部",
+    "en": "Return to live output"
+  },
+  {
+    "id": "M0498",
+    "zh": "当前窗格",
+    "en": "Current pane"
+  },
+  {
+    "id": "M0499",
+    "zh": "右栏暂无会话 — 点击左侧会话卡分配到这里",
+    "en": "Unassigned pane — click a session card to assign"
+  },
+  {
+    "id": "M0500",
+    "zh": "拖拽调整底栏高度",
+    "en": "Drag to resize output panel"
+  },
+  {
+    "id": "M0501",
+    "zh": "按级别筛选 Output 行",
+    "en": "Filter output by level"
+  },
+  {
+    "id": "M0502",
+    "zh": "会话输出中的 error / exception / 非零退出:{0} 条",
+    "en": "Session errors / exceptions / nonzero exits: {0}"
+  },
+  {
+    "id": "M0503",
+    "zh": "清空",
+    "en": "Clear"
+  },
+  {
+    "id": "M0504",
+    "zh": "暂无问题 —— 会话输出中的错误会出现在这里",
+    "en": "No problems — session errors will appear here"
+  },
+  {
+    "id": "M0505",
+    "zh": "搜索保留输出… · Enter 下一处",
+    "en": "Search retained output… · Enter for next"
+  },
+  {
+    "id": "M0506",
+    "zh": "上一处匹配（终端视口跟随）",
+    "en": "Previous match (follow in terminal)"
+  },
+  {
+    "id": "M0507",
+    "zh": "下一处匹配（终端视口跟随）",
+    "en": "Next match (follow in terminal)"
+  },
+  {
+    "id": "M0508",
+    "zh": "点击结果切换会话并定位 · 仅搜索仍保留的历史与屏幕输出",
+    "en": "Click a result to switch and locate · searches retained history and screen only"
+  },
+  {
+    "id": "M0509",
+    "zh": "暂无输出",
+    "en": "No output yet"
+  },
+  {
+    "id": "M0510",
+    "zh": "暂无调试行",
+    "en": "No debug lines"
+  },
+  {
+    "id": "M0511",
+    "zh": "拖拽调整右栏宽度",
+    "en": "Drag to resize inspector"
+  },
+  {
+    "id": "M0512",
+    "zh": "点击切换排序",
+    "en": "Click to change sorting"
+  },
+  {
+    "id": "M0513",
+    "zh": "结束进程",
+    "en": "Terminate process"
+  },
+  {
+    "id": "M0514",
+    "zh": "上一级 · Backspace / Alt+↑",
+    "en": "Parent folder · Backspace / Alt+↑"
+  },
+  {
+    "id": "M0515",
+    "zh": "在此打开终端：目录→活动终端 cd 进入；文件→cd 所在目录",
+    "en": "Open here: change the active terminal to this directory or the file's parent"
+  },
+  {
+    "id": "M0516",
+    "zh": "复制路径",
+    "en": "Copy path"
+  },
+  {
+    "id": "M0517",
+    "zh": "刷新 (F5)",
+    "en": "Refresh (F5)"
+  },
+  {
+    "id": "M0518",
+    "zh": "会话目录",
+    "en": "Session directory"
+  },
+  {
+    "id": "M0519",
+    "zh": "显示隐藏文件（.* 开头或系统隐藏属性）· Ctrl+H",
+    "en": "Show hidden files (dotfiles or system hidden attributes) · Ctrl+H"
+  },
+  {
+    "id": "M0520",
+    "zh": "粘贴",
+    "en": "Paste"
+  },
+  {
+    "id": "M0521",
+    "zh": "把剪贴板中的文件复制到当前目录 (Ctrl+V)",
+    "en": "Copy clipboard files to the current folder (Ctrl+V)"
+  },
+  {
+    "id": "M0522",
+    "zh": "用默认应用打开",
+    "en": "Open with default app"
+  },
+  {
+    "id": "M0523",
+    "zh": "在此打开终端",
+    "en": "Open terminal here"
+  },
+  {
+    "id": "M0524",
+    "zh": "在文件管理器中显示",
+    "en": "Show in file manager"
+  },
+  {
+    "id": "M0525",
+    "zh": "重命名 (F2)",
+    "en": "Rename (F2)"
+  },
+  {
+    "id": "M0526",
+    "zh": "拖到终端可粘贴路径",
+    "en": "Drag to terminal to insert path"
+  },
+  {
+    "id": "M0527",
+    "zh": "过滤日志…",
+    "en": "Filter logs…"
+  },
+  {
+    "id": "M0528",
+    "zh": "把过滤框内容当作正则表达式（忽略大小写）",
+    "en": "Treat filter text as a regular expression (ignore case)"
+  },
+  {
+    "id": "M0529",
+    "zh": "⬇ 写文件",
+    "en": "⬇ Write to file"
+  },
+  {
+    "id": "M0530",
+    "zh": "将会话输出写入本地日志文件",
+    "en": "Write session output to a local log file"
+  },
+  {
+    "id": "M0531",
+    "zh": "显示所有级别 / show all levels（数字=环形缓冲总条数）",
+    "en": "Show all levels (count = total entries in ring buffer)"
+  },
+  {
+    "id": "M0532",
+    "zh": "只看 info 级行（数字=缓冲内 info 条数，不受当前筛选影响）",
+    "en": "Show info lines (count = info entries in buffer, independent of filtering)"
+  },
+  {
+    "id": "M0533",
+    "zh": "只看 warn 级行（数字=缓冲内 warn 条数，不受当前筛选影响）",
+    "en": "Show warn lines (count = warn entries in buffer, independent of filtering)"
+  },
+  {
+    "id": "M0534",
+    "zh": "只看 error 级行（数字=缓冲内 error 条数，不受当前筛选影响）",
+    "en": "Show error lines (count = error entries in buffer, independent of filtering)"
+  },
+  {
+    "id": "M0535",
+    "zh": "相对",
+    "en": "Relative"
+  },
+  {
+    "id": "M0536",
+    "zh": "时间戳：关=绝对 HH:mm:ss；开=相对距现在（刚刚 / 12s / 3m / 1h / 昨天 HH:mm；更早回退绝对）。导出始终用绝对时间。",
+    "en": "Timestamps: off = HH:mm:ss; on = time ago (just now / 12s / 3m / 1h / yesterday). Older entries use absolute time. Export always uses absolute time."
+  },
+  {
+    "id": "M0537",
+    "zh": "换行",
+    "en": "Wrap"
+  },
+  {
+    "id": "M0538",
+    "zh": "换行：开（默认）=长消息自动折行；关=单行显示并允许横向滚动，便于密扫。",
+    "en": "Wrap: on (default) = wrap long messages; off = single lines with horizontal scrolling."
+  },
+  {
+    "id": "M0539",
+    "zh": "紧凑",
+    "en": "Compact"
+  },
+  {
+    "id": "M0540",
+    "zh": "紧凑密度：关（默认）=字号 9.5 / 内边距 4,1；开=字号约 8.5 / 内边距约 2,0，便于密扫更多行。",
+    "en": "Compact density: off (default) = 9.5 font / 4,1 padding; on = about 8.5 font / 2,0 padding to show more lines."
+  },
+  {
+    "id": "M0541",
+    "zh": "容量",
+    "en": "Capacity"
+  },
+  {
+    "id": "M0542",
+    "zh": "Logs 环形缓冲容量（条）。缩小会丢弃最旧行。",
+    "en": "Log ring buffer capacity (lines). Reducing it discards the oldest lines."
+  },
+  {
+    "id": "M0543",
+    "zh": "缓冲 500 行（浅）",
+    "en": "500 lines (small)"
+  },
+  {
+    "id": "M0544",
+    "zh": "缓冲 2000 行（默认）",
+    "en": "2000 lines (default)"
+  },
+  {
+    "id": "M0545",
+    "zh": "缓冲 5000 行（深）",
+    "en": "5000 lines (large)"
+  },
+  {
+    "id": "M0546",
+    "zh": "▲ 上一条",
+    "en": "▲ Previous"
+  },
+  {
+    "id": "M0547",
+    "zh": "选中上一条匹配行（需要过滤词；到头即停，不循环）",
+    "en": "Select previous matching line (requires filter; stops at first)"
+  },
+  {
+    "id": "M0548",
+    "zh": "▼ 下一条",
+    "en": "▼ Next"
+  },
+  {
+    "id": "M0549",
+    "zh": "选中下一条匹配行并滚动到它（暂停跟随尾部）；到头即停，不循环",
+    "en": "Select and scroll to next matching line (pauses follow; stops at last)"
+  },
+  {
+    "id": "M0550",
+    "zh": "选中上一条 error 级别行（当前可见列表；到头即停，不循环；暂停跟随尾部）",
+    "en": "Select previous visible error line (pauses follow; stops at first)"
+  },
+  {
+    "id": "M0551",
+    "zh": "选中下一条 error 级别行并滚动到它（当前可见列表；暂停跟随尾部；到头即停，不循环）",
+    "en": "Select and scroll to next visible error line (pauses follow; stops at last)"
+  },
+  {
+    "id": "M0552",
+    "zh": "↗ 跳到会话",
+    "en": "↗ Go to session"
+  },
+  {
+    "id": "M0553",
+    "zh": "激活选中日志行来源对应的终端会话（Logs 页保持打开；也可双击该行）",
+    "en": "Activate the selected log line's source session (keep Logs open; double-click also works)"
+  },
+  {
+    "id": "M0554",
+    "zh": "⎘ 复制可见行",
+    "en": "⎘ Copy visible"
+  },
+  {
+    "id": "M0555",
+    "zh": "复制当前过滤结果到剪贴板",
+    "en": "Copy current filtered results to clipboard"
+  },
+  {
+    "id": "M0556",
+    "zh": "⎘ 复制选中",
+    "en": "⎘ Copy selected"
+  },
+  {
+    "id": "M0557",
+    "zh": "复制当前选中的日志行到剪贴板（Logs 列表聚焦时 Ctrl+C）",
+    "en": "Copy selected log line (Ctrl+C when Logs is focused)"
+  },
+  {
+    "id": "M0558",
+    "zh": "⬇ 导出",
+    "en": "⬇ Export"
+  },
+  {
+    "id": "M0559",
+    "zh": "把当前过滤后的可见行一次性导出为 .log / .txt 文件（与「⬇ 写文件」实时写入无关）",
+    "en": "Export visible filtered lines to .log / .txt once (independent of live file logging)"
+  },
+  {
+    "id": "M0560",
+    "zh": "✕ 清空结果",
+    "en": "✕ Clear results"
+  },
+  {
+    "id": "M0561",
+    "zh": "清除当前过滤结果（从缓冲中移除，不再出现）",
+    "en": "Remove current filtered results from the buffer"
+  },
+  {
+    "id": "M0562",
+    "zh": "📌 保留历史",
+    "en": "📌 Keep history"
+  },
+  {
+    "id": "M0563",
+    "zh": "开启后：底部 Output 清空时 Logs 保留已缓冲历史；默认跟随清空",
+    "en": "Keep buffered Logs history when the Output panel is cleared; disabled by default"
+  },
+  {
+    "id": "M0564",
+    "zh": "暂无日志行",
+    "en": "No log lines"
+  },
+  {
+    "id": "M0565",
+    "zh": "⬇ 跟随",
+    "en": "⬇ Follow"
+  },
+  {
+    "id": "M0566",
+    "zh": "新行不再自动滚动；点击恢复跟随（或滚回底部）",
+    "en": "New lines no longer scroll automatically; click to resume or scroll to bottom"
+  },
+  {
+    "id": "M0567",
+    "zh": "已保存连接",
+    "en": "Saved connections"
+  },
+  {
+    "id": "M0568",
+    "zh": "新建 / 收起连接表单",
+    "en": "Create / collapse connection form"
+  },
+  {
+    "id": "M0569",
+    "zh": "新建 / 编辑连接",
+    "en": "Create / edit connection"
+  },
+  {
+    "id": "M0570",
+    "zh": "名称 (可选)",
+    "en": "Name (optional)"
+  },
+  {
+    "id": "M0571",
+    "zh": "用户",
+    "en": "User"
+  },
+  {
+    "id": "M0572",
+    "zh": "主机 host / IP",
+    "en": "Host / IP"
+  },
+  {
+    "id": "M0573",
+    "zh": "端口",
+    "en": "Port"
+  },
+  {
+    "id": "M0574",
+    "zh": "＋ 添加/更新",
+    "en": "＋ Add / update"
+  },
+  {
+    "id": "M0575",
+    "zh": "暂无保存的连接 · 点上方 ＋ 添加",
+    "en": "No saved connections · click ＋ above to add"
+  },
+  {
+    "id": "M0576",
+    "zh": "连接",
+    "en": "Connect"
+  },
+  {
+    "id": "M0577",
+    "zh": "连接 (Enter / 双击)",
+    "en": "Connect (Enter / double-click)"
+  },
+  {
+    "id": "M0578",
+    "zh": "连接使用本机 ssh 命令:密码 / 密钥确认直接在终端会话中完成;密钥建议用 ssh-agent 或 ~/.ssh/config。",
+    "en": "Uses local ssh. Confirm passwords / keys in the terminal; use ssh-agent or ~/.ssh/config for keys."
+  },
+  {
+    "id": "M0579",
+    "zh": "上一条",
+    "en": "Previous"
+  },
+  {
+    "id": "M0580",
+    "zh": "下一条",
+    "en": "Next"
+  },
+  {
+    "id": "M0581",
+    "zh": "定位",
+    "en": "Locate"
+  },
+  {
+    "id": "M0582",
+    "zh": "复制命令和输出",
+    "en": "Copy command and output"
+  },
+  {
+    "id": "M0583",
+    "zh": "保存为文本",
+    "en": "Save as text"
+  },
+  {
+    "id": "M0584",
+    "zh": "把选中的命令和输出保存为 UTF-8 .txt",
+    "en": "Save selected command and output as UTF-8 .txt"
+  },
+  {
+    "id": "M0585",
+    "zh": "暂无命令记录 · 需终端输出带命令标记",
+    "en": "No command history · requires terminal command markers"
+  },
+  {
+    "id": "M0586",
+    "zh": "只记录带命令开始/完成标记的终端。历史被裁掉后不能定位，也不会复制到别的命令。",
+    "en": "Only records terminals that emit command start/end markers. Trimmed history cannot be located or copied from another command."
+  },
+  {
+    "id": "M0587",
+    "zh": "工作空间",
+    "en": "Workspace"
+  },
+  {
+    "id": "M0588",
+    "zh": "◔ {0} 个终端",
+    "en": "◔ {0} terminals"
+  },
+  {
+    "id": "M0589",
+    "zh": "⊕ {0} 个运行中",
+    "en": "⊕ {0} running"
+  },
+  {
+    "id": "M0590",
+    "zh": "监控",
+    "en": "Monitor"
+  },
+  {
+    "id": "M0591",
+    "zh": "日志",
+    "en": "Logs"
+  },
+  {
+    "id": "M0592",
+    "zh": "重新打包 Republish",
+    "en": "Rebuild"
+  },
+  {
+    "id": "M0593",
+    "zh": "取消打包 Cancel",
+    "en": "Cancel build"
+  },
+  {
+    "id": "M0594",
+    "zh": "配置档 Profiles",
+    "en": "Profiles"
+  },
+  {
+    "id": "M0595",
+    "zh": "保存当前配置 Save profile",
+    "en": "Save current profile"
+  },
+  {
+    "id": "M0596",
+    "zh": "删除配置档 Delete profile",
+    "en": "Delete profile"
+  },
+  {
+    "id": "M0597",
+    "zh": "打开上次成功产物 Open last success",
+    "en": "Open last successful artifact"
+  },
+  {
+    "id": "M0598",
+    "zh": "复制上次成功产物路径 Copy last artifact path",
+    "en": "Copy last successful artifact path"
+  },
+  {
+    "id": "M0599",
+    "zh": "清除上次发布结果 Clear last result",
+    "en": "Clear last build result"
+  },
+  {
+    "id": "M0600",
+    "zh": "最近产物 Recent",
+    "en": "Recent artifacts"
+  },
+  {
+    "id": "M0601",
+    "zh": "最近使用的终端",
+    "en": "Recent terminals"
+  },
+  {
+    "id": "M0602",
+    "zh": "继续按切换键 · Shift 反向 · 松开修饰键确认 · Esc 取消",
+    "en": "Press again to cycle · Shift reverses · release modifiers to confirm · Esc cancels"
+  },
+  {
+    "id": "M0603",
+    "zh": "选择你的第一个 Shell",
+    "en": "Choose your first Shell"
+  },
+  {
+    "id": "M0604",
+    "zh": "或填写自定义 Shell 的完整路径",
+    "en": "Or enter the full path to a custom Shell"
+  },
+  {
+    "id": "M0605",
+    "zh": "开始使用",
+    "en": "Get started"
+  },
+  {
+    "id": "M0606",
+    "zh": "让工作空间更合你的习惯",
+    "en": "Make your workspace feel right"
+  },
+  {
+    "id": "M0607",
+    "zh": "关闭设置",
+    "en": "Close settings"
+  },
+  {
+    "id": "M0608",
+    "zh": "外观",
+    "en": "Appearance"
+  },
+  {
+    "id": "M0609",
+    "zh": "主题与终端文字",
+    "en": "Theme and terminal text"
+  },
+  {
+    "id": "M0610",
+    "zh": "缩小字体",
+    "en": "Smaller font"
+  },
+  {
+    "id": "M0611",
+    "zh": "放大字体",
+    "en": "Larger font"
+  },
+  {
+    "id": "M0612",
+    "zh": "重置",
+    "en": "Reset"
+  },
+  {
+    "id": "M0613",
+    "zh": "等宽字体：默认 Cascadia / Consolas",
+    "en": "Monospace font: Cascadia / Consolas by default"
+  },
+  {
+    "id": "M0614",
+    "zh": "Ctrl+= / Ctrl+− 调整字号 · Ctrl+0 重置",
+    "en": "Ctrl+= / Ctrl+− for font size · Ctrl+0 to reset"
+  },
+  {
+    "id": "M0615",
+    "zh": "实时预览",
+    "en": "Live preview"
+  },
+  {
+    "id": "M0616",
+    "zh": "Terminal Hub · 中文与 English 012345",
+    "en": "Terminal Hub · Chinese and English 012345"
+  },
+  {
+    "id": "M0617",
+    "zh": "主题、字体和字号立即应用，点击「完成」保存。",
+    "en": "Theme, font and size apply immediately. Click “Done” to save."
+  },
+  {
+    "id": "M0618",
+    "zh": "右侧工具栏",
+    "en": "Right inspector"
+  },
+  {
+    "id": "M0619",
+    "zh": "下方输出区",
+    "en": "Bottom output panel"
+  },
+  {
+    "id": "M0620",
+    "zh": "Dock 显示方式",
+    "en": "Dock display"
+  },
+  {
+    "id": "M0621",
+    "zh": "工作空间名称",
+    "en": "Workspace name"
+  },
+  {
+    "id": "M0622",
+    "zh": "模板名称，例如：前端项目",
+    "en": "Template name, e.g. Frontend project"
+  },
+  {
+    "id": "M0623",
+    "zh": "存为新模板",
+    "en": "Save new template"
+  },
+  {
+    "id": "M0624",
+    "zh": "打开模板",
+    "en": "Open template"
+  },
+  {
+    "id": "M0625",
+    "zh": "保存修改",
+    "en": "Save changes"
+  },
+  {
+    "id": "M0626",
+    "zh": "更新为当前布局",
+    "en": "Use current layout"
+  },
+  {
+    "id": "M0627",
+    "zh": "复制模板",
+    "en": "Duplicate template"
+  },
+  {
+    "id": "M0628",
+    "zh": "导出模板",
+    "en": "Export template"
+  },
+  {
+    "id": "M0629",
+    "zh": "导入模板",
+    "en": "Import template"
+  },
+  {
+    "id": "M0630",
+    "zh": "删除模板",
+    "en": "Delete template"
+  },
+  {
+    "id": "M0631",
+    "zh": "打开前预览",
+    "en": "Preview before opening"
+  },
+  {
+    "id": "M0632",
+    "zh": "预览显示当前编辑。打开当前选中的模板会带上这些修改，并保留现有终端。启动命令只在打开且启用时执行；导入不会执行。",
+    "en": "Preview reflects current edits. Opening the selected template includes these changes and keeps existing terminals. Startup commands run only when opening with execution enabled; importing never runs them."
+  },
+  {
+    "id": "M0633",
+    "zh": "会话分组",
+    "en": "Session groups"
+  },
+  {
+    "id": "M0634",
+    "zh": "删除",
+    "en": "Delete"
+  },
+  {
+    "id": "M0635",
+    "zh": "工作目录",
+    "en": "Working directory"
+  },
+  {
+    "id": "M0636",
+    "zh": "Shell 参数",
+    "en": "Shell arguments"
+  },
+  {
+    "id": "M0637",
+    "zh": "启动命令，例如：npm run dev",
+    "en": "Startup command, e.g. npm run dev"
+  },
+  {
+    "id": "M0638",
+    "zh": "打开模板时执行启动命令（本地 Shell）",
+    "en": "Run startup command when opening template (local Shell)"
+  },
+  {
+    "id": "M0639",
+    "zh": "快捷键",
+    "en": "Shortcuts"
+  },
+  {
+    "id": "M0640",
+    "zh": "点击右侧输入框，再按你想使用的快捷键。Backspace / Delete 清除；Tab 移到下一项。",
+    "en": "Click an input, then press your shortcut. Backspace / Delete clears; Tab moves to the next entry."
+  },
+  {
+    "id": "M0641",
+    "zh": "Alt+1 到 Alt+9 按侧栏完整顺序切换，包括折叠分组里的终端。置顶或拖动后序号跟着新顺序变化。",
+    "en": "Alt+1 through Alt+9 use the full sidebar order, including collapsed groups. Pinning or dragging changes this order."
+  },
+  {
+    "id": "M0642",
+    "zh": "按快捷键录入；Backspace 清除",
+    "en": "Press shortcut; Backspace clears"
+  },
+  {
+    "id": "M0643",
+    "zh": "恢复默认快捷键",
+    "en": "Restore default shortcuts"
+  },
+  {
+    "id": "M0644",
+    "zh": "空白表示不绑定；有冲突的快捷键不会生效。",
+    "en": "Leave blank to disable. Conflicting shortcuts will not run."
+  },
+  {
+    "id": "M0645",
+    "zh": "启动",
+    "en": "Startup"
+  },
+  {
+    "id": "M0646",
+    "zh": "新终端使用",
+    "en": "New terminals use"
+  },
+  {
+    "id": "M0647",
+    "zh": "自定义 Shell 路径",
+    "en": "Custom Shell path"
+  },
+  {
+    "id": "M0648",
+    "zh": "勾选后，文件夹或其空白处的右键菜单会出现“在 Terminal Hub 中打开”。取消勾选即移除。带空格或中文的路径会传给已打开的窗口。",
+    "en": "When enabled, the folder context menu shows “Open in Terminal Hub”. Uncheck to remove it. Paths with spaces or Chinese characters are passed to the existing window."
+  },
+  {
+    "id": "M0649",
+    "zh": "关于",
+    "en": "About"
+  },
+  {
+    "id": "M0650",
+    "zh": "报错行号编辑器（可选 VS Code / Code.exe）",
+    "en": "Editor for error line numbers (optional VS Code / Code.exe)"
+  },
+  {
+    "id": "M0651",
+    "zh": "留空用记事本打开；Code.exe 支持定位行号",
+    "en": "Leave blank for Notepad; Code.exe supports line numbers"
+  },
+  {
+    "id": "M0652",
+    "zh": "提醒后台命令完成或失败",
+    "en": "Notify on background command completion or failure"
+  },
+  {
+    "id": "M0653",
+    "zh": "支持命令完成协议的 Shell 提供结果与耗时；其他 Shell 保留输出与进程状态提示。",
+    "en": "Shells with command completion markers provide results and duration. Other Shells show output and process status."
+  },
+  {
+    "id": "M0654",
+    "zh": "查看当前版本说明",
+    "en": "Current release notes"
+  },
+  {
+    "id": "M0655",
+    "zh": "检查更新",
+    "en": "Check for updates"
+  },
+  {
+    "id": "M0656",
+    "zh": "打开 GitHub 发布页",
+    "en": "Open GitHub Releases"
+  },
+  {
+    "id": "M0657",
+    "zh": "下载所选版本…",
+    "en": "Download selected version…"
+  },
+  {
+    "id": "M0658",
+    "zh": "取消下载",
+    "en": "Cancel download"
+  },
+  {
+    "id": "M0659",
+    "zh": "打开下载文件",
+    "en": "Open downloaded file"
+  },
+  {
+    "id": "M0660",
+    "zh": "打开所在目录",
+    "en": "Open containing folder"
+  },
+  {
+    "id": "M0661",
+    "zh": "新版发行说明",
+    "en": "New release notes"
+  },
+  {
+    "id": "M0662",
+    "zh": "在浏览器查看发行说明",
+    "en": "View release notes in browser"
+  },
+  {
+    "id": "M0663",
+    "zh": "收藏命令会填入当前终端，不会自动按 Enter。多行命令只在终端开启括号粘贴时填入；否则不填入，避免逐行执行。Shell 不一致时仍会填入单行命令，并给出提示。",
+    "en": "Favorites insert text into the current terminal without pressing Enter. Multiline commands require bracketed paste to prevent line-by-line execution. Single-line commands can be inserted into a different Shell with a notice."
+  },
+  {
+    "id": "M0664",
+    "zh": "名称，例如：启动开发服务",
+    "en": "Name, e.g. Start dev server"
+  },
+  {
+    "id": "M0665",
+    "zh": "命令文本",
+    "en": "Command text"
+  },
+  {
+    "id": "M0666",
+    "zh": "适用 Shell，留空表示任意",
+    "en": "Shell (blank for any)"
+  },
+  {
+    "id": "M0667",
+    "zh": "可选快捷键。按键录入；Backspace 清除",
+    "en": "Optional shortcut; Backspace clears"
+  },
+  {
+    "id": "M0668",
+    "zh": "添加收藏",
+    "en": "Add favorite"
+  },
+  {
+    "id": "M0669",
+    "zh": "你的终端，你的工作空间",
+    "en": "Your terminals, your workspace"
+  },
+  {
+    "id": "M0670",
+    "zh": "查找终端与操作",
+    "en": "Find terminals and actions"
+  },
+  {
+    "id": "M0671",
+    "zh": "输入终端名、目录或操作…",
+    "en": "Enter a terminal name, directory or action…"
+  },
+  {
+    "id": "M0672",
+    "zh": "没有匹配的终端或操作",
+    "en": "No matching terminals or actions"
+  },
+  {
+    "id": "M0673",
+    "zh": "↑ ↓ 选择 · Enter 执行 · Esc 返回",
+    "en": "↑ ↓ Select · Enter runs · Esc returns"
+  },
+  {
+    "id": "M0674",
+    "zh": "查看终端",
+    "en": "View terminal"
+  },
+  {
+    "id": "M0675",
+    "zh": "关闭",
+    "en": "Close"
+  },
+  {
+    "id": "M0676",
+    "zh": "输出书签",
+    "en": "Output bookmarks"
+  },
+  {
+    "id": "M0677",
+    "zh": "按名称、会话或保存的文字筛选…",
+    "en": "Filter by name, session or saved text…"
+  },
+  {
+    "id": "M0678",
+    "zh": "书签保存的是文字快照。来源输出被裁剪、会话关闭或应用重启后，定位不可用，文字仍可查看复制。",
+    "en": "Bookmarks save text snapshots. Locating is unavailable after output is trimmed, the session closes or the app restarts; saved text can still be viewed and copied."
+  },
+  {
+    "id": "M0679",
+    "zh": "查看",
+    "en": "View"
+  },
+  {
+    "id": "M0680",
+    "zh": "查看保存的完整文字",
+    "en": "View full saved text"
+  },
+  {
+    "id": "M0681",
+    "zh": "跳转到原输出位置",
+    "en": "Go to original output"
+  },
+  {
+    "id": "M0682",
+    "zh": "复制",
+    "en": "Copy"
+  },
+  {
+    "id": "M0683",
+    "zh": "复制保存的文字",
+    "en": "Copy saved text"
+  },
+  {
+    "id": "M0684",
+    "zh": "改名",
+    "en": "Rename"
+  },
+  {
+    "id": "M0685",
+    "zh": "保存的完整文字",
+    "en": "Full saved text"
+  },
+  {
+    "id": "M0686",
+    "zh": "还没有书签",
+    "en": "No bookmarks yet"
+  },
+  {
+    "id": "M0687",
+    "zh": "查看：阅读完整文字 · 点击条目或按 Enter 定位 · Esc 返回",
+    "en": "View full text · click or press Enter to locate · Esc returns"
+  },
+  {
+    "id": "M0688",
+    "zh": "深蓝玻璃",
+    "en": "Blue glass"
+  },
+  {
+    "id": "M0689",
+    "zh": "深黑",
+    "en": "Black"
+  },
+  {
+    "id": "M0690",
+    "zh": "亮白",
+    "en": "White"
+  },
+  {
+    "id": "M0691",
+    "zh": "纸张",
+    "en": "Paper"
+  },
+  {
+    "id": "M0692",
+    "zh": "自动隐藏 · 底部「工具」呼出",
+    "en": "Auto-hide · reveal with bottom “Tools”"
+  },
+  {
+    "id": "M0693",
+    "zh": "始终显示",
+    "en": "Always visible"
+  },
+  {
+    "id": "M0694",
+    "zh": "隐藏",
+    "en": "Hidden"
+  },
+  {
+    "id": "M0695",
+    "zh": "工作区工具导航",
+    "en": "Workspace tools navigation"
+  },
+  {
+    "id": "M0696",
+    "zh": "输出规则",
+    "en": "Output rules"
+  },
+  {
+    "id": "M0697",
+    "zh": "广播输入",
+    "en": "Broadcast input"
+  },
+  {
+    "id": "M0698",
+    "zh": "项目任务",
+    "en": "Project tasks"
+  },
+  {
+    "id": "M0699",
+    "zh": "远程文件",
+    "en": "Remote files"
+  },
+  {
+    "id": "M0700",
+    "zh": "录制回放",
+    "en": "Recording & playback"
+  },
+  {
+    "id": "M0701",
+    "zh": "专注当前工作区",
+    "en": "Focus on this workspace"
+  },
+  {
+    "id": "M0702",
+    "zh": "规则 · 自动化 · 协作",
+    "en": "Rules · automation · collaboration"
+  },
+  {
+    "id": "M0703",
+    "zh": "把重要输出标出来，让错误和关键信息一眼可见。",
+    "en": "Highlight important output to spot errors and key information."
+  },
+  {
+    "id": "M0704",
+    "zh": "我的规则",
+    "en": "My rules"
+  },
+  {
+    "id": "M0705",
+    "zh": "新建输出规则",
+    "en": "New output rule"
+  },
+  {
+    "id": "M0706",
+    "zh": "命中 {0} 次",
+    "en": "{0} matches"
+  },
+  {
+    "id": "M0707",
+    "zh": "尚无规则",
+    "en": "No rules yet"
+  },
+  {
+    "id": "M0708",
+    "zh": "删除选中规则",
+    "en": "Delete selected rule"
+  },
+  {
+    "id": "M0709",
+    "zh": "关注你在意的输出",
+    "en": "Watch the output that matters"
+  },
+  {
+    "id": "M0710",
+    "zh": "添加关键字或正则表达式，自动高亮命中内容，也可以开启通知。",
+    "en": "Add keywords or regular expressions to highlight matching content and optionally notify."
+  },
+  {
+    "id": "M0711",
+    "zh": "＋ 新建第一条规则",
+    "en": "＋ Create first rule"
+  },
+  {
+    "id": "M0712",
+    "zh": "规则名称",
+    "en": "Rule name"
+  },
+  {
+    "id": "M0713",
+    "zh": "例如：构建错误",
+    "en": "e.g. Build errors"
+  },
+  {
+    "id": "M0714",
+    "zh": "匹配内容",
+    "en": "Match text"
+  },
+  {
+    "id": "M0715",
+    "zh": "关键字或正则表达式",
+    "en": "Keyword or regular expression"
+  },
+  {
+    "id": "M0716",
+    "zh": "启用规则",
+    "en": "Enable rule"
+  },
+  {
+    "id": "M0717",
+    "zh": "正则表达式",
+    "en": "Regular expression"
+  },
+  {
+    "id": "M0718",
+    "zh": "命中时通知",
+    "en": "Notify on match"
+  },
+  {
+    "id": "M0719",
+    "zh": "高亮颜色",
+    "en": "Highlight color"
+  },
+  {
+    "id": "M0720",
+    "zh": "扫描工作区输出",
+    "en": "Scan workspace output"
+  },
+  {
+    "id": "M0721",
+    "zh": "匹配结果",
+    "en": "Matching output"
+  },
+  {
+    "id": "M0722",
+    "zh": "双击结果，跳转到终端原文",
+    "en": "Double-click a result to locate it in the terminal"
+  },
+  {
+    "id": "M0723",
+    "zh": "{0} 条",
+    "en": "{0} results"
+  },
+  {
+    "id": "M0724",
+    "zh": "扫描包含当前屏幕和历史记录，最多显示 200 条结果。",
+    "en": "Scans the screen and history; displays up to 200 results."
+  },
+  {
+    "id": "M0725",
+    "zh": "一次输入，同步发送到你选中的多个终端。",
+    "en": "Send the same input to multiple selected terminals."
+  },
+  {
+    "id": "M0726",
+    "zh": "选择至少两个终端；开启后，键盘输入和粘贴都会同步发送。",
+    "en": "Select at least two terminals. Keyboard input and paste will be sent to all selected targets."
+  },
+  {
+    "id": "M0727",
+    "zh": "选择接收输入的终端",
+    "en": "Choose receiving terminals"
+  },
+  {
+    "id": "M0728",
+    "zh": "按 Esc 可以立即停止广播。",
+    "en": "Press Esc to stop broadcasting immediately."
+  },
+  {
+    "id": "M0729",
+    "zh": "停止广播",
+    "en": "Stop broadcast"
+  },
+  {
+    "id": "M0730",
+    "zh": "开启广播",
+    "en": "Start broadcast"
+  },
+  {
+    "id": "M0731",
+    "zh": "把构建、测试和常用命令保存下来，下次一键运行。",
+    "en": "Save build, test and frequently used commands to run again with one click."
+  },
+  {
+    "id": "M0732",
+    "zh": "我的任务",
+    "en": "My tasks"
+  },
+  {
+    "id": "M0733",
+    "zh": "新建项目任务",
+    "en": "New project task"
+  },
+  {
+    "id": "M0734",
+    "zh": "尚无任务",
+    "en": "No tasks yet"
+  },
+  {
+    "id": "M0735",
+    "zh": "删除选中任务",
+    "en": "Delete selected task"
+  },
+  {
+    "id": "M0736",
+    "zh": "常用命令，随时就绪",
+    "en": "Keep frequent commands ready"
+  },
+  {
+    "id": "M0737",
+    "zh": "选择一个终端，保存你经常执行的命令，运行状态会显示在这里。",
+    "en": "Select a terminal and save your frequent command. Its running status appears here."
+  },
+  {
+    "id": "M0738",
+    "zh": "＋ 新建第一个任务",
+    "en": "＋ Create first task"
+  },
+  {
+    "id": "M0739",
+    "zh": "任务名称",
+    "en": "Task name"
+  },
+  {
+    "id": "M0740",
+    "zh": "例如：构建项目",
+    "en": "e.g. Build project"
+  },
+  {
+    "id": "M0741",
+    "zh": "运行终端",
+    "en": "Target terminal"
+  },
+  {
+    "id": "M0742",
+    "zh": "选择一个 PowerShell / Bash 终端",
+    "en": "Select a PowerShell / Bash terminal"
+  },
+  {
+    "id": "M0743",
+    "zh": "执行命令",
+    "en": "Command to run"
+  },
+  {
+    "id": "M0744",
+    "zh": "运行 / 重跑",
+    "en": "Run / rerun"
+  },
+  {
+    "id": "M0745",
+    "zh": "停止",
+    "en": "Stop"
+  },
+  {
+    "id": "M0746",
+    "zh": "状态与退出码来自终端。停止任务会向终端发送 Ctrl+C。",
+    "en": "Status and exit code come from the terminal. Stopping sends Ctrl+C."
+  },
+  {
+    "id": "M0747",
+    "zh": "浏览 SSH 主机上的文件，在本地与远程之间传输。",
+    "en": "Browse SSH host files and transfer between local and remote folders."
+  },
+  {
+    "id": "M0748",
+    "zh": "SSH 主机",
+    "en": "SSH host"
+  },
+  {
+    "id": "M0749",
+    "zh": "选择已保存的 SSH 主机",
+    "en": "Select a saved SSH host"
+  },
+  {
+    "id": "M0750",
+    "zh": "远程目录",
+    "en": "Remote directory"
+  },
+  {
+    "id": "M0751",
+    "zh": "打开 / 刷新",
+    "en": "Open / refresh"
+  },
+  {
+    "id": "M0752",
+    "zh": "上一级",
+    "en": "Parent folder"
+  },
+  {
+    "id": "M0753",
+    "zh": "名称",
+    "en": "Name"
+  },
+  {
+    "id": "M0754",
+    "zh": "大小",
+    "en": "Size"
+  },
+  {
+    "id": "M0755",
+    "zh": "浏览远程目录",
+    "en": "Browse remote folders"
+  },
+  {
+    "id": "M0756",
+    "zh": "选择主机后打开目录，双击文件夹进入下一级。",
+    "en": "Select a host and open its directory. Double-click a folder to enter."
+  },
+  {
+    "id": "M0757",
+    "zh": "上传文件",
+    "en": "Upload file"
+  },
+  {
+    "id": "M0758",
+    "zh": "下载选中文件",
+    "en": "Download selected file"
+  },
+  {
+    "id": "M0759",
+    "zh": "取消传输",
+    "en": "Cancel transfer"
+  },
+  {
+    "id": "M0760",
+    "zh": "留下终端操作的完整过程，随时回顾关键步骤。",
+    "en": "Record terminal operations and review key steps later."
+  },
+  {
+    "id": "M0761",
+    "zh": "录制当前终端",
+    "en": "Record current terminal"
+  },
+  {
+    "id": "M0762",
+    "zh": "当前会话 · {0}",
+    "en": "Current session · {0}"
+  },
+  {
+    "id": "M0763",
+    "zh": "保存终端输出、颜色和尺寸变化，生成可独立回放的录制文件。",
+    "en": "Save terminal output, colors and size changes as a recording you can play independently."
+  },
+  {
+    "id": "M0764",
+    "zh": "开始录制",
+    "en": "Start recording"
+  },
+  {
+    "id": "M0765",
+    "zh": "停止并保存",
+    "en": "Stop and save"
+  },
+  {
+    "id": "M0766",
+    "zh": "回放已有录制",
+    "en": "Play an existing recording"
+  },
+  {
+    "id": "M0767",
+    "zh": "打开 .threc 文件，通过暂停、倍速与时间轴，定位你想看的片段。",
+    "en": "Open a .threc file and use pause, speed and the timeline to find a moment."
+  },
+  {
+    "id": "M0768",
+    "zh": "打开录制文件",
+    "en": "Open recording"
+  },
+  {
+    "id": "M0769",
+    "zh": "回放在独立的只读终端中展示。",
+    "en": "Playback uses a separate read-only terminal."
+  },
+  {
+    "id": "M0770",
+    "zh": "规则与任务会在关闭窗口时自动保存",
+    "en": "Rules and tasks are saved when this window closes"
+  },
+  {
+    "id": "M0771",
+    "zh": "保存更改",
+    "en": "Save changes"
+  },
+  {
+    "id": "M0772",
+    "zh": "保存发布配置 Save profile",
+    "en": "Save build profile"
+  },
+  {
+    "id": "M0773",
+    "zh": "保存发布配置",
+    "en": "Save build profile"
+  },
+  {
+    "id": "M0774",
+    "zh": "同名会更新已有配置并设为当前。空的仓库根目录表示下次 Deploy 仍从当前工作目录向上查找。RID 选择已有脚本：linux-x64 → publish-linux.sh，win-x64 → publish-windows.ps1，跟随系统则用本机平台。",
+    "en": "An existing profile with the same name is updated and activated. Leave the repository root blank to search upward from the current directory. RID selects the script: linux-x64 → publish-linux.sh; win-x64 → publish-windows.ps1; follow system uses the current platform."
+  },
+  {
+    "id": "M0775",
+    "zh": "名称 Name",
+    "en": "Name"
+  },
+  {
+    "id": "M0776",
+    "zh": "例如 linux-x64",
+    "en": "e.g. linux-x64"
+  },
+  {
+    "id": "M0777",
+    "zh": "仓库根目录 Repo root",
+    "en": "Repository root"
+  },
+  {
+    "id": "M0778",
+    "zh": "留空 = 从当前目录向上查找",
+    "en": "Blank = search upward from current folder"
+  },
+  {
+    "id": "M0779",
+    "zh": "平台 RID",
+    "en": "Platform RID"
+  },
+  {
+    "id": "M0780",
+    "zh": "备注 Note",
+    "en": "Notes"
+  },
+  {
+    "id": "M0781",
+    "zh": "可选",
+    "en": "Optional"
+  },
+  {
+    "id": "M0782",
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  {
+    "id": "M0783",
+    "zh": "关闭窗口即收回主窗",
+    "en": "Close this window to return to main"
+  },
+  {
+    "id": "M0784",
+    "zh": "↩ 收回",
+    "en": "↩ Return"
+  },
+  {
+    "id": "M0785",
+    "zh": "关闭本窗口，会话回到主窗口（焦点不在终端时按 Esc 亦可）",
+    "en": "Close this window to return the session to the main window (Esc when the terminal is unfocused)"
+  },
+  {
+    "id": "Language",
+    "zh": "界面语言",
+    "en": "Interface language"
+  },
+  {
+    "id": "FollowSystem",
+    "zh": "跟随系统",
+    "en": "Follow system"
+  },
+  {
+    "id": "LevelAll",
+    "zh": "全部 {0}",
+    "en": "All {0}"
+  },
+  {
+    "id": "CommandDoneTime",
+    "zh": "命令完成 · {0}s",
+    "en": "Command completed · {0}s"
+  },
+  {
+    "id": "CommandEndTime",
+    "zh": "命令结束 · {0}s",
+    "en": "Command ended · {0}s"
+  },
+  {
+    "id": "CommandFailedTime",
+    "zh": "命令失败 · {0} · {1}s",
+    "en": "Command failed · {0} · {1}s"
+  },
+  {
+    "id": "TaskDoneTime",
+    "zh": "完成 · {0}s",
+    "en": "Done · {0}s"
+  },
+  {
+    "id": "TaskFailedTime",
+    "zh": "失败（{0}） · {1}s",
+    "en": "Failed ({0}) · {1}s"
+  },
+  {
+    "id": "RemoteUploadedCount",
+    "zh": "上传完成 · {0} 个条目",
+    "en": "Upload complete · {0} entries"
+  },
+  {
+    "id": "HostLanguage",
+    "zh": "跟随系统 host",
+    "en": "Follow system (host)"
+  },
+  {
+    "id": "UiDisk",
+    "zh": "磁盘",
+    "en": "Disk"
+  },
+  {
+    "id": "UiHeight",
+    "zh": "高度",
+    "en": "Height"
+  },
+  {
+    "id": "UiMemory",
+    "zh": "内存",
+    "en": "Memory"
+  },
+  {
+    "id": "UiNetwork",
+    "zh": "网络",
+    "en": "Network"
+  },
+  {
+    "id": "UiProblems",
+    "zh": "问题",
+    "en": "Problems"
+  },
+  {
+    "id": "UiMonitor",
+    "zh": "系统监控",
+    "en": "System Monitor"
+  },
+  {
+    "id": "UiClear",
+    "zh": "⎘ 清空",
+    "en": "⎘ Clear"
+  },
+  {
+    "id": "UiDebug",
+    "zh": "调试",
+    "en": "Debug"
+  },
+  {
+    "id": "UiSearch",
+    "zh": "搜索",
+    "en": "Search"
+  },
+  {
+    "id": "UiProcesses",
+    "zh": "进程",
+    "en": "Processes"
+  },
+  {
+    "id": "UiFiles",
+    "zh": "文件",
+    "en": "Files"
+  },
+  {
+    "id": "TransferTarget",
+    "zh": "将“{0}”移动到“{1}”",
+    "en": "Move “{0}” to “{1}”"
+  },
+  {
+    "id": "NotificationDone",
+    "zh": "{0} · 命令完成 · {1}s",
+    "en": "{0} · command completed · {1}s"
+  },
+  {
+    "id": "NotificationEnded",
+    "zh": "{0} · 命令结束 · {1}s",
+    "en": "{0} · command ended · {1}s"
+  },
+  {
+    "id": "NotificationFailed",
+    "zh": "{0} · 命令失败（{1}） · {2}s",
+    "en": "{0} · command failed ({1}) · {2}s"
+  },
+  {
+    "id": "Workbench0",
+    "zh": "插件",
+    "en": "Plugins"
+  },
+  {
+    "id": "Workbench1",
+    "zh": "模块",
+    "en": "Modules"
+  },
+  {
+    "id": "Workbench2",
+    "zh": "插件设置",
+    "en": "Plugin settings"
+  },
+  {
+    "id": "Workbench3",
+    "zh": "管理插件和模块",
+    "en": "Manage plugins and modules"
+  },
+  {
+    "id": "Workbench4",
+    "zh": "导入插件",
+    "en": "Import plugin"
+  },
+  {
+    "id": "Workbench5",
+    "zh": "打开插件目录",
+    "en": "Open plugin directory"
+  },
+  {
+    "id": "Workbench6",
+    "zh": "选择包含 plugin.json 的插件目录",
+    "en": "Choose the folder containing plugin.json"
+  },
+  {
+    "id": "Workbench7",
+    "zh": "禁用",
+    "en": "Disable"
+  },
+  {
+    "id": "Workbench8",
+    "zh": "启用",
+    "en": "Enable"
+  },
+  {
+    "id": "Workbench9",
+    "zh": "移除",
+    "en": "Remove"
+  },
+  {
+    "id": "Workbench10",
+    "zh": "在当前工作区启用",
+    "en": "Enable in this workspace"
+  },
+  {
+    "id": "Workbench11",
+    "zh": "左右拆分窗格",
+    "en": "Split pane side by side"
+  },
+  {
+    "id": "Workbench12",
+    "zh": "上下拆分窗格",
+    "en": "Split pane vertically"
+  },
+  {
+    "id": "Workbench13",
+    "zh": "在当前窗格继续拆分",
+    "en": "Split the focused pane again"
+  },
+  {
+    "id": "Workbench14",
+    "zh": "移除窗格（保留会话）",
+    "en": "Remove pane (keep session)"
+  },
+  {
+    "id": "Workbench15",
+    "zh": "拆分窗格",
+    "en": "Split pane"
+  },
+  {
+    "id": "Workbench16",
+    "zh": "移除窗格",
+    "en": "Remove pane"
+  },
+  {
+    "id": "Workbench17",
+    "zh": "移动终端窗格",
+    "en": "Move terminal pane"
+  },
+  {
+    "id": "Workbench18",
+    "zh": "收起工作区工具",
+    "en": "Collapse workspace tools"
+  },
+  {
+    "id": "Workbench19",
+    "zh": "关闭工作区工具",
+    "en": "Close workspace tools"
+  },
+  {
+    "id": "Workbench20",
+    "zh": "plugin.json 为空",
+    "en": "plugin.json is empty"
+  },
+  {
+    "id": "Workbench21",
+    "zh": "plugin.json 缺少 id",
+    "en": "plugin.json is missing id"
+  },
+  {
+    "id": "Workbench22",
+    "zh": "插件标识重复：",
+    "en": "Duplicate plugin ID: "
+  },
+  {
+    "id": "Workbench23",
+    "zh": "插件 id 必须是可用的目录名称",
+    "en": "The plugin ID must be a valid directory name"
+  },
+  {
+    "id": "Workbench24",
+    "zh": "请选择独立的插件构建目录",
+    "en": "Choose a separate plugin build directory"
+  },
+  {
+    "id": "Workbench25",
+    "zh": "宿主 API {0} 不受支持；当前为 {1}",
+    "en": "Host API {0} is unsupported; the current version is {1}"
+  },
+  {
+    "id": "Workbench26",
+    "zh": "插件入口必须位于插件目录中",
+    "en": "The plugin entry must be inside its directory"
+  },
+  {
+    "id": "Workbench27",
+    "zh": "模块标识重复：",
+    "en": "Duplicate module ID: "
+  },
+  {
+    "id": "Workbench28",
+    "zh": "插件目录不在安装目录中",
+    "en": "The plugin directory is outside the install directory"
+  }
+]

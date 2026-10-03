@@ -61,7 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _shelfAutoHide;
     [ObservableProperty] private int _dockVisibilityMode;
     [ObservableProperty] private string _activeWorkingDirectory = "";
-    public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? "未选择会话" :
+    public string ActiveDirectoryName => string.IsNullOrEmpty(ActiveWorkingDirectory) ? TerminalHub.Core.Localization.Localizer.Current.Translate("未选择会话") :
         Path.GetFileName(ActiveWorkingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } name ? name : ActiveWorkingDirectory;
     partial void OnActiveWorkingDirectoryChanged(string value) => OnPropertyChanged(nameof(ActiveDirectoryName));
     public int ThemeIndex
@@ -263,11 +263,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void AssignToPane(int pane, TerminalSessionModel session)
     {
         if (!IsSplit || pane < 0 || pane >= PaneCount) return;
+        var before = CaptureLayout();
         var previous = GetPane(pane);
         // Selecting a session already visible swaps panes, preserving all PTYs.
         for (var i = 0; i < PaneCount; i++)
             if (i != pane && ReferenceEquals(GetPane(i), session)) SetPane(i, previous);
         SetPane(pane, session);
+        if (PaneTree is not null) NotifyPaneTree();
+        RecordLayout("终端位置交换", before);
     }
 
     private readonly SparklineBuffer _statusCpu = new(40);
@@ -331,10 +334,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settings = _settingsStore.Load();
         if (!_settings.SessionShortcuts.Any(s => s.Action == SessionShortcutAction.CommandPalette))
             _settings.SessionShortcuts.Add(new() { Action = SessionShortcutAction.CommandPalette, Gesture = "Ctrl+Shift+P" });
+        foreach (var action in new[] { SessionShortcutAction.Recent, SessionShortcutAction.UndoLayout, SessionShortcutAction.RedoLayout })
+            if (!_settings.SessionShortcuts.Any(s => s.Action == action))
+                _settings.SessionShortcuts.Add(SessionShortcutBinding.Defaults().Single(s => s.Action == action));
         LoadGroups();
         LoadFavorites();
         LoadBookmarks();
         LoadExplorerMenu();
+        TerminalHub.Core.Localization.Localizer.Current.SetLanguage(_settings.Language);
         LoadSessionShortcuts();
         foreach (var template in _settings.WorkspaceTemplates.OrderByDescending(t => t.LastUsed).ThenBy(t => t.Name))
             WorkspaceTemplates.Add(template);
@@ -404,13 +411,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         _sessions.SessionAdded += OnSessionAdded;
         _sessions.SessionRemoved += OnSessionRemoved;
-        _sessions.ActiveChanged += s => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        _sessions.ActiveChanged += s =>
         {
-            // Workspace switching already synchronizes the final session. Ignore
-            // its queued duplicate (and intermediate activations during restore).
-            if (!ReferenceEquals(ActiveSession, _sessions.Active)) SyncActive();
-        });
+            RememberRecentSession(s);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                // Workspace switching already synchronizes the final session. Ignore
+                // its queued duplicate (and intermediate activations during restore).
+                if (!ReferenceEquals(ActiveSession, _sessions.Active)) SyncActive();
+            });
+        };
         _sessions.SessionStateChanged += _ => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshCounts);
+        TerminalHub.Core.Localization.Localizer.Current.LanguageChanged += RefreshUiLanguage;
     }
 
     public AppSettings Settings => _settings;
@@ -511,21 +523,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var indices = new[] { ws.LeftIndex, ws.RightIndex, ws.BottomLeftIndex, ws.BottomRightIndex };
-        var panes = indices.Select(i => byIndex.GetValueOrDefault(i)).Where(p => p is not null)
-            .Cast<TerminalSessionModel>().Distinct().ToList();
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
         ExitSplit();
-        if (ws.IsSplit && panes.Count >= 2)
-        {
-            SplitLayout = ws.SplitLayout == SplitLayout.Quad && panes.Count < 4 ? SplitLayout.Horizontal : ws.SplitLayout;
-            for (var i = 0; i < PaneCount; i++) SetPane(i, panes[i]);
-            ColumnRatio = Math.Clamp(ws.ColumnRatio, .15, .85);
-            RowRatio = Math.Clamp(ws.RowRatio, .15, .85);
-            FocusedPane = Math.Clamp(ws.FocusedPane, 0, PaneCount - 1);
-            IsSplit = true;
-            _sessions.Activate(GetPane(FocusedPane)!);
-        }
-        else _sessions.Activate(byIndex.GetValueOrDefault(ws.ActiveIndex) ?? byIndex.Values.First());
+        SplitLayout = ws.SplitLayout; ColumnRatio = ws.ColumnRatio; RowRatio = ws.RowRatio;
+        LoadPaneLayout(ws, i => byIndex.GetValueOrDefault(i));
+        _sessions.Activate(IsSplit ? GetPane(FocusedPane) : byIndex.GetValueOrDefault(ws.ActiveIndex) ?? byIndex.Values.First());
     }
 
     private static SessionTag ParseTag(string tag) => tag switch
@@ -586,7 +588,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             // PTY spawn failures must be visible — a silent exception leaves the
             // user staring at an empty stage wondering where the terminal went.
-            Dashboard.AppendOutput("error",
+            Dashboard.AppendAppOutput("error",
                 $"创建会话失败 / failed to spawn terminal — {ex.Message}", "terminal");
             return null;
         }
@@ -595,7 +597,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>SSH tab → spawn a session running the local ssh binary.</summary>
     private void ConnectSsh(TerminalHub.Core.Ssh.SshHost host)
     {
-        Dashboard.AppendOutput("info", $"SSH 连接: {host.CommandLine}", "ssh");
+        Dashboard.AppendAppOutput("info", $"SSH 连接: {host.CommandLine}", "ssh");
         _ = SpawnSshAsync(host);
     }
 
@@ -618,7 +620,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            Dashboard.AppendOutput("error",
+            Dashboard.AppendAppOutput("error",
                 $"SSH 会话创建失败 / failed to spawn ssh — {ex.Message}", "ssh");
         }
     }
@@ -642,15 +644,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _columnRatio = .5;
     [ObservableProperty] private double _rowRatio = .5;
     private bool _changingLayout;
-    public int PaneCount => SplitLayout == SplitLayout.Quad ? 4 : 2;
-    public string LeftPaneName => LeftPane?.Name ?? "未分配会话";
-    public string RightPaneName => RightPane?.Name ?? "未分配会话";
-    public string BottomLeftPaneName => BottomLeftPane?.Name ?? "未分配会话";
-    public string BottomRightPaneName => BottomRightPane?.Name ?? "未分配会话";
-    public TerminalSessionModel? GetPane(int pane) => pane switch
+    public int PaneCount => PaneTree?.Leaves.Count() ?? (SplitLayout == SplitLayout.Quad ? 4 : 2);
+    public string LeftPaneName => LeftPane?.Name ?? TerminalHub.Core.Localization.Localizer.Current.Translate("未分配会话");
+    public string RightPaneName => RightPane?.Name ?? TerminalHub.Core.Localization.Localizer.Current.Translate("未分配会话");
+    public string BottomLeftPaneName => BottomLeftPane?.Name ?? TerminalHub.Core.Localization.Localizer.Current.Translate("未分配会话");
+    public string BottomRightPaneName => BottomRightPane?.Name ?? TerminalHub.Core.Localization.Localizer.Current.Translate("未分配会话");
+    public TerminalSessionModel? GetPane(int pane) => PaneTree is not null ? PaneTree.Leaves.ElementAtOrDefault(pane)?.Session : pane switch
     { 0 => LeftPane, 1 => RightPane, 2 => BottomLeftPane, 3 => BottomRightPane, _ => null };
     private void SetPane(int pane, TerminalSessionModel? session)
     {
+        if (PaneTree?.Leaves.ElementAtOrDefault(pane) is { } leaf) leaf.Session = session;
         switch (pane)
         { case 0: LeftPane = session; break; case 1: RightPane = session; break;
           case 2: BottomLeftPane = session; break; case 3: BottomRightPane = session; break; }
@@ -665,13 +668,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [RelayCommand] private void ToggleSplit()
     {
-        if (IsSplit) ExitSplit();
-        else _ = SetSplitLayoutAsync("Horizontal");
+        _ = SetSplitLayoutAsync(IsSplit ? "Single" : "Horizontal");
     }
     [RelayCommand] public async Task SetSplitLayoutAsync(string layout)
     {
         if (_changingLayout) return;
-        if (layout == "Single") { ExitSplit(); return; }
+        var before = CaptureLayout();
+        if (layout == "Single") { ExitSplit(); RecordLayout("合并分屏", before); return; }
         if (!Enum.TryParse<SplitLayout>(layout, out var requested)) return;
         _changingLayout = true;
         var workspace = ActiveWorkspace;
@@ -681,6 +684,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var panes = (IsSplit ? Enumerable.Range(0, PaneCount).Select(GetPane) : new[] { _sessions.Active })
                 .Where(s => s is not null && _sessions.Sessions.Contains(s)).Cast<TerminalSessionModel>().Distinct().ToList();
             var count = requested == SplitLayout.Quad ? 4 : 2;
+            var createdPane = false;
             foreach (var session in _sessions.Sessions.Where(s => _sessionWorkspaces.GetValueOrDefault(s.Id) == workspace))
                 if (!panes.Contains(session)) panes.Add(session);
             while (panes.Count < count)
@@ -689,25 +693,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (workspace != ActiveWorkspace) return;
                 if (created is null) return;
                 panes.Add(created);
+                createdPane = true;
             }
             panes = panes.Where(s => _sessions.Sessions.Contains(s)).ToList();
+            if (createdPane) await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            if (workspace != ActiveWorkspace) return;
             if (panes.Count < count) return;
             var focusedIndex = panes.IndexOf(focused!);
             if (focusedIndex >= count) (panes[count - 1], panes[focusedIndex]) = (panes[focusedIndex], panes[count - 1]);
             // Finish the assignment before showing the new arrangement.
             SplitLayout = requested;
+            PaneTree = null;
             for (var i = 0; i < 4; i++) SetPane(i, i < count ? panes[i] : null);
+            PaneTree = PresetTree(requested, panes); NotifyPaneTree();
             PaneMaximized = false;
             FocusedPane = Math.Clamp(panes.IndexOf(focused!), 0, count - 1);
             IsSplit = true;
             _sessions.Activate(GetPane(FocusedPane)!);
+            RecordLayout("调整分屏", before);
         }
         finally { _changingLayout = false; }
     }
     [RelayCommand] private void TogglePaneMaximized()
-    { if (IsSplit) PaneMaximized = !PaneMaximized; }
+    {
+        if (!IsSplit) return;
+        var before = CaptureLayout(); PaneMaximized = !PaneMaximized;
+        RecordLayout("最大化／恢复窗格", before);
+    }
     private void ExitSplit()
     {
+        PaneTree = null; OnPropertyChanged(nameof(PaneTree));
         IsSplit = false;
         PaneMaximized = false;
         LeftPane = RightPane = BottomLeftPane = BottomRightPane = null;
@@ -732,24 +747,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
     private void ReplaceRemovedPane(TerminalSessionModel removed)
     {
-        for (var i = 0; i < PaneCount; i++)
+        if (PaneTree is not null)
         {
-            if (!ReferenceEquals(GetPane(i), removed)) continue;
-            var replacement = ActiveWorkspace.Cards.Select(c => c.Model).FirstOrDefault(s => !ReferenceEquals(s, removed)
-                && !Enumerable.Range(0, PaneCount).Any(j => ReferenceEquals(GetPane(j), s)));
-            SetPane(i, replacement);
+            PaneTree = FillOrPrunePanes(PaneTree, ActiveWorkspace.Cards.Where(c => c.Model != removed).Select(c => c.Model));
+            var remaining = PaneTree?.Leaves.ElementAtOrDefault(FocusedPane)?.Session ?? ActiveWorkspace.Cards.FirstOrDefault(c => c.Model != removed)?.Model;
+            NotifyPaneTree();
+            _sessions.Activate(remaining);
         }
-        var remaining = Enumerable.Range(0, PaneCount).Select(GetPane).Where(s => s is not null).Distinct().ToList();
-        if (remaining.Count < 2) { ExitSplit(); return; }
-        if (remaining.Count < PaneCount)
-        {
-            var focused = GetPane(FocusedPane);
-            SplitLayout = SplitLayout.Horizontal;
-            LeftPane = remaining[0]; RightPane = remaining[1];
-            BottomLeftPane = BottomRightPane = null;
-            FocusedPane = ReferenceEquals(focused, RightPane) ? 1 : 0;
-        }
-        _sessions.Activate(GetPane(FocusedPane)!);
     }
 
     [RelayCommand]
@@ -867,14 +871,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     shortcut.Error = "请使用 Ctrl、Alt 或功能键，避免占用普通输入。";
                 else if (IsReservedShortcut(gesture))
                     shortcut.Error = "与复制、粘贴或现有应用操作冲突。";
+                else if (shortcut.Binding.Action == SessionShortcutAction.Recent &&
+                    (gesture.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0)
+                    shortcut.Error = "按住式切换需要 Ctrl、Alt 或 Meta 修饰键。";
+                else if (shortcut.Binding.Action == SessionShortcutAction.Recent && (gesture.KeyModifiers & KeyModifiers.Shift) != 0)
+                    shortcut.Error = "Shift 用于反向切换，请勿放入基础快捷键。";
                 else shortcut.ParsedGesture = gesture;
             }
             catch (Exception ex) when (ex is FormatException or ArgumentException)
             { shortcut.Error = "无法识别这个快捷键，请重新按键录入。"; }
         }
         foreach (var group in SessionShortcuts.Where(s => s.ParsedGesture is not null)
-            .GroupBy(s => (s.ParsedGesture!.Key, s.ParsedGesture.KeyModifiers)).Where(g => g.Count() > 1))
-            foreach (var shortcut in group) shortcut.Error = "与其他终端切换快捷键重复。";
+            .SelectMany(s => s.Binding.Action == SessionShortcutAction.Recent
+                ? new[] { (Shortcut: s, s.ParsedGesture!.Key, Modifiers: s.ParsedGesture.KeyModifiers), (Shortcut: s, s.ParsedGesture.Key, Modifiers: s.ParsedGesture.KeyModifiers | KeyModifiers.Shift) }
+                : new[] { (Shortcut: s, s.ParsedGesture!.Key, Modifiers: s.ParsedGesture.KeyModifiers) })
+            .GroupBy(s => (s.Key, s.Modifiers)).Where(g => g.Count() > 1))
+            foreach (var item in group) item.Shortcut.Error = "与其他终端切换快捷键重复。";
         ValidateFavoriteGestures();
         OnPropertyChanged(nameof(NextSessionMenuText));
         OnPropertyChanged(nameof(PreviousSessionMenuText));
@@ -891,6 +903,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private string SessionMenuText(SessionShortcutAction action, string label)
     {
         var binding = SessionShortcuts.FirstOrDefault(s => s.Binding.Action == action && s.Error.Length == 0 && s.ParsedGesture is not null);
+        label = TerminalHub.Core.Localization.Localizer.Current.Translate(label);
         return binding is null ? label : $"{label}      {binding.Gesture}";
     }
 
@@ -905,7 +918,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private static bool IsReservedShortcut(KeyGesture gesture)
     {
-        string[] reserved = ["Ctrl+C", "Ctrl+V", "Ctrl+Shift+C", "Ctrl+Shift+N", "Ctrl+Shift+W",
+        string[] reserved = ["Alt+Tab", "Ctrl+C", "Ctrl+V", "Ctrl+Shift+C", "Ctrl+Shift+N", "Ctrl+Shift+W",
             "Ctrl+Shift+B", "Ctrl+Shift+J", "Ctrl+OemPlus", "Ctrl+OemMinus", "Ctrl+0"];
         return reserved.Select(ParseSessionGesture).Any(item =>
             item.Matches(new KeyEventArgs { Key = gesture.Key, KeyModifiers = gesture.KeyModifiers }));
@@ -927,6 +940,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             case SessionShortcutAction.CommandPalette: PaletteRequested?.Invoke(); break;
             case SessionShortcutAction.Next: CycleSession(1); break;
             case SessionShortcutAction.Previous: CycleSession(-1); break;
+            case SessionShortcutAction.Recent: return false; // handled by the window's hold/release path
+            case SessionShortcutAction.UndoLayout: if (CanUndoLayout) UndoLayout(); break;
+            case SessionShortcutAction.RedoLayout: if (CanRedoLayout) RedoLayout(); break;
             case SessionShortcutAction.Select:
                 if (shortcut.Binding.SessionIndex >= 0 && shortcut.Binding.SessionIndex < SessionCards.Count)
                     ActivateCard(SessionCards[shortcut.Binding.SessionIndex]);
@@ -953,7 +969,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var cwd = ActiveSession?.WorkingDirectory;
         if (string.IsNullOrEmpty(cwd)) return;
         _ = CopyTextToClipboardAsync(cwd);
-        Dashboard.AppendOutput("info", $"已复制 CWD: {cwd}", "ui");
+        Dashboard.AppendAppOutput("info", $"已复制 CWD: {cwd}", "ui");
     }
 
     /// <summary>「↗ 在新窗口打开」: detach the given (or active) session into a
@@ -964,6 +980,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var model = card?.Model ?? ActiveSession;
         if (model is null) return;
+        ClearLayoutHistory();
         // Mark before detaching — SessionRemoved fires synchronously inside
         // Detach and must already see this as a popout, not a close.
         model.Detached = true;
@@ -979,11 +996,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var win = new SessionWindow(session, FontSize, TerminalFont);
         win.Terminal.InputSender = SendTerminalInput;
         win.AddHandler(Avalonia.Input.InputElement.KeyDownEvent, (_, e) =>
-        { if (BroadcastEnabled && e.Key == Avalonia.Input.Key.Escape) { StopBroadcast(); e.Handled = true; } }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        {
+            if (HandleRecentKeyDown(e, session)) { e.Handled = true; return; }
+            if (HandleSessionShortcut(e)) { e.Handled = true; return; }
+            if (BroadcastEnabled && e.Key == Avalonia.Input.Key.Escape) { StopBroadcast(); e.Handled = true; }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        win.AddHandler(Avalonia.Input.InputElement.KeyUpEvent, (_, e) =>
+        { if (HandleRecentKeyUp(e)) e.Handled = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        win.AddHandler(Avalonia.Input.InputElement.TextInputEvent, (_, e) =>
+        { if (RecentSwitcherOpen) e.Handled = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _popouts.Add(win);
+        win.Activated += (_, _) => RememberRecentSession(session);
         PositionPopout(win);
         win.Closed += (_, _) => OnPopoutClosed(win, session);
-        Dashboard.AppendOutput("info",
+        Dashboard.AppendAppOutput("info",
             $"会话「{session.Name}」已弹出为独立窗口（关闭子窗即收回）", "window");
         win.Show();
     }
@@ -1000,7 +1026,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         DetachedSessions.Remove(session);
         if (_disposed) return;
         _sessions.Reattach(session);
-        Dashboard.AppendOutput("info", $"会话「{session.Name}」已收回主窗口", "window");
+        Dashboard.AppendAppOutput("info", $"会话「{session.Name}」已收回主窗口", "window");
     }
 
     /// <summary>Cascade the popout over the main window so both stay visible.</summary>
@@ -1090,12 +1116,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 var pick = picker.SaveFilePickerAsync(new FilePickerSaveOptions
                 {
-                    Title = "导出 Logs 可见行",
+                    Title = TerminalHub.Core.Localization.Localizer.Current.Translate("导出 Logs 可见行"),
                     SuggestedFileName = Path.GetFileName(Logs.DefaultExportPath()),
                     FileTypeChoices =
                     [
-                        new FilePickerFileType("日志文件") { Patterns = ["*.log"] },
-                        new FilePickerFileType("文本文件") { Patterns = ["*.txt"] },
+                        new FilePickerFileType(TerminalHub.Core.Localization.Localizer.Current.Translate("日志文件")) { Patterns = ["*.log"] },
+                        new FilePickerFileType(TerminalHub.Core.Localization.Localizer.Current.Translate("文本文件")) { Patterns = ["*.txt"] },
                     ],
                 });
                 // Without xdg-desktop-portal the DBus call can hang forever — don't let
@@ -1153,14 +1179,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         Dashboard.SelectedBottomTab = 0;
         if (forceRepublish)
-            Dashboard.AppendOutput("info", "Deploy: 重新打包 / force republish", "deploy");
+            Dashboard.AppendAppOutput("info", "Deploy: 重新打包 / force republish", "deploy");
 
         var profileDriven = string.IsNullOrWhiteSpace(startDirectory);
         if (profileDriven && PublishProfiles.TouchActive(_settings) is { } used)
         {
             SaveSettingsInternal();
             NotifyActivePublishProfile();
-            Dashboard.AppendOutput("info", DescribeProfile(used, "使用配置档 / profile"), "deploy");
+            Dashboard.AppendAppOutput("info", DescribeProfile(used, "使用配置档 / profile"), "deploy");
         }
 
         var start = profileDriven
@@ -1180,7 +1206,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
             or ArgumentException or NotSupportedException)
         {
-            Dashboard.AppendOutput("warn", $"Deploy: 无法读取产物目录 — {ex.Message}", "deploy");
+            Dashboard.AppendAppOutput("warn", $"Deploy: 无法读取产物目录 — {ex.Message}", "deploy");
             found = [];
         }
 
@@ -1219,12 +1245,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var saved = PublishProfiles.Save(_settings, name, repoRoot, rid, note);
         if (saved is null)
         {
-            Dashboard.AppendOutput("warn", "Deploy: 配置档名称不能为空 / profile name required", "deploy");
+            Dashboard.AppendAppOutput("warn", "Deploy: 配置档名称不能为空 / profile name required", "deploy");
             return false;
         }
         SaveSettingsInternal();
         NotifyActivePublishProfile();
-        Dashboard.AppendOutput("info",
+        Dashboard.AppendAppOutput("info",
             DescribeProfile(saved, "已保存配置档 / profile saved") + " 下次 Deploy 使用该配置。",
             "deploy");
         return true;
@@ -1235,13 +1261,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (!PublishProfiles.Activate(_settings, idOrName))
         {
-            Dashboard.AppendOutput("warn", $"Deploy: 找不到配置档 / profile not found {idOrName}", "deploy");
+            Dashboard.AppendAppOutput("warn", $"Deploy: 找不到配置档 / profile not found {idOrName}", "deploy");
             return false;
         }
         SaveSettingsInternal();
         NotifyActivePublishProfile();
         var active = PublishProfiles.Active(_settings)!;
-        Dashboard.AppendOutput("info",
+        Dashboard.AppendAppOutput("info",
             DescribeProfile(active, "已切换配置档 / profile active") + " 下次 Deploy 使用该配置。",
             "deploy");
         return true;
@@ -1252,12 +1278,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var existing = PublishProfiles.Find(_settings, idOrName);
         if (existing is null || !PublishProfiles.Delete(_settings, idOrName))
         {
-            Dashboard.AppendOutput("warn", $"Deploy: 找不到配置档 / profile not found {idOrName}", "deploy");
+            Dashboard.AppendAppOutput("warn", $"Deploy: 找不到配置档 / profile not found {idOrName}", "deploy");
             return false;
         }
         SaveSettingsInternal();
         NotifyActivePublishProfile();
-        Dashboard.AppendOutput("info", $"Deploy: 已删除配置档 / profile deleted {existing.Name}", "deploy");
+        Dashboard.AppendAppOutput("info", $"Deploy: 已删除配置档 / profile deleted {existing.Name}", "deploy");
         return true;
     }
 
@@ -1274,7 +1300,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dashboard.SelectedBottomTab = 0;
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
         {
-            Dashboard.AppendOutput("warn", "Deploy: 产物目录不存在 / artifact folder missing", "deploy");
+            Dashboard.AppendAppOutput("warn", "Deploy: 产物目录不存在 / artifact folder missing", "deploy");
             QueryRecentArtifacts();
             return;
         }
@@ -1283,7 +1309,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         try { files = Directory.GetFiles(path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Dashboard.AppendOutput("warn", $"Deploy: 无法读取产物目录 — {ex.Message}", "deploy");
+            Dashboard.AppendAppOutput("warn", $"Deploy: 无法读取产物目录 — {ex.Message}", "deploy");
             return;
         }
         OpenArtifactFolder([new ArtifactLocator.ArtifactDir(path, files)]);
@@ -1299,7 +1325,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var path = _settings.LastPublishResult?.ArtifactPath;
         if (!CanOpenLastSuccessfulArtifact)
         {
-            Dashboard.AppendOutput("warn",
+            Dashboard.AppendAppOutput("warn",
                 "Deploy: 上次成功产物不存在 / last successful artifact missing", "deploy");
             OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
             OnPropertyChanged(nameof(CanCopyLastSuccessfulArtifact));
@@ -1318,14 +1344,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var path = _settings.LastPublishResult?.ArtifactPath;
         if (!CanCopyLastSuccessfulArtifact || string.IsNullOrWhiteSpace(path))
         {
-            Dashboard.AppendOutput("warn",
+            Dashboard.AppendAppOutput("warn",
                 "Deploy: 上次成功产物不存在 / last successful artifact missing", "deploy");
             OnPropertyChanged(nameof(CanOpenLastSuccessfulArtifact));
             OnPropertyChanged(nameof(CanCopyLastSuccessfulArtifact));
             return;
         }
         _ = CopyTextToClipboardAsync(path);
-        Dashboard.AppendOutput("info", $"已复制产物路径 {path}", "deploy");
+        Dashboard.AppendAppOutput("info", $"已复制产物路径 {path}", "deploy");
     }
 
     /// <summary>
@@ -1343,7 +1369,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         LastPublishResults.Clear(_settings);
         PersistSettings();
         NotifyLastPublish();
-        Dashboard.AppendOutput("info", "已清除上次发布结果", "deploy");
+        Dashboard.AppendAppOutput("info", "已清除上次发布结果", "deploy");
     }
 
     private IReadOnlyList<RecentArtifact> RefreshRecentArtifacts(string? start)
@@ -1355,10 +1381,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void AnnounceRecentArtifacts(string start)
     {
         var rows = RefreshRecentArtifacts(start);
-        Dashboard.AppendOutput("info",
+        Dashboard.AppendAppOutput("info",
             $"Deploy: 最近产物已刷新 / recent artifacts ({rows.Count})", "deploy");
         foreach (var row in rows)
-            Dashboard.AppendOutput("info",
+            Dashboard.AppendAppOutput("info",
                 $"  {row.Rid}  {FmtBytes(row.SizeBytes)}  {row.Modified.ToLocalTime():yyyy-MM-dd HH:mm}  {row.Path}",
                 "deploy");
     }
@@ -1375,23 +1401,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         foreach (var d in found)
         {
-            Dashboard.AppendOutput("info", $"Deploy: 产物目录 {d.Path}", "deploy");
+            Dashboard.AppendAppOutput("info", $"Deploy: 产物目录 {d.Path}", "deploy");
             foreach (var f in d.Files)
             {
                 var fi = new FileInfo(f);
-                Dashboard.AppendOutput("info", $"  {fi.Name}  ({FmtBytes(fi.Length)})", "deploy");
+                Dashboard.AppendAppOutput("info", $"  {fi.Name}  ({FmtBytes(fi.Length)})", "deploy");
             }
         }
         try
         {
             _openFolder(found[0].Path);
-            Dashboard.AppendOutput("info", "Deploy: 已在文件管理器中打开产物目录", "deploy");
+            Dashboard.AppendAppOutput("info", "Deploy: 已在文件管理器中打开产物目录", "deploy");
         }
         catch
         {
-            Dashboard.AppendOutput("warn", "Deploy: 无法打开文件管理器 — 请手动访问上面目录", "deploy");
+            Dashboard.AppendAppOutput("warn", "Deploy: 无法打开文件管理器 — 请手动访问上面目录", "deploy");
         }
-        Dashboard.AppendOutput("info",
+        Dashboard.AppendAppOutput("info",
             "Deploy: 重新发布请按住 Ctrl 再点 Deploy，或右键菜单「重新打包」。", "deploy");
     }
 
@@ -1403,7 +1429,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (PublishBusy())
         {
-            Dashboard.AppendOutput("warn",
+            Dashboard.AppendAppOutput("warn",
                 "Deploy: 打包进行中 / publish already running — 请等待当前 Publish 会话结束", "deploy");
             return;
         }
@@ -1416,7 +1442,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Dashboard.AppendOutput("info", $"Deploy: 开始打包 / publish start — {plan.DisplayCommand}", "deploy");
+        Dashboard.AppendAppOutput("info", $"Deploy: 开始打包 / publish start — {plan.DisplayCommand}", "deploy");
         Dashboard.SelectedBottomTab = 0;
         lock (_publishLock)
         {
@@ -1470,7 +1496,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (!session.IsRunning)
                 ReportPublishExit(session.Id, session.Pty.ExitCode ?? -1);
             Dashboard.SelectedBottomTab = 0;
-            Dashboard.AppendOutput("info",
+            Dashboard.AppendAppOutput("info",
                 "Deploy: 已启动会话 Publish · 标签 部署控制 (Deploy)。结束时 Output 会显示成功或失败。",
                 "deploy");
 
@@ -1508,10 +1534,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _cancelPendingStart = false;
             }
             if (cancelled)
-                Dashboard.AppendOutput("warn",
+                Dashboard.AppendAppOutput("warn",
                     "Deploy: 已取消打包 / publish cancelled", "deploy");
             else
-                Dashboard.AppendOutput("error",
+                Dashboard.AppendAppOutput("error",
                     $"Deploy: 启动失败 / publish failed to start — {ex.Message}", "deploy");
             if (record)
             {
@@ -1588,7 +1614,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (warnIdle)
         {
             Dashboard.SelectedBottomTab = 0;
-            Dashboard.AppendOutput("warn",
+            Dashboard.AppendAppOutput("warn",
                 "Deploy: 没有进行中的打包 / publish is not running", "deploy");
             return;
         }
@@ -1616,11 +1642,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Dashboard.SelectedBottomTab = 0;
         string? artifact = null;
         if (cancelled)
-            Dashboard.AppendOutput("warn",
+            Dashboard.AppendAppOutput("warn",
                 "Deploy: 已取消打包 / publish cancelled", "deploy");
         else if (code == 0)
         {
-            Dashboard.AppendOutput("info",
+            Dashboard.AppendAppOutput("info",
                 "Deploy: 打包成功 / publish succeeded。再次点击 Deploy 打开产物目录 artifacts/publish。",
                 "deploy");
             if (!string.IsNullOrWhiteSpace(root))
@@ -1630,7 +1656,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
         }
         else
-            Dashboard.AppendOutput("error",
+            Dashboard.AppendAppOutput("error",
                 $"Deploy: 打包失败 / publish failed (exit {code})。请查看 Publish 终端输出。",
                 "deploy");
 
@@ -1683,14 +1709,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void PrintPublishHints(string reason)
     {
-        Dashboard.AppendOutput("warn", reason, "deploy");
-        Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
+        Dashboard.AppendAppOutput("warn", reason, "deploy");
+        Dashboard.AppendAppOutput("info", OperatingSystem.IsWindows()
             ? "  打包 Windows: scripts\\publish-windows.ps1 (需 Inno Setup)"
             : "  打包 Linux:   ./scripts/publish-linux.sh  → artifacts/publish/linux-x64/", "deploy");
-        Dashboard.AppendOutput("info", OperatingSystem.IsWindows()
+        Dashboard.AppendAppOutput("info", OperatingSystem.IsWindows()
             ? "  打包 Linux:   ./scripts/publish-linux.sh"
             : "  打包 Windows: scripts\\publish-windows.ps1 (需在 Windows + Inno Setup)", "deploy");
-        Dashboard.AppendOutput("info", "  在仓库根目录运行上述命令，完成后再次点击 Deploy 打开产物目录", "deploy");
+        Dashboard.AppendAppOutput("info", "  在仓库根目录运行上述命令，完成后再次点击 Deploy 打开产物目录", "deploy");
     }
 
     private static string ResolveWindowsPublishShell() =>
@@ -1794,10 +1820,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var from = SessionCards.IndexOf(card);
         var to = SessionCards.IndexOf(target);
         if (from < 0 || to < 0 || from == to) return;
+        var before = CaptureLayout();
         card.Model.GroupId = target.Model.GroupId;
         card.Model.Pinned = target.Model.Pinned;
         SessionCards.Move(from, to);
         SyncActive();
+        RecordLayout("终端排序", before);
     }
 
     public string WorkspaceNameLive
@@ -1873,6 +1901,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ws.BottomRightIndex = IndexOf(current ? BottomRightPane : workspace.SavedPanes[3]);
         ws.ColumnRatio = current ? ColumnRatio : layout.ColumnRatio;
         ws.RowRatio = current ? RowRatio : layout.RowRatio;
+        ws.PaneTree = (current ? PaneTree : workspace.SavedTree)?.Save(IndexOf);
         return ws;
         int IndexOf(TerminalSessionModel? m) => m is null ? -1 : ordered.IndexOf(m);
     }
@@ -2100,6 +2129,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             s.Emulator.CwdChanged += path => OnSessionCwdReported(s, path);
             s.Emulator.CommandCompleted += command => OnCommandCompleted(s, command);
             s.Pty.Exited += (_, code) => RunOnUi(() => OnProjectTaskCompleted(s, code));
+            s.Emulator.Changed += () => _pluginDirtySessions[s.Id] = 0;
+            s.Emulator.CommandStarted += () => RunOnUi(() => NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.CommandStarted, s));
+            s.Emulator.CommandCompleted += state => RunOnUi(() => NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.CommandCompleted, s, state));
             s.Emulator.Bell += () => RunOnUi(() => OnSessionBell(s));
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -2110,6 +2142,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var card = new SessionCardViewModel(s);
             card.Refresh();
             owner.Cards.Add(card); owner.Refresh();
+            if (!reattach) NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.SessionCreated, s);
             if (owner == ActiveWorkspace) SessionCards.Add(card);
             RefreshCounts();
             SyncActive();
@@ -2125,6 +2158,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var detached = s.Detached;
         if (!detached)
         {
+            ClearLayoutHistory();
+            NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.SessionClosed, s);
+            _pluginDirtySessions.TryRemove(s.Id, out _);
             s.Pty.OutputReceived -= OnPtyOutput;
             _lineDecoders.TryRemove(s.Id, out _);
             _sessionNames.TryRemove(s.Id, out _);
@@ -2136,9 +2172,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var vm = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s));
             if (vm is not null) SessionCards.Remove(vm);
             if (_sessionWorkspaces.TryGetValue(s.Id, out var owner))
-            { owner.Cards.RemoveAll(c => c.Model == s); owner.Refresh(); }
+            { owner.Cards.RemoveAll(c => c.Model == s); NormalizeWorkspacePanes(owner); owner.Refresh(); }
             if (!detached)
             {
+                RemoveRecentSession(s);
                 _sessionWorkspaces.TryRemove(s.Id, out _);
                 _ = StopSessionRecordingAsync(s.Id);
                 // Session names recycle ("Terminal 01" → the next auto-named
@@ -2161,7 +2198,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _syncingActive = true;
         try
         {
+            var priorPluginSession = ActiveSession;
             ActiveSession = _sessions.Active;
+            if (priorPluginSession != ActiveSession) NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.ActiveSessionChanged, ActiveSession);
+            RememberRecentSession(ActiveSession);
             var target = SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, ActiveSession));
             var activeIndex = target is null ? 0 : SessionCards.IndexOf(target);
             for (var i = 0; i < SessionCards.Count; i++)
@@ -2256,6 +2296,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        TerminalHub.Core.Localization.Localizer.Current.LanguageChanged -= RefreshUiLanguage;
         _disposed = true;   // popout Closed handlers must not reattach anymore
         DisposeProjectTools();
         _updateDownloadCancellation?.Cancel();

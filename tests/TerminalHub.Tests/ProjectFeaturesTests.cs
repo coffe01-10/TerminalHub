@@ -154,10 +154,10 @@ public class ProjectFeaturesTests
         using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650); f.Vm.ThemeIndex = theme;
         var tools = new ProjectToolsWindow(f.Window, f.Vm); tools.Show(f.Window); await Task.Delay(80);
         var tabs = tools.GetVisualDescendants().OfType<TabControl>().First(); Assert.Equal(5, tabs.Items.Count);
-        var navigation = tools.FindControl<ListBox>("ToolNavigation")!;
+        var navigation = ((ProjectToolsView)tools.Content!).FindControl<ListBox>("ToolNavigation")!;
         Assert.Equal(0, navigation.SelectedIndex);
-        Assert.True(tools.FindControl<StackPanel>("RuleEmptyState")!.IsVisible);
-        Assert.False(tools.FindControl<ScrollViewer>("RuleEditor")!.IsVisible);
+        Assert.True(((ProjectToolsView)tools.Content!).FindControl<StackPanel>("RuleEmptyState")!.IsVisible);
+        Assert.False(((ProjectToolsView)tools.Content!).FindControl<ScrollViewer>("RuleEditor")!.IsVisible);
         if (Environment.GetEnvironmentVariable("TERMINALHUB_STAGE_CAPTURES") is { } emptyDirectory)
         { Directory.CreateDirectory(emptyDirectory); tools.CaptureRenderedFrame()!.Save(Path.Combine(emptyDirectory, $"project-empty-{theme}.png")); }
         var createRule = Assert.Single(tools.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "＋ 新建第一条规则"));
@@ -165,8 +165,8 @@ public class ProjectFeaturesTests
         tools.MouseDown(createPoint, MouseButton.Left); tools.MouseUp(createPoint, MouseButton.Left);
         await Task.Delay(40); Assert.NotNull(f.Vm.SelectedOutputRule);
         f.Vm.SelectedOutputRule!.Name = "构建错误"; f.Vm.SelectedOutputRule.Pattern = "error";
-        Assert.False(tools.FindControl<StackPanel>("RuleEmptyState")!.IsVisible);
-        Assert.True(tools.FindControl<ScrollViewer>("RuleEditor")!.IsVisible);
+        Assert.False(((ProjectToolsView)tools.Content!).FindControl<StackPanel>("RuleEmptyState")!.IsVisible);
+        Assert.True(((ProjectToolsView)tools.Content!).FindControl<ScrollViewer>("RuleEditor")!.IsVisible);
         f.Vm.NewProjectTaskCommand.Execute(null); f.Vm.SelectedProjectTask!.Name = "构建项目"; f.Vm.SelectedProjectTask.Command = "dotnet build";
         for (var i = 0; i < 5; i++)
         {

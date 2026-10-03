@@ -191,6 +191,6 @@ public sealed class LogTimestampConverter : IMultiValueConverter
     {
         var time = values.Count > 0 && values[0] is DateTime dt ? dt : default;
         var relative = values.Count > 1 && values[1] is true;
-        return LogTimestampFormatter.Format(time, relative);
+        return TerminalHub.Core.Localization.Localizer.Current.Translate(LogTimestampFormatter.Format(time, relative));
     }
 }

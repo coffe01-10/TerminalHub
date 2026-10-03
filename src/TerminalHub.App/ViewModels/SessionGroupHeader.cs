@@ -17,7 +17,7 @@ public sealed partial class SessionGroupHeader : ObservableObject
         var members = Group is null
             ? cards.Where(card => card.Model.Pinned).ToList()
             : cards.Where(card => card.Model.GroupId == Group.Id).ToList();
-        var mark = Group is null ? "置顶" : Group.Collapsed ? Group.Name + "  ▸" : Group.Name + "  ▾";
+        var mark = Group is null ? TerminalHub.Core.Localization.Localizer.Current.Translate("置顶") : Group.Collapsed ? Group.Name + "  ▸" : Group.Name + "  ▾";
         Title = $"{mark}  {members.Count}";
         Activity = members.Any(card => card.HasUnreadOutput) ? "有新输出"
             : members.Any(card => !card.Model.IsRunning) ? "有终端已退出"

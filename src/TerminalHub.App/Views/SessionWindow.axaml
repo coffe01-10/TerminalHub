@@ -1,34 +1,34 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:TerminalHub.App.Localization"
         xmlns:vm="using:TerminalHub.App.ViewModels"
         xmlns:ctl="using:TerminalHub.App.Controls"
         x:Class="TerminalHub.App.Views.SessionWindow"
         x:DataType="vm:SessionWindowViewModel"
-        Title="{Binding Title}"
+        Title="{loc:Translate {Binding Title}}"
         Icon="avares://TerminalHub/Assets/terminal-hub-icon.ico"
         Width="860" Height="540" MinWidth="420" MinHeight="260"
         WindowStartupLocation="Manual"
         Background="{DynamicResource UiCanvas}"
         >
 
-  <Grid RowDefinitions="30,*" Margin="8,6,8,8">
+  <Grid RowDefinitions="42,*" Margin="8,6,8,8">
 
     <!-- Header: status dot + name + tag + return-to-main -->
     <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="4,0,4,4">
-      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
+      <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="0,0,12,0">
         <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                   Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-        <TextBlock Text="{Binding Model.WorkingDirectory}" FontSize="10" Foreground="{DynamicResource UiMuted}"/>
+                   Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}"/>
+        <TextBlock Text="{Binding Model.WorkingDirectory}" FontSize="10" Foreground="{DynamicResource UiMuted}"
+                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Model.WorkingDirectory}"/>
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <TextBlock Text="关闭窗口即收回主窗" FontSize="10" Foreground="{DynamicResource UiFaint}"
-                   VerticalAlignment="Center"/>
-        <Button Content="↩ 收回" FontSize="10" Padding="10,2" CornerRadius="6"
+        <Button Content="{loc:Text M0784}" FontSize="10" Padding="10,2" CornerRadius="6"
                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                 Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"
                 Click="OnReturnClick"
-                ToolTip.Tip="关闭本窗口，会话回到主窗口（焦点不在终端时按 Esc 亦可）"/>
+                ToolTip.Tip="{loc:Text M0785}"/>
       </StackPanel>
     </Grid>
 
@@ -41,7 +41,7 @@
                           WorkingDirectory="{Binding Model.WorkingDirectory}" ShellCommand="{Binding Model.Shell}" IsRemote="{Binding Model.IsRemote}"
                           TerminalFontSize="{Binding FontSize}"
                           TerminalFontFamily="{Binding FontFamily}"/>
-        <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+        <Button Content="{loc:Text M0496}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,6,6" Padding="10,4" CornerRadius="8" FontSize="10"
                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                 Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"

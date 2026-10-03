@@ -1,10 +1,18 @@
-﻿; Terminal Hub / 终端控制中心 — Inno Setup installer script
+; Terminal Hub / 终端控制中心 — Inno Setup installer script
 ; Build:   scripts\publish-windows.ps1   (or: iscc packaging\TerminalHub.iss)
 ; Expects: app\TerminalHub.exe + payload
 
 #define AppName      "Terminal Hub"
 #define AppNameZh    "终端控制中心"
-#define AppVersion   "0.3.4"
+#ifndef AppVersion
+#define AppVersion "0.4.0"
+#endif
+#ifndef SourceDir
+#define SourceDir "..\app"
+#endif
+#ifndef ArtifactDir
+#define ArtifactDir "..\artifacts\installer"
+#endif
 #define AppPublisher "coffe01-10"
 #define AppExe       "TerminalHub.exe"
 
@@ -15,7 +23,7 @@ AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\TerminalHub
 DefaultGroupName={#AppName}
-OutputDir=..\artifacts\installer
+OutputDir={#ArtifactDir}
 OutputBaseFilename=TerminalHub-Setup-{#AppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -40,12 +48,12 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut / 创建桌面快�
 
 [Files]
 ; Share the portable package's explicit program payload; never collect local settings.
-Source: "..\app\TerminalHub.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\app\TerminalHub*.pdb"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\app\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\app\QUICKSTART.zh-CN.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\app\CHANGES.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\app\PERFORMANCE.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\TerminalHub.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\TerminalHub*.pdb"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\QUICKSTART.zh-CN.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\CHANGES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\PERFORMANCE.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}";      Filename: "{app}\{#AppExe}"

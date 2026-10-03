@@ -42,6 +42,7 @@ public enum SplitLayout { Horizontal, Vertical, Quad }
 
 public sealed class WorkspaceState
 {
+    public PaneLayout? PaneTree { get; set; }
     public List<WorkspaceSession> Sessions { get; set; } = [];
     public int ActiveIndex { get; set; } = -1;
     public bool IsSplit { get; set; }
@@ -69,6 +70,8 @@ public sealed class LogsSessionFilterState
 /// <summary>Persisted application settings (JSON on disk).</summary>
 public sealed class AppSettings
 {
+    public Dictionary<string, PluginSettings> Plugins { get; set; } = [];
+    public Dictionary<string, ModuleSettings> Modules { get; set; } = [];
     public const string AppName = "Terminal Hub";
     public const string AppNameZh = "终端控制中心";
 
@@ -79,6 +82,7 @@ public sealed class AppSettings
     /// <summary>Terminal font family list ("" = built-in monospace stack).</summary>
     public string FontFamily { get; set; } = "";
     public string Theme { get; set; } = "DarkGlass";
+    public string Language { get; set; } = "system";
     public List<SessionShortcutBinding> SessionShortcuts
     {
         get => _sessionShortcuts;

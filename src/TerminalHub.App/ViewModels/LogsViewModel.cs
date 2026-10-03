@@ -62,7 +62,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<LogEntry> Entries { get; } = [];
 
     /// <summary>Session filter options; index 0 = all sessions.</summary>
-    public ObservableCollection<string> SessionNames { get; } = ["全部会话"];
+    public ObservableCollection<string> SessionNames { get; } = [TerminalHub.Core.Localization.Localizer.Current.Translate("全部会话")];
 
     [ObservableProperty] private string _filterText = "";
     [ObservableProperty] private bool _useRegex;
@@ -885,7 +885,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         var selected = SessionFilterIndex > 0 && SessionFilterIndex < SessionNames.Count
             ? SessionNames[SessionFilterIndex] : null;
         SessionNames.Clear();
-        SessionNames.Add("全部会话");
+        SessionNames.Add(TerminalHub.Core.Localization.Localizer.Current.Translate("全部会话"));
         foreach (var n in _sessionNames()) SessionNames.Add(n);
         var idx = selected is null ? 0 : SessionNames.IndexOf(selected);
         SessionFilterIndex = idx >= 0 ? idx : 0;
@@ -896,4 +896,6 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _file.Failed -= OnFileWriteFailed;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged -= OnLogChanged;
     }
+    public void RefreshLanguage()
+    { if (SessionNames.Count > 0) SessionNames[0] = TerminalHub.Core.Localization.Localizer.Current.Translate("全部会话"); }
 }

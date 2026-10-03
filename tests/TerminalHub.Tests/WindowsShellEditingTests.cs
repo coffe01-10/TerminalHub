@@ -36,7 +36,9 @@ public class WindowsShellEditingTests
                     });
                 }
                 finally { for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]); }
-                await WaitFor(() => terminal.Buffer.TailText(24).Contains("> "), "PowerShell prompt");
+                // TailText trims line-end spaces, including the prompt's final space.
+                await WaitFor(() => CursorLine(terminal).StartsWith("PS ") && CursorLine(terminal).TrimEnd().EndsWith('>'),
+                    "PowerShell prompt", () => $"running={pty.IsRunning}, output={terminal.Buffer.TailText(24)}");
                 terminal.SendText("ab中文cd");
                 await WaitFor(() => CursorLine(terminal).Contains("ab中文cd"), "Chinese edit");
                 var end = terminal.Buffer.CaptureFrame().CursorX;
@@ -75,11 +77,11 @@ public class WindowsShellEditingTests
         Assert.Equal(frame.CursorX * width, rect.X, 6);
         Assert.Equal(frame.CursorY * rect.Height, rect.Y, 6);
     }
-    private static async Task WaitFor(Func<bool> condition, string scenario)
+    private static async Task WaitFor(Func<bool> condition, string scenario, Func<string>? diagnostic = null)
     {
         var deadline = Environment.TickCount64 + 15000;
         while (!condition() && Environment.TickCount64 < deadline) await Task.Delay(50);
-        Assert.True(condition(), scenario);
+        Assert.True(condition(), scenario + (diagnostic is null ? "" : ": " + diagnostic()));
     }
     [DllImport("kernel32.dll")] private static extern IntPtr GetStdHandle(int id);
     [DllImport("kernel32.dll")] private static extern bool SetStdHandle(int id, IntPtr handle);

@@ -1,6 +1,6 @@
 namespace TerminalHub.Core.Settings;
 
-public enum SessionShortcutAction { Next, Previous, Select, CommandPalette }
+public enum SessionShortcutAction { Next, Previous, Select, CommandPalette, Recent, UndoLayout, RedoLayout }
 
 public sealed class SessionShortcutBinding
 {
@@ -14,6 +14,9 @@ public sealed class SessionShortcutBinding
         new() { Action = SessionShortcutAction.Previous, Gesture = "Ctrl+Shift+Tab" },
         .. Enumerable.Range(0, 9).Select(i => new SessionShortcutBinding
             { Action = SessionShortcutAction.Select, SessionIndex = i, Gesture = $"Alt+{i + 1}" }),
-        new() { Action = SessionShortcutAction.CommandPalette, Gesture = "Ctrl+Shift+P" }
+        new() { Action = SessionShortcutAction.CommandPalette, Gesture = "Ctrl+Shift+P" },
+        new() { Action = SessionShortcutAction.Recent, Gesture = "Ctrl+F6" },
+        new() { Action = SessionShortcutAction.UndoLayout, Gesture = "Ctrl+Alt+Z" },
+        new() { Action = SessionShortcutAction.RedoLayout, Gesture = "Ctrl+Alt+Y" }
     ];
 }

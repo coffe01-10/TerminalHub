@@ -730,3 +730,11 @@
 - PR #51 合入 `main@7a674f7`：OSC7 裸路径 + IsBashRcArguments 重注入；502/0/3 绿；实机截图 C#proj %test 完整。
 - PR #52 合入 `main@cadefdd`（Linux 平台对齐）；恢复 Output 级别筛选刀 `feat/output-level-filter-mockup` → PR #53（全部/info/warn/error + 持久化，522 绿）。
 - PR #53 合入 `main@75cc0c7`（Output 级别筛选+持久化，522 绿）。下一刀：对照 ui-ref-dashboard/ai-assistant mockup 挑一个可辨差距切片实改。
+
+
+## 2026-10-03
+
+- v0.4.0 七项工作台功能的源码与文档补齐：任意树形分屏、插件 SDK/本地管理、工作区工具组件化接续上一轮拖动/MRU/语言/布局历史。
+- 新增 SDK 独立项目及 Minimal、CompactSidebar、SessionPanel 示例；不引用 App 私有实现。
+- 用户追加验收要求后，完成相关 Headless 回归、真实 Windows 原生窗口和 ConPTY 验收；修复备用会话填补、侧栏覆盖终端时的拖放误判、组件样式丢失，以及旧测试依赖隐藏控件/提示符尾空格的问题。结果见 [验收记录](acceptance-v0.4.0-2026-10-03.md)。系统 IME 实际候选窗、多显示器与 Linux 实机未验收；尚未 commit/push/发布。
+- 详情见 [本轮工作台记录](workbench-2026-10-03.md)及 [插件 SDK](plugin-sdk.md)。

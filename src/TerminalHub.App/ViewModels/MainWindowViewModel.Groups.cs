@@ -34,7 +34,7 @@ public partial class MainWindowViewModel
     public string DescribeSession(SessionCardViewModel card)
     {
         var group = SessionGroups.FirstOrDefault(item => item.Id == card.Model.GroupId)?.Name;
-        var prefix = card.Model.Pinned ? "置顶 · " : "";
+        var prefix = card.Model.Pinned ? TerminalHub.Core.Localization.Localizer.Current.Translate("置顶 · ") : "";
         if (!string.IsNullOrEmpty(group)) prefix += group + " · ";
         return prefix + card.WorkingDirectory + " · " + card.Model.Shell;
     }
@@ -231,7 +231,7 @@ public partial class MainWindowViewModel
     private string ShelfCaption(SessionCardViewModel card)
     {
         var group = SessionGroups.FirstOrDefault(item => item.Id == card.Model.GroupId)?.Name;
-        var prefix = card.Model.Pinned ? "置顶 · " : "";
+        var prefix = card.Model.Pinned ? TerminalHub.Core.Localization.Localizer.Current.Translate("置顶 · ") : "";
         if (!string.IsNullOrEmpty(group)) prefix += group + " · ";
         return prefix + card.DirectoryName;
     }

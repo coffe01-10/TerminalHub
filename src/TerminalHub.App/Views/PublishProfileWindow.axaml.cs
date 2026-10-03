@@ -41,7 +41,7 @@ public partial class PublishProfileWindow : Window
     {
         if (string.IsNullOrWhiteSpace(NameBox.Text))
         {
-            ErrorText.Text = "名称不能为空";
+            TerminalHub.App.Localization.UiText.Set(ErrorText, Avalonia.Controls.TextBlock.TextProperty, "名称不能为空");
             ErrorText.IsVisible = true;
             return;
         }

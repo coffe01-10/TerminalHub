@@ -1,0 +1,8 @@
+{
+  "id": "example.session-panel",
+  "name": "会话面板",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Example.SessionPanel.dll",
+  "entryType": "SessionPanelPlugin",
+  "hostApi": 1
+}

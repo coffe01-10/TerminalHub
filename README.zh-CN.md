@@ -140,3 +140,8 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 欢迎在 [Issues](https://github.com/coffe01-10/TerminalHub/issues) 提交建议。输入和显示问题请附系统、Shell / CLI 版本及复现步骤。
 
 [MIT License](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
+
+
+## v0.4.0 工作台扩展（本地构建）
+
+支持任意嵌套分屏、跨工作区拖动、最近使用切换、中英文切换、布局撤销/重做及嵌入式工作区工具。新增本地 .NET/Avalonia 插件机制，开发与导入见 [插件 SDK](docs/plugin-sdk.md)，交付边界见 [本轮记录](docs/workbench-2026-10-03.md)。已发布版仍为 v0.3.4。

@@ -56,6 +56,9 @@ public partial class MainWindow : Window
         InitializeOutputTools();
         Vm.PropertyChanged += OnStageSelectionChanged;
         InitializeWorkspaceTabs();
+        InitializeRecentSwitcher();
+        InitializeSessionTransfer();
+        InitializePlugins();
         SessionShelf.SelectionChanged += OnShelfSelectionChanged;
         InitializeShelfDrawer();
         SessionShelf.SizeChanged += (_, _) => UpdateStageLayout();
@@ -94,21 +97,37 @@ public partial class MainWindow : Window
         }
         SplitGrid.AddHandler(InputElement.PointerReleasedEvent, (_, _) => SavePaneRatios(),
             RoutingStrategies.Bubble, handledEventsToo: true);
+        foreach (var divider in new[] { ColumnDivider, RowDivider })
+        {
+            divider.AddHandler(PointerPressedEvent, (_, _) => Vm.BeginLayoutGesture("调整分屏比例"), RoutingStrategies.Tunnel, handledEventsToo: true);
+            divider.AddHandler(PointerReleasedEvent, (_, _) => { SavePaneRatios(); Vm.CompleteLayoutGesture(); }, RoutingStrategies.Bubble, handledEventsToo: true);
+            divider.PointerCaptureLost += (_, _) => { SavePaneRatios(); Vm.CompleteLayoutGesture(); };
+            divider.AddHandler(KeyDownEvent, (_, e) =>
+            {
+                if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down) Vm.BeginLayoutGesture("调整分屏比例");
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
+            divider.AddHandler(KeyUpEvent, (_, e) =>
+            {
+                if (e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down)) return;
+                SplitGrid.UpdateLayout(); SavePaneRatios(); Vm.CompleteLayoutGesture();
+            }, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
         Vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(MainWindowViewModel.IsSplit) or nameof(MainWindowViewModel.SplitLayout)
-                or nameof(MainWindowViewModel.PaneMaximized) or nameof(MainWindowViewModel.FocusedPane)
-                or nameof(MainWindowViewModel.ColumnRatio) or nameof(MainWindowViewModel.RowRatio)) UpdateSplitLayout();
+                or nameof(MainWindowViewModel.PaneMaximized)
+                or nameof(MainWindowViewModel.PaneRevision) or nameof(MainWindowViewModel.ColumnRatio) or nameof(MainWindowViewModel.RowRatio)) UpdateSplitLayout();
+            else if (e.PropertyName == nameof(MainWindowViewModel.FocusedPane) && Vm.PaneMaximized) UpdateSplitLayout();
         };
         UpdateSplitLayout();
         // Shelf drag reorder — threshold-gated so plain clicks still just select.
         SessionShelf.AddHandler(InputElement.PointerPressedEvent, OnShelfPointerPressed,
             RoutingStrategies.Tunnel, handledEventsToo: true);
-        SessionShelf.AddHandler(InputElement.PointerMovedEvent, OnShelfPointerMoved,
+        AddHandler(InputElement.PointerMovedEvent, OnShelfPointerMoved,
             RoutingStrategies.Bubble, handledEventsToo: true);
-        SessionShelf.AddHandler(InputElement.PointerReleasedEvent, OnShelfPointerReleased,
+        AddHandler(InputElement.PointerReleasedEvent, OnShelfPointerReleased,
             RoutingStrategies.Tunnel, handledEventsToo: true);
-        SessionShelf.PointerCaptureLost += (_, _) => EndShelfDrag(commit: false);
+        PointerCaptureLost += (_, _) => EndShelfDrag(commit: false);
         _shelfDragTimer.Tick += (_, _) => UpdateShelfDrag(autoScroll: true);
         // Files → terminal drag-out: a held row dragged far enough starts an
         // OS-level Files payload; the terminal treats it like an Explorer drop.
@@ -206,7 +225,7 @@ public partial class MainWindow : Window
             button.Content = null;
             button.Content = new StackPanel
             { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6,
-                Children = { icon, new TextBlock { Text = text, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } } };
+                Children = { icon, new TextBlock { [!TextBlock.TextProperty] = TerminalHub.App.Localization.UiText.Binding(text), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } } };
         }
         Label(ChromeSplit, "分屏"); Label(ChromePopout, "弹出");
     }
@@ -241,6 +260,7 @@ public partial class MainWindow : Window
         shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
         // Clamp locally so a transient window shrink cannot overwrite the
         // user's persisted height — the panel regrows with the window.
+        ProjectToolsRegion.Height = Math.Clamp(Bounds.Height * .34,180,360);
         OutputPanel.Height = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
         StageLayout.ColumnDefinitions[InspectorGutterColumn].Width = new GridLength(Vm.InspectorVisible ? 12 : 0);
         var inspectorWidth = Vm.InspectorWidth > 0 ? Vm.InspectorWidth : (Bounds.Width < 1250 ? 300 : 326);
@@ -354,14 +374,14 @@ public partial class MainWindow : Window
         {
             if (!_stageReady || generation != _selectionGeneration || !IsVisible || _dragCard is not null) return;
             if (Vm.ActiveCard is { } active && Vm.ShelfItems.Contains(active))
-                RevealShelfCard(active, animate: !workspaceSwitch && ShelfHost.IsVisible && _shelfRevealed);
+                RevealShelfCard(active, animate: !workspaceSwitch && ShelfHost.IsVisible && SessionShelf.IsVisible && _shelfRevealed);
             // Apply a shelf scroll before reading the card's visible origin.
             SessionShelf.UpdateLayout();
             var card = SessionShelf.GetVisualDescendants().OfType<StageCard>()
                 .FirstOrDefault(c => ReferenceEquals(c.DataContext, Vm.ActiveCard));
             // Measure in the shared parent: StageWindow itself is transformed
             // during a flight, so translating into it would distort the origin.
-            if (!workspaceSwitch && !Vm.IsSplit && ShelfHost.IsVisible && card is not null && Vm.ActiveSession is not null)
+            if (!workspaceSwitch && !Vm.IsSplit && ShelfHost.IsVisible && SessionShelf.IsVisible && card is not null && Vm.ActiveSession is not null)
             {
                 var body = card.Child ?? card;
                 var corners = new[] { new Point(), new Point(body.Bounds.Width, 0),
@@ -372,7 +392,7 @@ public partial class MainWindow : Window
                 StageWindow.ActivateFrom(new Rect(left - StageWindow.Bounds.X, top - StageWindow.Bounds.Y,
                     corners.Max(p => p.X) - left, corners.Max(p => p.Y) - top));
             }
-            if (IsActive && Vm.ActiveSession is not null) ActiveTerminal()?.Focus();
+            if (IsActive && Vm.ActiveSession is not null && !Vm.RecentSwitcherOpen) ActiveTerminal()?.Focus();
         });
     }
 
@@ -503,15 +523,15 @@ public partial class MainWindow : Window
 
     private async Task RenameSessionAsync(SessionCardViewModel card)
     {
-        var name = new TextBox { Text = card.Name, Watermark = "终端名称", Name = "SessionNameInput" };
-        var save = new Button { Content = "保存名称", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var name = new TextBox { Text = card.Name, [!Avalonia.Controls.TextBox.WatermarkProperty] = TerminalHub.App.Localization.UiText.Binding("终端名称"), Name = "SessionNameInput" };
+        var save = new Button { [!Avalonia.Controls.ContentControl.ContentProperty] = TerminalHub.App.Localization.UiText.Binding("保存名称"), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
         var dialog = new Window
         {
-            Title = "重命名终端", Width = 380, Height = 180, CanResize = false,
+            [!Avalonia.Controls.Window.TitleProperty] = TerminalHub.App.Localization.UiText.Binding("重命名终端"), Width = 380, Height = 180, CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = ThemeManager.Brush("Surface"),
             Content = new StackPanel { Margin = new Thickness(22), Spacing = 14,
-                Children = { new TextBlock { Text = "终端名称", Foreground = ThemeManager.Brush("Ink") }, name, save } }
+                Children = { new TextBlock { [!TextBlock.TextProperty] = TerminalHub.App.Localization.UiText.Binding("终端名称"), Foreground = ThemeManager.Brush("Ink") }, name, save } }
         };
         save.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(name.Text)) dialog.Close(name.Text.Trim()); };
         name.KeyDown += (_, e) =>
@@ -603,8 +623,8 @@ public partial class MainWindow : Window
     /// <summary>The terminal showing the session Search/Output follows — the
     /// focused split pane, or the single main view outside split mode.</summary>
     private TerminalView? ActiveTerminal()
-        => Vm.IsSplit ? Vm.FocusedPane switch
-        { 0 => LeftTerminal, 1 => RightTerminal, 2 => BottomLeftTerminal, _ => BottomRightTerminal } : MainTerminal;
+        => Vm.IsSplit && Vm.GetPane(Vm.FocusedPane) is { } session
+            ? _treeTerminals.GetValueOrDefault(session) : MainTerminal;
 
     private void OnScrollToBottomClick(object? sender, RoutedEventArgs e)
     {
@@ -770,7 +790,9 @@ public partial class MainWindow : Window
             .OrderBy(slot => slot.Item3).ToArray();
         _dragFrom = Array.FindIndex(_dragSlots, slot => ReferenceEquals(slot.Model, _dragCard));
         _dragTo = _dragFrom;
-        e.Pointer.Capture(SessionShelf);
+        _sessionDragOrigin = Vm.ActiveWorkspace; _sessionDragActive = Vm.ActiveCard;
+        _sessionDragPointer = e.Pointer; _sessionDragPosition = e.GetPosition(this);
+        e.Pointer.Capture(this);
         // Defer selection until release so dragging a background terminal does
         // not launch its foreground animation or scroll the shelf underneath us.
         e.Handled = true;
@@ -779,12 +801,14 @@ public partial class MainWindow : Window
     private void OnShelfPointerMoved(object? sender, PointerEventArgs e)
     {
         if (_dragCard is null) return;
+        _sessionDragPosition = e.GetPosition(this);
         _dragPosition = e.GetPosition(SessionShelf);
         if (!_cardDragging && Math.Abs(_dragPosition.Y - _dragOrigin.Y) + Math.Abs(_dragPosition.X - _dragOrigin.X) < 8)
             return;
         if (!_cardDragging)
         {
             _cardDragging = true;
+            Vm.BeginLayoutGesture("移动终端");
             _dragSlots[_dragFrom].Card.SetDragging(true);
             _shelfDragTimer.Start();
         }
@@ -795,6 +819,7 @@ public partial class MainWindow : Window
     private void UpdateShelfDrag(bool autoScroll)
     {
         if (!_cardDragging || _shelfScroll is null) return;
+        if (UpdateSessionTransfer()) return;
         if (autoScroll)
         {
             var speed = _dragPosition.Y < 36 ? -8 : _dragPosition.Y > SessionShelf.Bounds.Height - 36 ? 8 : 0;
@@ -844,22 +869,27 @@ public partial class MainWindow : Window
             return;
         }
         if (_dragCard is null) return;
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        _sessionDragPosition = e.GetPosition(this);
+        UpdateSessionTransfer();
+        if (TryDropSessionTransfer(_sessionDragPosition)) { e.Handled = true; return; }
         // Dragging a card well past the shelf's right edge (onto the stage)
         // pops it out — the browser "drag a tab off the strip" convention.
         // Vertical reorder keeps working; only clear horizontal overflow detaches.
         var pos = e.GetPosition(SessionShelf);
-        var detach = !OperatingSystem.IsWindows() && _cardDragging
+        var detach = !OperatingSystem.IsWindows() && _cardDragging && Vm.ActiveWorkspace == _sessionDragOrigin
             && (pos.X > SessionShelf.Bounds.Width + 24 || pos.X < -24);
         var clicked = _cardDragging ? null : _dragCard;
         var dragged = _dragCard;
-        EndShelfDrag(commit: !detach);
+        var insideShelf = new Rect(SessionShelf.Bounds.Size).Contains(pos) && Vm.ActiveWorkspace == _sessionDragOrigin;
+        EndShelfDrag(commit: !detach && insideShelf);
         e.Pointer.Capture(null);
         if (detach) Vm.OpenInNewWindowCommand.Execute(dragged);
         else if (clicked is not null) Vm.ActiveCard = clicked;
         e.Handled = true;
     }
 
-    private void EndShelfDrag(bool commit)
+    private void EndShelfDrag(bool commit, bool restoreWorkspace = true)
     {
         _shelfDragTimer.Stop();
         if (_dragCard is null) return;
@@ -884,6 +914,8 @@ public partial class MainWindow : Window
         _dragCard = null;
         _cardDragging = false;
         _dragSlots = [];
+        ClearSessionTransfer(restoreWorkspace && !commit);
+        if (restoreWorkspace) Vm.CompleteLayoutGesture(commit);
         // SessionCards.CollectionChanged fired mid-drag was skipped by the
         // _dragCard guard — header composition may have changed on the drop.
         UpdateStageLayout();
@@ -900,19 +932,19 @@ public partial class MainWindow : Window
 
     private void PopulateDeployMenu(MenuFlyout flyout)
     {
-        if (FindDeployMenu(flyout, static h => h.StartsWith("取消打包", StringComparison.Ordinal)) is { } cancel)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("取消打包"), StringComparison.Ordinal)) is { } cancel)
             cancel.IsEnabled = Vm.IsPublishRunning;
-        if (FindDeployMenu(flyout, static h => h.StartsWith("打开上次成功产物", StringComparison.Ordinal)) is { } last)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("打开上次成功产物"), StringComparison.Ordinal)) is { } last)
             last.IsEnabled = Vm.CanOpenLastSuccessfulArtifact;
-        if (FindDeployMenu(flyout, static h => h.StartsWith("复制上次成功产物路径", StringComparison.Ordinal)) is { } copy)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("复制上次成功产物路径"), StringComparison.Ordinal)) is { } copy)
             copy.IsEnabled = Vm.CanCopyLastSuccessfulArtifact;
-        if (FindDeployMenu(flyout, static h => h.StartsWith("清除上次发布结果", StringComparison.Ordinal)) is { } clear)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("清除上次发布结果"), StringComparison.Ordinal)) is { } clear)
             clear.IsEnabled = Vm.CanClearLastPublishResult;
-        if (FindDeployMenu(flyout, static h => h.StartsWith("配置档", StringComparison.Ordinal)) is { } profiles)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("配置档"), StringComparison.Ordinal)) is { } profiles)
             FillProfileMenu(profiles, activate: true);
-        if (FindDeployMenu(flyout, static h => h.StartsWith("删除配置档", StringComparison.Ordinal)) is { } deletes)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("删除配置档"), StringComparison.Ordinal)) is { } deletes)
             FillProfileMenu(deletes, activate: false);
-        if (FindDeployMenu(flyout, static h => h.StartsWith("最近产物", StringComparison.Ordinal)) is { } recent)
+        if (FindDeployMenu(flyout, static h => h.StartsWith(TerminalHub.Core.Localization.Localizer.Current.Translate("最近产物"), StringComparison.Ordinal)) is { } recent)
             FillRecentMenu(recent);
     }
 
@@ -925,7 +957,7 @@ public partial class MainWindow : Window
         var profiles = Vm.ListPublishProfiles();
         if (profiles.Count == 0)
         {
-            menu.Items.Add(new MenuItem { Header = "（无已存配置）", IsEnabled = false });
+            menu.Items.Add(new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding("（无已存配置）"), IsEnabled = false });
             return;
         }
 
@@ -961,7 +993,7 @@ public partial class MainWindow : Window
         var rows = Vm.QueryRecentArtifacts();
         if (rows.Count == 0)
         {
-            menu.Items.Add(new MenuItem { Header = "（暂无产物）", IsEnabled = false });
+            menu.Items.Add(new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding("（暂无产物）"), IsEnabled = false });
             return;
         }
 
@@ -993,11 +1025,14 @@ public partial class MainWindow : Window
     /// Ctrl+Tab / Ctrl+Shift+Tab cycle cards; F2 renames.</summary>
     private void OnSessionShortcutKeyDown(object? sender, KeyEventArgs e)
     {
+        if ((Vm.RecentSwitcherOpen || !PalettePanel.IsVisible && !BookmarkPanel.IsVisible && !Vm.SettingsOpen) && Vm.HandleRecentKeyDown(e))
+        { e.Handled = true; return; }
         if (Vm.BroadcastEnabled && e.Key == Key.Escape) { Vm.StopBroadcast(); e.Handled = true; return; }
         _lastPanelTrigger = null;
         if (PalettePanel.IsVisible) { HandlePaletteKey(e); return; }
         if (BookmarkPanel.IsVisible) { HandleBookmarkKey(e); return; }
         if (e.Source is ShortcutEditor) return;
+        if (_plugins is not null && _plugins.HandleShortcut(e)) { e.Handled = true; return; }
         if (Vm.HandleSessionShortcut(e)) { e.Handled = true; return; }
         // Grok uses F2 for settings; terminal-focused function keys belong to the CLI.
         // F2 on the Files list must reach its own bubble handler (file rename);
@@ -1440,7 +1475,7 @@ public partial class MainWindow : Window
             ("浅色", TerminalHub.Core.Terminal.TerminalColorScheme.Light)
         })
         {
-            var item = new MenuItem { Header = label, ToggleType = MenuItemToggleType.Radio,
+            var item = new MenuItem { [!MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding(label), ToggleType = MenuItemToggleType.Radio,
                 IsChecked = Vm.ActiveSession?.Emulator.ColorScheme == scheme };
             item.Click += (_, _) =>
             {
@@ -1451,14 +1486,14 @@ public partial class MainWindow : Window
             TerminalColorsMenu.Items.Add(item);
         }
         if (PinSessionItem is not null)
-            PinSessionItem.Header = Vm.ActiveCard?.Model.Pinned == true ? "取消置顶" : "置顶";
+            TerminalHub.App.Localization.UiText.Set(PinSessionItem, Avalonia.Controls.MenuItem.HeaderProperty, Vm.ActiveCard?.Model.Pinned == true ? "取消置顶" : "置顶");
         if (SaveSelectionItem is not null)
             SaveSelectionItem.IsEnabled = ActiveTerminal()?.HasSelection == true;
         if (ToggleGroupItem is not null)
         {
             var group = Vm.SessionGroups.FirstOrDefault(item => item.Id == Vm.ActiveCard?.Model.GroupId);
             ToggleGroupItem.IsEnabled = group is not null;
-            ToggleGroupItem.Header = group?.Collapsed == true ? "展开当前分组" : "折叠当前分组";
+            TerminalHub.App.Localization.UiText.Set(ToggleGroupItem, Avalonia.Controls.MenuItem.HeaderProperty, group?.Collapsed == true ? "展开当前分组" : "折叠当前分组");
         }
         if (MoveToGroupMenu is null) return;
         MoveToGroupMenu.Items.Clear();
@@ -1472,7 +1507,7 @@ public partial class MainWindow : Window
             MoveToGroupMenu.Items.Add(item);
         }
         if (MoveToGroupMenu.Items.Count == 0)
-            MoveToGroupMenu.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
+            MoveToGroupMenu.Items.Add(new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding("还没有分组"), IsEnabled = false });
         // Popped-out sessions leave the shelf entirely — this submenu is the
         // only in-window way to refocus a popout buried under other windows.
         if (PopoutSessionsMenu is not null)
@@ -1481,14 +1516,14 @@ public partial class MainWindow : Window
             foreach (var win in Vm.Popouts)
             {
                 if (win.Session is not { } session) continue;
-                var item = new MenuItem { Header = $"聚焦 {session.Name}" };
+                var item = new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding($"聚焦 {session.Name}") };
                 ToolTip.SetTip(item, session.WorkingDirectory);
                 var target = win;
                 item.Click += (_, _) => target.Activate();
                 PopoutSessionsMenu.Items.Add(item);
             }
             if (PopoutSessionsMenu.Items.Count == 0)
-                PopoutSessionsMenu.Items.Add(new MenuItem { Header = "无弹出窗口", IsEnabled = false });
+                PopoutSessionsMenu.Items.Add(new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding("无弹出窗口"), IsEnabled = false });
         }
     }
 
@@ -1500,9 +1535,10 @@ public partial class MainWindow : Window
         if (sender is not MenuFlyout flyout ||
             flyout.Target?.DataContext is not SessionCardViewModel card) return;
         flyout.Items.Clear();
-        MenuItem Item(string header, Action action, bool enabled = true)
+        MenuItem Item(string header, Action action, bool enabled = true, bool translate = true)
         {
             var item = new MenuItem { Header = header, IsEnabled = enabled };
+            if (translate) TerminalHub.App.Localization.UiText.Set(item, MenuItem.HeaderProperty, header);
             item.Click += (_, _) => action();
             return item;
         }
@@ -1512,12 +1548,12 @@ public partial class MainWindow : Window
             () => Vm.SetPinned(card, !card.Model.Pinned)));
         flyout.Items.Add(Item("重启会话", () => _ = Vm.RestartSession(card),
             card.Model.Pty.ExitCode is not null));
-        var moveTo = new MenuItem { Header = "移入分组" };
+        var moveTo = new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding("移入分组") };
         foreach (var group in Vm.SessionGroups)
             moveTo.Items.Add(Item(group.Name, () => Vm.MoveCardToGroup(card, group.Id),
-                group.Id != card.Model.GroupId));
+                group.Id != card.Model.GroupId, translate: false));
         if (moveTo.Items.Count == 0)
-            moveTo.Items.Add(new MenuItem { Header = "还没有分组", IsEnabled = false });
+            moveTo.Items.Add(new MenuItem { [!Avalonia.Controls.MenuItem.HeaderProperty] = TerminalHub.App.Localization.UiText.Binding("还没有分组"), IsEnabled = false });
         flyout.Items.Add(moveTo);
         flyout.Items.Add(Item("移出分组", () => Vm.MoveCardToGroup(card, null),
             !string.IsNullOrEmpty(card.Model.GroupId)));
@@ -1572,9 +1608,9 @@ public partial class MainWindow : Window
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "导出工作区模板",
+                Title = TerminalHub.Core.Localization.Localizer.Current.Translate("导出工作区模板"),
                 SuggestedFileName = (Vm.SelectedTemplate?.Name ?? "模板") + ".json",
-                FileTypeChoices = [new FilePickerFileType("工作区模板") { Patterns = ["*.json"] }],
+                FileTypeChoices = [new FilePickerFileType(TerminalHub.Core.Localization.Localizer.Current.Translate("工作区模板")) { Patterns = ["*.json"] }],
             });
             if (file is null) return;
             await using var stream = await file.OpenWriteAsync();
@@ -1594,9 +1630,9 @@ public partial class MainWindow : Window
         {
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "导入工作区模板",
+                Title = TerminalHub.Core.Localization.Localizer.Current.Translate("导入工作区模板"),
                 AllowMultiple = false,
-                FileTypeFilter = [new FilePickerFileType("工作区模板") { Patterns = ["*.json"] }],
+                FileTypeFilter = [new FilePickerFileType(TerminalHub.Core.Localization.Localizer.Current.Translate("工作区模板")) { Patterns = ["*.json"] }],
             });
             if (files.Count == 0) return;
             await using var stream = await files[0].OpenReadAsync();
@@ -1611,17 +1647,17 @@ public partial class MainWindow : Window
 
     private async Task<string?> PromptTextAsync(string title, string label, string initial)
     {
-        var input = new TextBox { Text = initial, Watermark = label };
-        var save = new Button { Content = "确定", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var input = new TextBox { Text = initial, [!TextBox.WatermarkProperty] = TerminalHub.App.Localization.UiText.Binding(label) };
+        var save = new Button { [!Avalonia.Controls.ContentControl.ContentProperty] = TerminalHub.App.Localization.UiText.Binding("确定"), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
         var dialog = new Window
         {
-            Title = title, Width = 380, Height = 180, CanResize = false,
+            [!Window.TitleProperty] = TerminalHub.App.Localization.UiText.Binding(title), Width = 380, Height = 180, CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = ThemeManager.Brush("Surface"),
             Content = new StackPanel
             {
                 Margin = new Thickness(22), Spacing = 14,
-                Children = { new TextBlock { Text = label, Foreground = ThemeManager.Brush("Ink") }, input, save }
+                Children = { new TextBlock { [!TextBlock.TextProperty] = TerminalHub.App.Localization.UiText.Binding(label), Foreground = ThemeManager.Brush("Ink") }, input, save }
             }
         };
         save.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(input.Text)) dialog.Close(input.Text.Trim()); };
@@ -1642,7 +1678,12 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         EndWorkspaceTabDrag(commit: false);
-        _projectTools?.Close();
+        _pluginManagerWindow?.Close();
+        _plugins.Changed -= RefreshExtensionUi;
+        _closingPluginWindows = true;
+        foreach (var window in _pluginWindows.Values.ToArray()) window.Close();
+        _plugins.Dispose();
+        Vm.SaveProjectToolsCommand.Execute(null);
         Vm.PaletteRequested -= OpenPalette;
         Vm.RevealCommandRequested -= OnRevealCommand;
         Vm.RevealBookmarkRequested -= OnRevealBookmark;

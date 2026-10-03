@@ -139,3 +139,10 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj --filter 'FullyQual
 ## 交付说明
 
 简短交代：改了什么、解决哪个具体问题、做了哪些验证、还有哪项未验证。若只修改源码并编译成功，不要声称安装版或当前运行进程已经更新。
+
+
+## 2026-10-03 工作台扩展接续
+
+v0.4.0 七项功能源码已实现，发行上传与人工验收另见 `docs/TODO.md`。任意分屏优先阅读 `PaneLayout.cs`、`PaneNode.cs`、`MainWindowViewModel.PaneTree.cs` 和 `MainWindow.PaneTree.cs`；不能再以四个旧窗格属性作为完整布局。旧属性只兼容已有设置和固定布局入口，树节点记录完整结构。
+
+插件公开契约位于 `src/TerminalHub.Extensibility`，加载/生命周期在 `App/Plugins/PluginManager.cs`，宿主操作在 `MainWindowViewModel.PluginHost.cs`，主窗口扩展展示在 `MainWindow.Plugins.cs`。五个工具从 `ProjectToolsView` 复用并与插件共用模块管理，不要恢复成每次打开就重建独立窗口。停用插件只清理它的注册，不能结束宿主会话。用户随后要求补做验收，相关回归与真实 Windows 原生窗口/ConPTY 验收已执行，结果见 `docs/acceptance-v0.4.0-2026-10-03.md`。系统 IME 实际候选窗、多显示器与 Linux 实机仍未执行，不能把格坐标回归当成系统候选窗验收。

@@ -8,6 +8,8 @@ public sealed partial class CommandRecordViewModel : ObservableObject
     public CommandRecord Record { get; }
     public string Title { get; }
     public string Detail { get; }
+    public TerminalHub.Core.Localization.LocalizedText DisplayTitle => new(Title, !Record.HasCommandText || Record.Command.Length == 0);
+    public TerminalHub.Core.Localization.LocalizedText DisplayDetail { get; }
     [ObservableProperty] private string _locateText = "";
     [ObservableProperty] private bool _canLocate;
 
@@ -24,6 +26,7 @@ public sealed partial class CommandRecordViewModel : ObservableObject
             : "失败 " + record.ExitCode;
         var duration = record.Duration is { } time ? " · " + time.TotalSeconds.ToString("0.0") + "s" : "";
         Detail = directory + " · " + state + duration;
+        DisplayDetail = new(() => directory + " · " + TerminalHub.Core.Localization.Localizer.Current.Translate(state) + duration);
     }
 
     public void Refresh(ScreenBuffer buffer)

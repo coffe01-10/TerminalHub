@@ -254,6 +254,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
     private void PreviewFile(string path)
     {
         ClearPreview();
+        _previewTextIsMessage = true;
         if (ImageExtensions.Contains(Path.GetExtension(path)))
         {
             PreviewTitle = Path.GetFileName(path);
@@ -261,6 +262,7 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             PreviewMeta = "";
             PreviewText = "正在加载图片…";
             HasPreview = true;
+            OnPropertyChanged(nameof(DisplayPreviewText));
             PreviewLoading = PreviewImageAsync(path, _previewRequest);
             return;
         }
@@ -281,11 +283,13 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
                     PreviewText = "〔文件过大 — 不提供文本预览〕";
                     break;
                 default:
+                    _previewTextIsMessage = false;
                     PreviewMeta = p.Truncated ? $"{meta} · 已截断" : meta;
                     PreviewText = p.Text;
                     break;
             }
             HasPreview = true;
+            OnPropertyChanged(nameof(DisplayPreviewText));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -319,13 +323,18 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
             PreviewImage = image;
             PreviewIsImage = image is not null;
             PreviewMeta = meta;
+            _previewTextIsMessage = true;
             PreviewText = notice;
+            OnPropertyChanged(nameof(DisplayPreviewText));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             if (!_disposed && request == _previewRequest) ReportPreviewError(ex);
         }
     }
+    private bool _previewTextIsMessage;
+    public TerminalHub.Core.Localization.LocalizedText DisplayPreviewText => new(PreviewText, _previewTextIsMessage);
+    partial void OnPreviewTextChanged(string value) => OnPropertyChanged(nameof(DisplayPreviewText));
 
     private void ReportPreviewError(Exception ex)
     {

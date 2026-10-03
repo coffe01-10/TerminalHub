@@ -140,3 +140,8 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 Suggestions are welcome in [Issues](https://github.com/coffe01-10/TerminalHub/issues). For input or rendering problems, include your OS, shell / CLI version, and reproduction steps.
 
 [MIT License](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
+
+
+## v0.4.0 workbench extensions (local build)
+
+Adds nested splits, cross-workspace session moves, recent-session switching, Chinese/English UI, layout undo/redo and embedded workspace tools. Native .NET/Avalonia plugins have a public SDK and independently built examples; see [plugin development](docs/plugin-sdk.md) and [delivery notes](docs/workbench-2026-10-03.md). The published release remains v0.3.4.

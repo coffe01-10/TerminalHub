@@ -58,9 +58,17 @@ public partial class MainWindow
         { Vm.SettingsOpen = true; SettingsTabs.SelectedIndex = 1; return Task.CompletedTask; });
         Add("保存当前工作区为模板", "保存会话及分屏", "", () =>
         { Vm.SettingsOpen = true; SettingsTabs.SelectedIndex = 1; Vm.TemplateName = Vm.WorkspaceName; return Task.CompletedTask; });
+        Add(Vm.UndoLayoutText, "", "", () => { if (Vm.CanUndoLayout) Vm.UndoLayout(); return Task.CompletedTask; });
+        Add(Vm.RedoLayoutText, "", "", () => { if (Vm.CanRedoLayout) Vm.RedoLayout(); return Task.CompletedTask; });
         foreach (var template in Vm.WorkspaceTemplates)
             Add("打开工作区 · " + template.Name, $"{template.Layout.Sessions.Count} 个终端 · 保留当前会话", "",
                 () => Vm.OpenTemplateAsync(template));
+        Add("左右拆分窗格", "在当前窗格继续拆分", "", () => Vm.SplitFocusedPaneAsync("Horizontal"));
+        Add("上下拆分窗格", "在当前窗格继续拆分", "", () => Vm.SplitFocusedPaneAsync("Vertical"));
+        Add("移除窗格（保留会话）", "", "", () => { Vm.RemoveFocusedPane(); return Task.CompletedTask; });
+        Add("工作区工具", "", "", () => { ToggleProjectTools(); return Task.CompletedTask; });
+        Add("管理插件和模块", "", "", () => { OpenPluginManager(); return Task.CompletedTask; });
+        foreach (var (owner, command) in _plugins.Commands.ToArray()) Add(TerminalHub.Core.Localization.Localizer.Current.GetModuleText(owner,command.Id,command.Title), command.Description ?? "", command.Gesture ?? "", command.Execute);
         PaletteSearch.Text = "";
         PalettePanel.IsVisible = true;
         FilterPalette();

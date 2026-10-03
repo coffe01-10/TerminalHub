@@ -45,21 +45,21 @@ public static class WorkspaceTemplateTransfer
     public static string Describe(WorkspaceTemplate template, Func<string, bool>? directoryExists = null, Func<string, bool>? shellExists = null)
     {
         var text = new StringBuilder();
-        text.Append("将创建 ").Append(template.Layout.Sessions.Count).AppendLine(" 个终端：");
+        text.Append(TerminalHub.Core.Localization.Localizer.Current.Translate("将创建 ")).Append(template.Layout.Sessions.Count).AppendLine(TerminalHub.Core.Localization.Localizer.Current.Translate(" 个终端："));
         foreach (var session in template.Layout.Sessions)
         {
-            var directory = string.IsNullOrWhiteSpace(session.WorkingDirectory) ? "默认目录" : session.WorkingDirectory;
+            var directory = string.IsNullOrWhiteSpace(session.WorkingDirectory) ? TerminalHub.Core.Localization.Localizer.Current.Translate("默认目录") : session.WorkingDirectory;
             var directoryNote = directoryExists is not null && !string.IsNullOrWhiteSpace(session.WorkingDirectory)
-                && !directoryExists(session.WorkingDirectory) ? "（目录不存在，可修改）" : "";
-            var shell = string.IsNullOrWhiteSpace(session.Shell) ? "默认 Shell" : session.Shell;
+                && !directoryExists(session.WorkingDirectory) ? TerminalHub.Core.Localization.Localizer.Current.Translate("（目录不存在，可修改）") : "";
+            var shell = string.IsNullOrWhiteSpace(session.Shell) ? TerminalHub.Core.Localization.Localizer.Current.Translate("默认 Shell") : session.Shell;
             var shellNote = shellExists is not null && !string.IsNullOrWhiteSpace(session.Shell)
-                && !shellExists(session.Shell) ? "（未找到 Shell，可修改）" : "";
+                && !shellExists(session.Shell) ? TerminalHub.Core.Localization.Localizer.Current.Translate("（未找到 Shell，可修改）") : "";
             text.Append(session.Name).Append(" · ").Append(directory).Append(directoryNote)
                 .Append(" · ").Append(shell).Append(shellNote);
             if (session.RunStartupCommand && !string.IsNullOrWhiteSpace(session.StartupCommand))
-                text.Append(" · 启动命令：").Append(session.StartupCommand.Replace("\r", "").Replace('\n', ' '));
-            if (session.Pinned) text.Append(" · 置顶");
-            if (!string.IsNullOrWhiteSpace(session.GroupName)) text.Append(" · 分组 ").Append(session.GroupName);
+                text.Append(TerminalHub.Core.Localization.Localizer.Current.Translate(" · 启动命令：")).Append(session.StartupCommand.Replace("\r", "").Replace('\n', ' '));
+            if (session.Pinned) text.Append(TerminalHub.Core.Localization.Localizer.Current.Translate(" · 置顶"));
+            if (!string.IsNullOrWhiteSpace(session.GroupName)) text.Append(TerminalHub.Core.Localization.Localizer.Current.Translate(" · 分组 ")).Append(session.GroupName);
             text.AppendLine();
         }
         return text.ToString().TrimEnd();

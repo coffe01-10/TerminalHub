@@ -27,7 +27,10 @@ public sealed record SessionSearchResult(TerminalSessionModel? Session, ScreenBu
 }
 
 /// <summary>Bottom-panel log entry. Source is a session name, "deploy", or empty for app events.</summary>
-public sealed record LogEntry(DateTime Time, string Level, string Message, string Source = "");
+public sealed record LogEntry(DateTime Time, string Level, string Message, string Source = "", bool IsAppMessage = false)
+{
+    public TerminalHub.Core.Localization.LocalizedText DisplayMessage => new(Message, IsAppMessage);
+}
 
 /// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
 public partial class DashboardViewModel : ViewModelBase
@@ -145,12 +148,12 @@ public partial class DashboardViewModel : ViewModelBase
         try
         {
             _killPid(p.Pid);
-            AppendOutput("info", $"已结束进程 {p.Name} (pid {p.Pid})", "proc");
+            AppendAppOutput("info", $"已结束进程 {p.Name} (pid {p.Pid})", "proc");
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException
                                      or System.ComponentModel.Win32Exception)
         {
-            AppendOutput("error", $"无法结束 {p.Name} (pid {p.Pid}): {ex.Message}", "proc");
+            AppendAppOutput("error", $"无法结束 {p.Name} (pid {p.Pid}): {ex.Message}", "proc");
         }
     }
 
@@ -240,7 +243,7 @@ public partial class DashboardViewModel : ViewModelBase
     // PTY read threads can emit thousands of lines per second — one
     // Dispatcher.Post per line floods the UI queue and freezes the window.
     // Lines queue here and a single scheduled flush drains them all.
-    private readonly ConcurrentQueue<(string level, string message, string source)> _pendingOutput = new();
+    private readonly ConcurrentQueue<(string level, string message, string source, bool uiMessage)> _pendingOutput = new();
     private readonly ConcurrentQueue<(string message, string source)> _pendingDebug = new();
     private int _outputFlushScheduled;
     private int _debugFlushScheduled;
@@ -267,9 +270,10 @@ public partial class DashboardViewModel : ViewModelBase
     }
 
     /// <summary>Append a line from a real session stream (PTY output) or an app event.</summary>
-    public void AppendOutput(string level, string message, string source = "")
+    public void AppendAppOutput(string level, string message, string source = "") => AppendOutput(level, message, source, true);
+    public void AppendOutput(string level, string message, string source = "", bool uiMessage = false)
     {
-        _pendingOutput.Enqueue((level, message, source));
+        _pendingOutput.Enqueue((level, message, source, uiMessage));
         if (Interlocked.Exchange(ref _outputFlushScheduled, 1) == 0)
             Avalonia.Threading.Dispatcher.UIThread.Post(FlushOutput, Avalonia.Threading.DispatcherPriority.Background);
     }
@@ -280,11 +284,11 @@ public partial class DashboardViewModel : ViewModelBase
         var now = DateTime.Now;
         while (_pendingOutput.TryDequeue(out var e))
         {
-            var entry = new LogEntry(now, e.level, e.message, e.source);
+            var entry = new LogEntry(now, e.level, e.message, e.source, e.uiMessage);
             OutputLog.Add(entry);
             if (PassesOutputFilter(entry)) VisibleOutput.Add(entry);
             if (e.level == "error")
-                Problems.Add(new LogEntry(now, e.level, e.message, e.source));
+                Problems.Add(new LogEntry(now, e.level, e.message, e.source, e.uiMessage));
         }
         while (OutputLog.Count > MaxOutputLines)
         {

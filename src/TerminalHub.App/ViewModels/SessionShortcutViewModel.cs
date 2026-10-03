@@ -12,6 +12,9 @@ public sealed partial class SessionShortcutViewModel : ObservableObject
         SessionShortcutAction.Next => "下一个终端",
         SessionShortcutAction.Previous => "上一个终端",
         SessionShortcutAction.CommandPalette => "命令面板",
+        SessionShortcutAction.Recent => "最近使用终端（按住）",
+        SessionShortcutAction.UndoLayout => "撤销布局",
+        SessionShortcutAction.RedoLayout => "重做布局",
         _ => $"第 {Binding.SessionIndex + 1} 个终端"
     };
     private readonly Action _changed;

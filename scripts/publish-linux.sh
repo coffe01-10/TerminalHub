@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Terminal Hub — publish a self-contained Linux x64 binary.
 # Output: artifacts/TerminalHub-linux-x64.tar.gz
-# Pass MSBuild options such as -p:Version=0.3.4 to override the release version.
+# Pass MSBuild options such as -p:Version=0.4.0 to override the release version.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

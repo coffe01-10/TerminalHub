@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>TerminalHub.Example.CompactSidebar</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/TerminalHub.Extensibility/TerminalHub.Extensibility.csproj"/>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest"/>
+  </ItemGroup>
+</Project>

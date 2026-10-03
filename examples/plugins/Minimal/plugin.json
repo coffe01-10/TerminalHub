@@ -1,0 +1,8 @@
+{
+  "id": "example.minimal",
+  "name": "最小插件",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Example.Minimal.dll",
+  "entryType": "MinimalPlugin",
+  "hostApi": 1
+}

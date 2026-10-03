@@ -1,7 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:TerminalHub.App.Localization"
         x:Class="TerminalHub.App.Views.PublishProfileWindow"
-        Title="保存发布配置 Save profile"
+        Title="{loc:Text M0772}"
         Width="460"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
@@ -9,38 +10,38 @@
         ShowInTaskbar="False"
         Background="{DynamicResource UiSurface}">
   <StackPanel Margin="20" Spacing="8">
-    <TextBlock Text="保存发布配置" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-    <TextBlock Text="同名会更新已有配置并设为当前。空的仓库根目录表示下次 Deploy 仍从当前工作目录向上查找。RID 选择已有脚本：linux-x64 → publish-linux.sh，win-x64 → publish-windows.ps1，跟随系统则用本机平台。"
+    <TextBlock Text="{loc:Text M0773}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+    <TextBlock Text="{loc:Text M0774}"
                Foreground="{DynamicResource UiMuted}" FontSize="11" TextWrapping="Wrap"/>
 
-    <TextBlock Text="名称 Name" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-    <TextBox x:Name="NameBox" Watermark="例如 linux-x64"
+    <TextBlock Text="{loc:Text M0775}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+    <TextBox x:Name="NameBox" Watermark="{loc:Text M0776}"
              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
              CornerRadius="6" Padding="8,4" FontSize="12"/>
 
-    <TextBlock Text="仓库根目录 Repo root" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-    <TextBox x:Name="RootBox" Watermark="留空 = 从当前目录向上查找"
+    <TextBlock Text="{loc:Text M0777}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+    <TextBox x:Name="RootBox" Watermark="{loc:Text M0778}"
              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
              CornerRadius="6" Padding="8,4" FontSize="12"/>
 
-    <TextBlock Text="平台 RID" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-    <ComboBox x:Name="RidBox" SelectedIndex="0" HorizontalAlignment="Stretch"
+    <TextBlock Text="{loc:Text M0779}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+    <ComboBox Classes="localized" x:Name="RidBox" SelectedIndex="0" HorizontalAlignment="Stretch"
               Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" CornerRadius="6" Padding="8,4">
-      <ComboBoxItem Tag="">跟随系统 host</ComboBoxItem>
+      <ComboBoxItem Tag="" Content="{loc:Text HostLanguage}"/>
       <ComboBoxItem Tag="linux-x64">linux-x64</ComboBoxItem>
       <ComboBoxItem Tag="win-x64">win-x64</ComboBoxItem>
     </ComboBox>
 
-    <TextBlock Text="备注 Note" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-    <TextBox x:Name="NoteBox" Watermark="可选"
+    <TextBlock Text="{loc:Text M0780}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+    <TextBox x:Name="NoteBox" Watermark="{loc:Text M0781}"
              Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
              CornerRadius="6" Padding="8,4" FontSize="12"/>
 
     <TextBlock x:Name="ErrorText" Foreground="{DynamicResource UiBad}" FontSize="11" IsVisible="False"/>
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
-      <Button Content="取消" Click="OnCancelClick" Padding="14,6" CornerRadius="8"/>
-      <Button Content="保存" Click="OnSaveClick" Padding="14,6" CornerRadius="8"
+      <Button Content="{loc:Text M0782}" Click="OnCancelClick" Padding="14,6" CornerRadius="8"/>
+      <Button Content="{loc:Text M0387}" Click="OnSaveClick" Padding="14,6" CornerRadius="8"
               Background="{DynamicResource UiAccent}" Foreground="{DynamicResource UiOnAccent}"/>
     </StackPanel>
   </StackPanel>

@@ -12,9 +12,11 @@ public partial class LiveWorkspace : ViewModelBase
     public List<SessionCardViewModel> Cards { get; } = [];
     public WorkspaceState Layout { get; set; } = new();
     public TerminalSessionModel? SavedActive { get; set; }
+    public PaneNode? SavedTree { get; set; }
     public TerminalSessionModel?[] SavedPanes { get; } = new TerminalSessionModel?[4];
     public bool ShelfAutoHide { get; set; }
     public double ShelfWidth { get; set; }
+    public bool PaneMaximized { get; set; }
     public int Count => Cards.Count;
     public TerminalSessionModel? Active => SavedActive is { } active && Cards.Any(c => c.Model == active)
         ? active : Cards.ElementAtOrDefault(Layout.ActiveIndex)?.Model;

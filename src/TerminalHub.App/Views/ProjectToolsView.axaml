@@ -1,0 +1,177 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:TerminalHub.App.Localization"
+        xmlns:conv="using:Avalonia.Data.Converters" xmlns:views="using:TerminalHub.App.Views"
+        x:Class="TerminalHub.App.Views.ProjectToolsView" x:CompileBindings="False"
+        FontFamily="Segoe UI, Microsoft YaHei UI, sans-serif" FontSize="13"
+        Background="{DynamicResource UiCanvas}" Foreground="{DynamicResource UiInk}">
+  <UserControl.Resources>
+    <StreamGeometry x:Key="RulesIcon">M2,2 H14 V14 H2 Z M4,4 V6 H12 V4 Z M4,8 V9 H12 V8 Z M4,11 V12 H9 V11 Z</StreamGeometry>
+    <StreamGeometry x:Key="BroadcastIcon">M7,6 H9 V10 H7 Z M4,4 L5,5 A4,4 0 0 0 5,11 L4,12 A6,6 0 0 1 4,4 Z M12,4 A6,6 0 0 1 12,12 L11,11 A4,4 0 0 0 11,5 Z M1,1 L2,2 A9,9 0 0 0 2,14 L1,15 A11,11 0 0 1 1,1 Z M15,1 A11,11 0 0 1 15,15 L14,14 A9,9 0 0 0 14,2 Z</StreamGeometry>
+    <StreamGeometry x:Key="TaskIcon">M2,2 H14 V14 H2 Z M4,5 L7,8 L4,11 L5,12 L9,8 L5,4 Z M9,11 H12 V12 H9 Z</StreamGeometry>
+    <StreamGeometry x:Key="FolderIcon">M1,3 H7 L9,5 H15 V14 H1 Z M3,7 V12 H13 V7 Z</StreamGeometry>
+    <StreamGeometry x:Key="RecordIcon">M8,1 A7,7 0 1 0 8,15 A7,7 0 1 0 8,1 M8,3 A5,5 0 1 1 8,13 A5,5 0 1 1 8,3 M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5</StreamGeometry>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="23"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="TextBlock.caption"><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+    <Style Selector="TextBlock.label"><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="Medium"/></Style>
+    <Style Selector="Border.card"><Setter Property="Background" Value="{DynamicResource UiSurface}"/><Setter Property="CornerRadius" Value="12"/></Style>
+    <Style Selector="TextBox, ComboBox"><Setter Property="MinHeight" Value="36"/><Setter Property="FontSize" Value="13"/><Setter Property="CornerRadius" Value="7"/><Setter Property="Padding" Value="10,7"/></Style>
+    <Style Selector="CheckBox"><Setter Property="FontSize" Value="12"/><Setter Property="MinHeight" Value="30"/></Style>
+    <Style Selector="CheckBox /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource UiInk}"/></Style>
+    <Style Selector="CheckBox /template/ Border#NormalRectangle"><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
+    <Style Selector="CheckBox:checked /template/ Border#NormalRectangle, CheckBox:checked:pointerover /template/ Border#NormalRectangle, CheckBox:checked:pressed /template/ Border#NormalRectangle"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/></Style>
+    <Style Selector="CheckBox:checked /template/ Path#CheckGlyph, CheckBox:checked:pointerover /template/ Path#CheckGlyph, CheckBox:checked:pressed /template/ Path#CheckGlyph"><Setter Property="Fill" Value="{DynamicResource UiOnAccent}"/></Style>
+    <Style Selector="Button"><Setter Property="Padding" Value="13,8"/><Setter Property="FontSize" Value="12"/><Setter Property="CornerRadius" Value="7"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="Opacity" Value="0.88"/><Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/></Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccent}"/><Setter Property="Opacity" Value="0.75"/></Style>
+    <Style Selector="Button.quiet"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/></Style>
+    <Style Selector="Button.quiet:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiRaised}"/><Setter Property="Foreground" Value="{DynamicResource UiInk}"/></Style>
+    <Style Selector="ListBox"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="6"/></Style>
+    <Style Selector="ListBoxItem"><Setter Property="Padding" Value="10,10"/><Setter Property="Margin" Value="0,2"/><Setter Property="CornerRadius" Value="7"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
+    <Style Selector="ListBox#ToolNavigation"><Setter Property="Padding" Value="12,0"/></Style>
+    <Style Selector="ListBox#ToolNavigation ListBoxItem">
+      <Setter Property="Padding" Value="14,13"/><Setter Property="Margin" Value="0,3"/><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/>
+      <Setter Property="Template"><ControlTemplate><Border x:Name="NavigationBackground" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Stretch"/></Border></ControlTemplate></Setter>
+    </Style>
+    <Style Selector="ListBox#ToolNavigation ListBoxItem:pointerover /template/ Border#NavigationBackground"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
+    <Style Selector="ListBox#ToolNavigation ListBoxItem:selected"><Setter Property="Foreground" Value="{DynamicResource UiAccent}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="ListBox#ToolNavigation ListBoxItem:selected /template/ Border#NavigationBackground"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
+    <Style Selector="ListBox#ToolNavigation PathIcon"><Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/></Style>
+    <Style Selector="TabControl#ToolsTabs TabItem"><Setter Property="Focusable" Value="False"/></Style>
+    <Style Selector="StackPanel.empty"><Setter Property="Spacing" Value="9"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="MaxWidth" Value="320"/></Style>
+    <Style Selector="StackPanel.empty TextBlock"><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="TextAlignment" Value="Center"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+    <Style Selector="PathIcon.empty-icon"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Foreground" Value="{DynamicResource UiFaint}"/><Setter Property="Margin" Value="0,0,0,7"/></Style>
+  </UserControl.Styles>
+  <Grid x:Name="ToolsLayout" ColumnDefinitions="156,*" RowDefinitions="*,64">
+    <Border Grid.RowSpan="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,0,1,0">
+      <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <StackPanel Spacing="8" Margin="24,28,20,24">
+          <TextBlock Text="TERMINAL HUB" FontSize="10" LetterSpacing="2" Foreground="{DynamicResource UiMuted}"/>
+          <TextBlock Text="{loc:Text M0463}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding ActiveWorkspace.Name}" FontSize="12" Foreground="{DynamicResource UiAccent}" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+        <ListBox x:Name="ToolNavigation" Grid.Row="1" SelectedIndex="{Binding SelectedIndex, ElementName=ToolsTabs, Mode=TwoWay}" AutomationProperties.Name="{loc:Text M0695}">
+          <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource RulesIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0696}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
+          <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource BroadcastIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0697}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
+          <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource TaskIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0698}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
+          <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource FolderIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0699}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
+          <ListBoxItem><Grid ColumnDefinitions="16,*" ColumnSpacing="12"><PathIcon Data="{StaticResource RecordIcon}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{loc:Text M0700}" TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></ListBoxItem>
+        </ListBox>
+        <StackPanel Grid.Row="3" Margin="24,16,20,24" Spacing="5"><TextBlock Text="{loc:Text M0701}" FontSize="11" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="{loc:Text M0702}" TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource UiFaint}"/></StackPanel>
+      </Grid>
+    </Border>
+    <TabControl x:Name="ToolsTabs" Grid.Column="1" Margin="12,16,12,0" SelectedIndex="0">
+      <TabControl.Template>
+        <ControlTemplate><Grid>
+          <!-- 保留容器生成，页面选择由左侧导航控制。隐藏的页签不参与键盘焦点。 -->
+          <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Width="0" Height="0" Opacity="0" IsHitTestVisible="False" ClipToBounds="True"/>
+          <ContentPresenter Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}" ContentTemplate="{TemplateBinding SelectedContentTemplate}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+        </Grid></ControlTemplate>
+      </TabControl.Template>
+      <TabItem Header="{loc:Text M0696}">
+        <Grid RowDefinitions="Auto,*,160" RowSpacing="16">
+          <StackPanel Spacing="6"><TextBlock Classes="title" Text="{loc:Text M0696}"/><TextBlock Classes="caption" Text="{loc:Text M0703}"/></StackPanel>
+          <Grid Grid.Row="1" ColumnDefinitions="184,*" ColumnSpacing="16">
+            <Border Classes="card"><Grid RowDefinitions="Auto,*,Auto">
+              <Grid ColumnDefinitions="*,Auto" Margin="14,10,8,4"><TextBlock Classes="label" Text="{loc:Text M0704}" VerticalAlignment="Center"/><Button Grid.Column="1" Content="＋" Classes="quiet" Padding="8,4" FontSize="18" Command="{Binding NewOutputRuleCommand}" ToolTip.Tip="{loc:Text M0705}" AutomationProperties.Name="{loc:Text M0705}"/></Grid>
+              <Panel Grid.Row="1"><ListBox ItemsSource="{Binding OutputRules}" SelectedItem="{Binding SelectedOutputRule}"><ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="5"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="Medium"/><TextBlock Text="{loc:Translate {Binding MatchCount, StringFormat='命中 {0} 次'}}" FontSize="11" Foreground="{DynamicResource UiMuted}"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+                <TextBlock Text="{loc:Text M0707}" Classes="caption" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding OutputRules.Count, Converter={x:Static views:ProjectToolsView.IsEmpty}}" IsHitTestVisible="False"/>
+              </Panel>
+              <Button Grid.Row="2" Content="{loc:Text M0708}" Classes="quiet" Margin="8,4,8,8" HorizontalAlignment="Stretch" Command="{Binding DeleteOutputRuleCommand}" IsEnabled="{Binding SelectedOutputRule, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
+            </Grid></Border>
+            <Border Grid.Column="1" Classes="card" Padding="20,16">
+              <Panel>
+                <StackPanel x:Name="RuleEmptyState" Classes="empty" IsVisible="{Binding SelectedOutputRule, Converter={x:Static conv:ObjectConverters.IsNull}}">
+                  <PathIcon Classes="empty-icon" Data="{StaticResource RulesIcon}"/><TextBlock Text="{loc:Text M0709}" FontSize="16" FontWeight="SemiBold"/><TextBlock Classes="caption" Text="{loc:Text M0710}"/><Button Content="{loc:Text M0711}" Classes="primary" Command="{Binding NewOutputRuleCommand}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                </StackPanel>
+                <ScrollViewer x:Name="RuleEditor" IsVisible="{Binding SelectedOutputRule, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Classes="label" Text="{loc:Text M0712}"/><TextBox Text="{Binding SelectedOutputRule.Name}" Watermark="{loc:Text M0713}"/>
+                    <TextBlock Classes="label" Text="{loc:Text M0714}" Margin="0,4,0,0"/><TextBox Text="{Binding SelectedOutputRule.Pattern}" Watermark="{loc:Text M0715}"/>
+                    <WrapPanel><CheckBox Content="{loc:Text M0716}" IsChecked="{Binding SelectedOutputRule.Enabled}" Margin="0,0,16,0"/><CheckBox Content="{loc:Text M0717}" IsChecked="{Binding SelectedOutputRule.IsRegex}" Margin="0,0,16,0"/><CheckBox Content="{loc:Text M0718}" IsChecked="{Binding SelectedOutputRule.Notify}"/></WrapPanel>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><TextBlock Classes="label" Text="{loc:Text M0719}" VerticalAlignment="Center"/><TextBox Grid.Column="1" Text="{Binding SelectedOutputRule.Color}" Watermark="#RRGGBB"/></Grid>
+                    <TextBlock Text="{loc:Translate {Binding SelectedOutputRule.Error}}" Foreground="{DynamicResource UiBad}" TextWrapping="Wrap" IsVisible="{Binding SelectedOutputRule.Error, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"/>
+                    <Button Content="{loc:Text M0720}" Classes="primary" Command="{Binding ScanOutputRulesCommand}" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+                  </StackPanel>
+                </ScrollViewer>
+              </Panel>
+            </Border>
+          </Grid>
+          <Border Grid.Row="2" Classes="card"><Grid RowDefinitions="Auto,*">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,12"><TextBlock Classes="label" Text="{loc:Text M0721}"/><TextBlock Grid.Column="1" Classes="caption" Text="{loc:Text M0722}" Margin="14,0,0,0"/><TextBlock Grid.Column="2" Classes="caption" Text="{loc:Translate {Binding OutputRuleResults.Count, StringFormat='{}{0} 条'}}"/></Grid>
+            <Panel Grid.Row="1"><ListBox ItemsSource="{Binding OutputRuleResults}" DoubleTapped="OnRuleLocate"><ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="3"><TextBlock Text="{Binding SessionName}" Foreground="{DynamicResource UiAccent}" FontSize="11"/><TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+              <TextBlock Classes="caption" Text="{loc:Text M0724}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20,0" IsVisible="{Binding OutputRuleResults.Count, Converter={x:Static views:ProjectToolsView.IsEmpty}}" IsHitTestVisible="False"/>
+            </Panel>
+          </Grid></Border>
+        </Grid>
+      </TabItem>
+      <TabItem Header="{loc:Text M0697}">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+          <StackPanel Spacing="6"><TextBlock Classes="title" Text="{loc:Text M0697}"/><TextBlock Classes="caption" Text="{loc:Text M0725}"/></StackPanel>
+          <Border Grid.Row="1" Background="{DynamicResource UiAccentSoft}" CornerRadius="10" Padding="16,12"><Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><PathIcon Data="{StaticResource BroadcastIcon}" Width="18" Height="18" Foreground="{DynamicResource UiAccent}"/><TextBlock Grid.Column="1" Text="{loc:Text M0726}" Foreground="{DynamicResource UiAccent}" FontSize="12" TextWrapping="Wrap"/></Grid></Border>
+          <Border Grid.Row="2" Classes="card"><Grid RowDefinitions="Auto,*">
+            <TextBlock Classes="label" Text="{loc:Text M0727}" Margin="18,16,18,8"/>
+            <ListBox Grid.Row="1" ItemsSource="{Binding BroadcastTargets}"><ListBox.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding Selected}" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"><StackPanel Spacing="4" Margin="6,0"><TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Medium"/><TextBlock Text="{Binding Card.WorkingDirectory}" FontSize="11" Foreground="{DynamicResource UiMuted}" TextTrimming="CharacterEllipsis"/></StackPanel></CheckBox></DataTemplate></ListBox.ItemTemplate></ListBox>
+          </Grid></Border>
+          <Border Grid.Row="3" Classes="card" Padding="16"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="5" VerticalAlignment="Center"><TextBlock Text="{loc:Translate {Binding BroadcastStatus}}" Foreground="{DynamicResource UiAccent}" TextWrapping="Wrap"/><TextBlock Classes="caption" Text="{loc:Text M0728}"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><Button Content="{loc:Text M0729}" Classes="quiet" Command="{Binding StopBroadcastCommand}" IsVisible="{Binding BroadcastEnabled}"/><Button Content="{loc:Text M0730}" Classes="primary" Command="{Binding StartBroadcastCommand}" IsVisible="{Binding !BroadcastEnabled}"/></StackPanel></Grid></Border>
+        </Grid>
+      </TabItem>
+      <TabItem Header="{loc:Text M0698}">
+        <Grid RowDefinitions="Auto,*" RowSpacing="16">
+          <StackPanel Spacing="6"><TextBlock Classes="title" Text="{loc:Text M0698}"/><TextBlock Classes="caption" Text="{loc:Text M0731}"/></StackPanel>
+          <Grid Grid.Row="1" ColumnDefinitions="184,*" ColumnSpacing="16">
+            <Border Classes="card"><Grid RowDefinitions="Auto,*,Auto">
+              <Grid ColumnDefinitions="*,Auto" Margin="14,10,8,4"><TextBlock Classes="label" Text="{loc:Text M0732}" VerticalAlignment="Center"/><Button Grid.Column="1" Content="＋" Classes="quiet" Padding="8,4" FontSize="18" Command="{Binding NewProjectTaskCommand}" ToolTip.Tip="{loc:Text M0733}" AutomationProperties.Name="{loc:Text M0733}"/></Grid>
+              <Panel Grid.Row="1"><ListBox ItemsSource="{Binding ProjectTasks}" SelectedItem="{Binding SelectedProjectTask}"><ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="5"><TextBlock Text="{Binding Name}" FontWeight="Medium" TextTrimming="CharacterEllipsis"/><TextBlock Text="{loc:Translate {Binding Status}}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource UiMuted}"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox><TextBlock Text="{loc:Text M0734}" Classes="caption" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ProjectTasks.Count, Converter={x:Static views:ProjectToolsView.IsEmpty}}" IsHitTestVisible="False"/></Panel>
+              <Button Grid.Row="2" Content="{loc:Text M0735}" Classes="quiet" Margin="8,4,8,8" HorizontalAlignment="Stretch" Command="{Binding DeleteProjectTaskCommand}" IsEnabled="{Binding SelectedProjectTask, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
+            </Grid></Border>
+            <Border Grid.Column="1" Classes="card" Padding="20"><Panel>
+              <StackPanel Classes="empty" IsVisible="{Binding SelectedProjectTask, Converter={x:Static conv:ObjectConverters.IsNull}}"><PathIcon Classes="empty-icon" Data="{StaticResource TaskIcon}"/><TextBlock Text="{loc:Text M0736}" FontSize="16" FontWeight="SemiBold"/><TextBlock Classes="caption" Text="{loc:Text M0737}"/><Button Content="{loc:Text M0738}" Classes="primary" Command="{Binding NewProjectTaskCommand}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+              <ScrollViewer IsVisible="{Binding SelectedProjectTask, Converter={x:Static conv:ObjectConverters.IsNotNull}}"><StackPanel Spacing="8">
+                <TextBlock Classes="label" Text="{loc:Text M0739}"/><TextBox Text="{Binding SelectedProjectTask.Name}" Watermark="{loc:Text M0740}"/>
+                <TextBlock Classes="label" Text="{loc:Text M0741}" Margin="0,6,0,0"/><ComboBox ItemsSource="{Binding ProjectTerminalNames}" SelectedItem="{Binding SelectedProjectTask.SessionName}" HorizontalAlignment="Stretch" PlaceholderText="{loc:Text M0742}"/>
+                <TextBlock Classes="label" Text="{loc:Text M0743}" Margin="0,6,0,0"/><TextBox Text="{Binding SelectedProjectTask.Command}" Watermark="dotnet build" AcceptsReturn="True" Height="128" FontFamily="Cascadia Mono, Consolas, monospace"/>
+                <WrapPanel Margin="0,8,0,0"><Button Content="{loc:Text M0744}" Classes="primary" Command="{Binding RunProjectTaskCommand}" Margin="0,0,8,8"/><Button Content="{loc:Text M0745}" Command="{Binding StopProjectTaskCommand}" Margin="0,0,8,8"/><Button Content="{loc:Text M0674}" Classes="quiet" Command="{Binding ShowProjectTaskTerminalCommand}" Margin="0,0,0,8"/></WrapPanel>
+                <TextBlock Text="{loc:Translate {Binding SelectedProjectTask.Status}}" Foreground="{DynamicResource UiAccent}" TextWrapping="Wrap"/><TextBlock Classes="caption" Text="{loc:Text M0746}"/>
+              </StackPanel></ScrollViewer>
+            </Panel></Border>
+          </Grid>
+        </Grid>
+      </TabItem>
+      <TabItem Header="{loc:Text M0699}">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+          <StackPanel Spacing="6"><TextBlock Classes="title" Text="{loc:Text M0699}"/><TextBlock Classes="caption" Text="{loc:Text M0747}"/></StackPanel>
+          <Border Grid.Row="1" Classes="card" Padding="16"><Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Classes="label" Text="{loc:Text M0748}" VerticalAlignment="Center"/><ComboBox Grid.Column="1" ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding RemoteFiles.Host}" HorizontalAlignment="Stretch" PlaceholderText="{loc:Text M0749}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayName}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox></Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Text="{Binding RemoteFiles.Path}" Watermark="{loc:Text M0750}" FontFamily="Cascadia Mono, Consolas, monospace"/><Button Grid.Column="1" Content="{loc:Text M0751}" Command="{Binding RemoteFiles.RefreshCommand}"/><Button Grid.Column="2" Content="{loc:Text M0752}" Classes="quiet" Command="{Binding RemoteFiles.UpCommand}"/></Grid>
+          </Grid></Border>
+          <Border Grid.Row="2" Classes="card"><Grid RowDefinitions="Auto,*,Auto">
+            <Grid ColumnDefinitions="*,Auto" Margin="18,14"><TextBlock Classes="label" Text="{loc:Text M0753}"/><TextBlock Grid.Column="1" Classes="caption" Text="{loc:Text M0754}"/></Grid>
+            <Panel Grid.Row="1"><ListBox ItemsSource="{Binding RemoteFiles.Entries}" SelectedItem="{Binding RemoteFiles.Selected}" DoubleTapped="OnRemoteDirectory"><ListBox.ItemTemplate><DataTemplate><Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10"><PathIcon Data="{StaticResource FolderIcon}" Width="16" Height="16" IsVisible="{Binding IsDirectory}" Foreground="{DynamicResource UiAccent}"/><TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="2" Text="{Binding Size, StringFormat='{}{0:N0} B'}" Foreground="{DynamicResource UiMuted}" FontSize="12"/></Grid></DataTemplate></ListBox.ItemTemplate></ListBox>
+              <StackPanel Classes="empty" IsVisible="{Binding RemoteFiles.Entries.Count, Converter={x:Static views:ProjectToolsView.IsEmpty}}" IsHitTestVisible="False"><PathIcon Classes="empty-icon" Data="{StaticResource FolderIcon}"/><TextBlock Text="{loc:Text M0755}" FontSize="16" FontWeight="SemiBold"/><TextBlock Classes="caption" Text="{loc:Text M0756}"/></StackPanel>
+            </Panel>
+            <WrapPanel Grid.Row="2" Margin="12,8,12,12"><Button Content="{loc:Text M0757}" Classes="primary" Click="OnUpload" Margin="0,0,8,4"/><Button Content="{loc:Text M0758}" Click="OnDownload" Margin="0,0,8,4"/><Button Content="{loc:Text M0523}" Classes="quiet" Command="{Binding RemoteFiles.OpenTerminalCommand}" Margin="0,0,8,4"/><Button Content="{loc:Text M0759}" Classes="quiet" Command="{Binding RemoteFiles.CancelCommand}" IsVisible="{Binding RemoteFiles.Busy}" Margin="0,0,0,4"/></WrapPanel>
+          </Grid></Border>
+          <StackPanel Grid.Row="3" Spacing="8"><ProgressBar Value="{Binding RemoteFiles.Progress}" Minimum="0" Maximum="100" Height="4" IsVisible="{Binding RemoteFiles.Busy}"/><TextBlock Classes="caption" Text="{loc:Translate {Binding RemoteFiles.Status}}"/></StackPanel>
+        </Grid>
+      </TabItem>
+      <TabItem Header="{loc:Text M0700}">
+        <ScrollViewer><StackPanel Spacing="16">
+          <StackPanel Spacing="6" Margin="0,0,0,6"><TextBlock Classes="title" Text="{loc:Text M0700}"/><TextBlock Classes="caption" Text="{loc:Text M0760}"/></StackPanel>
+          <Border Classes="card" Padding="24"><StackPanel Spacing="16">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14"><Border Background="{DynamicResource UiAccentSoft}" CornerRadius="10" Padding="12"><PathIcon Data="{StaticResource RecordIcon}" Foreground="{DynamicResource UiAccent}" Width="22" Height="22"/></Border><StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center"><TextBlock Text="{loc:Text M0761}" FontSize="16" FontWeight="SemiBold"/><TextBlock Classes="caption" Text="{loc:Translate {Binding ActiveSession.Name, StringFormat='当前会话 · {0}'}}"/></StackPanel></Grid>
+            <TextBlock Classes="caption" Text="{loc:Text M0763}"/>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="{loc:Text M0764}" Classes="primary" Click="OnRecord" IsVisible="{Binding !IsRecordingCurrent}"/><Button Content="{loc:Text M0765}" Classes="primary" Click="OnStopRecord" IsVisible="{Binding IsRecordingCurrent}"/></StackPanel>
+            <Border Background="{DynamicResource UiInset}" CornerRadius="8" Padding="12"><TextBlock Text="{loc:Translate {Binding RecordingStatus}}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}" FontSize="12"/></Border>
+          </StackPanel></Border>
+          <Border Classes="card" Padding="24"><StackPanel Spacing="12"><TextBlock Text="{loc:Text M0766}" FontSize="16" FontWeight="SemiBold"/><TextBlock Classes="caption" Text="{loc:Text M0767}"/><Button Content="{loc:Text M0768}" Click="OnPlayback" HorizontalAlignment="Left"/><TextBlock Classes="caption" Text="{loc:Text M0769}"/></StackPanel></Border>
+        </StackPanel></ScrollViewer>
+      </TabItem>
+    </TabControl>
+    <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,Auto" Margin="12,8,12,8"><TextBlock Text="{loc:Text M0770}" Classes="caption" VerticalAlignment="Center"/><Button Grid.Column="1" Content="{loc:Text M0771}" Classes="primary" Command="{Binding SaveProjectToolsCommand}" VerticalAlignment="Center"/></Grid>
+  </Grid>
+</UserControl>

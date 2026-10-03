@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:TerminalHub.App.Localization"
         xmlns:vm="using:TerminalHub.App.ViewModels"
         xmlns:ctl="using:TerminalHub.App.Controls"
         xmlns:mon="using:TerminalHub.Core.Monitoring"
@@ -11,7 +12,7 @@
         x:Class="TerminalHub.App.Views.MainWindow"
         x:Name="Root"
         x:DataType="vm:MainWindowViewModel"
-        Title="{Binding WindowTitle}"
+        Title="{loc:Translate {Binding WindowTitle}}"
         Icon="avares://TerminalHub/Assets/terminal-hub-icon.ico"
         Width="1440" Height="900" MinWidth="1100" MinHeight="680"
         Background="{DynamicResource UiCanvas}" FontFamily="Segoe UI, Microsoft YaHei UI, sans-serif"
@@ -41,6 +42,13 @@
   </Window.Resources>
 
   <Window.Styles>
+    <Style Selector="Border.workspace-tab.session-drop">
+      <Setter Property="BorderBrush" Value="{DynamicResource UiAccent}"/>
+      <Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/>
+    </Style>
+    <Style Selector="ctl|StageCard.session-drop">
+      <Setter Property="Opacity" Value="0.65"/>
+    </Style>
     <Style Selector="Border.workspace-tab">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="CornerRadius" Value="8"/>
@@ -152,7 +160,7 @@
 
   <Panel>
     <ctl:WorkspaceBackdrop/>
-    <Grid RowDefinitions="64,42,*,Auto,32">
+    <Grid RowDefinitions="64,42,*,Auto,Auto,Auto,32">
 
       <!-- ============ Title bar ============ -->
       <Border Grid.Row="0" Background="Transparent" Padding="26,0" PointerPressed="OnTitleBarPointerPressed">
@@ -161,30 +169,31 @@
             <Image Source="avares://TerminalHub/Assets/terminal-hub-icon.png" Width="32" Height="32"/>
             <TextBlock Text="Terminal Hub" FontFamily="{DynamicResource HeadingFont}" Foreground="{DynamicResource UiInk}" FontSize="17"
                        FontWeight="SemiBold" VerticalAlignment="Center"/>
-            <TextBlock Text="/   前台调度" Foreground="{DynamicResource UiMuted}" FontSize="12" Margin="14,0,0,0" VerticalAlignment="Center"/>
+            <TextBlock Text="{loc:Text M0447}" Foreground="{DynamicResource UiMuted}" FontSize="12" Margin="14,0,0,0" VerticalAlignment="Center"/>
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
                       Spacing="10" VerticalAlignment="Center">
             <TextBlock Text="{Binding OsLabel}" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center"/>
             <Button x:Name="ShelfToggleButton" Classes="terminal-tool" Classes.selected="{Binding !ShelfAutoHide}"
-                    Command="{Binding ToggleShelfCommand}" ToolTip.Tip="收起 / 固定左侧会话栏" AutomationProperties.Name="收起 / 固定左侧会话栏">
-              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSplit}"/><TextBlock Text="会话" VerticalAlignment="Center"/></StackPanel>
+                    Command="{Binding ToggleShelfCommand}" ToolTip.Tip="{loc:Text M0448}" AutomationProperties.Name="{loc:Text M0448}">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSplit}"/><TextBlock Text="{loc:Text M0449}" VerticalAlignment="Center"/></StackPanel>
             </Button>
-            <Button x:Name="PaletteButton" Classes="terminal-tool" Click="OnOpenPalette" ToolTip.Tip="命令面板 · 在快捷键设置中修改按键">
-              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSearch}"/><TextBlock Text="查找" VerticalAlignment="Center"/></StackPanel>
+            <Button Classes="terminal-tool" Content="{loc:Text Workbench0}" Click="OnManagePlugins"/>
+            <Button x:Name="PaletteButton" Classes="terminal-tool" Click="OnOpenPalette" ToolTip.Tip="{loc:Text M0450}">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolSearch}"/><TextBlock Text="{loc:Text M0451}" VerticalAlignment="Center"/></StackPanel>
             </Button>
-            <Button Classes="terminal-tool" Classes.selected="{Binding OutputVisible}" Command="{Binding ToggleOutputCommand}" ToolTip.Tip="显示 / 隐藏输出 · Ctrl+Shift+J">
-              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolOutput}"/><TextBlock Text="输出" VerticalAlignment="Center"/></StackPanel>
+            <Button Classes="terminal-tool" Classes.selected="{Binding OutputVisible}" Command="{Binding ToggleOutputCommand}" ToolTip.Tip="{loc:Text M0452}">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolOutput}"/><TextBlock Text="{loc:Text M0336}" VerticalAlignment="Center"/></StackPanel>
             </Button>
-            <Button Classes="terminal-tool" Classes.selected="{Binding InspectorVisible}" Command="{Binding ToggleInspectorCommand}" ToolTip.Tip="显示 / 隐藏右栏 · Ctrl+Shift+B">
-              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}"/><TextBlock Text="工具" VerticalAlignment="Center"/></StackPanel>
+            <Button Classes="terminal-tool" Classes.selected="{Binding InspectorVisible}" Command="{Binding ToggleInspectorCommand}" ToolTip.Tip="{loc:Text M0453}">
+              <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}"/><TextBlock Text="{loc:Text M0454}" VerticalAlignment="Center"/></StackPanel>
             </Button>
-            <Button Classes="terminal-tool" Classes.selected="{Binding SettingsOpen}" Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="设置" AutomationProperties.Name="设置">
+            <Button Classes="terminal-tool" Classes.selected="{Binding SettingsOpen}" Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="{loc:Text M0455}" AutomationProperties.Name="{loc:Text M0455}">
               <PathIcon Data="{StaticResource ToolSettings}"/>
             </Button>
-            <Button Classes="terminal-tool" Click="OnMinimizeClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化"><PathIcon Data="{StaticResource ToolMinimize}"/></Button>
-            <Button Classes="terminal-tool" Click="OnMaximizeClick" ToolTip.Tip="最大化 / 还原" AutomationProperties.Name="最大化 / 还原"><PathIcon Data="{StaticResource ToolWindow}"/></Button>
-            <Button Classes="terminal-tool" Click="OnCloseClick" ToolTip.Tip="关闭应用" AutomationProperties.Name="关闭应用"><PathIcon Data="{StaticResource ToolClose}"/></Button>
+            <Button Classes="terminal-tool" Click="OnMinimizeClick" ToolTip.Tip="{loc:Text M0456}" AutomationProperties.Name="{loc:Text M0456}"><PathIcon Data="{StaticResource ToolMinimize}"/></Button>
+            <Button Classes="terminal-tool" Click="OnMaximizeClick" ToolTip.Tip="{loc:Text M0457}" AutomationProperties.Name="{loc:Text M0457}"><PathIcon Data="{StaticResource ToolWindow}"/></Button>
+            <Button Classes="terminal-tool" Click="OnCloseClick" ToolTip.Tip="{loc:Text M0458}" AutomationProperties.Name="{loc:Text M0458}"><PathIcon Data="{StaticResource ToolClose}"/></Button>
           </StackPanel>
         </Grid>
       </Border>
@@ -196,29 +205,29 @@
             <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:LiveWorkspace">
               <Border Classes="workspace-tab" Classes.active="{Binding IsActive}">
                 <StackPanel Orientation="Horizontal">
-                  <Button Classes="workspace-name" Tag="{Binding}" Click="OnSwitchWorkspace" ToolTip.Tip="点击切换 · 拖动排序 · 右键重命名" AutomationProperties.Name="{Binding Name}">
-                    <Button.ContextMenu><ContextMenu><MenuItem Header="重命名工作区" Tag="{Binding}" Click="OnRenameWorkspace"/></ContextMenu></Button.ContextMenu>
+                  <Button Classes="workspace-name" Tag="{Binding}" Click="OnSwitchWorkspace" ToolTip.Tip="{loc:Text M0459}" AutomationProperties.Name="{Binding Name}">
+                    <Button.ContextMenu><ContextMenu><MenuItem Header="{loc:Text M0388}" Tag="{Binding}" Click="OnRenameWorkspace"/></ContextMenu></Button.ContextMenu>
                     <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Name}" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                       <Border Classes="workspace-count"><TextBlock Text="{Binding Count}" FontSize="10" Foreground="{DynamicResource UiMuted}" HorizontalAlignment="Center"/></Border>
                     </StackPanel>
                   </Button>
-                  <Button Classes="terminal-tool workspace-close" Tag="{Binding}" Click="OnCloseWorkspace" ToolTip.Tip="关闭工作区及其中的终端" AutomationProperties.Name="关闭工作区"><PathIcon Data="{StaticResource ToolClose}" Width="10" Height="10"/></Button>
+                  <Button Classes="terminal-tool workspace-close" Tag="{Binding}" Click="OnCloseWorkspace" ToolTip.Tip="{loc:Text M0460}" AutomationProperties.Name="{loc:Text M0461}"><PathIcon Data="{StaticResource ToolClose}" Width="10" Height="10"/></Button>
                 </StackPanel>
               </Border>
             </DataTemplate></ItemsControl.ItemTemplate>
           </ItemsControl>
         </ScrollViewer>
-        <Button Grid.Column="1" Classes="terminal-tool" Command="{Binding NewProjectWorkspaceCommand}" Margin="10,0"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolAdd}"/><TextBlock Text="新建工作区" VerticalAlignment="Center"/></StackPanel></Button>
-        <Button Grid.Column="2" Classes="terminal-tool" Click="OnProjectTools"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}"/><TextBlock Text="工作区工具" VerticalAlignment="Center"/></StackPanel></Button>
+        <Button Grid.Column="1" Classes="terminal-tool" Command="{Binding NewProjectWorkspaceCommand}" Margin="10,0"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolAdd}"/><TextBlock Text="{loc:Text M0462}" VerticalAlignment="Center"/></StackPanel></Button>
+        <Button Grid.Column="2" Classes="terminal-tool" Click="OnProjectTools"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource ToolTools}"/><TextBlock Text="{loc:Text M0463}" VerticalAlignment="Center"/></StackPanel></Button>
       </Grid>
       <Border x:Name="ShelfEdgeHint" Grid.Row="2" Width="16" HorizontalAlignment="Left" ZIndex="60"
-              IsVisible="{Binding ShelfAutoHide}" Background="Transparent" AutomationProperties.Name="左侧会话栏呼出区域">
+              IsVisible="{Binding ShelfAutoHide}" Background="Transparent" AutomationProperties.Name="{loc:Text M0464}">
         <Border Width="3" Height="52" CornerRadius="2" Background="{DynamicResource UiAccent}" Opacity="0.55"
                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"/>
       </Border>
       <Border Grid.Row="2" ZIndex="80" IsVisible="{Binding BroadcastEnabled}" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,4,0,0" Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1" CornerRadius="10" Padding="16,6">
-        <StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="{Binding BroadcastStatus}" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center" MaxWidth="650" TextTrimming="CharacterEllipsis"/><Button Content="停止 · Esc" Command="{Binding StopBroadcastCommand}" Classes="terminal-tool"/></StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="{loc:Translate {Binding BroadcastStatus}}" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center" MaxWidth="650" TextTrimming="CharacterEllipsis"/><Button Content="{loc:Text M0465}" Command="{Binding StopBroadcastCommand}" Classes="terminal-tool"/></StackPanel>
       </Border>
       <Grid Grid.Row="2" x:Name="StageLayout" ColumnDefinitions="280,18,*,0,0" Margin="18,10,24,14">
 
@@ -227,13 +236,13 @@
                          Classes.floating="{Binding ShelfAutoHide}" ZIndex="50">
         <Grid x:Name="ShelfContent" RowDefinitions="30,*,52">
           <Grid ColumnDefinitions="*,Auto,Auto" Margin="20,0,10,0">
-            <TextBlock Text="会话空间" Foreground="{DynamicResource UiMuted}" FontSize="11" LetterSpacing="2" VerticalAlignment="Center"/>
+            <TextBlock Text="{loc:Text M0466}" Foreground="{DynamicResource UiMuted}" FontSize="11" LetterSpacing="2" VerticalAlignment="Center"/>
             <TextBlock Grid.Column="1" Text="{Binding TerminalCount, StringFormat='{}{0:00}'}" Margin="0,0,8,0"
                        Foreground="{DynamicResource UiMuted}" FontSize="11" VerticalAlignment="Center"/>
             <Button x:Name="ShelfPinButton" Grid.Column="2" Classes="terminal-tool" Command="{Binding ToggleShelfCommand}"
-                    ToolTip.Tip="收起 / 固定会话栏" AutomationProperties.Name="收起 / 固定会话栏">
+                    ToolTip.Tip="{loc:Text M0367}" AutomationProperties.Name="{loc:Text M0367}">
               <Panel><TextBlock Text="‹" IsVisible="{Binding !ShelfAutoHide}" FontSize="20"/>
-                <TextBlock Text="固定" IsVisible="{Binding ShelfAutoHide}" FontSize="10"/></Panel>
+                <TextBlock Text="{loc:Text M0467}" IsVisible="{Binding ShelfAutoHide}" FontSize="10"/></Panel>
             </Button>
           </Grid>
           <ListBox x:Name="SessionShelf" Grid.Row="1" ItemsSource="{Binding ShelfItems}"
@@ -304,13 +313,13 @@
                       </Grid>
                       <Border Grid.Column="1" IsVisible="{Binding ShowTagPill}" Background="{Binding TagPillBrush}"
                               CornerRadius="5" Padding="6,1" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding TagText}" FontSize="9" Foreground="{Binding TagBrush}"/>
+                        <TextBlock Text="{loc:Translate {Binding TagText}}" FontSize="9" Foreground="{Binding TagBrush}"/>
                       </Border>
-                      <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
+                      <TextBlock Grid.Column="1" Text="{loc:Translate {Binding StatusText}}" Foreground="{Binding StatusBrush}"
                                  IsVisible="{Binding !ShowTagPill}" FontSize="9" VerticalAlignment="Center"/>
                       <Button Grid.Column="2" VerticalAlignment="Center" Padding="5,0" Margin="2,0,0,0"
                               Background="Transparent" BorderThickness="0" Cursor="Hand"
-                              ToolTip.Tip="会话操作" AutomationProperties.Name="会话卡操作">
+                              ToolTip.Tip="{loc:Text M0468}" AutomationProperties.Name="{loc:Text M0469}">
                         <Button.Flyout>
                           <MenuFlyout Opening="OnCardMenuOpening"/>
                         </Button.Flyout>
@@ -323,7 +332,7 @@
                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="3,6,3,0">
                       <TextBlock Text="{Binding ShelfCaption}" FontSize="9" Foreground="{DynamicResource UiMuted}"
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding WorkingDirectory}"/>
-                      <TextBlock Grid.Column="1" Text="当前终端" IsVisible="{Binding IsActive}" FontSize="9" Foreground="{DynamicResource UiAccent}"/>
+                      <TextBlock Grid.Column="1" Text="{loc:Text M0470}" IsVisible="{Binding IsActive}" FontSize="9" Foreground="{DynamicResource UiAccent}"/>
                     </Grid>
                     <ctl:StageCardFinish Grid.RowSpan="3" Margin="-9" IsVisible="{Binding !IsActive}" IsHitTestVisible="False"/>
                   </Grid>
@@ -337,7 +346,7 @@
                         CornerRadius="8" Padding="10,6" Margin="6,0" Cursor="Hand">
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Text="{Binding Title}" FontSize="11" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Activity}" FontSize="10" Foreground="{DynamicResource UiAccent}"
+                    <TextBlock Grid.Column="1" Text="{loc:Translate {Binding Activity}}" FontSize="10" Foreground="{DynamicResource UiAccent}"
                                Margin="8,0,0,0" VerticalAlignment="Center"/>
                   </Grid>
                 </Border>
@@ -350,7 +359,7 @@
                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding NewSessionCommand}">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <TextBlock Text="＋" Foreground="{DynamicResource UiAccent}" FontSize="17"/>
-              <TextBlock Grid.Column="1" Text="新建会话" Foreground="{DynamicResource UiInk}" Margin="8,2,0,0" FontSize="12"/>
+              <TextBlock Grid.Column="1" Text="{loc:Text M0471}" Foreground="{DynamicResource UiInk}" Margin="8,2,0,0" FontSize="12"/>
               <TextBlock Grid.Column="2" Text="Ctrl ⇧ N" Foreground="{DynamicResource UiMuted}" FontSize="10" VerticalAlignment="Center"/>
             </Grid>
           </Button>
@@ -359,7 +368,7 @@
 
         <!-- right-edge drag handle for the session shelf (18px gutter column) -->
         <Border x:Name="ShelfResizeHandle" Grid.Column="1" Background="Transparent"
-                Cursor="SizeWestEast" ToolTip.Tip="拖拽调整会话架宽度"/>
+                Cursor="SizeWestEast" ToolTip.Tip="{loc:Text M0472}"/>
 
         <!-- ===== CENTER ===== -->
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"
@@ -379,10 +388,10 @@
                 </Border>
               </StackPanel>
               <Grid x:Name="TerminalChromeTitle" Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,0,4,0" MaxWidth="360">
-                <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="双击重命名 · 会话列表聚焦时按 F2" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                <TextBlock Text="{Binding ActiveCard.Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontFamily="{DynamicResource HeadingFont}" DoubleTapped="OnRenameActive" ToolTip.Tip="{loc:Text M0473}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                 <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="6" Padding="8,4" Margin="12,0,0,0"
                         IsVisible="{Binding ActiveCard, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
-                  <StackPanel Spacing="2"><TextBlock Text="{Binding ActiveCard.StatusText}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/><TextBlock Text="{Binding ActiveCard.CommandStatusText}" FontSize="9" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding ActiveCard.CommandStatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/></StackPanel>
+                  <StackPanel Spacing="2"><TextBlock Text="{loc:Translate {Binding ActiveCard.StatusText}}" FontSize="10" Foreground="{Binding ActiveCard.StatusBrush}"/><TextBlock Text="{loc:Translate {Binding ActiveCard.CommandStatusText}}" FontSize="9" Foreground="{DynamicResource UiMuted}" IsVisible="{Binding ActiveCard.CommandStatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/></StackPanel>
                 </Border>
               </Grid>
               <Button x:Name="ChromeDirectory" Grid.Column="2" Classes="terminal-tool" Command="{Binding ShowWorkspaceCommand}"
@@ -391,77 +400,79 @@
               </Button>
               <Button x:Name="ChromeBack" Grid.Column="3" Classes="terminal-tool"
                       Command="{Binding CwdBackCommand}" IsEnabled="{Binding CanCwdBack}"
-                      ToolTip.Tip="后退目录历史" AutomationProperties.Name="后退目录历史">
+                      ToolTip.Tip="{loc:Text M0474}" AutomationProperties.Name="{loc:Text M0474}">
                 <PathIcon Data="{StaticResource ToolBack}"/>
               </Button>
               <Button x:Name="ChromeRefresh" Grid.Column="4" Classes="terminal-tool"
-                      Command="{Binding RefreshCwdCommand}" ToolTip.Tip="刷新当前目录" AutomationProperties.Name="刷新当前目录">
+                      Command="{Binding RefreshCwdCommand}" ToolTip.Tip="{loc:Text M0475}" AutomationProperties.Name="{loc:Text M0475}">
                 <PathIcon Data="{StaticResource ToolRefresh}"/>
               </Button>
               <Button x:Name="ChromeForward" Grid.Column="5" Classes="terminal-tool"
                       Command="{Binding CwdForwardCommand}" IsEnabled="{Binding CanCwdForward}"
-                      ToolTip.Tip="前进目录历史" AutomationProperties.Name="前进目录历史">
+                      ToolTip.Tip="{loc:Text M0476}" AutomationProperties.Name="{loc:Text M0476}">
                 <PathIcon Data="{StaticResource ToolForward}"/>
               </Button>
               <Button x:Name="ChromeSplit" Grid.Column="6" Classes="terminal-tool" Classes.selected="{Binding IsSplit}"
                       Command="{Binding ToggleSplitCommand}"
-                      ToolTip.Tip="点击切换左右分屏；右键选择上下、四窗格及最大化。点击窗格聚焦，点击会话卡分配。" AutomationProperties.Name="分屏">
+                      ToolTip.Tip="{loc:Text M0477}" AutomationProperties.Name="{loc:Text M0270}">
                 <PathIcon Data="{StaticResource ToolSplit}"/>
                 <Button.ContextFlyout>
                   <MenuFlyout>
-                    <MenuItem Header="左右分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Horizontal"/>
-                    <MenuItem Header="上下分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Vertical"/>
-                    <MenuItem Header="四窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Quad"/>
-                    <MenuItem Header="最大化 / 恢复当前窗格" Command="{Binding TogglePaneMaximizedCommand}" IsEnabled="{Binding IsSplit}"/>
-                    <MenuItem Header="回到单窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Single"/>
+                    <MenuItem Header="{loc:Text M0478}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Horizontal"/>
+                    <MenuItem Header="{loc:Text M0371}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Vertical"/>
+                    <MenuItem Header="{loc:Text M0373}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Quad"/>
+                    <MenuItem Header="{loc:Text M0375}" Command="{Binding TogglePaneMaximizedCommand}" IsEnabled="{Binding IsSplit}"/>
+                    <MenuItem Header="{loc:Text M0479}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Single"/>
                   </MenuFlyout>
                 </Button.ContextFlyout>
               </Button>
               <Button x:Name="ChromePopout" Grid.Column="7" Classes="terminal-tool"
                       Command="{Binding OpenInNewWindowCommand}"
-                      ToolTip.Tip="把当前会话弹出为独立窗口（关闭子窗即收回）" AutomationProperties.Name="弹出">
+                      ToolTip.Tip="{loc:Text M0480}" AutomationProperties.Name="{loc:Text M0271}">
                 <PathIcon Data="{StaticResource ToolPopout}"/>
               </Button>
-              <Button x:Name="ChromeNew" Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="新建会话 · Ctrl+Shift+N" AutomationProperties.Name="新建会话">
+              <Button x:Name="ChromeNew" Grid.Column="8" Classes="terminal-tool" Command="{Binding NewSessionCommand}" ToolTip.Tip="{loc:Text M0481}" AutomationProperties.Name="{loc:Text M0471}">
                 <PathIcon Data="{StaticResource ToolAdd}"/>
               </Button>
-              <Button x:Name="SessionMenuButton" Grid.Column="9" Classes="terminal-tool" ToolTip.Tip="会话操作" AutomationProperties.Name="会话操作">
+              <Button x:Name="SessionMenuButton" Grid.Column="9" Classes="terminal-tool" ToolTip.Tip="{loc:Text M0468}" AutomationProperties.Name="{loc:Text M0468}">
                 <PathIcon Data="{StaticResource ToolMore}"/>
                 <Button.Flyout>
                   <MenuFlyout Opening="OnSessionMenuOpening">
-                  <MenuItem Header="左右分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Horizontal"/>
-                  <MenuItem Header="上下分屏" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Vertical"/>
-                  <MenuItem Header="四窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Quad"/>
-                  <MenuItem Header="最大化 / 恢复当前窗格" Command="{Binding TogglePaneMaximizedCommand}" IsEnabled="{Binding IsSplit}"/>
-                  <MenuItem Header="回到单窗格" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Single"/>
+                  <MenuItem Header="{loc:Text M0478}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Horizontal"/>
+                  <MenuItem Header="{loc:Text M0371}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Vertical"/>
+                  <MenuItem Header="{loc:Text M0373}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Quad"/>
+                  <MenuItem Header="{loc:Text M0375}" Command="{Binding TogglePaneMaximizedCommand}" IsEnabled="{Binding IsSplit}"/>
+                  <MenuItem Header="{loc:Text M0479}" Command="{Binding SetSplitLayoutCommand}" CommandParameter="Single"/>
+                  <MenuItem Header="{loc:Translate {Binding UndoLayoutText}}" Command="{Binding UndoLayoutCommand}"/>
+                  <MenuItem Header="{loc:Translate {Binding RedoLayoutText}}" Command="{Binding RedoLayoutCommand}"/>
                     <Separator/>
-                    <MenuItem Header="重命名会话       F2" Click="OnRenameActive"/>
-                    <MenuItem x:Name="PinSessionItem" Header="置顶" Command="{Binding TogglePinActiveCommand}"/>
-                    <MenuItem Header="移出分组" Command="{Binding RemoveActiveFromGroupCommand}"/>
-                    <MenuItem x:Name="MoveToGroupMenu" Header="移入分组"/>
-                    <MenuItem Header="新建分组" Click="OnCreateGroupForActive"/>
-                    <MenuItem Header="重命名当前分组" Click="OnRenameActiveGroup"/>
-                    <MenuItem x:Name="ToggleGroupItem" Header="折叠当前分组" Command="{Binding ToggleActiveGroupCommand}"/>
-                    <MenuItem Header="查看当前工作区" Command="{Binding ShowWorkspaceCommand}"/>
-                    <MenuItem x:Name="TerminalColorsMenu" Header="终端配色"/>
-                    <MenuItem Header="关闭会话        Ctrl+Shift+W" Command="{Binding CloseActiveSessionCommand}"/>
-                    <MenuItem Header="{Binding NextSessionMenuText}" Command="{Binding CycleSessionNextCommand}"/>
-                    <MenuItem Header="{Binding PreviousSessionMenuText}" Command="{Binding CycleSessionPrevCommand}"/>
-                    <MenuItem x:Name="PopoutSessionsMenu" Header="弹出窗口"/>
+                    <MenuItem Header="{loc:Text M0482}" Click="OnRenameActive"/>
+                    <MenuItem x:Name="PinSessionItem" Header="{loc:Text M0255}" Command="{Binding TogglePinActiveCommand}"/>
+                    <MenuItem Header="{loc:Text M0309}" Command="{Binding RemoveActiveFromGroupCommand}"/>
+                    <MenuItem x:Name="MoveToGroupMenu" Header="{loc:Text M0308}"/>
+                    <MenuItem Header="{loc:Text M0310}" Click="OnCreateGroupForActive"/>
+                    <MenuItem Header="{loc:Text M0483}" Click="OnRenameActiveGroup"/>
+                    <MenuItem x:Name="ToggleGroupItem" Header="{loc:Text M0302}" Command="{Binding ToggleActiveGroupCommand}"/>
+                    <MenuItem Header="{loc:Text M0484}" Command="{Binding ShowWorkspaceCommand}"/>
+                    <MenuItem x:Name="TerminalColorsMenu" Header="{loc:Text M0485}"/>
+                    <MenuItem Header="{loc:Text M0486}" Command="{Binding CloseActiveSessionCommand}"/>
+                    <MenuItem Header="{loc:Translate {Binding NextSessionMenuText}}" Command="{Binding CycleSessionNextCommand}"/>
+                    <MenuItem Header="{loc:Translate {Binding PreviousSessionMenuText}}" Command="{Binding CycleSessionPrevCommand}"/>
+                    <MenuItem x:Name="PopoutSessionsMenu" Header="{loc:Text M0487}"/>
                     <Separator/>
-                    <MenuItem Header="复制 CWD" Command="{Binding CopyActiveCwdCommand}"/>
+                    <MenuItem Header="{loc:Text M0488}" Command="{Binding CopyActiveCwdCommand}"/>
                     <Separator/>
-                    <MenuItem Header="复制当前屏幕" Click="OnCopyScreen" ToolTip.Tip="复制当前可见的终端文字；浏览历史时复制当前视口"/>
-                    <MenuItem Header="复制全部输出" Click="OnCopyAllOutput" ToolTip.Tip="复制缓冲中仍保留的历史与屏幕；已裁剪的旧输出不在其中"/>
-                    <MenuItem x:Name="SaveSelectionItem" Header="保存选区为文本" Click="OnSaveSelection"/>
-                    <MenuItem Header="保存全部输出" Click="OnSaveAllOutput"/>
+                    <MenuItem Header="{loc:Text M0356}" Click="OnCopyScreen" ToolTip.Tip="{loc:Text M0489}"/>
+                    <MenuItem Header="{loc:Text M0358}" Click="OnCopyAllOutput" ToolTip.Tip="{loc:Text M0359}"/>
+                    <MenuItem x:Name="SaveSelectionItem" Header="{loc:Text M0333}" Click="OnSaveSelection"/>
+                    <MenuItem Header="{loc:Text M0335}" Click="OnSaveAllOutput"/>
                     <Separator/>
-                    <MenuItem Header="添加书签" Click="OnAddBookmark" ToolTip.Tip="有选区时保存选区文字并定位到选区起点；否则以视口首行定位并保存预览"/>
-                    <MenuItem Header="书签列表" Click="OnShowBookmarks"/>
+                    <MenuItem Header="{loc:Text M0348}" Click="OnAddBookmark" ToolTip.Tip="{loc:Text M0490}"/>
+                    <MenuItem Header="{loc:Text M0491}" Click="OnShowBookmarks"/>
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
-              <Button x:Name="ChromeClose" Grid.Column="10" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="关闭当前终端 · Ctrl+Shift+W" AutomationProperties.Name="关闭当前终端">
+              <Button x:Name="ChromeClose" Grid.Column="10" Classes="terminal-tool" Command="{Binding CloseActiveSessionCommand}" ToolTip.Tip="{loc:Text M0492}" AutomationProperties.Name="{loc:Text M0493}">
                 <PathIcon Data="{StaticResource ToolClose}"/>
               </Button>
             </Grid>
@@ -480,9 +491,9 @@
                             HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                   <TextBlock Text="›_" FontFamily="Consolas" FontSize="26" Foreground="{DynamicResource UiFaint}"
                              HorizontalAlignment="Center"/>
-                  <TextBlock Text="没有活动终端" FontSize="13" Foreground="{DynamicResource UiMuted}"
+                  <TextBlock Text="{loc:Text M0494}" FontSize="13" Foreground="{DynamicResource UiMuted}"
                              HorizontalAlignment="Center"/>
-                  <TextBlock Text="Ctrl+Shift+N 或点击左侧「新建会话」" FontSize="11" Foreground="{DynamicResource UiFaint}"
+                  <TextBlock Text="{loc:Text M0495}" FontSize="11" Foreground="{DynamicResource UiFaint}"
                              HorizontalAlignment="Center"/>
                 </StackPanel>
                 <!-- single view -->
@@ -493,12 +504,12 @@
                                     TerminalFontSize="{Binding FontSize, Mode=TwoWay}"
                                     TerminalFontFamily="{Binding TerminalFont}"
                                     SearchQuery="{Binding Dashboard.SearchQuery}"/>
-                  <Button Content="⬇ 回到底部" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                  <Button Content="{loc:Text M0496}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                           Margin="0,0,6,6" Padding="10,4" CornerRadius="8" FontSize="10"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                           Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                           IsVisible="{Binding #MainTerminal.IsScrolledUp}"
-                          ToolTip.Tip="回到实时输出底部"/>
+                          ToolTip.Tip="{loc:Text M0497}"/>
                   <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
                              HorizontalAlignment="Right" VerticalAlignment="Stretch"
                              Minimum="0" Maximum="{Binding #MainTerminal.ScrollbackSize}"
@@ -507,7 +518,8 @@
                              Visibility="{Binding #MainTerminal.OverlayScrollBarVisibility}"/>
                 </Panel>
                 <!-- split view: two independent sessions + draggable divider -->
-                <Grid x:Name="SplitGrid" IsVisible="{Binding IsSplit}" ColumnDefinitions="*,5,*" RowDefinitions="*,5,*">
+                <ContentControl x:Name="SplitHost" IsVisible="{Binding IsSplit}"/>
+                <Grid x:Name="SplitGrid" IsVisible="False" ColumnDefinitions="*,5,*" RowDefinitions="*,5,*">
                   <Border x:Name="LeftPaneBox" BorderThickness="1.5" CornerRadius="6" Margin="0,0,3,0"
                           Classes.pane-focus="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
                     <Border.Styles>
@@ -519,7 +531,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock x:Name="LeftPaneTitle" Text="{Binding LeftPaneName}" FontSize="11" FontWeight="SemiBold"
                                      Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                          <TextBlock Grid.Column="1" Text="{loc:Text M0498}" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
                                      IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                         </Grid>
                       </Border>
@@ -534,7 +546,7 @@
                               Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #LeftTerminal.IsScrolledUp}"
-                              ToolTip.Tip="回到实时输出底部"/>
+                              ToolTip.Tip="{loc:Text M0497}"/>
                       <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
                                  HorizontalAlignment="Right" VerticalAlignment="Stretch"
                                  Minimum="0" Maximum="{Binding #LeftTerminal.ScrollbackSize}"
@@ -557,7 +569,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock x:Name="RightPaneTitle" Text="{Binding RightPaneName}" FontSize="11" FontWeight="SemiBold"
                                      Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                          <TextBlock Grid.Column="1" Text="{loc:Text M0498}" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
                                      IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"/>
                         </Grid>
                       </Border>
@@ -568,7 +580,7 @@
                                         TerminalFontFamily="{Binding TerminalFont}"
                                         SearchQuery="{Binding Dashboard.SearchQuery}"
                                         IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
-                      <TextBlock Text="右栏暂无会话 — 点击左侧会话卡分配到这里"
+                      <TextBlock Text="{loc:Text M0499}"
                                  Foreground="{DynamicResource UiFaint}" FontSize="11" TextWrapping="Wrap"
                                  HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"
                                  IsVisible="{Binding RightPane, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
@@ -577,7 +589,7 @@
                               Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #RightTerminal.IsScrolledUp}"
-                              ToolTip.Tip="回到实时输出底部"/>
+                              ToolTip.Tip="{loc:Text M0497}"/>
                       <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
                                  HorizontalAlignment="Right" VerticalAlignment="Stretch"
                                  Minimum="0" Maximum="{Binding #RightTerminal.ScrollbackSize}"
@@ -598,7 +610,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock x:Name="BottomLeftPaneTitle" Text="{Binding BottomLeftPaneName}" FontSize="11" FontWeight="SemiBold"
                                      Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                          <TextBlock Grid.Column="1" Text="{loc:Text M0498}" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
                                      IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"/>
                         </Grid>
                       </Border>
@@ -613,7 +625,7 @@
                               Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #BottomLeftTerminal.IsScrolledUp}"
-                              ToolTip.Tip="回到实时输出底部"/>
+                              ToolTip.Tip="{loc:Text M0497}"/>
                       <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
                                  HorizontalAlignment="Right" VerticalAlignment="Stretch"
                                  Minimum="0" Maximum="{Binding #BottomLeftTerminal.ScrollbackSize}"
@@ -634,7 +646,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock x:Name="BottomRightPaneTitle" Text="{Binding BottomRightPaneName}" FontSize="11" FontWeight="SemiBold"
                                      Foreground="{DynamicResource UiInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Grid.Column="1" Text="当前窗格" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
+                          <TextBlock Grid.Column="1" Text="{loc:Text M0498}" FontSize="9" Foreground="{DynamicResource UiAccent}" VerticalAlignment="Center"
                                      IsVisible="{Binding FocusedPane, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=3}"/>
                         </Grid>
                       </Border>
@@ -649,7 +661,7 @@
                               Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                               Foreground="{DynamicResource UiAccent}" Click="OnScrollToBottomClick"
                               IsVisible="{Binding #BottomRightTerminal.IsScrolledUp}"
-                              ToolTip.Tip="回到实时输出底部"/>
+                              ToolTip.Tip="{loc:Text M0497}"/>
                       <ScrollBar Orientation="Vertical" Width="8" Opacity="0.5" Margin="0,0,1,0"
                                  HorizontalAlignment="Right" VerticalAlignment="Stretch"
                                  Minimum="0" Maximum="{Binding #BottomRightTerminal.ScrollbackSize}"
@@ -672,7 +684,7 @@
               <!-- top-edge drag handle: resize the bottom panel -->
               <Border x:Name="OutputResizeHandle" Height="8" VerticalAlignment="Top" Margin="0,-4,0,0"
                       Background="Transparent" Cursor="SizeNorthSouth" ZIndex="10"
-                      ToolTip.Tip="拖拽调整底栏高度"/>
+                      ToolTip.Tip="{loc:Text M0500}"/>
               <Grid RowDefinitions="30,*">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="4,0">
                   <ListBox x:Name="OutputTabs" SelectedIndex="{Binding Dashboard.SelectedBottomTab}"
@@ -700,28 +712,28 @@
                         <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
                       </Style>
                     </ListBox.Styles>
-                    <ListBoxItem>Output</ListBoxItem>
-                    <ListBoxItem>Debug</ListBoxItem>
+                    <ListBoxItem Content="{loc:Text M0336}"/>
+                    <ListBoxItem Content="{loc:Text UiDebug}"/>
                     <ListBoxItem>
                       <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="Problems"/>
+                        <TextBlock Text="{loc:Text UiProblems}"/>
                         <Border IsVisible="{Binding Dashboard.HasProblems}" CornerRadius="8"
                                 Background="{DynamicResource UiBad}" Padding="5,1" VerticalAlignment="Center">
                           <TextBlock Text="{Binding Dashboard.ProblemCount}" FontSize="9" Foreground="{DynamicResource UiOnAccent}"/>
                         </Border>
                       </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem>Search</ListBoxItem>
+                    <ListBoxItem Content="{loc:Text UiSearch}"/>
                   </ListBox>
-                  <ComboBox x:Name="OutputLevelCombo" Grid.Column="1" FontSize="10" Padding="8,1" MinWidth="76"
+                  <ComboBox Classes="localized" x:Name="OutputLevelCombo" Grid.Column="1" FontSize="10" Padding="8,1" MinWidth="76"
                             VerticalAlignment="Center" SelectedIndex="{Binding Dashboard.OutputLevelFilter}"
-                            ToolTip.Tip="按级别筛选 Output 行">
-                    <ComboBoxItem>全部</ComboBoxItem>
+                            ToolTip.Tip="{loc:Text M0501}">
+                    <ComboBoxItem Content="{loc:Text M0058}"/>
                     <ComboBoxItem>info</ComboBoxItem>
                     <ComboBoxItem>warn</ComboBoxItem>
                     <ComboBoxItem>error</ComboBoxItem>
                   </ComboBox>
-                  <Button Grid.Column="2" Content="⎘ Clear" FontSize="10" Padding="8,2"
+                  <Button Grid.Column="2" Content="{loc:Text UiClear}" FontSize="10" Padding="8,2"
                           Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                           Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"
                           Command="{Binding Dashboard.ClearOutputCommand}"/>
@@ -748,7 +760,7 @@
                             <TextBlock Text="{Binding Time, StringFormat='{}{0:HH:mm:ss}'}" Foreground="{DynamicResource UiFaint}"/>
                             <TextBlock Text="{Binding Level, StringFormat='[{0}]'}"
                                        Foreground="{Binding Level, Converter={x:Static vm:LogLevelConverter.Instance}}"/>
-                            <TextBlock Text="{Binding Message}" Foreground="{DynamicResource UiMuted}"/>
+                            <TextBlock Text="{loc:Translate {Binding DisplayMessage}}" Foreground="{DynamicResource UiMuted}"/>
                           </StackPanel>
                         </DataTemplate>
                       </ListBox.ItemTemplate>
@@ -772,7 +784,7 @@
                             <TextBlock Text="{Binding Time, StringFormat='{}{0:HH:mm:ss.fff}'}" Foreground="{DynamicResource UiFaint}"/>
                             <TextBlock IsVisible="{Binding Source, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"
                                        Text="{Binding Source, StringFormat='({0})'}" Foreground="{DynamicResource UiFaint}"/>
-                            <TextBlock Text="{Binding Message}" Foreground="{DynamicResource UiInk}"/>
+                            <TextBlock Text="{loc:Translate {Binding DisplayMessage}}" Foreground="{DynamicResource UiInk}"/>
                           </StackPanel>
                         </DataTemplate>
                       </ListBox.ItemTemplate>
@@ -782,15 +794,15 @@
                     <DockPanel IsVisible="{Binding Dashboard.SelectedBottomTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}">
                       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="8,4,8,0">
                         <TextBlock VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource UiFaint}"
-                                   Text="{Binding Dashboard.ProblemCount, StringFormat='会话输出中的 error / exception / 非零退出:{0} 条'}"/>
-                        <Button Grid.Column="1" Content="清空" FontSize="10" Padding="10,2"
+                                   Text="{loc:Translate {Binding Dashboard.ProblemCount, StringFormat='会话输出中的 error / exception / 非零退出:{0} 条'}}"/>
+                        <Button Grid.Column="1" Content="{loc:Text M0503}" FontSize="10" Padding="10,2"
                                 Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" CornerRadius="6" BorderThickness="0"
                                 IsVisible="{Binding Dashboard.HasProblems}"
                                 Command="{Binding Dashboard.ClearProblemsCommand}"/>
                       </Grid>
                       <TextBlock DockPanel.Dock="Top" Margin="8,4,8,0" FontSize="10" Foreground="{DynamicResource UiFaint}"
                                  IsVisible="{Binding !Dashboard.HasProblems}"
-                                 Text="暂无问题 —— 会话输出中的错误会出现在这里"/>
+                                 Text="{loc:Text M0504}"/>
                     <ListBox ItemsSource="{Binding Dashboard.Problems}"
                              Background="Transparent" BorderThickness="0" Padding="6">
                       <ListBox.Styles>
@@ -806,7 +818,7 @@
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="{Binding Level, StringFormat='[{0}]'}"
                                        Foreground="{Binding Level, Converter={x:Static vm:LogLevelConverter.Instance}}"/>
-                            <TextBlock Text="{Binding Message}" Foreground="{DynamicResource UiMuted}"/>
+                            <TextBlock Text="{loc:Translate {Binding DisplayMessage}}" Foreground="{DynamicResource UiMuted}"/>
                           </StackPanel>
                         </DataTemplate>
                       </ListBox.ItemTemplate>
@@ -818,26 +830,26 @@
                           RowDefinitions="Auto,Auto,*">
                       <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="8,6,8,0">
                         <TextBox x:Name="FindBox" Text="{Binding Dashboard.SearchQuery}"
-                                 Watermark="搜索保留输出… · Enter 下一处" FontSize="11"
+                                 Watermark="{loc:Text M0505}" FontSize="11"
                                  KeyDown="OnSearchBoxKeyDown"
                                  Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiInk}"
                                  CornerRadius="6" Padding="8,4"/>
                         <Button Grid.Column="1" Content="▲" Padding="8,2" Margin="6,0,0,0" FontSize="10"
                                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}"
                                 Foreground="{DynamicResource UiMuted}" CornerRadius="6" VerticalAlignment="Center"
-                                Click="OnSearchPrevMatch" ToolTip.Tip="上一处匹配（终端视口跟随）"/>
+                                Click="OnSearchPrevMatch" ToolTip.Tip="{loc:Text M0506}"/>
                         <Button Grid.Column="2" Content="▼" Padding="8,2" Margin="4,0,0,0" FontSize="10"
                                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}"
                                 Foreground="{DynamicResource UiMuted}" CornerRadius="6" VerticalAlignment="Center"
-                                Click="OnSearchNextMatch" ToolTip.Tip="下一处匹配（终端视口跟随）"/>
-                        <ComboBox Grid.Column="3" SelectedIndex="{Binding Dashboard.SearchScope}" Margin="6,0" MinWidth="108" FontSize="11">
-                          <ComboBoxItem Content="当前会话"/><ComboBoxItem Content="全部会话"/>
+                                Click="OnSearchNextMatch" ToolTip.Tip="{loc:Text M0507}"/>
+                        <ComboBox Classes="localized" Grid.Column="3" SelectedIndex="{Binding Dashboard.SearchScope}" Margin="6,0" MinWidth="108" FontSize="11">
+                          <ComboBoxItem Content="{loc:Text M0015}"/><ComboBoxItem Content="{loc:Text M0057}"/>
                         </ComboBox>
-                        <TextBlock Grid.Column="4" Text="{Binding Dashboard.SearchStatus}"
+                        <TextBlock Grid.Column="4" Text="{loc:Translate {Binding Dashboard.SearchStatus}}"
                                    Foreground="{DynamicResource UiFaint}" FontSize="10" Margin="10,0"
                                    VerticalAlignment="Center" MinWidth="70"/>
                       </Grid>
-                      <TextBlock Grid.Row="1" Text="点击结果切换会话并定位 · 仅搜索仍保留的历史与屏幕输出"
+                      <TextBlock Grid.Row="1" Text="{loc:Text M0508}"
                                  Foreground="{DynamicResource UiFaint}" FontSize="9" Margin="10,4,0,2"/>
                       <ListBox Grid.Row="2" x:Name="SearchResults" ItemsSource="{Binding Dashboard.SearchHits}"
                                Tapped="OnSearchHitDoubleTapped"
@@ -864,7 +876,7 @@
                     </Grid>
 
                     <!-- empty states: Output / Debug (Problems + Search carry their own hints) -->
-                    <TextBlock Text="暂无输出" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{loc:Text M0509}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center" VerticalAlignment="Center">
                       <TextBlock.IsVisible>
                         <MultiBinding Converter="{x:Static vm:TabEmptyConverter.Instance}" ConverterParameter="0">
@@ -873,7 +885,7 @@
                         </MultiBinding>
                       </TextBlock.IsVisible>
                     </TextBlock>
-                    <TextBlock Text="暂无调试行" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{loc:Text M0510}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center" VerticalAlignment="Center">
                       <TextBlock.IsVisible>
                         <MultiBinding Converter="{x:Static vm:TabEmptyConverter.Instance}" ConverterParameter="1">
@@ -892,7 +904,7 @@
 
         <!-- left-edge drag handle for the inspector rail (12px gutter column) -->
         <Border x:Name="InspectorResizeHandle" Grid.Column="3" Background="Transparent"
-                Cursor="SizeWestEast" ToolTip.Tip="拖拽调整右栏宽度"/>
+                Cursor="SizeWestEast" ToolTip.Tip="{loc:Text M0511}"/>
 
         <!-- ===== RIGHT: Processes/Files/Logs/SSH ===== -->
         <Border Grid.Column="4" CornerRadius="{DynamicResource SurfaceCorner}" IsVisible="{Binding InspectorVisible}"
@@ -926,10 +938,10 @@
                       </Style>
               </ListBox.Styles>
               <ListBoxItem>Processes</ListBoxItem>
-              <ListBoxItem>Files</ListBoxItem>
-              <ListBoxItem>Logs</ListBoxItem>
+              <ListBoxItem Content="{loc:Text UiFiles}"/>
+              <ListBoxItem Content="{loc:Text M0591}"/>
               <ListBoxItem>SSH</ListBoxItem>
-              <ListBoxItem>命令</ListBoxItem>
+              <ListBoxItem Content="{loc:Text M0338}"/>
             </ListBox>
 
             <Panel Grid.Row="1" Margin="0,4,0,0">
@@ -942,7 +954,7 @@
                             FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
                             Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="pid"
-                            ToolTip.Tip="点击切换排序">
+                            ToolTip.Tip="{loc:Text M0512}">
                       <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock Text="PID"/>
                         <TextBlock Text="{Binding Dashboard.PidMark}" Foreground="{DynamicResource UiAccent}"/>
@@ -952,9 +964,9 @@
                             FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Cursor="Hand"
                             Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="name"
-                            ToolTip.Tip="点击切换排序">
+                            ToolTip.Tip="{loc:Text M0512}">
                       <StackPanel Orientation="Horizontal" Spacing="3">
-                        <TextBlock Text="NAME"/>
+                        <TextBlock Text="{loc:Text M0753}"/>
                         <TextBlock Text="{Binding Dashboard.NameMark}" Foreground="{DynamicResource UiAccent}"/>
                       </StackPanel>
                     </Button>
@@ -962,7 +974,7 @@
                             FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Cursor="Hand"
                             Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="cpu"
-                            ToolTip.Tip="点击切换排序">
+                            ToolTip.Tip="{loc:Text M0512}">
                       <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock Text="{Binding Dashboard.CpuMark}" Foreground="{DynamicResource UiAccent}"/>
                         <TextBlock Text="CPU"/>
@@ -972,7 +984,7 @@
                             FontWeight="SemiBold" Foreground="{DynamicResource UiFaint}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Cursor="Hand"
                             Command="{Binding Dashboard.SortProcessesCommand}" CommandParameter="mem"
-                            ToolTip.Tip="点击切换排序">
+                            ToolTip.Tip="{loc:Text M0512}">
                       <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock Text="{Binding Dashboard.MemMark}" Foreground="{DynamicResource UiAccent}"/>
                         <TextBlock Text="MEM"/>
@@ -980,7 +992,7 @@
                     </Button>
                   </Grid>
                   <Panel Grid.Row="1">
-                    <TextBlock Text="{Binding Dashboard.ProcessesEmptyText}" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{loc:Translate {Binding Dashboard.ProcessesEmptyText}}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding Dashboard.Processes.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <ListBox ItemsSource="{Binding Dashboard.Processes}"
@@ -1006,7 +1018,7 @@
                         <Grid ColumnDefinitions="50,*,70,70">
                           <Grid.ContextMenu>
                             <ContextMenu>
-                              <MenuItem Header="结束进程"
+                              <MenuItem Header="{loc:Text M0513}"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Dashboard.KillProcessCommand}"
                                         CommandParameter="{Binding}"/>
                             </ContextMenu>
@@ -1028,7 +1040,7 @@
                 <Border Grid.Row="1" CornerRadius="10" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" Padding="8" Margin="0,6,0,0">
                   <StackPanel Spacing="8">
-                    <TextBlock Text="System Monitor" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource UiMuted}"/>
+                    <TextBlock Text="{loc:Text UiMonitor}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource UiMuted}"/>
                     <Grid ColumnDefinitions="*,10,*">
                       <Border CornerRadius="8" Background="{DynamicResource UiSurface}" Padding="8">
                         <Grid RowDefinitions="Auto,Auto,*">
@@ -1041,7 +1053,7 @@
                       </Border>
                       <Border Grid.Column="2" CornerRadius="8" Background="{DynamicResource UiSurface}" Padding="8">
                         <Grid RowDefinitions="Auto,Auto,*">
-                          <TextBlock Text="Memory" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
+                          <TextBlock Text="{loc:Text UiMemory}" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
                           <StackPanel Grid.Row="1" Orientation="Horizontal">
                             <TextBlock Text="{Binding Dashboard.MemUsage}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                             <TextBlock Text="{Binding Dashboard.MemTotal}" FontSize="10" Foreground="{DynamicResource UiFaint}"
@@ -1055,7 +1067,7 @@
                     <Grid ColumnDefinitions="*,10,*">
                       <Border CornerRadius="8" Background="{DynamicResource UiSurface}" Padding="8">
                         <StackPanel Spacing="4">
-                          <TextBlock Text="Disk" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
+                          <TextBlock Text="{loc:Text UiDisk}" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
                           <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding Dashboard.DiskUsage}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                           </StackPanel>
@@ -1066,7 +1078,7 @@
                       </Border>
                       <Border Grid.Column="2" CornerRadius="8" Background="{DynamicResource UiSurface}" Padding="8">
                         <Grid RowDefinitions="Auto,*,*">
-                          <TextBlock Text="Network" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
+                          <TextBlock Text="{loc:Text UiNetwork}" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
                           <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="4">
                             <TextBlock Text="{Binding Dashboard.NetDown}" FontSize="11" Foreground="{DynamicResource UiGood}"/>
                             <ctl:SparklineControl Values="{Binding Dashboard.NetDownSpark}" Stroke="{DynamicResource UiGood}"
@@ -1092,7 +1104,7 @@
                   <Button Content="↑" Padding="8,2" CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           IsEnabled="{Binding Files.CanGoUp}"
-                          Command="{Binding Files.UpCommand}" ToolTip.Tip="上一级 · Backspace / Alt+↑"/>
+                          Command="{Binding Files.UpCommand}" ToolTip.Tip="{loc:Text M0514}"/>
                   <ScrollViewer x:Name="CrumbScroll" Grid.Column="1" Margin="6,0" VerticalAlignment="Center"
                                 HorizontalScrollBarVisibility="Auto"
                                 VerticalScrollBarVisibility="Disabled">
@@ -1103,7 +1115,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:FilesViewModel+Crumb">
                           <StackPanel Orientation="Horizontal" Spacing="2">
-                            <Button Content="{Binding Label}" Padding="4,1" FontSize="10"
+                            <Button Content="{loc:Translate {Binding Label}}" Padding="4,1" FontSize="10"
                                     Background="Transparent" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
                                     FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
                                     Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.NavigateCrumbCommand}"
@@ -1123,22 +1135,22 @@
                   <Button Grid.Column="2" Content="⇥" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.OpenInTerminalCommand}"
-                          ToolTip.Tip="在此打开终端：目录→活动终端 cd 进入；文件→cd 所在目录"/>
+                          ToolTip.Tip="{loc:Text M0515}"/>
                   <Button Grid.Column="3" Content="⎘" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
                           Command="{Binding Files.CopyPathCommand}"
-                          ToolTip.Tip="复制路径"/>
+                          ToolTip.Tip="{loc:Text M0516}"/>
                   <Button Grid.Column="4" Content="⟳" Padding="8,2" Margin="0,0,6,0" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderBrush="{DynamicResource UiBorder}"
-                          Command="{Binding Files.RefreshCommand}" ToolTip.Tip="刷新 (F5)"/>
+                          Command="{Binding Files.RefreshCommand}" ToolTip.Tip="{loc:Text M0517}"/>
                   <Button Grid.Column="5" Content="⌂" Padding="8,2" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
-                          Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="会话目录"/>
+                          Command="{Binding Files.GoToSessionDirCommand}" ToolTip.Tip="{loc:Text M0518}"/>
                   <ToggleButton Grid.Column="6" Content=".*" Padding="7,2" Margin="6,0,0,0" CornerRadius="6"
                                 Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiFaint}"
                                 BorderBrush="{DynamicResource UiBorder}" FontSize="10"
                                 IsChecked="{Binding Files.ShowHidden}"
-                                ToolTip.Tip="显示隐藏文件（.* 开头或系统隐藏属性）· Ctrl+H">
+                                ToolTip.Tip="{loc:Text M0519}">
                     <ToggleButton.Styles>
                       <Style Selector="ToggleButton:checked">
                         <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
@@ -1147,7 +1159,7 @@
                     </ToggleButton.Styles>
                   </ToggleButton>
                 </Grid>
-                <TextBlock Grid.Row="1" Text="{Binding Files.StatusText}"
+                <TextBlock Grid.Row="1" Text="{loc:Translate {Binding Files.StatusText}}"
                            Foreground="{Binding Files.StatusIsError, Converter={x:Static vm:BoolToErrorBrushConverter.Instance}}"
                            FontSize="9.5" Margin="2,0,0,2"
                            IsVisible="{Binding Files.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
@@ -1163,9 +1175,9 @@
                            KeyDown="OnFilesListKeyDown">
                     <ListBox.ContextMenu>
                       <ContextMenu Opened="OnFilesContextMenuOpened">
-                        <MenuItem Header="新建文件夹" Click="OnFilesNewFolderClick"/>
-                        <MenuItem Header="新建文本文件" Click="OnFilesNewTextFileClick"/>
-                        <MenuItem x:Name="PasteMenuItem" Header="粘贴" Click="OnFilesPasteClick" ToolTip.Tip="把剪贴板中的文件复制到当前目录 (Ctrl+V)"/>
+                        <MenuItem Header="{loc:Text M0043}" Click="OnFilesNewFolderClick"/>
+                        <MenuItem Header="{loc:Text M0291}" Click="OnFilesNewTextFileClick"/>
+                        <MenuItem x:Name="PasteMenuItem" Header="{loc:Text M0520}" Click="OnFilesPasteClick" ToolTip.Tip="{loc:Text M0521}"/>
                       </ContextMenu>
                     </ListBox.ContextMenu>
                     <ListBox.Styles>
@@ -1192,18 +1204,18 @@
                         <Grid ColumnDefinitions="14,*,Auto,Auto">
                           <Grid.ContextMenu>
                             <ContextMenu>
-                              <MenuItem Header="用默认应用打开"
+                              <MenuItem Header="{loc:Text M0522}"
                                         IsVisible="{Binding !IsDirectory}"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenExternallyCommand}"
                                         CommandParameter="{Binding}"/>
-                              <MenuItem Header="在此打开终端"
+                              <MenuItem Header="{loc:Text M0523}"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.OpenInTerminalCommand}"
                                         CommandParameter="{Binding}"/>
-                              <MenuItem Header="在文件管理器中显示"
+                              <MenuItem Header="{loc:Text M0524}"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.RevealInFileManagerCommand}"
                                         CommandParameter="{Binding}"/>
-                              <MenuItem Header="重命名 (F2)" Click="OnFilesRenameClick"/>
-                              <MenuItem Header="复制路径"
+                              <MenuItem Header="{loc:Text M0525}" Click="OnFilesRenameClick"/>
+                              <MenuItem Header="{loc:Text M0516}"
                                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Files.CopyPathCommand}"
                                         CommandParameter="{Binding}"/>
                             </ContextMenu>
@@ -1241,7 +1253,7 @@
                   <TextBlock Text="{Binding Files.PreviewTitle}" FontSize="10.5" FontWeight="SemiBold"
                              Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"
                              ToolTip.Tip="{Binding Files.PreviewPath}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Files.PreviewMeta}" FontSize="9"
+                  <TextBlock Grid.Column="1" Text="{loc:Translate {Binding Files.PreviewMeta}}" FontSize="9"
                              Foreground="{DynamicResource UiFaint}" VerticalAlignment="Center"/>
                 </Grid>
 
@@ -1252,7 +1264,7 @@
                   <Panel>
                     <Image Source="{Binding Files.PreviewImage}" Stretch="Uniform"
                            IsVisible="{Binding Files.PreviewIsImage}"/>
-                    <TextBox Text="{Binding Files.PreviewText}" IsReadOnly="True"
+                    <TextBox Text="{loc:Translate {Binding Files.DisplayPreviewText}}" IsReadOnly="True"
                              AcceptsReturn="True" TextWrapping="NoWrap" BorderThickness="0"
                              Background="Transparent" Foreground="{DynamicResource UiMuted}" FontSize="9.5"
                              FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"
@@ -1265,9 +1277,9 @@
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                         IsVisible="{Binding !Files.HasPreview}">
                   <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Files.PreviewHint}" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{loc:Translate {Binding Files.PreviewHint}}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center"/>
-                    <TextBlock Text="拖到终端可粘贴路径" Foreground="{DynamicResource UiFaint}" FontSize="9"
+                    <TextBlock Text="{loc:Text M0526}" Foreground="{DynamicResource UiFaint}" FontSize="9"
                                HorizontalAlignment="Center" Margin="0,3,0,0" Opacity="0.7"/>
                   </StackPanel>
                 </Border>
@@ -1320,7 +1332,7 @@
                 </Grid.Styles>
                 <!-- filter row: text + regex toggle + file sink -->
                 <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2,0,4">
-                  <TextBox Text="{Binding Logs.FilterText}" Watermark="过滤日志…"
+                  <TextBox Text="{Binding Logs.FilterText}" Watermark="{loc:Text M0527}"
                            Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                            Foreground="{DynamicResource UiInk}" Padding="8,3" FontSize="10.5"/>
                   <ToggleButton Grid.Column="1" Content=".*" Margin="4,0,0,0" Padding="6,3" MinWidth="30"
@@ -1328,7 +1340,7 @@
                                 Foreground="{DynamicResource UiMuted}" FontSize="10"
                                 FontFamily="Cascadia Code, Consolas, Menlo, monospace"
                                 IsChecked="{Binding Logs.UseRegex}"
-                                ToolTip.Tip="把过滤框内容当作正则表达式（忽略大小写）">
+                                ToolTip.Tip="{loc:Text M0528}">
                     <ToggleButton.Styles>
                       <Style Selector="ToggleButton:checked">
                         <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
@@ -1336,11 +1348,11 @@
                       </Style>
                     </ToggleButton.Styles>
                   </ToggleButton>
-                  <ToggleButton Grid.Column="2" Content="⬇ 写文件" Margin="6,0,0,0" Padding="8,3"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text M0529}" Margin="6,0,0,0" Padding="8,3"
                                 CornerRadius="6" Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}"
                                 Foreground="{DynamicResource UiMuted}" FontSize="10"
                                 IsChecked="{Binding Logs.FileLogging}"
-                                ToolTip.Tip="将会话输出写入本地日志文件">
+                                ToolTip.Tip="{loc:Text M0530}">
                     <ToggleButton.Styles>
                       <Style Selector="ToggleButton:checked">
                         <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
@@ -1351,43 +1363,43 @@
                 </Grid>
                 <!-- level filter: exclusive chip bar (全部/info/warn/error + live ring-buffer counts) + timestamp / wrap / compact / 容量 -->
                 <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
-                  <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelAllChipLabel}"
+                  <ToggleButton Classes="levelchip" Content="{loc:Translate {Binding Logs.LevelAllChipLabel}}"
                                 IsChecked="{Binding Logs.LevelAllSelected}"
-                                ToolTip.Tip="显示所有级别 / show all levels（数字=环形缓冲总条数）"/>
+                                ToolTip.Tip="{loc:Text M0531}"/>
                   <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelInfoChipLabel}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.LevelInfoSelected}"
-                                ToolTip.Tip="只看 info 级行（数字=缓冲内 info 条数，不受当前筛选影响）"/>
+                                ToolTip.Tip="{loc:Text M0532}"/>
                   <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelWarnChipLabel}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.LevelWarnSelected}"
-                                ToolTip.Tip="只看 warn 级行（数字=缓冲内 warn 条数，不受当前筛选影响）"/>
+                                ToolTip.Tip="{loc:Text M0533}"/>
                   <ToggleButton Classes="levelchip" Content="{Binding Logs.LevelErrorChipLabel}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.LevelErrorSelected}"
-                                ToolTip.Tip="只看 error 级行（数字=缓冲内 error 条数，不受当前筛选影响）"/>
+                                ToolTip.Tip="{loc:Text M0534}"/>
                   <!-- timestamp mode: off=绝对 HH:mm:ss · on=相对「距现在」刚刚/12s/3m/1h/昨天 -->
-                  <ToggleButton Classes="timechip" Content="相对" Margin="10,0,0,0"
+                  <ToggleButton Classes="timechip" Content="{loc:Text M0535}" Margin="10,0,0,0"
                                 IsChecked="{Binding Logs.UseRelativeTimestamps}"
-                                ToolTip.Tip="时间戳：关=绝对 HH:mm:ss；开=相对距现在（刚刚 / 12s / 3m / 1h / 昨天 HH:mm；更早回退绝对）。导出始终用绝对时间。"/>
+                                ToolTip.Tip="{loc:Text M0536}"/>
                   <!-- line wrap: on(default)=Wrap · off=NoWrap + horizontal scroll for dense scanning -->
-                  <ToggleButton Classes="timechip" Content="换行" Margin="4,0,0,0"
+                  <ToggleButton Classes="timechip" Content="{loc:Text M0537}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.WrapLines}"
-                                ToolTip.Tip="换行：开（默认）=长消息自动折行；关=单行显示并允许横向滚动，便于密扫。"/>
+                                ToolTip.Tip="{loc:Text M0538}"/>
                   <!-- compact density: off(default)=FontSize 9.5 / Padding 4,1 · on≈8.5 / 2,0 -->
-                  <ToggleButton Classes="timechip" Content="紧凑" Margin="4,0,0,0"
+                  <ToggleButton Classes="timechip" Content="{loc:Text M0539}" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.CompactDensity}"
-                                ToolTip.Tip="紧凑密度：关（默认）=字号 9.5 / 内边距 4,1；开=字号约 8.5 / 内边距约 2,0，便于密扫更多行。"/>
+                                ToolTip.Tip="{loc:Text M0540}"/>
                   <!-- ring-buffer capacity presets (exclusive chips; default 2000) -->
-                  <TextBlock Text="容量" FontSize="10" Foreground="{DynamicResource UiFaint}"
+                  <TextBlock Text="{loc:Text M0541}" FontSize="10" Foreground="{DynamicResource UiFaint}"
                              VerticalAlignment="Center" Margin="10,0,4,0"
-                             ToolTip.Tip="Logs 环形缓冲容量（条）。缩小会丢弃最旧行。"/>
+                             ToolTip.Tip="{loc:Text M0542}"/>
                   <ToggleButton Classes="capchip" Content="500"
                                 IsChecked="{Binding Logs.Capacity500Selected}"
-                                ToolTip.Tip="缓冲 500 行（浅）"/>
+                                ToolTip.Tip="{loc:Text M0543}"/>
                   <ToggleButton Classes="capchip" Content="2000" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.Capacity2000Selected}"
-                                ToolTip.Tip="缓冲 2000 行（默认）"/>
+                                ToolTip.Tip="{loc:Text M0544}"/>
                   <ToggleButton Classes="capchip" Content="5000" Margin="4,0,0,0"
                                 IsChecked="{Binding Logs.Capacity5000Selected}"
-                                ToolTip.Tip="缓冲 5000 行（深）"/>
+                                ToolTip.Tip="{loc:Text M0545}"/>
                 </WrapPanel>
                 <!-- session filter -->
                 <ComboBox Grid.Row="2" ItemsSource="{Binding Logs.SessionNames}"
@@ -1397,51 +1409,51 @@
                           VerticalAlignment="Center"/>
                 <!-- actions: match nav / copy visible / export / clear results / retain history -->
                 <WrapPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,4">
-                  <Button Content="▲ 上一条" Padding="8,3" CornerRadius="6"
+                  <Button Content="{loc:Text M0546}" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.GoPrevMatchCommand}"
                           IsEnabled="{Binding Logs.CanGoPrevMatch}"
-                          ToolTip.Tip="选中上一条匹配行（需要过滤词；到头即停，不循环）"/>
-                  <Button Content="▼ 下一条" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0547}"/>
+                  <Button Content="{loc:Text M0548}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.GoNextMatchCommand}"
                           IsEnabled="{Binding Logs.CanGoNextMatch}"
-                          ToolTip.Tip="选中下一条匹配行并滚动到它（暂停跟随尾部）；到头即停，不循环"/>
+                          ToolTip.Tip="{loc:Text M0549}"/>
                   <Button Content="▲ error" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiBad}"
                           FontSize="10" Command="{Binding Logs.GoPrevErrorCommand}"
                           IsEnabled="{Binding Logs.CanGoPrevError}"
-                          ToolTip.Tip="选中上一条 error 级别行（当前可见列表；到头即停，不循环；暂停跟随尾部）"/>
+                          ToolTip.Tip="{loc:Text M0550}"/>
                   <Button Content="▼ error" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiBad}"
                           FontSize="10" Command="{Binding Logs.GoNextErrorCommand}"
                           IsEnabled="{Binding Logs.CanGoNextError}"
-                          ToolTip.Tip="选中下一条 error 级别行并滚动到它（当前可见列表；暂停跟随尾部；到头即停，不循环）"/>
-                  <Button Content="↗ 跳到会话" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0551}"/>
+                  <Button Content="{loc:Text M0552}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.JumpToSessionCommand}"
-                          ToolTip.Tip="激活选中日志行来源对应的终端会话（Logs 页保持打开；也可双击该行）"/>
-                  <Button Content="⎘ 复制可见行" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0553}"/>
+                  <Button Content="{loc:Text M0554}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.CopyVisibleCommand}"
-                          ToolTip.Tip="复制当前过滤结果到剪贴板"/>
-                  <Button Content="⎘ 复制选中" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0555}"/>
+                  <Button Content="{loc:Text M0556}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.CopySelectedCommand}"
                           IsEnabled="{Binding Logs.HasSelectedEntry}"
-                          ToolTip.Tip="复制当前选中的日志行到剪贴板（Logs 列表聚焦时 Ctrl+C）"/>
-                  <Button Content="⬇ 导出" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0557}"/>
+                  <Button Content="{loc:Text M0558}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.ExportVisibleCommand}"
-                          ToolTip.Tip="把当前过滤后的可见行一次性导出为 .log / .txt 文件（与「⬇ 写文件」实时写入无关）"/>
-                  <Button Content="✕ 清空结果" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0559}"/>
+                  <Button Content="{loc:Text M0560}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                           Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                           FontSize="10" Command="{Binding Logs.ClearVisibleCommand}"
-                          ToolTip.Tip="清除当前过滤结果（从缓冲中移除，不再出现）"/>
-                  <ToggleButton Content="📌 保留历史" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
+                          ToolTip.Tip="{loc:Text M0561}"/>
+                  <ToggleButton Content="{loc:Text M0562}" Margin="6,0,0,0" Padding="8,3" CornerRadius="6"
                                 Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiBorder}" Foreground="{DynamicResource UiMuted}"
                                 FontSize="10" IsChecked="{Binding Logs.RetainHistoryOnClear}"
-                                ToolTip.Tip="开启后：底部 Output 清空时 Logs 保留已缓冲历史；默认跟随清空">
+                                ToolTip.Tip="{loc:Text M0563}">
                     <ToggleButton.Styles>
                       <Style Selector="ToggleButton:checked">
                         <Setter Property="Foreground" Value="{DynamicResource UiAccent}"/>
@@ -1451,7 +1463,7 @@
                   </ToggleButton>
                 </WrapPanel>
                 <!-- invalid-regex hint -->
-                <TextBlock Grid.Row="4" Text="{Binding Logs.FilterError}" Foreground="{DynamicResource UiBad}"
+                <TextBlock Grid.Row="4" Text="{loc:Translate {Binding Logs.FilterError}}" Foreground="{DynamicResource UiBad}"
                            FontSize="9.5" Margin="2,0,2,3" TextWrapping="Wrap"
                            IsVisible="{Binding Logs.FilterError, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
 
@@ -1490,6 +1502,7 @@
                                 <MultiBinding Converter="{x:Static vm:LogTimestampConverter.Instance}">
                                   <Binding Path="Time"/>
                                   <Binding Path="$parent[ListBox].DataContext.Logs.UseRelativeTimestamps"/>
+                                  <Binding Path="Revision" Source="{x:Static loc:UiText.Locale}"/>
                                 </MultiBinding>
                               </TextBlock.Text>
                             </TextBlock>
@@ -1501,7 +1514,7 @@
                                                     Query="{Binding $parent[ListBox].DataContext.Logs.FilterText}"
                                                     UseRegex="{Binding $parent[ListBox].DataContext.Logs.UseRegex}"
                                                     IsVisible="{Binding Source, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
-                            <ctl:HighlightTextBlock LineText="{Binding Message}" Foreground="{DynamicResource UiMuted}"
+                            <ctl:HighlightTextBlock LineText="{loc:Translate {Binding DisplayMessage}}" Foreground="{DynamicResource UiMuted}"
                                                     FontSize="{Binding $parent[ListBox].DataContext.Logs.CompactDensity, Converter={x:Static vm:BoolToLogsFontSizeConverter.Instance}}"
                                                     TextWrapping="{Binding $parent[ListBox].DataContext.Logs.WrapLines, Converter={x:Static vm:BoolToTextWrappingConverter.Instance}}"
                                                     Query="{Binding $parent[ListBox].DataContext.Logs.FilterText}"
@@ -1510,25 +1523,25 @@
                         </DataTemplate>
                       </ListBox.ItemTemplate>
                     </ListBox>
-                    <TextBlock Text="暂无日志行" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                    <TextBlock Text="{loc:Text M0564}" Foreground="{DynamicResource UiFaint}" FontSize="10"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding Logs.Entries.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <!-- follow paused: floats over the list until resumed -->
-                    <Button Content="⬇ 跟随" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    <Button Content="{loc:Text M0565}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                             Margin="0,0,10,10" Padding="10,4" CornerRadius="8"
                             Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
                             Foreground="{DynamicResource UiAccent}" FontSize="10"
                             Command="{Binding Logs.ResumeFollowCommand}"
                             IsVisible="{Binding Logs.FollowPaused}"
-                            ToolTip.Tip="新行不再自动滚动；点击恢复跟随（或滚回底部）"/>
+                            ToolTip.Tip="{loc:Text M0566}"/>
                   </Panel>
                 </Border>
 
                 <StackPanel Grid.Row="6" Orientation="Horizontal" Spacing="10" Margin="2,4,2,0">
-                  <TextBlock Text="{Binding Logs.FileStatus}" Foreground="{DynamicResource UiGood}"
+                  <TextBlock Text="{loc:Translate {Binding Logs.FileStatus}}" Foreground="{DynamicResource UiGood}"
                              FontSize="9" TextWrapping="Wrap"
                              IsVisible="{Binding Logs.FileStatus, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
-                  <TextBlock Text="{Binding Logs.StatusText}" Foreground="{DynamicResource UiMuted}"
+                  <TextBlock Text="{loc:Translate {Binding Logs.StatusText}}" Foreground="{DynamicResource UiMuted}"
                              FontSize="9" TextWrapping="Wrap"
                              IsVisible="{Binding Logs.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
                 </StackPanel>
@@ -1539,40 +1552,40 @@
                     RowDefinitions="Auto,Auto,*,Auto">
                 <!-- list-first header: the edit form only opens on demand once hosts exist -->
                 <Grid ColumnDefinitions="*,Auto" Margin="2,0,0,4" IsVisible="{Binding Ssh.HasHosts}">
-                  <TextBlock Text="已保存连接" FontSize="10.5" FontWeight="SemiBold"
+                  <TextBlock Text="{loc:Text M0567}" FontSize="10.5" FontWeight="SemiBold"
                              Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
                   <Button Grid.Column="1" Content="＋" Padding="8,1" FontSize="12"
                           CornerRadius="6" Background="{DynamicResource UiRaised}"
                           Foreground="{DynamicResource UiAccent}" BorderBrush="{DynamicResource UiBorder}"
-                          ToolTip.Tip="新建 / 收起连接表单" Command="{Binding Ssh.ToggleEditingCommand}" IsVisible="{Binding Ssh.CanToggleEditing}"/>
+                          ToolTip.Tip="{loc:Text M0568}" Command="{Binding Ssh.ToggleEditingCommand}" IsVisible="{Binding Ssh.CanToggleEditing}"/>
                 </Grid>
                 <!-- edit form -->
                 <Border Grid.Row="1" IsVisible="{Binding Ssh.Editing}" KeyDown="OnSshFormKeyDown"
                         CornerRadius="8" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}"
                         BorderThickness="1" Padding="8" Margin="0,2,0,6">
                   <StackPanel Spacing="6">
-                    <TextBlock Text="新建 / 编辑连接" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiMuted}"/>
+                    <TextBlock Text="{loc:Text M0569}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource UiMuted}"/>
                     <Grid ColumnDefinitions="*,*">
-                      <TextBox Text="{Binding Ssh.EditName}" Watermark="名称 (可选)"
+                      <TextBox Text="{Binding Ssh.EditName}" Watermark="{loc:Text M0570}"
                                Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                                Foreground="{DynamicResource UiInk}" Padding="8,3" FontSize="10.5"/>
-                      <TextBox Grid.Column="1" Text="{Binding Ssh.EditUser}" Watermark="用户"
+                      <TextBox Grid.Column="1" Text="{Binding Ssh.EditUser}" Watermark="{loc:Text M0571}"
                                Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                                Foreground="{DynamicResource UiInk}" Padding="8,3" FontSize="10.5" Margin="6,0,0,0"/>
                     </Grid>
-                    <TextBox Text="{Binding Ssh.EditHost}" Watermark="主机 host / IP"
+                    <TextBox Text="{Binding Ssh.EditHost}" Watermark="{loc:Text M0572}"
                              Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                              Foreground="{DynamicResource UiInk}" Padding="8,3" FontSize="10.5"
                              FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBox Text="{Binding Ssh.EditPort}" Watermark="端口"
+                      <TextBox Text="{Binding Ssh.EditPort}" Watermark="{loc:Text M0573}"
                                Background="{DynamicResource UiRaised}" CornerRadius="6" BorderBrush="{DynamicResource UiBorder}"
                                Foreground="{DynamicResource UiInk}" Padding="8,3" FontSize="10.5"/>
-                      <Button Grid.Column="1" Content="＋ 添加/更新" Margin="6,0,0,0" Padding="10,3"
+                      <Button Grid.Column="1" Content="{loc:Text M0574}" Margin="6,0,0,0" Padding="10,3"
                               CornerRadius="6" Background="{DynamicResource UiAccent}" Foreground="{DynamicResource UiOnAccent}" FontSize="10"
                               Command="{Binding Ssh.AddOrUpdateCommand}"/>
                     </Grid>
-                    <TextBlock Text="{Binding Ssh.StatusText}" FontSize="9.5" TextWrapping="Wrap"
+                    <TextBlock Text="{loc:Translate {Binding Ssh.StatusText}}" FontSize="9.5" TextWrapping="Wrap"
                                Foreground="{DynamicResource UiWarm}"
                                IsVisible="{Binding Ssh.StatusText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
                   </StackPanel>
@@ -1582,7 +1595,7 @@
                 <Border Grid.Row="2" CornerRadius="8" Background="{DynamicResource UiSurface}"
                         BorderBrush="{DynamicResource UiBorder}" BorderThickness="1">
                   <Panel>
-                    <TextBlock Text="暂无保存的连接 · 点上方 ＋ 添加" Foreground="{DynamicResource UiFaint}"
+                    <TextBlock Text="{loc:Text M0575}" Foreground="{DynamicResource UiFaint}"
                                FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding Ssh.Hosts.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                     <ListBox ItemsSource="{Binding Ssh.Hosts}" SelectedItem="{Binding Ssh.Selected}"
@@ -1611,8 +1624,8 @@
                             <TextBlock Text="{Binding CommandLine}" FontSize="9" Foreground="{DynamicResource UiFaint}" TextTrimming="CharacterEllipsis"
                                        FontFamily="Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace"/>
                           </StackPanel>
-                          <Button Grid.Column="1" Content="连接" Padding="8,2" Margin="6,0,0,0"
-                                  ToolTip.Tip="连接 (Enter / 双击)"
+                          <Button Grid.Column="1" Content="{loc:Text M0576}" Padding="8,2" Margin="6,0,0,0"
+                                  ToolTip.Tip="{loc:Text M0577}"
                                   CornerRadius="5" Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiAccent}"
                                   BorderBrush="{DynamicResource UiBorder}" FontSize="10" ClickMode="Press"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Ssh.ConnectCommand}"
@@ -1631,21 +1644,21 @@
 
                 <TextBlock Grid.Row="3" FontSize="9" Foreground="{DynamicResource UiFaint}" Margin="2,6,2,0"
                            TextWrapping="Wrap"
-                           Text="连接使用本机 ssh 命令:密码 / 密钥确认直接在终端会话中完成;密钥建议用 ssh-agent 或 ~/.ssh/config。"/>
+                           Text="{loc:Text M0578}"/>
               </Grid>
 
               <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                     RowDefinitions="Auto,*,Auto">
                 <WrapPanel Orientation="Horizontal">
-                  <Button Content="上一条" Margin="0,0,6,6" Command="{Binding PreviousCommandCommand}"/>
-                  <Button Content="下一条" Margin="0,0,6,6" Command="{Binding NextCommandCommand}"/>
-                  <Button Content="定位" Margin="0,0,6,6" Command="{Binding LocateCommandCommand}"/>
-                  <Button Content="复制命令和输出" Margin="0,0,6,6" Command="{Binding CopyCommandRecordCommand}"/>
-                  <Button Content="保存为文本" Margin="0,0,6,6" Click="OnSaveCommandRecord"
-                          ToolTip.Tip="把选中的命令和输出保存为 UTF-8 .txt"/>
+                  <Button Content="{loc:Text M0579}" Margin="0,0,6,6" Command="{Binding PreviousCommandCommand}"/>
+                  <Button Content="{loc:Text M0580}" Margin="0,0,6,6" Command="{Binding NextCommandCommand}"/>
+                  <Button Content="{loc:Text M0581}" Margin="0,0,6,6" Command="{Binding LocateCommandCommand}"/>
+                  <Button Content="{loc:Text M0582}" Margin="0,0,6,6" Command="{Binding CopyCommandRecordCommand}"/>
+                  <Button Content="{loc:Text M0583}" Margin="0,0,6,6" Click="OnSaveCommandRecord"
+                          ToolTip.Tip="{loc:Text M0584}"/>
                 </WrapPanel>
                 <Panel Grid.Row="1">
-                  <TextBlock Text="暂无命令记录 · 需终端输出带命令标记" Foreground="{DynamicResource UiFaint}"
+                  <TextBlock Text="{loc:Text M0585}" Foreground="{DynamicResource UiFaint}"
                              FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
                              IsVisible="{Binding CommandRecords.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
                   <ListBox ItemsSource="{Binding CommandRecords}" SelectedItem="{Binding SelectedCommand}"
@@ -1653,17 +1666,17 @@
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:CommandRecordViewModel">
                       <StackPanel Margin="2,4" Spacing="2">
-                        <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource UiMuted}" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding LocateText}" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
+                        <TextBlock Text="{loc:Translate {Binding DisplayTitle}}" FontSize="12" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{loc:Translate {Binding DisplayDetail}}" FontSize="10" Foreground="{DynamicResource UiMuted}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{loc:Translate {Binding LocateText}}" FontSize="10" Foreground="{DynamicResource UiFaint}"/>
                       </StackPanel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                   </ListBox>
                 </Panel>
                 <StackPanel Grid.Row="2" Spacing="4" Margin="2,6,2,0">
-                  <TextBlock Text="{Binding CommandNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
-                  <TextBlock Text="只记录带命令开始/完成标记的终端。历史被裁掉后不能定位，也不会复制到别的命令。" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiFaint}"/>
+                  <TextBlock Text="{loc:Translate {Binding CommandNotice}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                  <TextBlock Text="{loc:Text M0586}" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiFaint}"/>
                 </StackPanel>
               </Grid>
 
@@ -1672,25 +1685,41 @@
         </Border>
       </Grid>
 
+      <StackPanel x:Name="PluginSidePanel" Grid.Row="2" IsVisible="False" Width="300" HorizontalAlignment="Right" Margin="12" Background="{DynamicResource UiPanel}" ZIndex="70"/>
+      <StackPanel x:Name="PluginBottomPanel" Grid.Row="4" IsVisible="False" MaxHeight="220" Background="{DynamicResource UiPanel}"/>
+      <Border x:Name="ProjectToolsRegion" Grid.Row="5" IsVisible="False" Height="300" MinHeight="180"
+              Background="{DynamicResource UiPanel}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,1,0,0">
+        <Grid RowDefinitions="32,*">
+          <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,0">
+            <TextBlock Text="{loc:Text M0463}" VerticalAlignment="Center" Foreground="{DynamicResource UiInk}"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+              <Button Content="−" Click="OnCollapseProjectTools" ToolTip.Tip="{loc:Text Workbench18}"/>
+              <Button Content="×" Click="OnCloseProjectTools" ToolTip.Tip="{loc:Text Workbench19}"/>
+            </StackPanel>
+          </Grid>
+          <ContentControl x:Name="ProjectToolsContent" Grid.Row="1"/>
+        </Grid>
+      </Border>
       <!-- ============ Status bar ============ -->
-      <Border Grid.Row="4" Background="{DynamicResource UiCanvas}" Padding="26,0">
+      <Border Grid.Row="6" Background="{DynamicResource UiCanvas}" Padding="26,0">
         <Grid ColumnDefinitions="*,Auto">
-          <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+          <StackPanel x:Name="StatusContents" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+            <TextBlock x:Name="PluginNotice" Foreground="{DynamicResource UiBad}" MaxWidth="280" TextTrimming="CharacterEllipsis" IsVisible="False"/>
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Text="▦" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center"/>
-              <TextBlock Text="工作空间" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+              <TextBlock Text="{loc:Text M0587}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
               <TextBlock Text="{Binding ActiveDirectoryName}" Foreground="{DynamicResource UiInk}" FontSize="11" FontWeight="SemiBold"/>
             </StackPanel>
-            <TextBlock Text="{Binding LaunchNotice}" Foreground="{DynamicResource UiBad}" FontSize="11"
+            <TextBlock Text="{loc:Translate {Binding LaunchNotice}}" Foreground="{DynamicResource UiBad}" FontSize="11"
                        TextTrimming="CharacterEllipsis" MaxWidth="420"
-                       ToolTip.Tip="{Binding LaunchNotice}"
+                       ToolTip.Tip="{loc:Translate {Binding LaunchNotice}}"
                        IsVisible="{Binding LaunchNotice, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
-            <TextBlock Text="{Binding TerminalCount, StringFormat='◔ {0} 个终端'}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-            <TextBlock Text="{Binding RunningCount, StringFormat='⊕ {0} 个运行中'}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+            <TextBlock Text="{loc:Translate {Binding TerminalCount, StringFormat='◔ {0} 个终端'}}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+            <TextBlock Text="{loc:Translate {Binding RunningCount, StringFormat='⊕ {0} 个运行中'}}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
             <TextBlock Text="{Binding CpuText}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
-            <TextBlock Text="{Binding MemText}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
+            <TextBlock Text="{loc:Translate {Binding MemText}}" Foreground="{DynamicResource UiMuted}" FontSize="11"/>
             <ctl:SparklineControl Values="{Binding StatusSpark}" Stroke="{DynamicResource UiAccent}" Width="50" Height="14" VerticalAlignment="Center"/>
           </StackPanel>
         </Grid>
@@ -1704,7 +1733,7 @@
             Width="82" Height="30" CornerRadius="15" Background="Transparent" Margin="0,0,0,11" ZIndex="101"
             PointerEntered="OnDockHintEntered"
             IsVisible="{Binding DockVisibilityMode, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}">
-      <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center" VerticalAlignment="Center"><PathIcon Data="{StaticResource ToolTools}" Width="14" Height="14" Foreground="{DynamicResource UiInk}"/><TextBlock Text="工具" FontSize="11" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/></StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center" VerticalAlignment="Center"><PathIcon Data="{StaticResource ToolTools}" Width="14" Height="14" Foreground="{DynamicResource UiInk}"/><TextBlock Text="{loc:Text M0454}" FontSize="11" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/></StackPanel>
     </Border>
     <!-- ============ Floating action dock ============ -->
     <ctl:DropletDock x:Name="ActionDock" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,11"
@@ -1752,19 +1781,19 @@
       <StackPanel Orientation="Horizontal" Spacing="2">
         <Button x:Name="NewDockButton" Classes="dock dock-primary" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                 Command="{Binding DockSelectCommand}" CommandParameter="0"
-                ToolTip.Tip="新建会话" AutomationProperties.Name="新建会话">
+                ToolTip.Tip="{loc:Text M0471}" AutomationProperties.Name="{loc:Text M0471}">
           <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
             <!-- Local Foreground outranks every style, including the window-level
                  dock rules (UiMuted at rest / UiAccent in dock-active → invisible). -->
             <PathIcon Data="{StaticResource ToolAdd}" Foreground="{DynamicResource UiOnAccent}"/>
-            <TextBlock Text="新建会话" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Text="{loc:Text M0471}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=1}"
                 Command="{Binding DockSelectCommand}" CommandParameter="1">
           <StackPanel>
             <PathIcon Data="{StaticResource ToolMonitor}" HorizontalAlignment="Center"/>
-            <TextBlock Text="监控" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <TextBlock Text="{loc:Text M0590}" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
         <Button Classes="dock" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=2}"
@@ -1778,7 +1807,7 @@
                 Command="{Binding DockSelectCommand}" CommandParameter="3">
           <StackPanel>
             <PathIcon Data="{StaticResource ToolLogs}" HorizontalAlignment="Center"/>
-            <TextBlock Text="日志" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <TextBlock Text="{loc:Text M0591}" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
         <!-- Click: open artifacts, or publish if none. Ctrl+click / right-click 重新打包: force republish.
@@ -1788,36 +1817,36 @@
         <Button x:Name="DeployDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=4}"
                 Command="{Binding DockSelectCommand}" CommandParameter="4"
-                ToolTip.Tip="{Binding DeployDockTip}">
+                ToolTip.Tip="{loc:Translate {Binding DeployDockTip}}">
           <Button.ContextFlyout>
             <MenuFlyout Opening="OnDeployMenuOpening">
-              <MenuItem Header="重新打包 Republish" Click="OnRepublishMenuClick"/>
-              <MenuItem Header="取消打包 Cancel" Click="OnCancelPublishMenuClick"
+              <MenuItem Header="{loc:Text M0592}" Click="OnRepublishMenuClick"/>
+              <MenuItem Header="{loc:Text M0593}" Click="OnCancelPublishMenuClick"
                         IsEnabled="{Binding IsPublishRunning}"/>
               <Separator/>
-              <MenuItem Header="配置档 Profiles">
-                <MenuItem Header="（无已存配置）" IsEnabled="False"/>
+              <MenuItem Header="{loc:Text M0594}">
+                <MenuItem Header="{loc:Text M0286}" IsEnabled="False"/>
               </MenuItem>
-              <MenuItem Header="保存当前配置 Save profile" Click="OnSavePublishProfileClick"/>
-              <MenuItem Header="删除配置档 Delete profile">
-                <MenuItem Header="（无已存配置）" IsEnabled="False"/>
+              <MenuItem Header="{loc:Text M0595}" Click="OnSavePublishProfileClick"/>
+              <MenuItem Header="{loc:Text M0596}">
+                <MenuItem Header="{loc:Text M0286}" IsEnabled="False"/>
               </MenuItem>
               <Separator/>
-              <MenuItem Header="打开上次成功产物 Open last success" Click="OnOpenLastSuccessClick"
+              <MenuItem Header="{loc:Text M0597}" Click="OnOpenLastSuccessClick"
                         IsEnabled="False"/>
-              <MenuItem Header="复制上次成功产物路径 Copy last artifact path" Click="OnCopyLastSuccessPathClick"
+              <MenuItem Header="{loc:Text M0598}" Click="OnCopyLastSuccessPathClick"
                         IsEnabled="False"/>
-              <MenuItem Header="清除上次发布结果 Clear last result" Click="OnClearLastPublishResultClick"
+              <MenuItem Header="{loc:Text M0599}" Click="OnClearLastPublishResultClick"
                         IsEnabled="False"/>
-              <MenuItem Header="最近产物 Recent">
-                <MenuItem Header="（暂无产物）" IsEnabled="False"/>
+              <MenuItem Header="{loc:Text M0600}">
+                <MenuItem Header="{loc:Text M0289}" IsEnabled="False"/>
               </MenuItem>
             </MenuFlyout>
           </Button.ContextFlyout>
           <StackPanel>
             <PathIcon Data="{StaticResource ToolDeploy}" HorizontalAlignment="Center"/>
-            <TextBlock Text="{Binding DeployDockCaption}" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-            <TextBlock Text="{Binding LastPublishBadge}" FontSize="9"
+            <TextBlock Text="{loc:Translate {Binding DeployDockCaption}}" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <TextBlock Text="{loc:Translate {Binding LastPublishBadge}}" FontSize="9"
                        HorizontalAlignment="Center" Margin="0,1,0,0"
                        IsVisible="{Binding HasLastPublishBadge}"
                        TextWrapping="NoWrap"/>
@@ -1831,23 +1860,59 @@
         <Button x:Name="SettingsDockButton" Classes="dock"
                 Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"
                 Command="{Binding DockSelectCommand}" CommandParameter="5"
-                ToolTip.Tip="设置">
+                ToolTip.Tip="{loc:Text M0455}">
           <StackPanel>
             <PathIcon Data="{StaticResource ToolSettings}" HorizontalAlignment="Center"/>
-            <TextBlock Text="设置" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <TextBlock Text="{loc:Text M0455}" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
           </StackPanel>
         </Button>
 
       </StackPanel>
     </ctl:DropletDock>
 
+    <Border x:Name="SessionTransferHint" IsVisible="False" IsHitTestVisible="False" ZIndex="220"
+            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20,108,20,0" Padding="14,8"
+            Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1" CornerRadius="10">
+      <TextBlock x:Name="SessionTransferText" Foreground="{DynamicResource UiAccent}" TextTrimming="CharacterEllipsis" MaxWidth="700"/>
+    </Border>
+    <Border x:Name="RecentSwitcherPanel" IsVisible="{Binding RecentSwitcherOpen}" ZIndex="230" HorizontalAlignment="Center" VerticalAlignment="Center"
+            Width="560" MaxHeight="620" Margin="24" Padding="20" CornerRadius="18"
+            Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
+            BoxShadow="{DynamicResource FloatingShadow}">
+      <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+        <TextBlock Text="{loc:Text M0601}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+        <ListBox x:Name="RecentSessionList" Grid.Row="1" MaxHeight="480" ItemsSource="{Binding RecentCandidates}"
+                 SelectedItem="{Binding SelectedRecent}" DoubleTapped="OnRecentDoubleTapped">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="CornerRadius" Value="8"/></Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiRaised}"/></Style>
+            <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource UiAccentSoft}"/></Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:RecentSessionEntry">
+              <Grid ColumnDefinitions="150,*" ColumnSpacing="16" Margin="4">
+                <Border Height="80" ClipToBounds="True" Background="{DynamicResource UiInset}" CornerRadius="6">
+                  <ctl:StagePreview Emulator="{Binding Emulator}"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                  <TextBlock Text="{Binding Name}" Foreground="{DynamicResource UiInk}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding Workspace}" Foreground="{DynamicResource UiMuted}" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Grid.Row="2" Text="{loc:Text M0602}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+      </Grid>
+    </Border>
+
     <Border x:Name="ShellSetupPanel" IsVisible="{Binding ShellSetupOpen}" ZIndex="210"
             HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="480" Margin="24"
             Padding="24" Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiBorder}"
             BorderThickness="1" BoxShadow="{DynamicResource SurfaceShadow}" CornerRadius="18">
       <StackPanel Spacing="14">
-        <TextBlock Text="选择你的第一个 Shell" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-        <TextBlock Text="{Binding ShellSetupMessage}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+        <TextBlock Text="{loc:Text M0603}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+        <TextBlock Text="{loc:Translate {Binding ShellSetupMessage}}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
         <ComboBox x:Name="StartupShellPicker" ItemsSource="{Binding AvailableStartupShells}"
                   SelectedItem="{Binding SelectedStartupShell}" HorizontalAlignment="Stretch">
           <ComboBox.ItemTemplate>
@@ -1856,8 +1921,8 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBox Text="{Binding StartupCustomShell}" Watermark="或填写自定义 Shell 的完整路径"/>
-        <Button Content="开始使用" Command="{Binding ContinueShellSetupCommand}" HorizontalAlignment="Right"/>
+        <TextBox Text="{Binding StartupCustomShell}" Watermark="{loc:Text M0604}"/>
+        <Button Content="{loc:Text M0605}" Command="{Binding ContinueShellSetupCommand}" HorizontalAlignment="Right"/>
       </StackPanel>
     </Border>
 
@@ -1872,101 +1937,107 @@
             <PathIcon Data="{StaticResource ToolSettings}" Width="20" Height="20" Foreground="{DynamicResource UiAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <StackPanel Grid.Column="1" Spacing="3" Margin="12,0,0,0" VerticalAlignment="Center">
-            <TextBlock Text="设置" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-            <TextBlock Text="让工作空间更合你的习惯" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+            <TextBlock Text="{loc:Text M0455}" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+            <TextBlock Text="{loc:Text M0606}" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
           </StackPanel>
           <Button Grid.Column="2" Content="×" Width="28" Height="28" Padding="0" CornerRadius="14"
                   HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                   Background="{DynamicResource UiRaised}" Foreground="{DynamicResource UiMuted}" BorderThickness="0"
-                  Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="关闭设置"/>
+                  Command="{Binding DockSelectCommand}" CommandParameter="5" ToolTip.Tip="{loc:Text M0607}"/>
         </Grid>
         <TabControl x:Name="SettingsTabs" Grid.Row="1" Margin="16,0,16,12">
-          <TabItem Header="外观">
+          <TabItem Header="{loc:Text M0608}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Spacing="12" Margin="4,12,4,4">
                 <Border Classes="settings-group">
                   <StackPanel Spacing="10">
-                    <TextBlock Text="主题与终端文字" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                    <ComboBox x:Name="ThemePicker" SelectedIndex="{Binding ThemeIndex}">
-                      <ComboBoxItem>深蓝玻璃</ComboBoxItem><ComboBoxItem>深黑</ComboBoxItem>
-                      <ComboBoxItem>亮白</ComboBoxItem><ComboBoxItem>纸张</ComboBoxItem>
+                    <TextBlock Text="{loc:Text Language}" Foreground="{DynamicResource UiInk}"/>
+                    <ComboBox Classes="localized" x:Name="LanguagePicker" SelectedIndex="{Binding LanguageIndex}">
+                      <ComboBoxItem Content="{loc:Text FollowSystem}"/>
+                      <ComboBoxItem Content="简体中文"/>
+                      <ComboBoxItem Content="English"/>
+                    </ComboBox>
+                    <TextBlock Text="{loc:Text M0609}" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                    <ComboBox Classes="localized" x:Name="ThemePicker" SelectedIndex="{Binding ThemeIndex}">
+                      <ComboBoxItem Content="{loc:Text M0688}"/><ComboBoxItem Content="{loc:Text M0689}"/>
+                      <ComboBoxItem Content="{loc:Text M0690}"/><ComboBoxItem Content="{loc:Text M0691}"/>
                     </ComboBox>
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
-                      <Button Content="−" Classes="terminal-tool" Command="{Binding DecreaseFontSizeCommand}" ToolTip.Tip="缩小字体"/>
+                      <Button Content="−" Classes="terminal-tool" Command="{Binding DecreaseFontSizeCommand}" ToolTip.Tip="{loc:Text M0610}"/>
                       <NumericUpDown Grid.Column="1" Value="{Binding FontSize}" Minimum="8" Maximum="32" Increment="1" FormatString="0"/>
-                      <Button Grid.Column="2" Content="＋" Classes="terminal-tool" Command="{Binding IncreaseFontSizeCommand}" ToolTip.Tip="放大字体"/>
-                      <Button Grid.Column="3" Content="重置" Classes="terminal-tool" Command="{Binding ResetTerminalFontSizeCommand}"/>
+                      <Button Grid.Column="2" Content="＋" Classes="terminal-tool" Command="{Binding IncreaseFontSizeCommand}" ToolTip.Tip="{loc:Text M0611}"/>
+                      <Button Grid.Column="3" Content="{loc:Text M0612}" Classes="terminal-tool" Command="{Binding ResetTerminalFontSizeCommand}"/>
                     </Grid>
-                    <TextBox Text="{Binding TerminalFontName}" Watermark="等宽字体：默认 Cascadia / Consolas"/>
-                    <TextBlock Text="Ctrl+= / Ctrl+− 调整字号 · Ctrl+0 重置" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+                    <TextBox Text="{Binding TerminalFontName}" Watermark="{loc:Text M0613}"/>
+                    <TextBlock Text="{loc:Text M0614}" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
                   </StackPanel>
                 </Border>
-                <TextBlock Classes="settings-heading" Text="实时预览"/>
+                <TextBlock Classes="settings-heading" Text="{loc:Text M0615}"/>
                 <Border Background="{DynamicResource UiInset}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" CornerRadius="8" Padding="16">
                   <StackPanel Spacing="8">
                     <TextBlock Text="{Binding TerminalPreviewPrompt}" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiAccent}"/>
-                    <TextBlock Text="Terminal Hub · 中文与 English 012345" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiInk}" TextWrapping="Wrap"/>
+                    <TextBlock Text="{loc:Text M0616}" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiInk}" TextWrapping="Wrap"/>
                     <TextBlock Text="✓ Build succeeded" FontFamily="{Binding TerminalFont}" FontSize="{Binding FontSize}" Foreground="{DynamicResource UiGood}"/>
                   </StackPanel>
                 </Border>
-                <TextBlock Text="主题、字体和字号立即应用，点击「完成」保存。" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{loc:Text M0617}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
               </StackPanel>
             </ScrollViewer>
           </TabItem>
-          <TabItem Header="工作区">
+          <TabItem Header="{loc:Text M0201}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="settings-group" Margin="4,12,4,4">
                 <StackPanel Spacing="14">
-                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="右侧工具栏" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding InspectorVisible}" OnContent="" OffContent="" MinWidth="0"/></Grid>
-                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="下方输出区" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding OutputVisible}" OnContent="" OffContent="" MinWidth="0"/></Grid>
-                  <TextBlock Text="Dock 显示方式" Foreground="{DynamicResource UiInk}"/>
-                  <ComboBox SelectedIndex="{Binding DockVisibilityMode}"><ComboBoxItem>自动隐藏 · 底部「工具」呼出</ComboBoxItem><ComboBoxItem>始终显示</ComboBoxItem><ComboBoxItem>隐藏</ComboBoxItem></ComboBox>
-                  <TextBlock Text="工作空间名称" Foreground="{DynamicResource UiInk}"/>
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{loc:Text M0618}" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding InspectorVisible}" OnContent="" OffContent="" MinWidth="0"/></Grid>
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{loc:Text M0619}" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding OutputVisible}" OnContent="" OffContent="" MinWidth="0"/></Grid>
+                  <TextBlock Text="{loc:Text M0620}" Foreground="{DynamicResource UiInk}"/>
+                  <ComboBox Classes="localized" SelectedIndex="{Binding DockVisibilityMode}"><ComboBoxItem Content="{loc:Text M0692}"/><ComboBoxItem Content="{loc:Text M0693}"/><ComboBoxItem Content="{loc:Text M0694}"/></ComboBox>
+                  <TextBlock Text="{loc:Text M0621}" Foreground="{DynamicResource UiInk}"/>
                   <TextBox Text="{Binding WorkspaceNameLive}"/>
-                  <TextBlock Text="工作区模板" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <TextBlock Text="{loc:Text M0317}" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                   <ComboBox x:Name="WorkspaceTemplatePicker" ItemsSource="{Binding WorkspaceTemplates}" SelectedItem="{Binding SelectedTemplate}">
                     <ComboBox.ItemTemplate><DataTemplate x:DataType="settings:WorkspaceTemplate"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
                   </ComboBox>
-                  <TextBox Text="{Binding TemplateName}" Watermark="模板名称，例如：前端项目"/>
+                  <TextBox Text="{Binding TemplateName}" Watermark="{loc:Text M0622}"/>
                   <WrapPanel>
-                    <Button Content="存为新模板" Command="{Binding SaveCurrentAsTemplateCommand}" Margin="0,0,6,6"/>
-                    <Button Content="打开模板" Command="{Binding OpenTemplateCommand}" IsEnabled="{Binding !IsOpeningTemplate}" Margin="0,0,6,6"/>
-                    <Button Content="保存修改" Command="{Binding SaveTemplateChangesCommand}" Margin="0,0,6,6"/>
-                    <Button Content="更新为当前布局" Command="{Binding UpdateTemplateLayoutCommand}" Margin="0,0,6,6"/>
-                    <Button Content="复制模板" Command="{Binding DuplicateTemplateCommand}" Margin="0,0,6,6"/>
-                    <Button Content="导出模板" Click="OnExportTemplate" Margin="0,0,6,6"/>
-                    <Button Content="导入模板" Click="OnImportTemplate" Margin="0,0,6,6"/>
-                    <Button Content="删除模板" Command="{Binding DeleteTemplateCommand}" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0623}" Command="{Binding SaveCurrentAsTemplateCommand}" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0624}" Command="{Binding OpenTemplateCommand}" IsEnabled="{Binding !IsOpeningTemplate}" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0625}" Command="{Binding SaveTemplateChangesCommand}" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0626}" Command="{Binding UpdateTemplateLayoutCommand}" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0627}" Command="{Binding DuplicateTemplateCommand}" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0628}" Click="OnExportTemplate" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0629}" Click="OnImportTemplate" Margin="0,0,6,6"/>
+                    <Button Content="{loc:Text M0630}" Command="{Binding DeleteTemplateCommand}" Margin="0,0,6,6"/>
                   </WrapPanel>
-                  <TextBlock Text="打开前预览" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
-                  <TextBlock Text="{Binding TemplatePreview}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-                  <TextBlock Text="{Binding TemplateMessage}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
-                  <TextBlock Text="预览显示当前编辑。打开当前选中的模板会带上这些修改，并保留现有终端。启动命令只在打开且启用时执行；导入不会执行。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-                  <TextBlock Text="会话分组" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <TextBlock Text="{loc:Text M0631}" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <TextBlock Text="{loc:Translate {Binding TemplatePreview}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                  <TextBlock Text="{loc:Translate {Binding TemplateMessage}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                  <TextBlock Text="{loc:Text M0632}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                  <TextBlock Text="{loc:Text M0633}" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
                   <ItemsControl ItemsSource="{Binding SessionGroups}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="settings:SessionGroup">
                         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
-                          <TextBox Text="{Binding Name}" Watermark="分组名称"/>
-                          <Button Grid.Column="1" Content="删除" Margin="6,0,0,0"
+                          <TextBox Text="{Binding Name}" Watermark="{loc:Text M0311}"/>
+                          <Button Grid.Column="1" Content="{loc:Text M0634}" Margin="6,0,0,0"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteGroupCommand}"
                                   CommandParameter="{Binding}"/>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <Button Content="新建分组" Click="OnCreateEmptyGroup" HorizontalAlignment="Left"/>
+                  <Button Content="{loc:Text M0310}" Click="OnCreateEmptyGroup" HorizontalAlignment="Left"/>
                   <ItemsControl ItemsSource="{Binding TemplateSessions}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:WorkspaceSessionEditor">
                         <Expander Header="{Binding Name}" HorizontalAlignment="Stretch" Margin="0,0,0,8">
                           <StackPanel Spacing="8">
-                            <TextBox Text="{Binding Name}" Watermark="终端名称"/>
-                            <TextBox Text="{Binding WorkingDirectory}" Watermark="工作目录"/>
+                            <TextBox Text="{Binding Name}" Watermark="{loc:Text M0272}"/>
+                            <TextBox Text="{Binding WorkingDirectory}" Watermark="{loc:Text M0635}"/>
                             <TextBox Text="{Binding Shell}" Watermark="Shell"/>
-                            <TextBox Text="{Binding Arguments}" Watermark="Shell 参数"/>
-                            <TextBox Text="{Binding StartupCommand}" Watermark="启动命令，例如：npm run dev"/>
-                            <CheckBox Content="打开模板时执行启动命令（本地 Shell）" IsChecked="{Binding RunStartupCommand}" IsEnabled="{Binding CanRunStartupCommand}"/>
+                            <TextBox Text="{Binding Arguments}" Watermark="{loc:Text M0636}"/>
+                            <TextBox Text="{Binding StartupCommand}" Watermark="{loc:Text M0637}"/>
+                            <CheckBox Content="{loc:Text M0638}" IsChecked="{Binding RunStartupCommand}" IsEnabled="{Binding CanRunStartupCommand}"/>
                           </StackPanel>
                         </Expander>
                       </DataTemplate>
@@ -1976,82 +2047,82 @@
               </Border>
             </ScrollViewer>
           </TabItem>
-          <TabItem Header="快捷键">
+          <TabItem Header="{loc:Text M0639}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Spacing="12" Margin="4,12,4,4">
-                <TextBlock Text="点击右侧输入框，再按你想使用的快捷键。Backspace / Delete 清除；Tab 移到下一项。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-                <TextBlock Text="Alt+1 到 Alt+9 按侧栏完整顺序切换，包括折叠分组里的终端。置顶或拖动后序号跟着新顺序变化。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{loc:Text M0640}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{loc:Text M0641}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
                 <ItemsControl ItemsSource="{Binding SessionShortcuts}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:SessionShortcutViewModel">
                       <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,180" Margin="0,0,0,10">
-                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
-                        <ctl:ShortcutEditor Grid.Column="1" Text="{Binding Gesture, Mode=TwoWay}" ToolTip.Tip="按快捷键录入；Backspace 清除"/>
-                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Foreground="{DynamicResource UiBad}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding Error, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                        <TextBlock Text="{loc:Translate {Binding Label}}" Foreground="{DynamicResource UiInk}" VerticalAlignment="Center"/>
+                        <ctl:ShortcutEditor Grid.Column="1" Text="{Binding Gesture, Mode=TwoWay}" ToolTip.Tip="{loc:Text M0642}"/>
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{loc:Translate {Binding Error}}" Foreground="{DynamicResource UiBad}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding Error, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Button Content="恢复默认快捷键" Command="{Binding ResetSessionShortcutsCommand}"/>
-                <TextBlock Text="空白表示不绑定；有冲突的快捷键不会生效。" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+                <Button Content="{loc:Text M0643}" Command="{Binding ResetSessionShortcutsCommand}"/>
+                <TextBlock Text="{loc:Text M0644}" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
               </StackPanel>
             </ScrollViewer>
           </TabItem>
-          <TabItem Header="启动">
+          <TabItem Header="{loc:Text M0645}">
             <Border Classes="settings-group" Margin="4,12,4,4" VerticalAlignment="Top">
               <StackPanel Spacing="12">
-                <TextBlock Text="新终端使用" Foreground="{DynamicResource UiInk}"/>
-                <ComboBox ItemsSource="{Binding SettingsShellLabels}" SelectedIndex="{Binding SettingsShellIndex}"/>
-                <TextBlock Text="自定义 Shell 路径" Foreground="{DynamicResource UiInk}"/>
-                <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="{Binding CustomShellWatermark}"/>
-                <CheckBox Content="{Binding FileManagerMenuLabel}" IsChecked="{Binding ExplorerMenuEnabled}" IsEnabled="{Binding FileManagerMenuAvailable}"/>
-                <TextBlock Text="{Binding ExplorerMenuMessage}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-                <TextBlock Text="勾选后，文件夹或其空白处的右键菜单会出现“在 Terminal Hub 中打开”。取消勾选即移除。带空格或中文的路径会传给已打开的窗口。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{loc:Text M0646}" Foreground="{DynamicResource UiInk}"/>
+                <ComboBox ItemsSource="{Binding SettingsShellLabels}" SelectedIndex="{Binding SettingsShellIndex}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{loc:Translate {ReflectionBinding}}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                <TextBlock Text="{loc:Text M0647}" Foreground="{DynamicResource UiInk}"/>
+                <TextBox Text="{Binding Settings.CustomShellPath}" Watermark="{loc:Translate {Binding CustomShellWatermark}}"/>
+                <CheckBox Content="{loc:Translate {Binding FileManagerMenuLabel}}" IsChecked="{Binding ExplorerMenuEnabled}" IsEnabled="{Binding FileManagerMenuAvailable}"/>
+                <TextBlock Text="{loc:Translate {Binding ExplorerMenuMessage}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{loc:Text M0648}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
               </StackPanel>
             </Border>
           </TabItem>
-          <TabItem Header="关于">
+          <TabItem Header="{loc:Text M0649}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="14" Margin="4,12">
               <TextBlock Text="Terminal Hub" FontSize="20" Foreground="{DynamicResource UiInk}"/>
-              <TextBlock Text="{Binding AppVersionText}" Foreground="{DynamicResource UiMuted}"/>
-              <TextBlock Text="报错行号编辑器（可选 VS Code / Code.exe）" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
-              <TextBox Text="{Binding Settings.FileEditorPath}" Watermark="留空用记事本打开；Code.exe 支持定位行号"/>
-              <CheckBox Content="提醒后台命令完成或失败" IsChecked="{Binding Settings.NotifyCommandCompletion}"/>
-              <TextBlock Text="支持命令完成协议的 Shell 提供结果与耗时；其他 Shell 保留输出与进程状态提示。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-              <Button Content="查看当前版本说明" Command="{Binding OpenReleaseNotesCommand}"/>
-              <Button Content="检查更新" Command="{Binding CheckForUpdatesCommand}"/>
-              <Button Content="打开 GitHub 发布页" Command="{Binding OpenProjectReleasesCommand}"/>
-              <TextBlock Text="{Binding UpdateMessage}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+              <TextBlock Text="{loc:Translate {Binding AppVersionText}}" Foreground="{DynamicResource UiMuted}"/>
+              <TextBlock Text="{loc:Text M0650}" FontSize="11" Foreground="{DynamicResource UiMuted}"/>
+              <TextBox Text="{Binding Settings.FileEditorPath}" Watermark="{loc:Text M0651}"/>
+              <CheckBox Content="{loc:Text M0652}" IsChecked="{Binding Settings.NotifyCommandCompletion}"/>
+              <TextBlock Text="{loc:Text M0653}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+              <Button Content="{loc:Text M0654}" Command="{Binding OpenReleaseNotesCommand}"/>
+              <Button Content="{loc:Text M0655}" Command="{Binding CheckForUpdatesCommand}"/>
+              <Button Content="{loc:Text M0656}" Command="{Binding OpenProjectReleasesCommand}"/>
+              <TextBlock Text="{loc:Translate {Binding UpdateMessage}}" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
               <ComboBox ItemsSource="{Binding UpdateAssets}" SelectedItem="{Binding SelectedUpdateAsset}" IsEnabled="{Binding !IsDownloadingUpdate}" HorizontalAlignment="Stretch">
-                <ComboBox.ItemTemplate><DataTemplate x:DataType="settings:ReleaseAsset"><StackPanel Spacing="3"><TextBlock Text="{Binding Label}"/><TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource UiMuted}"/></StackPanel></DataTemplate></ComboBox.ItemTemplate>
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="settings:ReleaseAsset"><StackPanel Spacing="3"><TextBlock Text="{loc:Translate {Binding Label}}"/><TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource UiMuted}"/></StackPanel></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
-              <Button Content="下载所选版本…" Click="OnDownloadUpdate" IsEnabled="{Binding !IsDownloadingUpdate}"/>
+              <Button Content="{loc:Text M0657}" Click="OnDownloadUpdate" IsEnabled="{Binding !IsDownloadingUpdate}"/>
               <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdateDownloadPercent}" IsIndeterminate="{Binding UpdateDownloadIndeterminate}" IsVisible="{Binding IsDownloadingUpdate}"/>
-              <Button Content="取消下载" Command="{Binding CancelUpdateDownloadCommand}" IsVisible="{Binding IsDownloadingUpdate}"/>
-              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDownloadedUpdate}"><Button Content="打开下载文件" Command="{Binding OpenDownloadedUpdateCommand}"/><Button Content="打开所在目录" Command="{Binding OpenUpdateFolderCommand}"/></StackPanel>
-              <TextBlock Text="新版发行说明" Foreground="{DynamicResource UiInk}"/>
+              <Button Content="{loc:Text M0658}" Command="{Binding CancelUpdateDownloadCommand}" IsVisible="{Binding IsDownloadingUpdate}"/>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDownloadedUpdate}"><Button Content="{loc:Text M0659}" Command="{Binding OpenDownloadedUpdateCommand}"/><Button Content="{loc:Text M0660}" Command="{Binding OpenUpdateFolderCommand}"/></StackPanel>
+              <TextBlock Text="{loc:Text M0661}" Foreground="{DynamicResource UiInk}"/>
               <TextBox Text="{Binding UpdateNotes}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="200"/>
-              <Button Content="在浏览器查看发行说明" Command="{Binding OpenUpdateDownloadCommand}"/>
+              <Button Content="{loc:Text M0662}" Command="{Binding OpenUpdateDownloadCommand}"/>
             </StackPanel>
             </ScrollViewer>
           </TabItem>
-          <TabItem Header="命令">
+          <TabItem Header="{loc:Text M0338}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Spacing="12" Margin="4,12,4,4">
-                <TextBlock Text="收藏命令会填入当前终端，不会自动按 Enter。多行命令只在终端开启括号粘贴时填入；否则不填入，避免逐行执行。Shell 不一致时仍会填入单行命令，并给出提示。" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
-                <TextBlock Text="{Binding FavoriteNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                <TextBlock Text="{loc:Text M0663}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"/>
+                <TextBlock Text="{loc:Translate {Binding FavoriteNotice}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
                 <ItemsControl ItemsSource="{Binding FavoriteCommands}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:FavoriteCommandViewModel">
                       <Border BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
                         <StackPanel Spacing="8">
-                          <TextBox Text="{Binding Name}" Watermark="名称，例如：启动开发服务"/>
-                          <TextBox Text="{Binding Command}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" Watermark="命令文本"/>
-                          <TextBox Text="{Binding Shell}" Watermark="适用 Shell，留空表示任意"/>
-                          <ctl:ShortcutEditor Text="{Binding Shortcut, Mode=TwoWay}" ToolTip.Tip="可选快捷键。按键录入；Backspace 清除"/>
-                          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource UiBad}" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
-                          <Button Content="删除" HorizontalAlignment="Left"
+                          <TextBox Text="{Binding Name}" Watermark="{loc:Text M0664}"/>
+                          <TextBox Text="{Binding Command}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" Watermark="{loc:Text M0665}"/>
+                          <TextBox Text="{Binding Shell}" Watermark="{loc:Text M0666}"/>
+                          <ctl:ShortcutEditor Text="{Binding Shortcut, Mode=TwoWay}" ToolTip.Tip="{loc:Text M0667}"/>
+                          <TextBlock Text="{loc:Translate {Binding Error}}" Foreground="{DynamicResource UiBad}" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
+                          <Button Content="{loc:Text M0634}" HorizontalAlignment="Left"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteFavoriteCommand}"
                                   CommandParameter="{Binding}"/>
                         </StackPanel>
@@ -2059,15 +2130,15 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Button Content="添加收藏" Command="{Binding AddFavoriteCommand}" HorizontalAlignment="Left"/>
+                <Button Content="{loc:Text M0668}" Command="{Binding AddFavoriteCommand}" HorizontalAlignment="Left"/>
               </StackPanel>
             </ScrollViewer>
           </TabItem>
         </TabControl>
         <Border Grid.Row="2" Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="0,1,0,0" Padding="20,12">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="你的终端，你的工作空间" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="完成" MinWidth="86" Background="{DynamicResource UiAccent}" Foreground="{DynamicResource UiOnAccent}" CornerRadius="8"
+            <TextBlock Text="{loc:Text M0669}" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="{loc:Text M0010}" MinWidth="86" Background="{DynamicResource UiAccent}" Foreground="{DynamicResource UiOnAccent}" CornerRadius="8"
                     Padding="18,8" HorizontalContentAlignment="Center" Command="{Binding SaveSettingsCommand}"/>
           </Grid>
         </Border>
@@ -2079,8 +2150,8 @@
             Background="{DynamicResource UiCanvas}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1"
             BoxShadow="{DynamicResource FloatingShadow}" CornerRadius="14">
       <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
-        <TextBlock Text="查找终端与操作" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold"/>
-        <TextBox x:Name="PaletteSearch" Grid.Row="1" Watermark="输入终端名、目录或操作…" TextChanged="OnPaletteTextChanged"/>
+        <TextBlock Text="{loc:Text M0670}" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold"/>
+        <TextBox x:Name="PaletteSearch" Grid.Row="1" Watermark="{loc:Text M0671}" TextChanged="OnPaletteTextChanged"/>
         <ListBox x:Name="PaletteResults" Grid.Row="2" MaxHeight="320" Background="Transparent" BorderThickness="0" DoubleTapped="OnExecutePalette">
           <ListBox.Styles>
             <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
@@ -2090,17 +2161,17 @@
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:PaletteEntry">
               <Grid ColumnDefinitions="*,Auto" Margin="6,5">
-                <StackPanel Spacing="4"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource UiMuted}" TextTrimming="CharacterEllipsis"/></StackPanel>
+                <StackPanel Spacing="4"><TextBlock Text="{loc:Translate {Binding Label}}" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{loc:Translate {Binding Detail}}" FontSize="11" Foreground="{DynamicResource UiMuted}" TextTrimming="CharacterEllipsis"/></StackPanel>
                 <TextBlock Grid.Column="1" Text="{Binding Shortcut}" Foreground="{DynamicResource UiFaint}" FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0"/>
               </Grid>
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
-        <StackPanel Grid.Row="3" Spacing="6"><TextBlock x:Name="PaletteEmpty" Text="没有匹配的终端或操作" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="↑ ↓ 选择 · Enter 执行 · Esc 返回" FontSize="11" Foreground="{DynamicResource UiFaint}"/></StackPanel>
+        <StackPanel Grid.Row="3" Spacing="6"><TextBlock x:Name="PaletteEmpty" Text="{loc:Text M0672}" Foreground="{DynamicResource UiMuted}"/><TextBlock Text="{loc:Text M0673}" FontSize="11" Foreground="{DynamicResource UiFaint}"/></StackPanel>
       </Grid>
     </Border>
     <Border IsVisible="{Binding NotificationVisible}" ZIndex="220" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24,0,24,90" MaxWidth="380" Padding="16" CornerRadius="12" Background="{DynamicResource UiRaised}" BorderBrush="{DynamicResource UiAccent}" BorderThickness="1">
-      <StackPanel Spacing="10"><TextBlock Text="{Binding NotificationText}" TextWrapping="Wrap" Foreground="{DynamicResource UiInk}"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="查看终端" Command="{Binding ShowNotificationSessionCommand}"/><Button Content="关闭" Command="{Binding DismissNotificationCommand}"/></StackPanel></StackPanel>
+      <StackPanel Spacing="10"><TextBlock Text="{loc:Translate {Binding NotificationText}}" TextWrapping="Wrap" Foreground="{DynamicResource UiInk}"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="{loc:Text M0674}" Command="{Binding ShowNotificationSessionCommand}"/><Button Content="{loc:Text M0675}" Command="{Binding DismissNotificationCommand}"/></StackPanel></StackPanel>
     </Border>
     <Border ZIndex="290" Background="#66000000" IsVisible="{Binding #BookmarkPanel.IsVisible}" PointerPressed="OnBookmarkBackdrop"/>
     <Border x:Name="BookmarkPanel" IsVisible="False" ZIndex="300" Width="760" MaxHeight="620"
@@ -2109,17 +2180,17 @@
             BoxShadow="{DynamicResource FloatingShadow}" CornerRadius="14">
       <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="10">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Text="输出书签" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text M0676}" Foreground="{DynamicResource UiInk}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Button Content="当前会话" Classes="terminal-tool" Padding="10,3" FontSize="11"
+            <Button Content="{loc:Text M0015}" Classes="terminal-tool" Padding="10,3" FontSize="11"
                     Classes.selected="{Binding !BookmarksAllSessions}" Click="OnBookmarkScopeSession"/>
-            <Button Content="全部" Classes="terminal-tool" Padding="10,3" FontSize="11"
+            <Button Content="{loc:Text M0058}" Classes="terminal-tool" Padding="10,3" FontSize="11"
                     Classes.selected="{Binding BookmarksAllSessions}" Click="OnBookmarkScopeAll"/>
           </StackPanel>
         </Grid>
-        <TextBox x:Name="BookmarkSearch" Grid.Row="1" Watermark="按名称、会话或保存的文字筛选…" TextChanged="OnBookmarkSearchChanged"/>
+        <TextBox x:Name="BookmarkSearch" Grid.Row="1" Watermark="{loc:Text M0677}" TextChanged="OnBookmarkSearchChanged"/>
         <TextBlock Grid.Row="2" FontSize="10" Foreground="{DynamicResource UiFaint}" TextWrapping="Wrap"
-                   Text="书签保存的是文字快照。来源输出被裁剪、会话关闭或应用重启后，定位不可用，文字仍可查看复制。"/>
+                   Text="{loc:Text M0678}"/>
         <ListBox x:Name="BookmarkResults" Grid.Row="3" MaxHeight="220" Background="Transparent" BorderThickness="0"
                  ItemsSource="{Binding VisibleBookmarks}" SelectedItem="{Binding SelectedBookmark}" Tapped="OnBookmarkTapped">
           <ListBox.Styles>
@@ -2134,21 +2205,21 @@
                   <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}" TextTrimming="CharacterEllipsis"/>
                   <TextBlock Text="{Binding Meta}" FontSize="10" Foreground="{DynamicResource UiMuted}"/>
                   <TextBlock Text="{Binding Preview}" FontSize="10" Foreground="{DynamicResource UiFaint}" TextTrimming="CharacterEllipsis" MaxWidth="440"/>
-                  <TextBlock Text="{Binding LocateText}" FontSize="10" Foreground="{DynamicResource UiAccent}"
+                  <TextBlock Text="{loc:Translate {Binding LocateText}}" FontSize="10" Foreground="{DynamicResource UiAccent}"
                              IsVisible="{Binding LocateText, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
-                  <Button Content="查看" FontSize="10" Padding="8,2" CornerRadius="5" Click="OnViewBookmark"
-                          ToolTip.Tip="查看保存的完整文字"/>
-                  <Button Content="定位" FontSize="10" Padding="8,2" CornerRadius="5"
+                  <Button Content="{loc:Text M0679}" FontSize="10" Padding="8,2" CornerRadius="5" Click="OnViewBookmark"
+                          ToolTip.Tip="{loc:Text M0680}"/>
+                  <Button Content="{loc:Text M0581}" FontSize="10" Padding="8,2" CornerRadius="5"
                           Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).LocateBookmarkCommand}" CommandParameter="{Binding}"
-                          ToolTip.Tip="跳转到原输出位置"/>
-                  <Button Content="复制" FontSize="10" Padding="8,2" CornerRadius="5"
+                          ToolTip.Tip="{loc:Text M0681}"/>
+                  <Button Content="{loc:Text M0682}" FontSize="10" Padding="8,2" CornerRadius="5"
                           Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyBookmarkCommand}" CommandParameter="{Binding}"
-                          ToolTip.Tip="复制保存的文字"/>
-                  <Button Content="改名" FontSize="10" Padding="8,2" CornerRadius="5" Click="OnRenameBookmark"
-                          ToolTip.Tip="重命名书签"/>
-                  <Button Content="删除" FontSize="10" Padding="8,2" CornerRadius="5"
+                          ToolTip.Tip="{loc:Text M0683}"/>
+                  <Button Content="{loc:Text M0684}" FontSize="10" Padding="8,2" CornerRadius="5" Click="OnRenameBookmark"
+                          ToolTip.Tip="{loc:Text M0342}"/>
+                  <Button Content="{loc:Text M0634}" FontSize="10" Padding="8,2" CornerRadius="5"
                           Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteBookmarkCommand}" CommandParameter="{Binding}"/>
                 </StackPanel>
               </Grid>
@@ -2158,18 +2229,18 @@
         <Grid Grid.Row="4" RowDefinitions="Auto,Auto" RowSpacing="6"
               IsVisible="{Binding SelectedBookmark, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="保存的完整文字" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" x:Name="SaveBookmarkButton" Content="保存书签为文本" FontSize="11" Padding="10,3" Click="OnSaveBookmark"/>
+            <TextBlock Text="{loc:Text M0685}" FontSize="11" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" x:Name="SaveBookmarkButton" Content="{loc:Text M0344}" FontSize="11" Padding="10,3" Click="OnSaveBookmark"/>
           </Grid>
           <TextBox x:Name="BookmarkSnapshotText" Grid.Row="1" Text="{Binding SelectedBookmark.Text}" IsReadOnly="True"
                    AcceptsReturn="True" TextWrapping="NoWrap" Height="130"
                    ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
         </Grid>
         <StackPanel Grid.Row="5" Spacing="5">
-          <TextBlock Text="{Binding BookmarkNotice}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"
+          <TextBlock Text="{loc:Translate {Binding BookmarkNotice}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"
                      IsVisible="{Binding BookmarkNotice, Converter={x:Static vm:StringNotEmptyConverter.Instance}}"/>
-          <TextBlock x:Name="BookmarkEmpty" Text="还没有书签" FontSize="11" Foreground="{DynamicResource UiMuted}" TextWrapping="Wrap"/>
-          <TextBlock Text="查看：阅读完整文字 · 点击条目或按 Enter 定位 · Esc 返回" FontSize="11" Foreground="{DynamicResource UiFaint}"/>
+          <TextBlock x:Name="BookmarkEmpty" Text="{loc:Text M0686}" FontSize="11" Foreground="{DynamicResource UiMuted}" TextWrapping="Wrap"/>
+          <TextBlock Text="{loc:Text M0687}" FontSize="11" Foreground="{DynamicResource UiFaint}"/>
         </StackPanel>
       </Grid>
     </Border>

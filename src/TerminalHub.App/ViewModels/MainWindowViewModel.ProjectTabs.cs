@@ -69,32 +69,20 @@ public partial class MainWindowViewModel
             _settings.WorkspaceName = workspace.Name;
             ShelfAutoHide = workspace.ShelfAutoHide;
             ShelfWidth = workspace.ShelfWidth;
-            var layout = workspace.Layout;
-            SplitLayout = layout.SplitLayout;
-            var indices = new[] { layout.LeftIndex, layout.RightIndex, layout.BottomLeftIndex, layout.BottomRightIndex };
-            var hasLivePanes = workspace.SavedPanes.Any(s => s is not null);
-            var panes = Enumerable.Range(0, PaneCount).Select(i => hasLivePanes
-                ? workspace.SavedPanes[i] is { } model && SessionCards.Any(c => c.Model == model) ? model : null
-                : SessionCards.ElementAtOrDefault(indices[i])?.Model).ToArray();
-            if (layout.IsSplit && panes.All(p => p is not null) && panes.Distinct().Count() == PaneCount)
-            {
-                for (var i = 0; i < panes.Length; i++) SetPane(i, panes[i]);
-                ColumnRatio = layout.ColumnRatio; RowRatio = layout.RowRatio;
-                FocusedPane = Math.Clamp(layout.FocusedPane, 0, PaneCount - 1);
-                IsSplit = true;
-            }
-            _sessions.Activate(IsSplit ? GetPane(FocusedPane) : workspace.Active ?? SessionCards.FirstOrDefault()?.Model);
+            RestoreLiveLayout(workspace);
             SyncActive();
             RefreshProjectTools();
             RefreshCounts();
         }
         finally { _switchingWorkspace = false; }
+        NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.WorkspaceChanged);
     }
 
     [RelayCommand]
     private void CloseProjectWorkspace(LiveWorkspace? workspace)
     {
         if (workspace is null) return;
+        ClearLayoutHistory();
         if (workspace == ActiveWorkspace)
         {
             var next = ProjectWorkspaces.FirstOrDefault(w => w != workspace);
@@ -156,7 +144,10 @@ public partial class MainWindowViewModel
     }
     private void RememberActiveWorkspace()
     {
+        ActiveWorkspace.ShelfAutoHide = ShelfAutoHide; ActiveWorkspace.ShelfWidth = ShelfWidth;
         ActiveWorkspace.Layout = CaptureWorkspace(); ActiveWorkspace.SavedActive = _sessions.Active;
+        ActiveWorkspace.PaneMaximized = PaneMaximized;
+        ActiveWorkspace.SavedTree = PaneTree?.Clone();
         for (var i = 0; i < 4; i++) ActiveWorkspace.SavedPanes[i] = GetPane(i);
     }
 }

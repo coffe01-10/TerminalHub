@@ -8,7 +8,7 @@
     <LangVersion>12</LangVersion>
     <RootNamespace>TerminalHub.App</RootNamespace>
     <AssemblyName>TerminalHub</AssemblyName>
-    <Version>0.3.4</Version>
+    <Version>0.4.0</Version>
     <ApplicationIcon>Assets\terminal-hub-icon.ico</ApplicationIcon>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -31,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TerminalHub.Core\TerminalHub.Core.csproj" />
     <ProjectReference Include="..\TerminalHub.Pty\TerminalHub.Pty.csproj" />
+    <ProjectReference Include="..\TerminalHub.Extensibility\TerminalHub.Extensibility.csproj" />
   </ItemGroup>
 
 </Project>

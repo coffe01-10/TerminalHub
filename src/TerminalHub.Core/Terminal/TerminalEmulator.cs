@@ -39,6 +39,7 @@ public sealed class TerminalEmulator : IDisposable
     public CommandJournal Commands { get; } = new();
     public event Action? CommandsChanged;
     public event Action<ShellCommandState>? CommandCompleted;
+    public event Action? CommandStarted;
     public event Action<string>? TitleChanged
     {
         add => Buffer.TitleChanged += value;
@@ -67,6 +68,7 @@ public sealed class TerminalEmulator : IDisposable
             {
                 _commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 CommandState = new(true, null, TimeSpan.Zero);
+                CommandStarted?.Invoke();
             }
             else if (marker == 'D' && CommandState?.Running == true)
             {

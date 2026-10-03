@@ -75,7 +75,9 @@ public partial class MainWindowViewModel
             { favorite.Error = "无法识别这个快捷键，请重新按键录入。"; }
         }
         var used = SessionShortcuts.Where(item => item.ParsedGesture is not null && item.Error.Length == 0)
-            .Select(item => item.ParsedGesture!)
+            .SelectMany(item => item.Binding.Action == SessionShortcutAction.Recent
+                ? new[] { item.ParsedGesture!, new KeyGesture(item.ParsedGesture!.Key, item.ParsedGesture.KeyModifiers | KeyModifiers.Shift) }
+                : new[] { item.ParsedGesture! })
             .Concat(FavoriteCommands.Where(item => item.ParsedGesture is not null && item.Error.Length == 0).Select(item => item.ParsedGesture!))
             .GroupBy(gesture => (gesture.Key, gesture.KeyModifiers))
             .Where(group => group.Count() > 1)

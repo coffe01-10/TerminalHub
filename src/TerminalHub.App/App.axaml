@@ -21,6 +21,13 @@
       <Setter Property="Background" Value="{DynamicResource UiInset}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/>
     </Style>
+    <Style Selector="ComboBox.localized">
+      <Setter Property="SelectionBoxItemTemplate">
+        <DataTemplate>
+          <TextBlock Text="{ReflectionBinding SelectedItem.Content, RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
+        </DataTemplate>
+      </Setter>
+    </Style>
     <Style Selector="MenuFlyoutPresenter">
       <Setter Property="ctl:DropletExpansion.AnimatePopup" Value="True"/>
       <Setter Property="Background" Value="{DynamicResource UiFloating}"/>

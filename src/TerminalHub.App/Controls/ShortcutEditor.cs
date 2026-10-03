@@ -11,7 +11,7 @@ public sealed class ShortcutEditor : TextBox
     public ShortcutEditor()
     {
         IsReadOnly = true;
-        Watermark = "点击后按快捷键";
+        this.Bind(WatermarkProperty, Localization.UiText.Binding("点击后按快捷键"));
     }
     protected override void OnKeyDown(KeyEventArgs e)
     {

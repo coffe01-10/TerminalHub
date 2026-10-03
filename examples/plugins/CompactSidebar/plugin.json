@@ -1,0 +1,8 @@
+{
+  "id": "example.compact-sidebar",
+  "name": "紧凑侧栏",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Example.CompactSidebar.dll",
+  "entryType": "CompactSidebarPlugin",
+  "hostApi": 1
+}

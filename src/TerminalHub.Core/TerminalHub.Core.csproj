@@ -8,4 +8,7 @@
     <RootNamespace>TerminalHub.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Messages.json" />
+  </ItemGroup>
 </Project>

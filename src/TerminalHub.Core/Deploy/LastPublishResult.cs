@@ -120,7 +120,7 @@ public static class LastPublishResults
         var when = result.FinishedAt == default
             ? ""
             : " · " + result.FinishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-        return $"上次结果：{label} · exit {result.ExitCode} · {FormatDuration(result.DurationMs)}{when}";
+        return $"上次结果：{TerminalHub.Core.Localization.Localizer.Current.Translate(label)} · exit {result.ExitCode} · {FormatDuration(result.DurationMs)}{when}";
     }
 
     /// <summary>True when a last-success folder is stored and that directory still exists.</summary>

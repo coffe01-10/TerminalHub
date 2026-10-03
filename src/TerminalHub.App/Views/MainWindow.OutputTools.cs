@@ -28,7 +28,7 @@ public partial class MainWindow
     /// <summary>Transient status toast (saved path, copy summary…).</summary>
     private void ShowToast(string text)
     {
-        ToastText.Text = text;
+        TerminalHub.App.Localization.UiText.Set(ToastText, TextBlock.TextProperty, text);
         ToastPanel.IsVisible = true;
         _toastTimer.Stop();
         _toastTimer.Start();
@@ -83,11 +83,11 @@ public partial class MainWindow
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = title,
+                Title = TerminalHub.Core.Localization.Localizer.Current.Translate(title),
                 SuggestedFileName = suggestedName,
                 DefaultExtension = "txt",
                 ShowOverwritePrompt = true,
-                FileTypeChoices = [new FilePickerFileType("文本文件") { Patterns = ["*.txt"] }],
+                FileTypeChoices = [new FilePickerFileType(TerminalHub.Core.Localization.Localizer.Current.Translate("文本文件")) { Patterns = ["*.txt"] }],
             });
             if (file is null) return;
             await using (var stream = await file.OpenWriteAsync())
@@ -111,7 +111,7 @@ public partial class MainWindow
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "保存 " + asset.Label,
+                Title = TerminalHub.Core.Localization.Localizer.Current.Translate("保存 " + asset.Label),
                 SuggestedFileName = Path.GetFileName(asset.Name),
                 ShowOverwritePrompt = true
             });
@@ -194,9 +194,10 @@ public partial class MainWindow
     {
         var empty = Vm.VisibleBookmarks.Count == 0;
         BookmarkEmpty.IsVisible = empty;
-        BookmarkEmpty.Text = Vm.Bookmarks.Count == 0
+        var emptyText = Vm.Bookmarks.Count == 0
             ? "还没有书签 — 选中终端文字后，用「添加书签」保存重要输出。"
             : Vm.BookmarksAllSessions ? "没有匹配的书签。" : "当前会话没有匹配的书签，可切换到「全部」。";
+        TerminalHub.App.Localization.UiText.Set(BookmarkEmpty, TextBlock.TextProperty, emptyText);
         // Rebuilds (open/search/scope/delete) reset the ListBox selection; keep a
         // first row selected like the palette so Enter always has a target.
         if (!empty && BookmarkResults.SelectedIndex < 0)

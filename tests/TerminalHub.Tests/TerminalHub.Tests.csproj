@@ -23,6 +23,16 @@
     <ProjectReference Include="..\..\src\TerminalHub.Core\TerminalHub.Core.csproj" />
     <ProjectReference Include="..\..\src\TerminalHub.Pty\TerminalHub.Pty.csproj" />
     <ProjectReference Include="..\..\src\TerminalHub.App\TerminalHub.App.csproj" />
+    <ProjectReference Include="..\..\examples\plugins\Minimal\Minimal.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\examples\plugins\CompactSidebar\CompactSidebar.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\examples\plugins\SessionPanel\SessionPanel.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <Target Name="CopyAcceptancePlugins" AfterTargets="Build">
+    <ItemGroup>
+      <AcceptancePlugin Include="..\..\examples\plugins\**\bin\$(Configuration)\net8.0\TerminalHub.Example.*.dll;..\..\examples\plugins\**\bin\$(Configuration)\net8.0\plugin.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AcceptancePlugin)" DestinationFolder="$(OutDir)AcceptancePlugins\%(AcceptancePlugin.RecursiveDir)" />
+  </Target>
 
 </Project>

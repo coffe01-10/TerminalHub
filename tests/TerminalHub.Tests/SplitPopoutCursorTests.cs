@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Headless.XUnit;
 using TerminalHub.App.Controls;
 using TerminalHub.App.Views;
@@ -94,7 +95,7 @@ public class SplitPopoutCursorTests
         vm.ToggleSplitCommand.Execute(null);
         await Task.Delay(500);
 
-        var leftView = window.FindControl<TerminalView>("LeftTerminal")!;
+        var leftView = window.FindControl<ContentControl>("SplitHost")!.GetVisualDescendants().OfType<TerminalView>().Single(v => v.Emulator == leftEmu);
         Assert.Same(leftEmu, leftView.Emulator);
         SelectToken(leftView, leftEmu.Buffer, "SELWORDS_42");
         Assert.Equal("SELWORDS_42", leftView.GetSelectedText());
