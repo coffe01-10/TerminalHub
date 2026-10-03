@@ -971,7 +971,8 @@ public class LogsPanelTests
         dash.SearchQuery = "needle";
         await Task.Delay(50);
         Assert.Single(dash.SearchHits);
-        Assert.Equal("1 处匹配", dash.SearchStatus);
+        // Product copy includes the per-session cap (localized in Messages.json too).
+        Assert.Equal("1 行匹配（每会话最多 200 行）", dash.SearchStatus);
         Assert.Contains("needle", dash.SearchHits[0].Text);
 
         dash.SearchQuery = "zzz";
