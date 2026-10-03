@@ -16,6 +16,12 @@ public partial class MainWindowViewModel
         BottomLeftPane = leaves.ElementAtOrDefault(2)?.Session; BottomRightPane = leaves.ElementAtOrDefault(3)?.Session;
         FocusedPane = Math.Clamp(FocusedPane, 0, Math.Max(0, leaves.Length - 1));
         IsSplit = leaves.Length > 1;
+        // A pruned tree (panes closed out of a Quad) no longer matches the
+        // recorded preset. Degrade it the same way the legacy pane path does
+        // (NormalizeWorkspacePanes) so snapshots and layout undo replay the
+        // right pane count instead of spawning four panes from a two-leaf tree.
+        if (PaneTree is not null && leaves.Length < 4 && SplitLayout == SplitLayout.Quad)
+            SplitLayout = SplitLayout.Horizontal;
         if (!IsSplit) PaneMaximized = false;
         PaneRevision++; OnPropertyChanged(nameof(PaneTree)); OnPropertyChanged(nameof(PaneRevision));
         OnPropertyChanged(nameof(PaneCount)); UpdateDisplayedCards();

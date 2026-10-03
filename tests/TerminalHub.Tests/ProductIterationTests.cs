@@ -91,7 +91,11 @@ public class ProductIterationTests
             Assert.True(saved.Layout.IsSplit);
             Assert.Equal(1, saved.Layout.FocusedPane);
             await vm.OpenTemplateAsync(saved);
-            await Until(() => vm.SessionCards.Count == 10);
+            // RestoreWorkspaceAsync activates the focused pane synchronously, but
+            // ActiveSession converges via a posted SyncActive — wait for both the
+            // spawned cards and that activation before asserting.
+            await Until(() => vm.SessionCards.Count == 10
+                && ReferenceEquals(vm.ActiveSession, vm.RightPane));
             Assert.Equal(10, vm.SessionCards.Count);
             Assert.All(original, session => Assert.True(session.IsRunning));
             Assert.DoesNotContain(vm.LeftPane!, original);

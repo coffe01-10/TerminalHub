@@ -138,7 +138,10 @@ public class SplitPaneTests
         var other = vm.SessionCards.First(c =>
             !ReferenceEquals(c.Model, vm.LeftPane) && !ReferenceEquals(c.Model, vm.RightPane));
         vm.ActiveCard = other;
-        await Until(() => ReferenceEquals(vm.RightPane, other.Model), "right pane never retargeted to the clicked card");
+        // AssignToPane + _sessions.Activate run synchronously, but ActiveSession
+        // converges via a posted SyncActive — wait for it before asserting.
+        await Until(() => ReferenceEquals(vm.RightPane, other.Model)
+            && ReferenceEquals(vm.ActiveSession, other.Model), "right pane never retargeted to the clicked card");
         Assert.Same(other.Model, vm.ActiveSession);
 
         // Focus left, click another card → left pane retargets, right keeps its own.

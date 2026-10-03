@@ -381,9 +381,15 @@ public class StageLayoutTests
         var surface = window.FindControl<StageSurface>("StageWindow")!;
         vm.ToggleSplitCommand.Execute(null);
         await Task.Delay(100);
+        // The fixed SplitGrid boxes are permanently collapsed (SplitHost renders
+        // the live pane tree); click the real "PaneFrame" borders — left first,
+        // then right, matching the visual tree order.
+        var panes = window.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name == "PaneFrame").ToArray();
+        Assert.Equal(2, panes.Length);
         foreach (var side in new[] { "Right", "Left", "Right" })
         {
-            var pane = window.FindControl<Border>(side + "PaneBox")!;
+            var pane = side == "Left" ? panes[0] : panes[1];
             var point = pane.TranslatePoint(new Point(60, 65), window)!.Value;
             window.MouseDown(point, MouseButton.Left);
             window.MouseUp(point, MouseButton.Left);
