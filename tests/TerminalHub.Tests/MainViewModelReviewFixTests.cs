@@ -252,12 +252,15 @@ public class MainViewModelReviewFixTests
         try
         {
             Assert.True(inCallback.WaitOne(TimeSpan.FromSeconds(10)), "first sample never ran");
-            var dispose = Task.Run(() => monitor.Dispose());
+            // A dedicated thread, not Task.Run: on a loaded CI box a pooled
+            // task may not get scheduled within the wait budget.
+            var dispose = new Thread(() => monitor.Dispose()) { IsBackground = true };
+            dispose.Start();
             Thread.Sleep(300);
-            Assert.False(dispose.IsCompleted,
+            Assert.True(dispose.IsAlive,
                 "Dispose must block while a sampling callback is still running");
             release.Set();
-            Assert.True(dispose.Wait(TimeSpan.FromSeconds(10)),
+            Assert.True(dispose.Join(TimeSpan.FromSeconds(10)),
                 "Dispose never returned after the callback finished");
         }
         finally
