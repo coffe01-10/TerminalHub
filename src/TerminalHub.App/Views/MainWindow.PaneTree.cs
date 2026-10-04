@@ -38,7 +38,10 @@ public partial class MainWindow
             ? CreatePane(leaf) : CreateBranch(Vm.PaneTree);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            if (IsActive && !Vm.SettingsOpen && !Vm.RecentSwitcherOpen && !PalettePanel.IsVisible && _dragCard is null)
+            // Same rule as OnStageSelectionChanged: a layout re-render must not
+            // pull focus out of a TextBox the user is typing in.
+            if (IsActive && !Vm.SettingsOpen && !Vm.RecentSwitcherOpen && !PalettePanel.IsVisible && _dragCard is null
+                && FocusManager?.GetFocusedElement() is not TextBox)
                 ActiveTerminal()?.Focus();
         });
     }

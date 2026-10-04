@@ -19,6 +19,51 @@ namespace TerminalHub.Tests;
 public class WorkbenchOperationTests
 {
     [AvaloniaFact]
+    public async Task SplitDoesNotAssignSessionClosedBeforeSpawnContinuation()
+    {
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
+        var keep = f.Vm.ActiveCard!;
+        foreach (var card in f.Vm.SessionCards.Where(c => c != keep).ToArray())
+            f.Vm.CloseSessionCommand.Execute(card);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        System.Collections.Specialized.NotifyCollectionChangedEventHandler closeNew = (_, e) =>
+        {
+            if (e.NewItems is null) return;
+            foreach (SessionCardViewModel card in e.NewItems)
+                Dispatcher.UIThread.Post(() => f.Vm.CloseSessionCommand.Execute(card));
+        };
+        f.Vm.SessionCards.CollectionChanged += closeNew;
+        try { await f.Vm.SplitPaneAsync(0, false); }
+        finally { f.Vm.SessionCards.CollectionChanged -= closeNew; }
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        Assert.False(f.Vm.IsSplit);
+        Assert.Null(f.Vm.PaneTree);
+        Assert.Same(keep, Assert.Single(f.Vm.SessionCards));
+        Assert.True(keep.Model.IsRunning);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task ProgrammaticSessionChange_PreservesSearchBoxFocus(bool split)
+    {
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
+        if (split) await f.Vm.SetSplitLayoutAsync("Horizontal");
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        f.Vm.Dashboard.SelectedBottomTab = DashboardViewModel.SearchTabIndex;
+        f.Window.Activate(); f.Window.UpdateLayout();
+        Assert.True(f.Window.IsActive);
+        var box = f.Window.FindControl<TextBox>("FindBox")!;
+        Assert.True(box.Focus());
+        if (split) f.Vm.CloseSessionCommand.Execute(f.Vm.ActiveCard);
+        else f.Vm.ActivateSearchSession(f.Vm.SessionCards.First(c => c != f.Vm.ActiveCard).Model);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        Assert.Same(box, f.Window.FocusManager!.GetFocusedElement());
+        f.Window.KeyTextInput("focus-kept");
+        Assert.Contains("focus-kept", box.Text);
+        Assert.All(f.Vm.SessionCards, c => Assert.DoesNotContain("focus-kept", c.Model.Emulator.Buffer.TailText(30)));
+    }
+
+    [AvaloniaFact]
     public async Task TransferAndUndoRestoreBothWorkspacesWithoutReplacingProcesses()
     {
         using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();

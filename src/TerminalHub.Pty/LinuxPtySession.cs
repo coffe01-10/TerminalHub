@@ -20,6 +20,12 @@ public sealed class LinuxPtySession : IPtySession
     private int _childPid;
     private CancellationTokenSource? _readLoopCts;
     private Task? _readLoop;
+    private Task? _writeLoop;
+    // Serialized writes: write() blocks while the child isn't reading stdin,
+    // and callers include the UI thread (paste/typing) and the PTY read thread
+    // (VT query replies). A bounded queue + dedicated writer keeps both from
+    // stalling; a full queue means the child is dead or stuck — drop input.
+    private readonly System.Collections.Concurrent.BlockingCollection<byte[]> _writeQueue = new(256);
     private IntPtr _argvBlock, _envpBlock;
     private readonly List<IntPtr> _allocations = new();
 
@@ -27,6 +33,7 @@ public sealed class LinuxPtySession : IPtySession
     private volatile bool _isRunning;
     private volatile bool _hasExitCode;
     private volatile bool _disposed;
+    private int _disposeOnce;
     private int _exitCode;
 
     public Guid Id { get; } = Guid.NewGuid();
@@ -104,6 +111,8 @@ public sealed class LinuxPtySession : IPtySession
 
         _readLoopCts = new CancellationTokenSource();
         _readLoop = Task.Run(() => ReadLoop(_readLoopCts.Token), CancellationToken.None);
+        _writeLoop = Task.Factory.StartNew(WriteLoop,
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         _ = Task.Run(WatchChild);
         return Task.CompletedTask;
     }
@@ -213,12 +222,22 @@ public sealed class LinuxPtySession : IPtySession
         // poll() drives the loop: cancellation is observed within 100ms, and a
         // blocked read() can never outlive Dispose (close() does not reliably
         // wake a read() already in progress on Linux).
-        // The fd is captured once: Dispose waits for this loop before closing
-        // the handle, so the number stays valid for the loop's lifetime.
-        var fd = _master is { } m ? (int)m.DangerousGetHandle() : -1;
-        var fds = new PollFd { Fd = fd, Events = Native.POLLIN };
+        // Pin the master fd for the loop's lifetime: Dispose waits only 300ms
+        // for us before disposing the SafeFileHandle — a slow subscriber
+        // (Parser.Feed under lock contention) can outlive that, and the held
+        // ref defers the real close() so poll/read never touch a descriptor
+        // the OS may already have recycled for an unrelated open.
+        var release = false;
+        var fd = -1;
+        var master = _master;
         try
         {
+            if (master is not null)
+            {
+                master.DangerousAddRef(ref release);
+                fd = (int)master.DangerousGetHandle();
+            }
+            var fds = new PollFd { Fd = fd, Events = Native.POLLIN };
             while (!ct.IsCancellationRequested)
             {
                 int ready;
@@ -247,6 +266,10 @@ public sealed class LinuxPtySession : IPtySession
             }
         }
         catch (ObjectDisposedException) { /* master fd closed beneath us */ }
+        finally
+        {
+            if (release) master?.DangerousRelease();
+        }
     }
 
     private async Task WatchChild()
@@ -262,6 +285,9 @@ public sealed class LinuxPtySession : IPtySession
                 _exitCode = Native.WIFEXITED(status) ? Native.WEXITSTATUS(status) : -1;
                 _hasExitCode = true;
                 _isRunning = false;
+                // A retained exited session must not retain its dedicated writer.
+                try { _writeQueue.CompleteAdding(); }
+                catch (ObjectDisposedException) { /* Dispose already released the queue */ }
                 // After Dispose the owner is gone — a late Exited callback would
                 // touch already-torn-down views. The code itself stays queryable.
                 if (_disposed) return;
@@ -269,7 +295,12 @@ public sealed class LinuxPtySession : IPtySession
                 // tail itself and exits on EIO. Cancelling would truncate output.
                 await Task.Delay(50); // let the read loop deliver the last chunks first
                 if (_disposed) return;
-                Exited?.Invoke(this, _exitCode);
+                // A throwing subscriber must not eat the notification for the
+                // subscribers behind it — invoke each inside its own guard.
+                if (Exited is { } exited)
+                    foreach (Action<IPtySession, int> handler in exited.GetInvocationList())
+                        try { handler(this, _exitCode); }
+                        catch (Exception ex) { Debug.WriteLine($"PTY exit subscriber failed: {ex.Message}"); }
                 return;
             }
             await Task.Delay(120);
@@ -278,38 +309,55 @@ public sealed class LinuxPtySession : IPtySession
 
     public void Write(ReadOnlySpan<byte> data)
     {
-        var master = _master;
-        if (master is null || !IsRunning) return;
-        var tmp = data.ToArray();
-        // Pin the fd for the whole write: VT query responses come in on the
-        // PTY read thread while Dispose can close the handle from the UI
-        // thread — without AddRef the OS could recycle the descriptor and the
-        // write would hit an unrelated fd.
-        var release = false;
+        if (_master is null || !IsRunning) return;
         try
         {
-            master.DangerousAddRef(ref release);
-            var fd = (int)master.DangerousGetHandle();
-            // Loop on short writes — a large paste can exceed the PTY kernel
-            // buffer (on Linux, 4096 bytes in canonical-echo terms); EINTR → retry.
-            var off = 0;
-            while (off < tmp.Length)
+            if (!_writeQueue.TryAdd(data.ToArray()))
+                Debug.WriteLine("PTY input queue full — dropping write");
+        }
+        catch (InvalidOperationException) { /* CompleteAdding raced */ }
+    }
+
+    private void WriteLoop()
+    {
+        try
+        {
+            foreach (var tmp in _writeQueue.GetConsumingEnumerable())
             {
-                var n = Native.write(fd, ref tmp[off], tmp.Length - off);
-                if (n < 0)
+                if (!IsRunning) return;
+                var master = _master;
+                if (master is null) return;
+                // Pin the fd for the whole write: Dispose can close the handle
+                // while a chunk is in flight — without AddRef the OS could
+                // recycle the descriptor and the write would hit an unrelated fd.
+                var release = false;
+                try
                 {
-                    if (Marshal.GetLastWin32Error() == Native.EINTR) continue;
-                    break;
+                    master.DangerousAddRef(ref release);
+                    var fd = (int)master.DangerousGetHandle();
+                    // Loop on short writes — a large paste can exceed the PTY
+                    // kernel buffer (4096 in canonical-echo terms); EINTR → retry.
+                    var off = 0;
+                    while (off < tmp.Length)
+                    {
+                        var n = Native.write(fd, ref tmp[off], tmp.Length - off);
+                        if (n < 0)
+                        {
+                            if (Marshal.GetLastWin32Error() == Native.EINTR) continue;
+                            break;
+                        }
+                        if (n == 0) break;
+                        off += n;
+                    }
                 }
-                if (n == 0) break;
-                off += n;
+                catch (ObjectDisposedException) { /* handle closed concurrently */ }
+                finally
+                {
+                    if (release) master.DangerousRelease();
+                }
             }
         }
-        catch (ObjectDisposedException) { /* handle closed concurrently */ }
-        finally
-        {
-            if (release) master.DangerousRelease();
-        }
+        catch (InvalidOperationException) { /* queue completed */ }
     }
 
     public void Resize(int columns, int rows)
@@ -370,14 +418,23 @@ public sealed class LinuxPtySession : IPtySession
 
     public void Dispose()
     {
+        // Dispose can race with the exit path / a second explicit call;
+        // CompleteAdding on an already-disposed collection throws.
+        if (Interlocked.Exchange(ref _disposeOnce, 1) != 0) return;
         _disposed = true;
         Kill();
         _readLoopCts?.Cancel();
+        // Stop accepting writes and let the writer fail out on the dead master
+        // (Kill above broke it); a writer still blocked in write() holds its
+        // DangerousAddRef, so closing below defers until it exits.
+        _writeQueue.CompleteAdding();
+        try { _writeLoop?.Wait(500); } catch { }
+        _writeQueue.Dispose();
         // Wait for the read loop BEFORE closing the fd — otherwise the loop could
         // read() a stale descriptor number that the OS may have already recycled.
         try { _readLoop?.Wait(300); } catch { }
         // SafeFileHandle.Dispose defers the real close() until any in-flight
-        // DangerousAddRef (Write/Resize on another thread) has released.
+        // DangerousAddRef (Write/Resize/read loop on another thread) has released.
         _master?.Dispose();
         FreeNativeAllocations();
     }

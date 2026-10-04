@@ -11,15 +11,23 @@ public sealed record RecordingHeader(int Version, string Title, int Columns, int
 public sealed class TerminalRecorder : IAsyncDisposable
 {
     private readonly TerminalEmulator _emulator;
-    private readonly Channel<RecordingEvent> _queue = Channel.CreateUnbounded<RecordingEvent>(new() { SingleReader = true });
+    // Bounded: JSON+磁盘吞吐永远追不上洪水输出，无界队列会让内存随输入速率
+    // 线性涨。写不下就丢事件并标记溢出，回放端用 "gap" 事件标示缺口。
+    private readonly Channel<RecordingEvent> _queue = Channel.CreateBounded<RecordingEvent>(new BoundedChannelOptions(1024) { SingleReader = true });
     private readonly long _started = Stopwatch.GetTimestamp();
     private readonly Task _writer;
+    private int _overflow;
+    // Latest unwritten resize, kept so a congested queue can't silently drop
+    // it — playback would keep old dimensions and misplace every later cell.
+    private int _resizeCols = -1, _resizeRows;
     private bool _stopped;
     public string Path { get; }
     public TerminalRecorder(TerminalEmulator emulator, string path, string title)
+        : this(emulator, path, title, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 65536, true)) { }
+
+    private TerminalRecorder(TerminalEmulator emulator, string path, string title, Stream stream)
     {
         _emulator = emulator; Path = path;
-        var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 65536, true);
         RecordingHeader header;
         lock (emulator.Buffer.SyncRoot)
         {
@@ -32,8 +40,37 @@ public sealed class TerminalRecorder : IAsyncDisposable
         _writer = Task.Run(() => WriteAsync(stream, header));
     }
     private double Time => Stopwatch.GetElapsedTime(_started).TotalMilliseconds;
-    private void OnData(ReadOnlyMemory<byte> data) => _queue.Writer.TryWrite(new(Time, "output", data.ToArray()));
-    private void OnResize(int columns, int rows) => _queue.Writer.TryWrite(new(Time, "resize", null, columns, rows));
+    private void OnData(ReadOnlyMemory<byte> data)
+    {
+        // Ordering contract: a pending resize and the gap marker must land
+        // before any later output, otherwise the recording silently merges
+        // non-contiguous bytes / stale dimensions into a continuous stream.
+        if (!FlushResize()) { Interlocked.Exchange(ref _overflow, 1); return; }
+        if (_overflow == 1)
+        {
+            if (!_queue.Writer.TryWrite(new(Time, "gap"))) return;
+            Interlocked.Exchange(ref _overflow, 0);
+        }
+        if (!_queue.Writer.TryWrite(new(Time, "output", data.ToArray())))
+            Interlocked.Exchange(ref _overflow, 1);
+    }
+    private bool FlushResize()
+    {
+        if (_resizeCols < 0) return true;
+        if (!_queue.Writer.TryWrite(new(Time, "resize", null, _resizeCols, _resizeRows))) return false;
+        _resizeCols = -1;
+        return true;
+    }
+    private void OnResize(int columns, int rows)
+    {
+        // Only the latest size matters; on failure keep it pending for OnData.
+        if (_queue.Writer.TryWrite(new(Time, "resize", null, columns, rows)))
+            _resizeCols = -1;
+        else
+        {
+            _resizeCols = columns; _resizeRows = rows;
+        }
+    }
     private async Task WriteAsync(Stream stream, RecordingHeader header)
     {
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
@@ -47,13 +84,28 @@ public sealed class TerminalRecorder : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
+        bool stop = false;
+        RecordingEvent? resize = null, gap = null, end = null;
         lock (_emulator.Buffer.SyncRoot)
         {
             if (!_stopped)
             {
                 _stopped = true; _emulator.Parser.DataApplied -= OnData; _emulator.Resized -= OnResize;
-                _queue.Writer.TryWrite(new(Time, "end")); _queue.Writer.TryComplete();
+                stop = true;
+                var stoppedAt = Time;
+                if (_resizeCols >= 0) resize = new(stoppedAt, "resize", null, _resizeCols, _resizeRows);
+                if (_overflow != 0) gap = new(stoppedAt, "gap");
+                end = new(stoppedAt, "end");
             }
+        }
+        if (stop)
+        {
+            // Once detached, waiting for disk capacity is safe outside SyncRoot.
+            // A full queue at stop must not lose its final size, gap, or end marker.
+            if (resize is not null) await _queue.Writer.WriteAsync(resize).ConfigureAwait(false);
+            if (gap is not null) await _queue.Writer.WriteAsync(gap).ConfigureAwait(false);
+            await _queue.Writer.WriteAsync(end!).ConfigureAwait(false);
+            _queue.Writer.TryComplete();
         }
         await _writer.ConfigureAwait(false);
     }
@@ -149,6 +201,7 @@ public sealed class TerminalPlayback : IDisposable
             var item = Events[_next++];
             if (item.Kind == "output" && item.Data is { } data) Emulator.Parser.Feed(data);
             else if (item.Kind == "resize") Emulator.Resize(item.Columns, item.Rows);
+            else if (item.Kind == "gap") Emulator.Parser.DiscardPendingInput();
         }
         PositionMs = timeMs;
     }

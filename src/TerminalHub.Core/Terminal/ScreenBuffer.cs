@@ -160,10 +160,14 @@ public sealed class ScreenBuffer
     /// (CSI &gt;u push / CSI &lt;u pop / CSI =u set). Bit 0 = disambiguate escape codes.</summary>
     public int KittyKeyboardFlags { get; private set; }
     private readonly List<int> _kittyFlagStack = new();
+    // Input-driven depth cap — an app looping CSI >u must not grow the list
+    // without bound (every other input structure here is capped too).
+    private const int MaxKittyFlagStack = 64;
 
     /// <summary>CSI &gt;flags u — save the current flags and switch to <paramref name="flags"/>.</summary>
     public void KittyPush(int flags)
     {
+        if (_kittyFlagStack.Count >= MaxKittyFlagStack) _kittyFlagStack.RemoveAt(0);
         _kittyFlagStack.Add(KittyKeyboardFlags);
         KittyKeyboardFlags = flags;
     }
@@ -506,6 +510,7 @@ public sealed class ScreenBuffer
         var blank = TerminalCell.Blank(CurrentBg);
         for (var i = 0; i < count && col + i < Columns; i++)
             _screen[baseIdx + col + i] = blank;
+        RepairWidePairs(row);
     }
 
     private void ShiftLeft(int row, int col, int count)
@@ -517,6 +522,32 @@ public sealed class ScreenBuffer
         var blank = TerminalCell.Blank(CurrentBg);
         for (var i = Math.Max(col, Columns - count); i < Columns; i++)
             _screen[baseIdx + i] = blank;
+        RepairWidePairs(row);
+    }
+
+    /// <summary>
+    /// Bulk moves/erases split wide-glyph pairs at the touched range's edges:
+    /// a lead whose continuation was moved/blanked keeps IsWide and renders a
+    /// ghost glyph, and a continuation whose lead stayed outside lands as an
+    /// orphan that shifts the rest of the row. One pass clears both halves.
+    /// </summary>
+    private void RepairWidePairs(int row)
+    {
+        var baseIdx = row * Columns;
+        for (var col = 0; col < Columns; col++)
+        {
+            ref var cell = ref _screen[baseIdx + col];
+            if (cell.IsWideContinuation)
+            {
+                if (col == 0 || !_screen[baseIdx + col - 1].IsWide)
+                    ClearContinuationCell(row, col);
+            }
+            else if (cell.IsWide
+                && (col + 1 >= Columns || !_screen[baseIdx + col + 1].IsWideContinuation))
+            {
+                ClearWideLead(row, col);
+            }
+        }
     }
 
     public void CarriageReturn()
@@ -774,6 +805,7 @@ public sealed class ScreenBuffer
             for (var c = cStart; c <= cEnd; c++)
                 _screen[r * Columns + c] = blank;
             if (cStart == 0 && cEnd == Columns - 1) _wrapped[r] = false;
+            else RepairWidePairs(r);   // partial-row erase can split a pair at either edge
             Touch(r);
         }
     }

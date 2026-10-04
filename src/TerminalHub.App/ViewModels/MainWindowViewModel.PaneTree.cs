@@ -72,6 +72,14 @@ public partial class MainWindowViewModel
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Background);
             }
             if (session is null || ActiveWorkspace != workspace || session == target.Session) return;
+            // Closing the target's session during the CreateSessionAsync await
+            // lets OnSessionRemoved prune/null its leaf — rebuilding a split
+            // around it plants a Session=null leaf that crashes the pane
+            // renderer (leaf.Session!), or edits a detached orphan.
+            if (!workspace.Cards.Any(c => c.Model == target.Session)) return;
+            // The newly posted card can also be closed before this continuation.
+            if (!workspace.Cards.Any(c => c.Model == session)) return;
+            if (IsSplit && !PaneTree!.Leaves.Contains(target)) return;
             // Moving a visible leaf into a new split removes its old view, never its PTY.
             if (!IsSplit) PaneTree = target;
             PaneTree = RemoveNode(PaneTree, session);

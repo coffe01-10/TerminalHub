@@ -39,6 +39,10 @@ public class LinuxPtyTests
         pty.Write("exit\n"u8.ToArray());
         var code = await exited.Task.WaitAsync(TimeSpan.FromSeconds(8));
         Assert.Equal(0, code);
+        // Keep the exited session alive, as the shelf does; its writer must stop.
+        var writer = (Task)typeof(LinuxPtySession).GetField("_writeLoop",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(pty)!;
+        await writer.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]

@@ -395,7 +395,11 @@ public partial class MainWindow : Window
                 StageWindow.ActivateFrom(new Rect(left - StageWindow.Bounds.X, top - StageWindow.Bounds.Y,
                     corners.Max(p => p.X) - left, corners.Max(p => p.Y) - top));
             }
-            if (IsActive && Vm.ActiveSession is not null && !Vm.RecentSwitcherOpen) ActiveTerminal()?.Focus();
+            // A programmatic ActiveCard change (session exited, workspace
+            // switch, drop) must not yank focus out of a text box the user is
+            // typing in — the keystrokes would land in the PTY instead.
+            var typingElsewhere = FocusManager?.GetFocusedElement() is TextBox;
+            if (IsActive && Vm.ActiveSession is not null && !Vm.RecentSwitcherOpen && !typingElsewhere) ActiveTerminal()?.Focus();
         });
     }
 
@@ -1263,7 +1267,11 @@ public partial class MainWindow : Window
             EndFilesDrag();
             if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (OperationCanceledException) { /* storage lookup or native drag was cancelled */ }
+        // async void: any drag failure (platform OLE COMException, re-entrant
+        // DoDragDrop, NotSupportedException on odd paths) must land in the
+        // status line — escaping the filter here is an unhandled UI exception.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             if (!token.IsCancellationRequested)
             {
