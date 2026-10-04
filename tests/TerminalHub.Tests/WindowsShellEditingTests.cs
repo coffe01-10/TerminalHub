@@ -14,7 +14,7 @@ namespace TerminalHub.Tests;
 [Collection("ProcessWide")]
 public class WindowsShellEditingTests
 {
-    [Fact]
+    [LocalPwshFact]
     public async Task PowerShell_RealConPty_ChineseArrowsMultilineAndResize()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -31,7 +31,9 @@ public class WindowsShellEditingTests
                     foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
                     await terminal.StartAsync(new PtyOptions
                     {
-                        Shell = "pwsh", WorkingDirectory = Environment.CurrentDirectory,
+                        // Short cwd keeps "PS <cwd>>" on one 80-column line —
+                        // the prompt wait below reads the cursor row.
+                        Shell = "pwsh", WorkingDirectory = Path.GetPathRoot(Environment.CurrentDirectory)!,
                         Arguments = "-NoLogo -NoProfile " + ShellIntegration.PowerShellArguments
                     });
                 }

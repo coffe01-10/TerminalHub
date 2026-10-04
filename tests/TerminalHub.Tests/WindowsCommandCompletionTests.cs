@@ -9,7 +9,7 @@ namespace TerminalHub.Tests;
 [Collection("ProcessWide")]
 public class WindowsCommandCompletionTests
 {
-    [Fact]
+    [LocalPwshFact]
     public async Task PowerShell_ReportsSuccessNativeFailureAndResetsPreviousExitCode()
     {
         if (!OperatingSystem.IsWindows()) return;

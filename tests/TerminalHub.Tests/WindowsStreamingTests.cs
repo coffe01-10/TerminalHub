@@ -29,7 +29,7 @@ public sealed class InlineDataIfShellInstalledAttribute : DataAttribute
         yield return _data;
     }
 
-    private static bool OnPath(string program)
+    internal static bool OnPath(string program)
     {
         var path = Environment.GetEnvironmentVariable("PATH");
         if (string.IsNullOrEmpty(path)) return false;
@@ -39,6 +39,20 @@ public sealed class InlineDataIfShellInstalledAttribute : DataAttribute
                 File.Exists(Path.Combine(dir, program + ".exe"))) return true;
         }
         return false;
+    }
+}
+
+/// <summary>Real-ConPTY pwsh facts: skip when PowerShell 7 is not on PATH —
+/// ConPTY would fail at CreateProcess (error 2) before any assertion runs.
+/// Mirrors InlineDataIfShellInstalled for [Fact] methods.</summary>
+public sealed class LocalPwshFactAttribute : FactAttribute
+{
+    public LocalPwshFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows())
+            Skip = "Real ConPTY editing is Windows-only.";
+        else if (!InlineDataIfShellInstalledAttribute.OnPath("pwsh"))
+            Skip = "PowerShell 7 (pwsh) is not installed on this machine; skipping real-ConPTY editing.";
     }
 }
 
