@@ -10,6 +10,8 @@ using Avalonia.Media;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using TerminalHub.App.Controls;
+using TerminalHub.App.ViewModels;
+using TerminalHub.App.Views;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Settings;
 using Xunit;
@@ -37,21 +39,23 @@ public class NextIterationTests
         vm.FocusPane(3);
         await Task.Delay(150);
         fixture.Window.UpdateLayout();
-        var boxes = new[] { "LeftPaneBox", "RightPaneBox", "BottomLeftPaneBox", "BottomRightPaneBox" }
-            .Select(n => fixture.Window.FindControl<Border>(n)!).ToArray();
+        // Panes render through the pane tree (MainWindow.PaneTree.cs): each leaf is a
+        // PaneFrame border hosting its TerminalView; the static SplitGrid is legacy.
+        var boxes = PaneFrames(fixture.Window, vm, 4);
         Assert.Equal(4, Enumerable.Range(0, 4).Select(vm.GetPane).Distinct().Count());
         Assert.All(boxes, b => Assert.True(b.IsEffectivelyVisible && b.Bounds.Width > 80 && b.Bounds.Height > 50));
         Assert.True(boxes[0].Bounds.Width > boxes[1].Bounds.Width);
         Assert.True(boxes[0].Bounds.Height < boxes[2].Bounds.Height);
         var pane = vm.BottomRightPane!;
-        var view = fixture.Window.FindControl<TerminalView>("BottomRightTerminal")!;
-        view.Focus();
+        boxes[3].GetVisualDescendants().OfType<TerminalView>().Single().Focus();
         Assert.Equal(3, vm.FocusedPane);
         var originalColumns = pane.Emulator.Buffer.Columns;
         vm.TogglePaneMaximizedCommand.Execute(null);
         await Task.Delay(150);
         fixture.Window.UpdateLayout();
-        Assert.Single(boxes, b => b.IsEffectivelyVisible);
+        // Maximizing re-renders the tree with just the focused leaf.
+        Assert.Single(fixture.Window.GetVisualDescendants()
+            .OfType<Border>().Where(b => b.Name == "PaneFrame" && b.IsEffectivelyVisible).ToList());
         Assert.True(pane.Emulator.Buffer.Columns > originalColumns);
         vm.TogglePaneMaximizedCommand.Execute(null);
         await Task.Delay(150);
@@ -61,7 +65,11 @@ public class NextIterationTests
         var template = vm.SelectedTemplate!;
         Assert.True(WorkspaceTemplateTransfer.TryParse(WorkspaceTemplateTransfer.ToJson(template), out var imported, out _));
         await vm.OpenTemplateAsync(imported);
-        await Until(() => vm.SessionCards.Count == 10);
+        // RestoreWorkspaceAsync activates the focused pane synchronously, but
+        // ActiveSession converges via a posted SyncActive — wait for both the
+        // spawned cards and that activation before asserting.
+        await Until(() => vm.SessionCards.Count == 10
+            && ReferenceEquals(vm.ActiveSession, vm.BottomRightPane));
         Assert.Equal(SplitLayout.Quad, vm.SplitLayout);
         Assert.Equal(3, vm.FocusedPane);
         Assert.Equal(.6, vm.ColumnRatio);
@@ -73,9 +81,18 @@ public class NextIterationTests
         await vm.SetSplitLayoutAsync("Vertical");
         await Until(() => ReferenceEquals(focused, vm.ActiveSession));
         fixture.Window.UpdateLayout();
-        Assert.Equal(boxes[0].Bounds.Width, boxes[1].Bounds.Width, 1);
-        Assert.True(boxes[1].Bounds.Y > boxes[0].Bounds.Y);
+        var stacked = PaneFrames(fixture.Window, vm, 2);
+        Assert.Equal(stacked[0].Bounds.Width, stacked[1].Bounds.Width, 1);
+        Assert.True(stacked[1].Bounds.Y > stacked[0].Bounds.Y);
     }
+
+    // Live pane frames ordered by pane index: each PaneFrame hosts exactly one
+    // pane's TerminalView, matched by emulator instead of control name.
+    private static Border[] PaneFrames(MainWindow window, MainWindowViewModel vm, int count) =>
+        Enumerable.Range(0, count).Select(i => window.GetVisualDescendants().OfType<Border>()
+            .Single(b => b.Name == "PaneFrame" && b.GetVisualDescendants().OfType<TerminalView>()
+                .Any(t => ReferenceEquals(t.Emulator, vm.GetPane(i)!.Emulator))))
+        .ToArray();
 
     [AvaloniaFact]
     public async Task CrossSearch_ReflowsOnActivation_AndRefusesTrimmedOrClosedOutput()

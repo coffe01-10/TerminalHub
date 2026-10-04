@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
@@ -82,11 +83,18 @@ public class PlatformParityTests
             window.UpdateLayout();
             var terminal = window.FindControl<TerminalView>("MainTerminal")!;
             var dock = window.FindControl<DropletDock>("ActionDock")!;
-            Assert.True(terminal.Bounds.Width > 200 && terminal.Bounds.Height > 120);
+            // Windows restores the two-row title + directory chrome (ApplyWindowsChrome),
+            // which costs the stage ~38px more than the single-row Linux chrome.
+            var minHeight = OperatingSystem.IsWindows() ? 80 : 120;
+            Assert.True(terminal.Bounds.Width > 200 && terminal.Bounds.Height > minHeight);
             Assert.True(dock.IsHitTestVisible);
             var buttons = dock.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("dock")).ToList();
             Assert.Equal(6, buttons.Count);
-            Assert.All(buttons, b => Assert.True(b.Bounds.Width > 0 && b.Command is not null));
+            // Windows moves 新建/设置 into the top chrome and hides the dock duplicates;
+            // every dock button the platform actually shows must be laid out and wired.
+            Assert.Equal(OperatingSystem.IsWindows() ? 4 : 6, buttons.Count(b => b.IsEffectivelyVisible));
+            Assert.All(buttons.Where(b => b.IsEffectivelyVisible), b => Assert.True(b.Bounds.Width > 0 && b.Command is not null));
+            AssertDockContrast(buttons, dock);
             var outputDirectory = Environment.GetEnvironmentVariable("TERMINALHUB_PARITY_CAPTURES");
             if (!string.IsNullOrEmpty(outputDirectory))
             {
@@ -105,5 +113,49 @@ public class PlatformParityTests
             }
         }
         finally { window.Close(); ThemeManager.Apply(previousTheme); Directory.Delete(directory, true); }
+    }
+
+    // WCAG 2.1 AA for the 10-11px dock labels: each dock button needs 4.5:1 between
+    // its foreground and its effective background. A transparent button fill composes
+    // over the dock surface, which itself floats on UiCanvas.
+    private static void AssertDockContrast(IReadOnlyList<Button> buttons, DropletDock dock)
+    {
+        var canvas = ((ISolidColorBrush)ThemeManager.Brush("Canvas")).Color;
+        var dockFill = ((ISolidColorBrush)dock.Background!).Color;
+        var surface = ComposeOver(dockFill, canvas);
+        for (var i = 0; i < buttons.Count; i++)
+        {
+            var fill = (buttons[i].Background as ISolidColorBrush)?.Color ?? surface;
+            var background = ComposeOver(fill, surface);
+            var foreground = ((ISolidColorBrush)buttons[i].Foreground!).Color;
+            var ratio = ContrastRatio(foreground, background);
+            Assert.True(ratio >= 4.5, $"dock button {i}: {foreground} on {background} contrast {ratio:0.00} < 4.5");
+        }
+    }
+
+    private static Color ComposeOver(Color top, Color bottom)
+    {
+        var alpha = top.A / 255.0;
+        return new Color(
+            0xFF,
+            (byte)Math.Round(top.R * alpha + bottom.R * (1 - alpha)),
+            (byte)Math.Round(top.G * alpha + bottom.G * (1 - alpha)),
+            (byte)Math.Round(top.B * alpha + bottom.B * (1 - alpha)));
+    }
+
+    private static double ContrastRatio(Color a, Color b)
+    {
+        var la = RelativeLuminance(a);
+        var lb = RelativeLuminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    private static double RelativeLuminance(Color c) =>
+        0.2126 * SrgbChannel(c.R) + 0.7152 * SrgbChannel(c.G) + 0.0722 * SrgbChannel(c.B);
+
+    private static double SrgbChannel(byte value)
+    {
+        var v = value / 255.0;
+        return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
     }
 }

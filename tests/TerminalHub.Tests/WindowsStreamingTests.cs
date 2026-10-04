@@ -1,11 +1,46 @@
+using System.Reflection;
 using System.Text;
 using System.Runtime.InteropServices;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Terminal;
 using TerminalHub.Pty;
 using Xunit;
+using Xunit.Sdk;
 
 namespace TerminalHub.Tests;
+
+/// <summary>Inline data carrying the shell name as the theory argument; skips its
+/// test case when that shell is not on PATH (e.g. PowerShell 7 not installed)
+/// instead of failing at process start. Gated machines still exercise shells
+/// they do have.</summary>
+public sealed class InlineDataIfShellInstalledAttribute : DataAttribute
+{
+    private readonly object[] _data;
+
+    public InlineDataIfShellInstalledAttribute(string shell)
+    {
+        _data = new object[] { shell };
+        if (!OnPath(shell))
+            Skip = $"{shell} is not installed on this machine; skipping this shell case.";
+    }
+
+    public override IEnumerable<object[]> GetData(MethodInfo testMethod)
+    {
+        yield return _data;
+    }
+
+    private static bool OnPath(string program)
+    {
+        var path = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrEmpty(path)) return false;
+        foreach (var dir in path.Split(Path.PathSeparator))
+        {
+            if (File.Exists(Path.Combine(dir, program)) ||
+                File.Exists(Path.Combine(dir, program + ".exe"))) return true;
+        }
+        return false;
+    }
+}
 
 /// <summary>Mutates process-global std handles — must not overlap any other test.</summary>
 [CollectionDefinition("ProcessWide", DisableParallelization = true)]
@@ -146,8 +181,8 @@ public class WindowsStreamingTests
     }
 
     [Theory]
-    [InlineData("pwsh")]
-    [InlineData("powershell.exe")]
+    [InlineDataIfShellInstalled("pwsh")]
+    [InlineDataIfShellInstalled("powershell.exe")]
     public async Task RealPowerShell_TaskCompletionAndRecordingReplayUseActualOutput(string shell)
     {
         if (!OperatingSystem.IsWindows()) return;

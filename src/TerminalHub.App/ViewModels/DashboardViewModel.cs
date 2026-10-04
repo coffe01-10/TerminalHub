@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using TerminalHub.Core.Monitoring;
@@ -32,9 +34,14 @@ public sealed record LogEntry(DateTime Time, string Level, string Message, strin
     public TerminalHub.Core.Localization.LocalizedText DisplayMessage => new(Message, IsAppMessage);
 }
 
-/// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
-public partial class DashboardViewModel : ViewModelBase
-{
+    /// <summary>Right dashboard + bottom Output/Debug/Problems/Search panel.</summary>
+    public partial class DashboardViewModel : ViewModelBase
+    {
+        /// <summary>Sticky gate, set once the Debug tab is first opened — PTY
+        /// raw-line capture (ANSI escape conversion + DebugLog append) is
+        /// skipped entirely while this stays false.</summary>
+        public bool DebugCaptureEnabled { get; set; }
+
     public const int SearchTabIndex = 3;
     private readonly ISystemMonitor _monitor;
     /// <summary>Process kill entry point (tests inject a capture).</summary>
@@ -45,13 +52,19 @@ public partial class DashboardViewModel : ViewModelBase
     private readonly SparklineBuffer _netTx = new(60);
 
     public ObservableCollection<ProcessInfo> Processes { get; } = [];
-    public ObservableCollection<LogEntry> OutputLog { get; } = [];
+
+    private readonly BatchedLogCollection _outputLog = new();
+    private readonly BatchedLogCollection _visibleOutput = new();
+    private readonly BatchedLogCollection _problems = new();
+    private readonly BatchedLogCollection _debugLog = new();
+
+    public ObservableCollection<LogEntry> OutputLog => _outputLog;
     /// <summary>Rows the Output tab actually shows — <see cref="OutputLog"/>
     /// filtered by <see cref="OutputLevelFilter"/>. Entries are never dropped.</summary>
-    public ObservableCollection<LogEntry> VisibleOutput { get; } = [];
-    public ObservableCollection<LogEntry> Problems { get; } = [];
+    public ObservableCollection<LogEntry> VisibleOutput => _visibleOutput;
+    public ObservableCollection<LogEntry> Problems => _problems;
     /// <summary>Raw (pre-ANSI-strip, escaped) session lines for the Debug tab.</summary>
-    public ObservableCollection<LogEntry> DebugLog { get; } = [];
+    public ObservableCollection<LogEntry> DebugLog => _debugLog;
     /// <summary>Search hits over the selected session scope, including retained history.</summary>
     public ObservableCollection<SessionSearchResult> SearchHits { get; } = [];
 
@@ -80,14 +93,50 @@ public partial class DashboardViewModel : ViewModelBase
     public bool SearchNavigationInProgress { get; set; }
     partial void OnSearchScopeChanged(int value) => RefreshSearch();
 
+    /// <summary>Quiet window for typing-continuation searches; the first character
+    /// and any non-append edit (backspace, paste, clear) still refresh at once.</summary>
+    private static readonly TimeSpan SearchTypingDelay = TimeSpan.FromMilliseconds(250);
+    private Avalonia.Threading.DispatcherTimer? _searchRefreshTimer;
+    /// <summary>Previous <see cref="SearchQuery"/> value, tracked manually so a pure
+    /// append (old value + suffix) is recognizable without changing the property.</summary>
+    private string _lastSearchQuery = "";
+
     public void ClearSearchResults()
     {
+        _searchRefreshTimer?.Stop(); // an immediate refresh supersedes any pending one
         foreach (var hit in SearchHits)
             lock (hit.Buffer.SyncRoot) hit.Buffer.Anchors.Remove(hit.Anchor);
         SearchHits.Clear();
     }
 
-    partial void OnSearchQueryChanged(string value) => RefreshSearch();
+    partial void OnSearchQueryChanged(string value)
+    {
+        // Every query change scans the full scrollback+screen of every session in
+        // scope — per-keystroke that is a burst of full-buffer scans. A typing
+        // continuation coalesces into one trailing refresh; anything else (first
+        // char, edit-in-place, clear) refreshes immediately as before.
+        var isTypingContinuation = _lastSearchQuery.Length > 0
+            && value.Length > _lastSearchQuery.Length
+            && value.StartsWith(_lastSearchQuery, StringComparison.Ordinal);
+        _lastSearchQuery = value;
+        if (!isTypingContinuation)
+        {
+            RefreshSearch();
+            return;
+        }
+        if (_searchRefreshTimer is null)
+        {
+            _searchRefreshTimer = new Avalonia.Threading.DispatcherTimer { Interval = SearchTypingDelay };
+            _searchRefreshTimer.Tick += (_, _) =>
+            {
+                _searchRefreshTimer!.Stop(); // one-shot: drop the refresh if navigation is in progress
+                RefreshSearch();
+            };
+        }
+        _searchRefreshTimer.Stop();
+        _searchRefreshTimer.Start();
+    }
+
     partial void OnSelectedBottomTabChanged(int value)
     {
         if (value == SearchTabIndex) RefreshSearch();
@@ -262,11 +311,12 @@ public partial class DashboardViewModel : ViewModelBase
         // another flush instead of waiting for the next Append.
         _debugFlushScheduled = 0;
         var now = DateTime.Now;
+        var batch = new List<LogEntry>();
         while (_pendingDebug.TryDequeue(out var e))
-        {
-            DebugLog.Add(new LogEntry(now, "debug", e.message, e.source));
-        }
-        while (DebugLog.Count > MaxDebugLines) DebugLog.RemoveAt(0);
+            batch.Add(new LogEntry(now, "debug", e.message, e.source));
+        _debugLog.AddRange(batch);
+        var overflow = _debugLog.Count - MaxDebugLines;
+        if (overflow > 0) _debugLog.TrimFront(overflow);
     }
 
     /// <summary>Append a line from a real session stream (PTY output) or an app event.</summary>
@@ -282,23 +332,40 @@ public partial class DashboardViewModel : ViewModelBase
     {
         _outputFlushScheduled = 0;
         var now = DateTime.Now;
+        var added = new List<LogEntry>();
+        var addedVisible = new List<LogEntry>();
+        var addedProblems = new List<LogEntry>();
         while (_pendingOutput.TryDequeue(out var e))
         {
             var entry = new LogEntry(now, e.level, e.message, e.source, e.uiMessage);
-            OutputLog.Add(entry);
-            if (PassesOutputFilter(entry)) VisibleOutput.Add(entry);
+            added.Add(entry);
+            if (PassesOutputFilter(entry)) addedVisible.Add(entry);
             if (e.level == "error")
-                Problems.Add(new LogEntry(now, e.level, e.message, e.source, e.uiMessage));
+                addedProblems.Add(new LogEntry(now, e.level, e.message, e.source, e.uiMessage));
         }
-        while (OutputLog.Count > MaxOutputLines)
+        // One batched notification per collection per flush (instead of one per
+        // line) — subscribers like LogsViewModel recompute chip counts per event.
+        _outputLog.AddRange(added);
+        _visibleOutput.AddRange(addedVisible);
+        _problems.AddRange(addedProblems);
+
+        // Ring trims. VisibleOutput is an order-preserving filtered view of
+        // OutputLog, so the dropped prefix's matches are a prefix of it — count
+        // them instead of scanning VisibleOutput per dropped line.
+        var overflow = _outputLog.Count - MaxOutputLines;
+        if (overflow > 0)
         {
-            var dropped = OutputLog[0];
-            OutputLog.RemoveAt(0);
-            VisibleOutput.Remove(dropped);
+            var dropVisible = 0;
+            for (var i = 0; i < overflow; i++)
+                if (PassesOutputFilter(_outputLog[i])) dropVisible++;
+            _outputLog.TrimFront(overflow);
+            _visibleOutput.TrimFront(dropVisible);
         }
-        while (VisibleOutput.Count > MaxOutputLines) VisibleOutput.RemoveAt(0);
-        while (Problems.Count > MaxProblemLines) Problems.RemoveAt(0);
-        ProblemCount = Problems.Count;
+        var visibleOverflow = _visibleOutput.Count - MaxOutputLines;
+        if (visibleOverflow > 0) _visibleOutput.TrimFront(visibleOverflow);
+        var problemOverflow = _problems.Count - MaxProblemLines;
+        if (problemOverflow > 0) _problems.TrimFront(problemOverflow);
+        ProblemCount = _problems.Count;
     }
 
     private static readonly string[] OutputLevelNames = ["", "info", "warn", "error"];
@@ -340,5 +407,40 @@ public partial class DashboardViewModel : ViewModelBase
         if (bytesPerSec >= 1L << 20) return $"{bytesPerSec / (1L << 20):0.0} MB/s";
         if (bytesPerSec >= 1L << 10) return $"{bytesPerSec / (1L << 10):0.0} KB/s";
         return $"{bytesPerSec:0} B/s";
+    }
+
+    /// <summary><see cref="ObservableCollection{LogEntry}"/> with batched append and
+    /// front-trim: a PTY burst costs one CollectionChanged per flush instead of one
+    /// per line. Avalonia's items controls handle multi-item Add/Remove events.</summary>
+    private sealed class BatchedLogCollection : ObservableCollection<LogEntry>
+    {
+        /// <summary>Append a batch and raise a single Add notification for all of it.</summary>
+        public void AddRange(IReadOnlyList<LogEntry> items)
+        {
+            if (items.Count == 0) return;
+            CheckReentrancy();
+            foreach (var item in items) Items.Add(item);
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(
+                NotifyCollectionChangedAction.Add, (System.Collections.IList)items, Count - items.Count));
+        }
+
+        /// <summary>Drop the oldest <paramref name="count"/> items with a single Remove
+        /// notification and one list shift (the ring-buffer trim path).</summary>
+        public void TrimFront(int count)
+        {
+            if (count <= 0) return;
+            count = Math.Min(count, Count);
+            var removed = new LogEntry[count];
+            for (var i = 0; i < count; i++) removed[i] = Items[i];
+            CheckReentrancy();
+            // ObservableCollection's parameterless ctor backs Items with a List<T>.
+            ((List<LogEntry>)Items).RemoveRange(0, count);
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(
+                NotifyCollectionChangedAction.Remove, (System.Collections.IList)removed, 0));
+        }
     }
 }

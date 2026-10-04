@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -345,8 +346,11 @@ public sealed class LinuxPtySession : IPtySession
             using var process = Process.GetProcessById(child);
             process.Kill(entireProcessTree: true);
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-        { /* The child already exited. */ }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
+            or Win32Exception or IOException)
+        { /* The child already exited, or the tree walk hit a process it could not
+           terminate — either way this must not escape Kill/Dispose, or the master
+           fd stays open; the signals below remain the authoritative kill. */ }
         var pgid = Native.getpgid(child);
         var mine = Native.getpgid(0);
         if (pgid > 1 && pgid == child && pgid != mine)

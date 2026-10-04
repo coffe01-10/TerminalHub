@@ -7,7 +7,30 @@ public static class WorkspaceTemplateTransfer
 {
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
-    public static string ToJson(WorkspaceTemplate template) => JsonSerializer.Serialize(template, Json);
+    public static string ToJson(WorkspaceTemplate template)
+    {
+        // Exported template files are shareable; SSH connection details
+        // (user@host, port, key paths) must not leave the machine. Local copies
+        // (Clone) still keep them — see the raw serializer below.
+        var layout = template.Layout;
+        var safe = new WorkspaceTemplate { Name = template.Name, LastUsed = template.LastUsed, Layout = new WorkspaceState
+        {
+            PaneTree = layout.PaneTree,
+            Sessions = layout.Sessions.Select(session => IsSsh(session) ? session with { Shell = "", Arguments = "" } : session).ToList(),
+            ActiveIndex = layout.ActiveIndex, IsSplit = layout.IsSplit,
+            LeftIndex = layout.LeftIndex, RightIndex = layout.RightIndex, FocusedPane = layout.FocusedPane,
+            SplitLayout = layout.SplitLayout, BottomLeftIndex = layout.BottomLeftIndex, BottomRightIndex = layout.BottomRightIndex,
+            ColumnRatio = layout.ColumnRatio, RowRatio = layout.RowRatio,
+        } };
+        return Serialize(safe);
+    }
+
+    private static string Serialize(WorkspaceTemplate template) => JsonSerializer.Serialize(template, Json);
+
+    // Same ssh test as WorkspaceSessionEditor.CanRunStartupCommand.
+    private static bool IsSsh(WorkspaceSession session)
+        => string.Equals(session.Tag, "SSH", StringComparison.OrdinalIgnoreCase)
+            || Path.GetFileNameWithoutExtension(session.Shell).Equals("ssh", StringComparison.OrdinalIgnoreCase);
 
     public static bool TryParse(string json, out WorkspaceTemplate? template, out string error)
     {
@@ -35,7 +58,7 @@ public static class WorkspaceTemplateTransfer
 
     public static WorkspaceTemplate Clone(WorkspaceTemplate source)
     {
-        if (!TryParse(ToJson(source), out var copy, out _) || copy is null)
+        if (!TryParse(Serialize(source), out var copy, out _) || copy is null)
             throw new InvalidOperationException("模板复制失败。");
         copy.Name = source.Name.Trim() + " 副本";
         copy.LastUsed = source.LastUsed;

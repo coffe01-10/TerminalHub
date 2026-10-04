@@ -49,6 +49,16 @@ public class StageLayoutTests
             Window.Show();
         }
 
+        /// <summary>Waits until the five startup sessions have spawned — replaces
+        /// fixed boot sleeps that flake when session startup outruns them.</summary>
+        public async Task ReadyAsync()
+        {
+            var deadline = Environment.TickCount64 + 5000;
+            while (Vm.SessionCards.Count < 5 && Environment.TickCount64 < deadline)
+                await Task.Delay(20);
+            Assert.True(Vm.SessionCards.Count >= 5, "startup sessions never spawned");
+        }
+
         public void Dispose()
         {
             Window.Close();
@@ -371,9 +381,15 @@ public class StageLayoutTests
         var surface = window.FindControl<StageSurface>("StageWindow")!;
         vm.ToggleSplitCommand.Execute(null);
         await Task.Delay(100);
+        // The fixed SplitGrid boxes are permanently collapsed (SplitHost renders
+        // the live pane tree); click the real "PaneFrame" borders — left first,
+        // then right, matching the visual tree order.
+        var panes = window.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name == "PaneFrame").ToArray();
+        Assert.Equal(2, panes.Length);
         foreach (var side in new[] { "Right", "Left", "Right" })
         {
-            var pane = window.FindControl<Border>(side + "PaneBox")!;
+            var pane = side == "Left" ? panes[0] : panes[1];
             var point = pane.TranslatePoint(new Point(60, 65), window)!.Value;
             window.MouseDown(point, MouseButton.Left);
             window.MouseUp(point, MouseButton.Left);

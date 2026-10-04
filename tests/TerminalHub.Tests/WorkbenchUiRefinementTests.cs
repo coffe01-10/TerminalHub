@@ -26,7 +26,7 @@ public class WorkbenchUiRefinementTests
     [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
     public async Task ToolsAndManager_FitEnglishAtMinimumSize_KeepFocusedOrderEditorAndPluginSettings(int theme)
     {
-        using var f = new StageLayoutTests.StageFixture(width: 1100, height: 700); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(width: 1100, height: 700); await f.ReadyAsync();
         f.Vm.ThemeIndex = theme; f.Vm.LanguageIndex = 2;
         var manager = Field<PluginManager>(f.Window, "_plugins");
         try

@@ -29,7 +29,9 @@ public sealed class SftpClient : IDisposable
         catch (Exception ex)
         {
             client.Dispose();
-            var error = await client._error!;
+            var error = "";
+            try { error = await client._error!; }
+            catch (Exception) { } // a failing stderr reader must not replace the original connect error
             throw new IOException($"SFTP 连接失败。请先在 SSH 终端完成主机确认，并配置密钥或 ssh-agent。{error.Trim()}", ex);
         }
     }
@@ -97,7 +99,15 @@ public sealed class SftpClient : IDisposable
             }
             ct.ThrowIfCancellationRequested(); File.Move(temporary, local, true);
         }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); if (!_disposed) await CloseAsync(handle); }
+        finally
+        {
+            // Cleanup must not replace the transfer outcome (original error or a
+            // completed download) — same IOException guard as UploadAsync.
+            try { if (File.Exists(temporary)) File.Delete(temporary); }
+            catch (IOException) { }
+            try { if (!_disposed) await CloseAsync(handle); }
+            catch (IOException) { Dispose(); }
+        }
     }
     public async Task UploadAsync(string local, string remote, IProgress<long>? progress, CancellationToken ct)
     {

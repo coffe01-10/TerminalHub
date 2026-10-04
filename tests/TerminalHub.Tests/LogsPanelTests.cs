@@ -31,7 +31,9 @@ public class LogsPanelTests
         public void Dispose() { }
     }
 
-    /// <summary>Polls until <paramref name="condition"/> holds (OutputLog appends arrive via the UI dispatcher).</summary>
+    /// <summary>Polls until <paramref name="condition"/> holds (OutputLog appends
+    /// arrive via the UI dispatcher); timing out fails here instead of deferring
+    /// to whatever assertion — if any — comes next.</summary>
     private static async Task Until(Func<bool> condition, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(8));
@@ -40,6 +42,7 @@ public class LogsPanelTests
             if (condition()) return;
             await Task.Delay(25);
         }
+        Assert.True(condition(), "Timed out waiting for the logs UI state.");
     }
 
     private static (DashboardViewModel dash, LogsViewModel logs, SessionLogFile file) MakeLogs(
@@ -968,7 +971,8 @@ public class LogsPanelTests
         dash.SearchQuery = "needle";
         await Task.Delay(50);
         Assert.Single(dash.SearchHits);
-        Assert.Equal("1 处匹配", dash.SearchStatus);
+        // Product copy includes the per-session cap (localized in Messages.json too).
+        Assert.Equal("1 行匹配（每会话最多 200 行）", dash.SearchStatus);
         Assert.Contains("needle", dash.SearchHits[0].Text);
 
         dash.SearchQuery = "zzz";

@@ -18,6 +18,9 @@ public sealed class ConPtySession : IPtySession
     // Cached at exit so ExitCode/IsRunning stay queryable after _process is disposed.
     private volatile bool _hasExitCode;
     private int _exitCode;
+    // 0 -> 1 once a real exit code is committed: first writer (the Exited
+    // callback or Dispose) wins, so a late guess of -1 cannot overwrite it.
+    private int _exitCodeCommitted;
     private CancellationTokenSource? _readCts;
     private Task? _readTask;
     private int _disposed;
@@ -80,19 +83,21 @@ public sealed class ConPtySession : IPtySession
         _process.EnableRaisingEvents = true;
         _process.Exited += (_, _) =>
         {
+            var p = _process;
+            // Dispose nulls _process and collects the exit code itself — a
+            // callback running that late could only guess -1 and would
+            // overwrite the real value Dispose is about to cache.
+            if (p is null) return;
             // Default -1 ("unknown"), NOT 0: a race that makes ExitCode throw
             // must not be reported as a successful exit.
             var code = -1;
-            var p = _process;
             try
             {
-                if (p is not null)
-                {
-                    if (!p.HasExited) p.WaitForExit(1000);
-                    code = p.ExitCode;
-                }
+                if (!p.HasExited) p.WaitForExit(1000);
+                code = p.ExitCode;
             }
             catch { }
+            if (Interlocked.Exchange(ref _exitCodeCommitted, 1) != 0) return;
             _exitCode = code;
             _hasExitCode = true;
             Exited?.Invoke(this, code);
@@ -260,7 +265,10 @@ public sealed class ConPtySession : IPtySession
                 if (!_hasExitCode)
                 {
                     p.WaitForExit(2000);   // Kill() is asynchronous — give it a moment
-                    if (p.HasExited) { _exitCode = p.ExitCode; _hasExitCode = true; }
+                    // First writer wins: the Exited callback may have committed
+                    // the real code while we waited — never overwrite it.
+                    if (p.HasExited && Interlocked.Exchange(ref _exitCodeCommitted, 1) == 0)
+                    { _exitCode = p.ExitCode; _hasExitCode = true; }
                 }
             }
             catch { /* handle already gone — exit code stays unknown */ }

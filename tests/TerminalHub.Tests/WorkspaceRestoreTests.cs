@@ -23,6 +23,8 @@ public class WorkspaceRestoreTests
         public void Dispose() { }
     }
 
+    /// <summary>Polls until <paramref name="condition"/> holds; timing out fails
+    /// here instead of deferring to whatever assertion — if any — comes next.</summary>
     private static async Task Until(Func<bool> condition, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(8));
@@ -31,6 +33,7 @@ public class WorkspaceRestoreTests
             if (condition()) return;
             await Task.Delay(25);
         }
+        Assert.True(condition(), "Timed out waiting for the workspace state.");
     }
 
     private static string TempDir()

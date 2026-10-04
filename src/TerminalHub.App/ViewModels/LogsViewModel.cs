@@ -36,6 +36,12 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     private readonly Action? _persistFilters;
     /// <summary>Host activates a session by card name; returns false when unknown.</summary>
     private readonly Func<string, bool>? _activateSession;
+    /// <summary>Debounce window for <see cref="SaveCurrentFilters"/>. Null (default)
+    /// keeps the historical synchronous save; a positive span coalesces a burst of
+    /// filter changes into one trailing save, flushed on <see cref="Dispose"/> so the
+    /// final state always reaches disk.</summary>
+    private readonly TimeSpan? _filterSaveDebounce;
+    private Avalonia.Threading.DispatcherTimer? _filterSaveTimer;
     private int _capacity;
 
     /// <summary>True while saved values are being replayed (<see cref="ApplyPersistedFilters"/>
@@ -351,7 +357,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         Func<string, Task>? copyToClipboard = null,
         Func<Task<string?>>? promptExportPath = null,
         Action? persistFilters = null,
-        Func<string, bool>? activateSession = null)
+        Func<string, bool>? activateSession = null,
+        TimeSpan? filterSaveDebounce = null)
     {
         _dashboard = dashboard;
         _file = file;
@@ -364,6 +371,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
         _promptExportPath = promptExportPath;
         _persistFilters = persistFilters;
         _activateSession = activateSession;
+        _filterSaveDebounce = filterSaveDebounce;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged += OnLogChanged;
         Entries.CollectionChanged += OnEntriesChanged;
         Refilter();
@@ -459,15 +467,24 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
                 {
                     _buffer.Add(entry);
                     CountLevel(entry, +1);
-                    while (_buffer.Count > _capacity)
-                    {
-                        var evicted = _buffer[0];
-                        CountLevel(evicted, -1);
-                        _buffer.RemoveAt(0);
-                        var shown = Entries.IndexOf(evicted);
-                        if (shown >= 0) Entries.RemoveAt(shown);
-                    }
                     if (Matches(entry)) Entries.Add(entry);
+                }
+                var overflow = _buffer.Count - _capacity;
+                if (overflow > 0)
+                {
+                    // Entries is an order-preserving filtered view of the buffer, so
+                    // the evicted matches are its prefix — walk a cursor instead of
+                    // running Entries.IndexOf (a full scan) per evicted line.
+                    var evictedShown = 0;
+                    for (var i = 0; i < overflow; i++)
+                    {
+                        var evicted = _buffer[i];
+                        CountLevel(evicted, -1);
+                        if (evictedShown < Entries.Count && ReferenceEquals(Entries[evictedShown], evicted))
+                            evictedShown++;
+                    }
+                    _buffer.RemoveRange(0, overflow);
+                    for (var i = 0; i < evictedShown; i++) Entries.RemoveAt(0);
                 }
                 bufferChanged = true;
                 break;
@@ -617,7 +634,8 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
     /// <summary>Filter change → record the combo under the active selection's key
     /// (its map entry for a named session, <see cref="_globalFilters"/> for
     /// 「全部会话」), then hand it to the save callback (wired by MainWindowViewModel
-    /// to settings + disk).</summary>
+    /// to settings + disk). The record stays synchronous (session switching reads
+    /// these slots immediately); only the save callback may be debounced.</summary>
     private void SaveCurrentFilters()
     {
         if (_restoringFilters) return;
@@ -625,7 +643,40 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
             _globalFilters = CurrentFilterState();
         else if (SessionFilterIndex > 0 && SessionFilterIndex < SessionNames.Count)
             _sessionFilters[SessionNames[SessionFilterIndex]] = CurrentFilterState();
-        _persistFilters?.Invoke();
+        if (_filterSaveDebounce is { } delay)
+            ScheduleFilterSave(delay);
+        else
+            _persistFilters?.Invoke();
+    }
+
+    /// <summary>Restart the trailing save timer — only the burst's last change
+    /// writes, and the timer reads live state at fire time so the flushed save
+    /// carries the final values.</summary>
+    private void ScheduleFilterSave(TimeSpan delay)
+    {
+        if (_persistFilters is null) return;
+        if (_filterSaveTimer is null)
+        {
+            _filterSaveTimer = new Avalonia.Threading.DispatcherTimer();
+            _filterSaveTimer.Tick += (_, _) =>
+            {
+                _filterSaveTimer!.Stop();
+                _persistFilters?.Invoke();
+            };
+        }
+        _filterSaveTimer.Interval = delay;
+        _filterSaveTimer.Stop();
+        _filterSaveTimer.Start();
+    }
+
+    /// <summary>A pending debounced save must never be lost — flush it on teardown.</summary>
+    private void FlushPendingFilterSave()
+    {
+        if (_filterSaveTimer?.IsEnabled == true)
+        {
+            _filterSaveTimer.Stop();
+            _persistFilters?.Invoke();
+        }
     }
 
     private void UpdateRegex()
@@ -893,6 +944,7 @@ public partial class LogsViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        FlushPendingFilterSave();
         _file.Failed -= OnFileWriteFailed;
         ((INotifyCollectionChanged)_dashboard.OutputLog).CollectionChanged -= OnLogChanged;
     }

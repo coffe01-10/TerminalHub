@@ -102,6 +102,9 @@ public partial class TerminalView : Control
     private bool _cursorOn = true;
     private readonly DispatcherTimer _blink;
     private readonly Dictionary<Color, IBrush> _brushCache = new();
+    // Output-rule highlight brushes keyed by rule color string — the render
+    // loop resolves every rule again for each visible row on every frame.
+    private readonly Dictionary<string, IBrush?> _ruleBrushes = new();
     private readonly TerminalImeClient _imeClient;
     private string? _preedit;         // IME composition text (null = not composing)
     private int _preeditCaret;        // caret index inside _preedit, in chars
@@ -119,6 +122,13 @@ public partial class TerminalView : Control
     private InputPosition _inputPosition;
     private (TerminalFrame? Frame, InputPosition Input, string? Text, int Caret) _compositionKey;
     private PreeditLayout? _compositionLayout;
+    // Tail-search flattening cache: FlattenRow is a pure function of a row's
+    // cells, so a row with unchanged cells reuses the previous scan's text/cols.
+    // Continuous TUI output reruns the scan for every parse batch but usually
+    // rewrites only a few rows per batch.
+    private TerminalCell[][] _tailRowsCells = [];
+    private string?[] _tailRowsText = [];
+    private int[][] _tailRowsCols = [];
 
     // Mouse selection — absolute buffer lines (scrollback indexes stay stable).
     private (int line, int col)? _selAnchor, _selEnd;
@@ -604,11 +614,12 @@ public partial class TerminalView : Control
                 var (text, columns) = ScreenBuffer.FlattenRow(span);
                 foreach (var matcher in _emulator.OutputRules)
                 {
-                    if (!Color.TryParse(matcher.Rule.Color, out var color)) continue;
+                    var highlight = RuleHighlightBrush(matcher.Rule.Color);
+                    if (highlight is null) continue;
                     foreach (var match in matcher.Find(text))
                     {
                         var start = columns[match.Index]; var end = columns[match.Index + match.Length - 1];
-                        ctx.DrawRectangle(new SolidColorBrush(color, .32), null,
+                        ctx.DrawRectangle(highlight, null,
                             new Rect(start * _cellW, row * _cellH, (end + GlyphColumns(span, end) - start) * _cellW, _cellH));
                     }
                 }
@@ -735,41 +746,69 @@ public partial class TerminalView : Control
         }
 
         var tail = _typedTail;
-        for (var len = Math.Min(24, tail.Length); len >= 2; len -= 6)
+        if (tail.Length >= 2)
         {
-            var needle = tail[^len..];
-            var anyDist = long.MaxValue;   // nearest occurrence overall
-            var anyCol = -1; var anyRow = 0;
-            var offDist = long.MaxValue;   // nearest occurrence NOT ending on the cursor
-            var offCol = -1; var offRow = 0;
-            for (var r = 0; r < f.Rows; r++)
+            SyncTailRows(f);
+            for (var len = Math.Min(24, tail.Length); len >= 2; len -= 6)
             {
-                var cells = f.Cells.AsSpan(r * f.Columns, f.Columns);
-                var inkEnd = RowInkEnd(f, r);
-                var (text, cols) = ScreenBuffer.FlattenRow(cells);
-                var from = 0;
-                while (from <= text.Length - needle.Length)
+                var needle = tail[^len..];
+                var anyDist = long.MaxValue;   // nearest occurrence overall
+                var anyCol = -1; var anyRow = 0;
+                var offDist = long.MaxValue;   // nearest occurrence NOT ending on the cursor
+                var offCol = -1; var offRow = 0;
+                for (var r = 0; r < f.Rows; r++)
                 {
-                    var ti = text.IndexOf(needle, from, StringComparison.Ordinal);
-                    if (ti < 0) break;
-                    if (cols[ti] >= inkEnd) break;   // matches never start in blank padding
-                    // End cell after the matched cluster — never inside a wide
-                    // glyph's padding and never into blank space past the ink.
-                    var lastCol = cols[ti + needle.Length - 1];
-                    var ci = Math.Min(lastCol + (cells[lastCol].IsWide ? 2 : 1), inkEnd);
-                    var dist = Math.Abs(r - f.CursorY) * 4096L + Math.Abs(ci - f.CursorX);
-                    if (dist < anyDist) { anyDist = dist; anyCol = ci; anyRow = r; }
-                    if ((r != f.CursorY || ci != f.CursorX) && dist < offDist)
-                    { offDist = dist; offCol = ci; offRow = r; }
-                    from = ti + 1;
+                    var cells = f.Cells.AsSpan(r * f.Columns, f.Columns);
+                    var inkEnd = RowInkEnd(f, r);
+                    var text = _tailRowsText[r]!;
+                    var cols = _tailRowsCols[r];
+                    var from = 0;
+                    while (from <= text.Length - needle.Length)
+                    {
+                        var ti = text.IndexOf(needle, from, StringComparison.Ordinal);
+                        if (ti < 0) break;
+                        if (cols[ti] >= inkEnd) break;   // matches never start in blank padding
+                        // End cell after the matched cluster — never inside a wide
+                        // glyph's padding and never into blank space past the ink.
+                        var lastCol = cols[ti + needle.Length - 1];
+                        var ci = Math.Min(lastCol + (cells[lastCol].IsWide ? 2 : 1), inkEnd);
+                        var dist = Math.Abs(r - f.CursorY) * 4096L + Math.Abs(ci - f.CursorX);
+                        if (dist < anyDist) { anyDist = dist; anyCol = ci; anyRow = r; }
+                        if ((r != f.CursorY || ci != f.CursorX) && dist < offDist)
+                        { offDist = dist; offCol = ci; offRow = r; }
+                        from = ti + 1;
+                    }
                 }
+                if (!f.CursorVisible && offCol >= 0)
+                    return new(Math.Min(offCol, f.Columns - 1), offRow, true);
+                if (anyCol >= 0)
+                    return new(Math.Min(anyCol, f.Columns - 1), anyRow, true);
             }
-            if (!f.CursorVisible && offCol >= 0)
-                return new(Math.Min(offCol, f.Columns - 1), offRow, true);
-            if (anyCol >= 0)
-                return new(Math.Min(anyCol, f.Columns - 1), anyRow, true);
         }
         return new(Math.Min(f.CursorX, RowInkEnd(f, f.CursorY)), f.CursorY, false);
+    }
+
+    /// <summary>Flatten every frame row once for the tail search, reusing the
+    /// previous call's rows while their cells are unchanged — the ≤4 needle
+    /// lengths would otherwise re-flatten the whole screen each round, and each
+    /// parse batch would re-flatten rows that did not change.</summary>
+    private void SyncTailRows(TerminalFrame f)
+    {
+        if (_tailRowsText.Length != f.Rows)
+        {
+            _tailRowsCells = new TerminalCell[f.Rows][];
+            _tailRowsText = new string?[f.Rows];
+            _tailRowsCols = new int[f.Rows][];
+        }
+        for (var r = 0; r < f.Rows; r++)
+        {
+            var cells = f.Cells.AsSpan(r * f.Columns, f.Columns);
+            if (_tailRowsText[r] is not null && SamePaintedCells(cells, _tailRowsCells[r])) continue;
+            var (text, cols) = ScreenBuffer.FlattenRow(cells);
+            _tailRowsCells[r] = cells.ToArray();
+            _tailRowsText[r] = text;
+            _tailRowsCols[r] = cols;
+        }
     }
 
     private static InputRegion? FindInputRegion(TerminalFrame frame)
@@ -1084,6 +1123,17 @@ public partial class TerminalView : Control
         if (_brushCache.Count == 128) _brushCache.Clear();
         brush = new ImmutableSolidColorBrush(color);
         _brushCache[color] = brush;
+        return brush;
+    }
+
+    /// <summary>Translucent highlight brush for an output-rule color string,
+    /// cached per view (null = unparseable, skip the rule).</summary>
+    private IBrush? RuleHighlightBrush(string color)
+    {
+        if (_ruleBrushes.TryGetValue(color, out var brush)) return brush;
+        brush = Color.TryParse(color, out var parsed)
+            ? new ImmutableSolidColorBrush(parsed, .32) : null;
+        _ruleBrushes[color] = brush;
         return brush;
     }
 

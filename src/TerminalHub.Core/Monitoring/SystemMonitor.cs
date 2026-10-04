@@ -12,6 +12,7 @@ public sealed class SystemMonitor : ISystemMonitor
 {
     private readonly TimeSpan _processSampleFloor = TimeSpan.FromSeconds(1);
     private Timer? _timer;
+    private readonly object _sampleLock = new();
     private long _lastIdleTicks, _lastTotalTicks;
     private long _lastRxBytes, _lastTxBytes;
     private DateTime _lastNetSample = DateTime.MinValue;
@@ -34,20 +35,34 @@ public sealed class SystemMonitor : ISystemMonitor
 
     public void Dispose()
     {
-        _timer?.Dispose();
+        Interlocked.Exchange(ref _disposed, 1);
+        var timer = _timer;
         _timer = null;
+        timer?.Dispose();
+        // Join an in-flight sample. The lock is reentrant so a Sampled
+        // subscriber can also dispose the monitor without waiting on itself.
+        lock (_sampleLock) { }
     }
 
     /// <summary>Timer callbacks are not serialized — a slow sample (process list on a
     /// loaded box) must not let a second Tick run concurrently and corrupt the deltas.</summary>
     private int _ticking;
+    /// <summary>Set by Dispose — a queued-but-unstarted callback must not sample
+    /// (or raise Sampled) after the subscriber has begun tearing down.</summary>
+    private int _disposed;
 
     private void Tick()
     {
+        if (Volatile.Read(ref _disposed) != 0) return;
         if (Interlocked.Exchange(ref _ticking, 1) != 0) return;
         try
         {
-            TickCore();
+            lock (_sampleLock)
+            {
+                // Dispose may have run before this callback acquired the lock.
+                if (Volatile.Read(ref _disposed) == 0)
+                    TickCore();
+            }
         }
         finally
         {

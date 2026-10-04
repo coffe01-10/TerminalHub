@@ -49,7 +49,7 @@ public class OfficialPluginTests
     [AvaloniaFact]
     public async Task Notes_SwitchAndDisableBeforeAutosave_KeepWorkspaceTextAndRestoreConfiguration()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var manager = Field<PluginManager>(f.Window, "_plugins");
         try
         {
@@ -76,7 +76,7 @@ public class OfficialPluginTests
     [AvaloniaFact]
     public async Task Clips_ActualDllCapture_SelectNewestLimitTo20AndCopy_ClearOnDisable()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var manager = Field<PluginManager>(f.Window, "_plugins");
         try
         {
@@ -111,7 +111,7 @@ public class OfficialPluginTests
     [AvaloniaFact]
     public async Task Watch_UsesActualShellMarkers_DistinguishesFailureUnknownAndNoMarker_AndFiltersWorkspaces()
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         var manager = Field<PluginManager>(f.Window, "_plugins");
         try
         {
@@ -138,7 +138,7 @@ public class OfficialPluginTests
     [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
     public async Task OfficialPages_FitMinimumToolsWindowAndEnglish_AndUseDynamicThemes(int theme)
     {
-        using var f = new StageLayoutTests.StageFixture(); await Task.Delay(650);
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         f.Vm.ThemeIndex = theme; f.Vm.LanguageIndex = 2;
         var manager = Field<PluginManager>(f.Window, "_plugins");
         try

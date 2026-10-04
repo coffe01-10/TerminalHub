@@ -9,14 +9,21 @@ namespace TerminalHub.Tests;
 /// cross-talk, clean toggling and graceful session-removal handling.</summary>
 public class SplitPaneTests
 {
+    private static async Task Until(Func<bool> condition, string? message = null)
+    {
+        var deadline = Environment.TickCount64 + 5000;
+        while (!condition() && Environment.TickCount64 < deadline)
+            await Task.Delay(20);
+        Assert.True(condition(), message ?? "Timed out waiting for the split-pane state.");
+    }
+
     private static async Task<(MainWindow Window, TerminalHub.App.ViewModels.MainWindowViewModel Vm)> Boot()
     {
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1440, Height = 900 };
         window.Show();
-        await Task.Delay(500); // startup sessions spawn
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
-        Assert.True(vm.SessionCards.Count >= 3);
+        await Until(() => vm.SessionCards.Count >= 3, "startup sessions never spawned");
         return (window, vm);
     }
 
@@ -31,15 +38,11 @@ public class SplitPaneTests
     [AvaloniaFact]
     public async Task Split_EnterExit_TwoDistinctSessions()
     {
-        var window = new MainWindow { Width = 1440, Height = 900 };
-        PtySessionFactory.UseMock = true;
-        window.Show();
-        await Task.Delay(500);
-        var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        var (window, vm) = await Boot();
 
         Assert.False(vm.IsSplit);
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(300);
+        await Until(() => vm.IsSplit, "split never activated");
 
         Assert.True(vm.IsSplit);
         Assert.NotNull(vm.LeftPane);
@@ -71,17 +74,14 @@ public class SplitPaneTests
         Assert.True(fullCols > 80);
 
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(500);
-        Assert.True(vm.IsSplit);
+        await Until(() => vm.IsSplit, "split never activated");
         Assert.Same(emulator, vm.LeftPane!.Emulator); // left pane reuses the active session
-        Assert.True(emulator.Buffer.Columns < fullCols,
+        await Until(() => emulator.Buffer.Columns < fullCols,
             $"left pane should have shrunk the grid below {fullCols}, got {emulator.Buffer.Columns}");
 
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(500);
-        Assert.False(vm.IsSplit);
-        Assert.Equal(fullCols, emulator.Buffer.Columns);
-        Assert.Equal(fullRows, emulator.Buffer.Rows);
+        await Until(() => !vm.IsSplit && emulator.Buffer.Columns == fullCols
+            && emulator.Buffer.Rows == fullRows, "exiting split never restored the emulator size");
         window.Close();
     }
 
@@ -90,7 +90,7 @@ public class SplitPaneTests
     {
         var (window, vm) = await Boot();
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(300);
+        await Until(() => vm.IsSplit, "split never activated");
         var left = vm.LeftPane!;
         var right = vm.RightPane!;
 
@@ -113,18 +113,16 @@ public class SplitPaneTests
     {
         var (window, vm) = await Boot();
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(300);
+        await Until(() => vm.IsSplit, "split never activated");
 
         Assert.Same(vm.LeftPane, vm.ActiveSession); // split opened focused on left
 
         vm.FocusPane(1);
-        await Task.Delay(150);
+        await Until(() => ReferenceEquals(vm.ActiveSession, vm.RightPane), "right pane never activated");
         Assert.Equal(1, vm.FocusedPane);
-        Assert.Same(vm.RightPane, vm.ActiveSession);
 
         vm.FocusPane(0);
-        await Task.Delay(150);
-        Assert.Same(vm.LeftPane, vm.ActiveSession);
+        await Until(() => ReferenceEquals(vm.ActiveSession, vm.LeftPane), "left pane never reactivated");
         window.Close();
     }
 
@@ -133,15 +131,17 @@ public class SplitPaneTests
     {
         var (window, vm) = await Boot();
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(300);
+        await Until(() => vm.IsSplit, "split never activated");
 
         // Focus right pane, click a different card → right pane retargets.
         vm.FocusPane(1);
         var other = vm.SessionCards.First(c =>
             !ReferenceEquals(c.Model, vm.LeftPane) && !ReferenceEquals(c.Model, vm.RightPane));
         vm.ActiveCard = other;
-        await Task.Delay(200);
-        Assert.Same(other.Model, vm.RightPane);
+        // AssignToPane + _sessions.Activate run synchronously, but ActiveSession
+        // converges via a posted SyncActive — wait for it before asserting.
+        await Until(() => ReferenceEquals(vm.RightPane, other.Model)
+            && ReferenceEquals(vm.ActiveSession, other.Model), "right pane never retargeted to the clicked card");
         Assert.Same(other.Model, vm.ActiveSession);
 
         // Focus left, click another card → left pane retargets, right keeps its own.
@@ -149,8 +149,7 @@ public class SplitPaneTests
         var third = vm.SessionCards.First(c =>
             !ReferenceEquals(c.Model, vm.RightPane) && !ReferenceEquals(c.Model, vm.LeftPane));
         vm.ActiveCard = third;
-        await Task.Delay(200);
-        Assert.Same(third.Model, vm.LeftPane);
+        await Until(() => ReferenceEquals(vm.LeftPane, third.Model), "left pane never retargeted to the clicked card");
         Assert.Same(other.Model, vm.RightPane);
         window.Close();
     }
@@ -161,21 +160,21 @@ public class SplitPaneTests
         PtySessionFactory.UseMock = true;
         var window = new MainWindow { Width = 1200, Height = 800 };
         window.Show();
-        await Task.Delay(500);
         var vm = (TerminalHub.App.ViewModels.MainWindowViewModel)window.DataContext!;
+        await Until(() => vm.SessionCards.Count >= 3, "startup sessions never spawned");
 
         // Close down to exactly one session via the real close path.
         while (vm.SessionCards.Count > 1)
         {
-            vm.CloseSessionCommand.Execute(vm.SessionCards.Last());
-            await Task.Delay(120);
+            var closing = vm.SessionCards.Last();
+            vm.CloseSessionCommand.Execute(closing);
+            await Until(() => !vm.SessionCards.Contains(closing), "session never closed");
         }
         Assert.Single(vm.SessionCards);
 
         var before = vm.SessionCards.Count;
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(500); // second session spawns asynchronously
-        Assert.True(vm.IsSplit);
+        await Until(() => vm.IsSplit, "split never activated"); // second session spawns asynchronously
         Assert.Equal(before + 1, vm.SessionCards.Count);
         Assert.NotNull(vm.LeftPane);
         Assert.NotNull(vm.RightPane);
@@ -188,8 +187,7 @@ public class SplitPaneTests
             vm.ToggleSplitCommand.Execute(null);
             Assert.False(vm.IsSplit);
             vm.ToggleSplitCommand.Execute(null);
-            await Task.Delay(250);
-            Assert.True(vm.IsSplit);
+            await Until(() => vm.IsSplit, "re-entering split never completed");
             Assert.Equal(total, vm.SessionCards.Count);
         }
         window.Close();
@@ -200,12 +198,12 @@ public class SplitPaneTests
     {
         var (window, vm) = await Boot();
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(300);
+        await Until(() => vm.IsSplit, "split never activated");
 
         var right = vm.RightPane!;
         var rightCard = vm.SessionCards.First(c => ReferenceEquals(c.Model, right));
         vm.CloseSessionCommand.Execute(rightCard); // real close → SessionRemoved
-        await Task.Delay(400);
+        await Until(() => !ReferenceEquals(vm.RightPane, right), "right pane never fell back");
 
         Assert.True(vm.IsSplit); // still split
         Assert.NotNull(vm.LeftPane);
@@ -222,18 +220,17 @@ public class SplitPaneTests
     {
         var (window, vm) = await Boot();
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(300);
+        await Until(() => vm.IsSplit, "split never activated");
         Assert.True(vm.SessionCards.Count >= 3); // needs a session besides both panes
 
         var left = vm.LeftPane!;
         var right = vm.RightPane!;
         var leftCard = vm.SessionCards.First(c => ReferenceEquals(c.Model, left));
         vm.CloseSessionCommand.Execute(leftCard);
-        await Task.Delay(400);
+        await Until(() => vm.LeftPane is not null && !ReferenceEquals(vm.LeftPane, left),
+            "left pane never fell back");
 
         Assert.True(vm.IsSplit);
-        Assert.NotNull(vm.LeftPane);
-        Assert.NotSame(left, vm.LeftPane);
         Assert.NotSame(right, vm.LeftPane); // panes must not collapse onto one session
         window.Close();
     }
@@ -246,24 +243,20 @@ public class SplitPaneTests
         {
             var extra = vm.SessionCards.First(c => !ReferenceEquals(c.Model, vm.ActiveSession));
             vm.CloseSessionCommand.Execute(extra);
-            await Task.Delay(150);
+            await Until(() => !vm.SessionCards.Contains(extra), "extra session never closed");
         }
         vm.ToggleSplitCommand.Execute(null);
-        await Task.Delay(250);
-        Assert.Equal(2, vm.SessionCards.Count);
-        Assert.True(vm.IsSplit);
+        await Until(() => vm.IsSplit && vm.SessionCards.Count == 2, "split with two sessions never came up");
         Assert.NotSame(vm.LeftPane, vm.RightPane);
 
         vm.FocusPane(1);
         var right = vm.RightPane;
         var rightCard = vm.SessionCards.First(c => ReferenceEquals(c.Model, right));
         vm.CloseSessionCommand.Execute(rightCard);
-        await Task.Delay(400);
+        await Until(() => !vm.IsSplit && vm.SessionCards.Count == 1, "closing the last focused side never exited split");
 
-        Assert.False(vm.IsSplit);
         Assert.Null(vm.LeftPane);
         Assert.Null(vm.RightPane);
-        Assert.Single(vm.SessionCards);
         Assert.NotSame(right, vm.ActiveSession);
         window.Close();
     }

@@ -60,8 +60,9 @@ public class OutputVisibilityTests
         vm.OutputVisible = true;
         Assert.True(panel.IsVisible);
 
-        // Trigger a real app event: split creates one logged entry per pane.
-        vm.ToggleSplitCommand.Execute(null);
+        // Trigger a real app event through the product's app-event pipeline.
+        // (Split toggling stopped logging entries when it became the layout switch.)
+        vm.Dashboard.AppendAppOutput("info", "split opened", "split");
         await Task.Delay(400);
         var entry = Assert.Single(vm.Dashboard.OutputLog,
             e => e.Source == "split" && e.Level == "info");
@@ -72,7 +73,6 @@ public class OutputVisibilityTests
         var list = window.FindControl<ListBox>("OutputList")!;
         Assert.Contains(list.GetVisualDescendants().OfType<TextBlock>(),
             t => t.Text == entry.Message);
-        vm.ToggleSplitCommand.Execute(null);
         window.Close();
     }
 
@@ -134,7 +134,7 @@ public class OutputVisibilityTests
         Assert.True(combo.IsEffectivelyVisible);
         Assert.Equal(0, combo.SelectedIndex); // 全部
 
-        vm.ToggleSplitCommand.Execute(null);  // real event → info row
+        vm.Dashboard.AppendAppOutput("info", "split opened", "split");  // real event → info row
         await Task.Delay(400);
         vm.Dashboard.AppendOutput("warn", "deploy profile missing", "deploy");
         await Task.Delay(300);
