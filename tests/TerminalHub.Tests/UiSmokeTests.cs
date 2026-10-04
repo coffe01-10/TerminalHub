@@ -256,6 +256,9 @@ public class UiSmokeTests
                 string.Join(" | ", vm.Dashboard.OutputLog.Select(l => l.Message)));
 
             var emu = vm.ActiveSession!.Emulator;
+            // DebugLog only captures once the Debug tab has been opened
+            // (DebugCaptureEnabled is lazy by design).
+            vm.Dashboard.SelectedBottomTab = 1;
             emu.SendText("echo E2E_$((6*7))\r");
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
