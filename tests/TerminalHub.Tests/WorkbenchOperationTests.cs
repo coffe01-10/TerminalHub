@@ -137,21 +137,45 @@ public class WorkbenchOperationTests
         Assert.Contains("after-undo", f.Vm.ActiveSession!.Emulator.Buffer.TailText(30));
     }
 
-    [AvaloniaFact]
-    public async Task ShelfClickOnAlreadySelectedCard_AssignsToFocusedPane()
+    [AvaloniaTheory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task ShelfClickOnAlreadySelectedCard_AssignsToFocusedPane(bool activationPending)
     {
         using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
         await f.Vm.SetSplitLayoutAsync("Horizontal"); await Task.Delay(120);
         var left = f.Vm.LeftPane; var right = f.Vm.RightPane;
         var card = f.Vm.SessionCards.Single(c => c.Model == left);
         f.Vm.ActivateCard(card); await Task.Delay(50); // selected card, left pane
-        // Pane focus moved without activation — the state a queued SyncActive
-        // leaves behind, and a same-card mouse click must still assign the pane.
-        f.Vm.FocusedPane = 1;
         var point = CardPoint(f.Window, card);
+        EventHandler<PointerReleasedEventArgs> focusBeforeClick = (_, _) =>
+        {
+            f.Vm.FocusPane(1); // queue SyncActive before the shelf's bubbling click handler
+            Assert.Same(card, f.Vm.ActiveCard);
+        };
+        if (activationPending)
+            // Headless mouse helpers pump the dispatcher before each event, so
+            // arrange the pending activation within the release event itself.
+            f.Window.AddHandler(InputElement.PointerReleasedEvent, focusBeforeClick, RoutingStrategies.Tunnel);
+        else
+            f.Vm.FocusedPane = 1;
+        Assert.Same(card, f.Vm.ActiveCard);
         f.Window.MouseDown(point, MouseButton.Left);
-        f.Window.MouseUp(point, MouseButton.Left); await Task.Delay(50);
+        f.Window.MouseUp(point, MouseButton.Left);
+        f.Window.RemoveHandler(InputElement.PointerReleasedEvent, focusBeforeClick);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
         Assert.Same(left, f.Vm.RightPane); Assert.Same(right, f.Vm.LeftPane);
+        Assert.Same(left, f.Vm.ActiveSession);
+
+        // A repeated click must not add an undo step or discard the pane swap.
+        point = CardPoint(f.Window, card);
+        f.Window.MouseDown(point, MouseButton.Left);
+        f.Window.MouseUp(point, MouseButton.Left);
+        f.Vm.UndoLayout();
+        Assert.Same(left, f.Vm.LeftPane); Assert.Same(right, f.Vm.RightPane);
+        Assert.True(f.Vm.IsSplit);
+        f.Vm.RedoLayout();
+        Assert.Same(left, f.Vm.RightPane); Assert.Same(right, f.Vm.LeftPane);
+        Assert.True(left!.IsRunning); Assert.True(right!.IsRunning);
     }
 
     [AvaloniaFact]
