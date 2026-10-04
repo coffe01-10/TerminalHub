@@ -7,6 +7,7 @@
         xmlns:files="using:TerminalHub.Core.Files"
         xmlns:ssh="using:TerminalHub.Core.Ssh"
         xmlns:corepty="using:TerminalHub.Core.Pty"
+        xmlns:ai="using:TerminalHub.Core.Ai"
         xmlns:settings="using:TerminalHub.Core.Settings"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="TerminalHub.App.Views.MainWindow"
@@ -942,6 +943,7 @@
               <ListBoxItem Content="{loc:Text M0591}"/>
               <ListBoxItem>SSH</ListBoxItem>
               <ListBoxItem Content="{loc:Text M0338}"/>
+              <ListBoxItem>AI</ListBoxItem>
             </ListBox>
 
             <Panel Grid.Row="1" Margin="0,4,0,0">
@@ -1678,6 +1680,58 @@
                   <TextBlock Text="{loc:Translate {Binding CommandNotice}}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
                   <TextBlock Text="{loc:Text M0586}" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiFaint}"/>
                 </StackPanel>
+              </Grid>
+
+              <Grid IsVisible="{Binding SelectedRightTab, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=5}"
+                    RowDefinitions="Auto,*" Margin="8,6">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{loc:Text M0790}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource UiInk}"/>
+                  <ComboBox ItemsSource="{Binding AiPanel.Clis}" SelectedItem="{Binding AiPanel.SelectedCli}" HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="ai:AiCli">
+                        <StackPanel Spacing="1"><TextBlock Text="{Binding DisplayName}" FontSize="12"/>
+                          <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{DynamicResource UiFaint}" TextTrimming="CharacterEllipsis"/></StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBlock Text="{loc:Text M0791}" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiMuted}"
+                             IsVisible="{Binding AiPanel.Clis.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                  <TextBox Text="{Binding AiPanel.TaskDraft}" Watermark="{loc:Text M0792}"
+                           AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" MaxHeight="140"/>
+                  <Button Content="{loc:Text M0793}" Classes="primary" HorizontalAlignment="Stretch"
+                          Command="{Binding AiPanel.StartTaskCommand}"/>
+                  <TextBlock Text="{Binding AiPanel.Notice}" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource UiAccent}"/>
+                </StackPanel>
+                <Panel Grid.Row="1" Margin="0,8,0,0">
+                  <TextBlock Text="{loc:Text M0794}" Foreground="{DynamicResource UiFaint}" FontSize="10"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap"
+                             IsVisible="{Binding AiPanel.Tasks.Count, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"/>
+                  <ListBox ItemsSource="{Binding AiPanel.Tasks}" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:AiTaskViewModel">
+                        <Border BorderBrush="{DynamicResource UiBorder}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{DynamicResource UiInk}" TextWrapping="Wrap" Grid.ColumnSpan="2"/>
+                            <TextBlock Grid.Row="1" FontSize="10" Foreground="{DynamicResource UiMuted}" VerticalAlignment="Center">
+                              <Run Text="{Binding Cli.DisplayName}"/><Run Text=" · "/><Run Text="{Binding Status}"/>
+                              <Run Text=" · "/><Run Text="{Binding Started, StringFormat={}{0:HH:mm}}"/>
+                            </TextBlock>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                              <Button Content="{loc:Text M0679}" Classes="quiet" Padding="6,2" FontSize="10"
+                                      IsVisible="{Binding Active}"
+                                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AiPanel.ShowTaskCommand}"
+                                      CommandParameter="{Binding}"/>
+                              <Button Content="{loc:Text Workbench9}" Classes="quiet" Padding="6,2" FontSize="10"
+                                      IsVisible="{Binding !Active}"
+                                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AiPanel.RemoveTaskCommand}"
+                                      CommandParameter="{Binding}"/>
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Panel>
               </Grid>
 
             </Panel>

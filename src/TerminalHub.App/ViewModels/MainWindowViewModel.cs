@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TerminalHub.Core.Ai;
 using TerminalHub.Core.Deploy;
 using TerminalHub.Core.Logging;
 using TerminalHub.Core.Monitoring;
@@ -321,6 +322,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public FilesViewModel Files { get; }
     public LogsViewModel Logs { get; }
     public SshViewModel Ssh { get; }
+    public AiPanelViewModel AiPanel { get; }
     private readonly SessionLogFile _sessionLog = new();
     /// <summary>"Open in file manager" seam — tests stub it so no real Explorer
     /// window pops on a temp artifacts dir the test then deletes (位置不可用).</summary>
@@ -412,6 +414,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Logs.ApplySessionFilterMap(_settings.LogsSessionFilters);
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal, sshAvailable);
         InitializeProjectTools();
+        AiPanel = new AiPanelViewModel(
+            spawn: SpawnAiTaskSessionAsync,
+            activate: s => ActivateSearchSession(s),
+            notify: (s, text) => ShowNotification(s, text),
+            isVisible: IsSessionVisibleOnScreen);
 
         // Logs' session filter follows card adds/removes live, not just on tab open.
         SessionCards.CollectionChanged += OnSessionCardsChanged;
@@ -544,6 +551,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         "部署控制" or "deploy" or "Deploy" => SessionTag.Deploy,
         "Codex" => SessionTag.Codex,
         "SSH" or "ssh" => SessionTag.Ssh,
+        "AI" => SessionTag.Ai,
         _ => SessionTag.None,
     };
 
@@ -553,6 +561,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// back to the platform default dir (same guard as the workspace snapshot).</summary>
     private static string LocalSpawnCwd(TerminalSessionModel session)
         => session.Tag == SessionTag.Ssh ? "" : session.WorkingDirectory;
+
+    /// <summary>AI panel spawn: the task text becomes the CLI's initial-prompt
+    /// argument (deterministic — no wait-for-prompt timing), tagged AI, cwd
+    /// following the active local session's dir.</summary>
+    private async Task<TerminalSessionModel?> SpawnAiTaskSessionAsync(AiCli cli, string title)
+    {
+        var (shell, args) = AiCliCatalog.SpawnCommand(cli, title);
+        var cwd = ActiveSession is { Tag: not SessionTag.Ssh } s ? s.WorkingDirectory : "";
+        var name = title.Length > 24 ? title[..24] + "…" : title;
+        return await CreateSessionAsync(name, SessionTag.Ai, cwd, shellCommand: shell, arguments: args);
+    }
 
     private async Task<TerminalSessionModel?> CreateSessionAsync(
         string? name, SessionTag tag, string cwd,
