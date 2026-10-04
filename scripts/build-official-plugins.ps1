@@ -1,9 +1,9 @@
 #requires -Version 7.0
 <# .SYNOPSIS Builds official API 1 plugins into importable folders and ZIPs. #>
-param([string]$Configuration = 'Release')
+param([string]$Configuration = 'Release', [string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
-$destinationRoot = Join-Path $repo 'artifacts/official-plugins'
+$destinationRoot = if ($OutputDirectory) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $repo 'artifacts/official-plugins' }
 New-Item -ItemType Directory -Path $destinationRoot -Force | Out-Null
 foreach ($name in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch')) {
     dotnet build (Join-Path $repo "plugins/$name/$name.csproj") -c $Configuration --disable-build-servers -m:1 -p:UseSharedCompilation=false -p:NuGetAudit=false

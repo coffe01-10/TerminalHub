@@ -327,4 +327,11 @@ Windows 继续保留本轮恢复的会话卡片样式、工具栏、底部坞入
 
 2026-10-03 插件接续：已交付[开发与使用文档](plugins/README.md)、离线跳转入口及工作区笔记、屏幕摘录、命令看板三个官方插件。相关回归与真实 Windows ConPTY 验收见[记录](plugins/acceptance-2026-10-03.md)；本地包位于 `artifacts/official-plugins`，尚未上传发行附件。
 
+### v0.4.1 本地维护版（2026-10-04，本地构建未发布）
+
+- [x] 维护版本号 0.4.1（App csproj、Inno 脚本、QUICKSTART），发行说明 [v0.4.1](releases/v0.4.1.md)。
+- [x] 中文输入/光标实测：真实 ConPTY 上 Claude Code、PSReadLine 与 Codex 0.158.0 中文编辑通过（Codex 提示词检测改为按帧判定并补回放回归）；新增 `--ime-acceptance` 以真实 SendInput + 系统中文输入法验证组合、提交、Enter 不提交、右边界、分屏与弹出窗口，5/5 通过；候选窗位置经逐张人工视觉审核确认（`acceptance/ime-visual-review.json`），边界为单屏 125% + 工具 Software 渲染。首轮分屏组合错配为验收时序干扰，非产品 bug。
+- [x] 本地包：`artifacts/v0.4.1`（便携 ZIP、`installer/TerminalHub-Setup-0.4.1.exe`、三个官方插件 ZIP、README、验收证据）。
+- [ ] 默认 GPU 渲染候选位置、具体 IME profile、微信输入法、多显示器/DPI、安装包实装、GitHub 发行上传未执行。
+
 实现并验证某项后再勾选，补充对应版本及具体结果；未完成的部分继续保留为待办。验证围绕上面的实际使用场景进行，记录未验证范围。

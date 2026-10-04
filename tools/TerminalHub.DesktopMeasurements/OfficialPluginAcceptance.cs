@@ -35,7 +35,11 @@ public sealed partial class MeasurementApplication
             await Until(() => vm.ActiveSession?.Emulator.Buffer.TailText(20).Contains("official-ready") == true);
             var session = vm.ActiveSession!; Check(session.Pty is ConPtySession && session.IsRunning, "Real Windows ConPTY session is ready");
             vm.LanguageIndex = 1; var manager = Field<PluginManager>(window, "_plugins");
-            foreach (var name in new[] { "WorkspaceNotes", "ScreenClips", "CommandWatch" }) manager.Import(Path.Combine(Environment.CurrentDirectory, "artifacts", "official-plugins", name));
+            // Import dir defaults to the repo build output; TERMINALHUB_OFFICIAL_PLUGIN_DIR
+            // points the acceptance run at a specific packaged drop.
+            var pluginDir = Environment.GetEnvironmentVariable("TERMINALHUB_OFFICIAL_PLUGIN_DIR")
+                ?? Path.Combine(Environment.CurrentDirectory, "artifacts", "official-plugins");
+            foreach (var name in new[] { "WorkspaceNotes", "ScreenClips", "CommandWatch" }) manager.Import(Path.Combine(pluginDir, name));
             Check(manager.Plugins.Count == 3 && manager.Plugins.All(p => p.Enabled), "Three packaged official DLLs load together");
             typeof(MainWindow).GetMethod("ToggleProjectTools", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, null);
             var tools = Field<ProjectToolsWindow>(window, "_projectToolsWindow"); var view = (ProjectToolsView)tools.Content!;

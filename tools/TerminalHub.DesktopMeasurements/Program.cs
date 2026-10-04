@@ -28,8 +28,18 @@ internal static class Program
         try
         {
             if (OperatingSystem.IsWindows()) foreach (var id in ids) SetStdHandle(id, IntPtr.Zero);
-            return AppBuilder.Configure<MeasurementApplication>().UsePlatformDetect().WithInterFont()
-                .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
+            var builder = AppBuilder.Configure<MeasurementApplication>().UsePlatformDetect().WithInterFont();
+            // --ime-acceptance only: the default GPU composition keeps window pixels
+            // out of the legacy framebuffer BitBlt can see. Software rendering +
+            // RedirectionSurface puts real pixels there so test-window captures
+            // actually show this window. Other modes keep the normal backend.
+            if (OperatingSystem.IsWindows() && args.Contains("--ime-acceptance"))
+                builder = builder.With(new Win32PlatformOptions
+                {
+                    RenderingMode = [Win32RenderingMode.Software],
+                    CompositionMode = [Win32CompositionMode.RedirectionSurface]
+                });
+            return builder.StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
         }
         finally
         {
@@ -52,6 +62,7 @@ public sealed partial class MeasurementApplication : TerminalHub.App.App
         Dispatcher.UIThread.Post(async () =>
         {
             if (Environment.GetCommandLineArgs().Contains("--official-plugin-acceptance")) await AcceptOfficialPluginsAsync();
+            else if (Environment.GetCommandLineArgs().Contains("--ime-acceptance")) await AcceptImeAsync();
             else if (Environment.GetCommandLineArgs().Contains("--workbench-acceptance")) await AcceptWorkbenchAsync();
             else if (Environment.GetCommandLineArgs().Contains("--workspace-switch")) await MeasureWorkspaceSwitchAsync();
             else await MeasureAsync();

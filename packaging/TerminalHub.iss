@@ -5,7 +5,7 @@
 #define AppName      "Terminal Hub"
 #define AppNameZh    "终端控制中心"
 #ifndef AppVersion
-#define AppVersion "0.4.0"
+#define AppVersion "0.4.1"
 #endif
 #ifndef SourceDir
 #define SourceDir "..\app"
