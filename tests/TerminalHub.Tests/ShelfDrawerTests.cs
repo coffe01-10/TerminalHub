@@ -65,6 +65,13 @@ public class ShelfDrawerTests
             var active = Card(fixture, fixture.Vm.ActiveCard!);
             var near = Card(fixture, fixture.Vm.SessionCards[index == 4 ? 3 : index + 1]);
             var far = Card(fixture, fixture.Vm.SessionCards[index == 0 ? 4 : 0]);
+            // Centering lasts 220ms and updates the 220ms opacity transition
+            // along the way. The 350ms centering wait can still sample fading
+            // cards in the wrong order, as observed on the Windows CI runner.
+            var deadline = Environment.TickCount64 + 5000;
+            while ((active.Opacity != 1 || near.Opacity <= far.Opacity)
+                   && Environment.TickCount64 < deadline)
+                await Task.Delay(25);
             Assert.Equal(1, active.Opacity);
             Assert.True(near.Opacity > far.Opacity, $"Near {near.Opacity}, far {far.Opacity}");
         }
