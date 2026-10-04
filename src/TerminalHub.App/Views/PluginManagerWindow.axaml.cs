@@ -91,7 +91,18 @@ public partial class PluginManagerWindow : Window
                 if (plugin.Error.Length > 0) bottom.Children.Add(Text(plugin.Error, "UiBad", 12, false));
                 var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
                 actions.Children.Add(Action(plugin.Enabled ? "禁用" : "启用", () => { if (plugin.Enabled) _manager.Disable(plugin); else _manager.Enable(plugin); }, plugin.Enabled ? null : "primary"));
+                if (plugin.Enabled && !plugin.IsScript) actions.Children.Add(Action("重载", () => _manager.Reload(plugin)));
                 actions.Children.Add(Action("移除", () => _manager.Remove(plugin), "danger"));
+                if (!plugin.IsScript)
+                {
+                    var auto = new CheckBox { [!ContentControl.ContentProperty] = UiText.Binding("改动自动重载"), IsChecked = _manager.Preferences(plugin).AutoReload, VerticalAlignment = VerticalAlignment.Center };
+                    auto.IsCheckedChanged += (_, _) => Save(() =>
+                    {
+                        var flag = auto.IsChecked == true; _manager.Preferences(plugin).AutoReload = flag;
+                        if (flag && plugin.Enabled) _manager.StartWatch(plugin); else _manager.StopWatch(plugin);
+                    });
+                    actions.Children.Add(auto);
+                }
                 Grid.SetColumn(actions,1); bottom.Children.Add(actions); Grid.SetRow(bottom,1); body.Children.Add(bottom); PluginCards.Children.Add(Card(body));
             }
             foreach (var module in _manager.Modules.OrderBy(m => _manager.Settings(m).Order ?? m.Definition.Order))
