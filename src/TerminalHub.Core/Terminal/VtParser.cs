@@ -206,7 +206,14 @@ public sealed class VtParser
             case >= 0x07 and <= 0x0F: ExecuteControl(b); break;
             case 0x9B: Enter(State.Csi); break;                 // 8-bit CSI
             case 0x9D: Enter(State.Osc); break;
-            case >= 0x80 and < 0xC0: _afterZwj = false; _buffer.PutChar('\uFFFD'); break;
+            // 8-bit C1: the string states swallow the whole payload instead of
+            // printing each byte as U+FFFD text; IND/NEL/RI act as controls.
+            case 0x84: _afterZwj = false; _buffer.Index(); break;   // 8-bit IND
+            case 0x85: _afterZwj = false; _buffer.NextLine(); break; // 8-bit NEL
+            case 0x8D: _afterZwj = false; _buffer.ReverseIndex(); break; // 8-bit RI
+            case 0x90: Enter(State.Dcs); break;                 // 8-bit DCS
+            case 0x98: case 0x9E: case 0x9F: Enter(State.SosPmApc); break; // SOS/PM/APC
+            case >= 0x80 and < 0xC0: _afterZwj = false; break;  // other C1 (SS2/SS3/ST/...) — swallow
             case >= 0xC0 and < 0xE0: _utf8Value = b & 0x1F; _utf8Remaining = 1; _utf8Min = 0x80; break;
             case >= 0xE0 and < 0xF0: _utf8Value = b & 0x0F; _utf8Remaining = 2; _utf8Min = 0x800; break;
             case >= 0xF0: _utf8Value = b & 0x07; _utf8Remaining = 3; _utf8Min = 0x10000; break;

@@ -12,6 +12,10 @@ namespace TerminalHub.Pty;
 public sealed class ConPtySession : IPtySession
 {
     private IntPtr _hpc = IntPtr.Zero;
+    // ResizePseudoConsole vs ClosePseudoConsole: Resize reads _hpc on the UI
+    // thread while Dispose closes it on a worker — take this lock around both
+    // so a resize never lands on a closed (possibly recycled) HPCON.
+    private readonly object _hpcLock = new();
     private SafeFileHandle? _ptyIn;      // write end -> conpty input
     private SafeFileHandle? _ptyOut;     // read end  <- conpty output
     private Process? _process;
@@ -23,12 +27,41 @@ public sealed class ConPtySession : IPtySession
     private int _exitCodeCommitted;
     private CancellationTokenSource? _readCts;
     private Task? _readTask;
+    // Serialized writes: WriteFile blocks while the child isn't reading stdin,
+    // and callers include the UI thread (paste/typing) and the PTY read thread
+    // (VT query replies). A bounded queue + dedicated writer keeps both from
+    // stalling; a full queue means the child is dead or stuck — drop input.
+    private readonly System.Collections.Concurrent.BlockingCollection<byte[]> _writeQueue = new(256);
+    private Task? _writeTask;
     private int _disposed;
 
     public Guid Id { get; } = Guid.NewGuid();
-    public bool IsRunning => _process is { HasExited: false };
-    public int? ExitCode => _hasExitCode ? _exitCode : _process is { HasExited: true } p ? p.ExitCode : null;
-    public int? ProcessId => _process?.Id;
+    public bool IsRunning
+    {
+        get
+        {
+            // Dispose can release the Process between the field read and the
+            // member call — a gone session reports "not running".
+            try { return _process is { HasExited: false }; }
+            catch (InvalidOperationException) { return false; }
+        }
+    }
+    public int? ExitCode
+    {
+        get
+        {
+            try { return _hasExitCode ? _exitCode : _process is { HasExited: true } p ? p.ExitCode : null; }
+            catch (InvalidOperationException) { return null; }
+        }
+    }
+    public int? ProcessId
+    {
+        get
+        {
+            try { return _process?.Id; }
+            catch (InvalidOperationException) { return null; }
+        }
+    }
 
     public event Action<IPtySession, ReadOnlyMemory<byte>>? OutputReceived;
     public event Action<IPtySession, int>? Exited;
@@ -100,13 +133,21 @@ public sealed class ConPtySession : IPtySession
             if (Interlocked.Exchange(ref _exitCodeCommitted, 1) != 0) return;
             _exitCode = code;
             _hasExitCode = true;
-            Exited?.Invoke(this, code);
+            // This runs on a Process.Exited threadpool callback — an escaping
+            // subscriber exception crashes the process, and a throwing
+            // subscriber would eat the notification for everyone behind it.
+            if (Exited is { } exited)
+                foreach (Action<IPtySession, int> handler in exited.GetInvocationList())
+                    try { handler(this, code); }
+                    catch (Exception ex) { Debug.WriteLine($"ConPTY exit subscriber failed: {ex.Message}"); }
         };
 
         _readCts = new CancellationTokenSource();
         // Dedicated thread: the read blocks in ReadFile until conhost emits data
         // or the pipe breaks. LongRunning keeps it off the thread pool.
         _readTask = Task.Factory.StartNew(() => ReadLoop(_readCts.Token),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        _writeTask = Task.Factory.StartNew(WriteLoop,
             CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         return Task.CompletedTask;
     }
@@ -207,31 +248,53 @@ public sealed class ConPtySession : IPtySession
     public void Write(ReadOnlySpan<byte> data)
     {
         if (_ptyIn is null || !IsRunning) return;
-        var tmp = data.ToArray();
-        // Loop on short writes — a large paste can exceed the pipe's kernel buffer.
-        var off = 0;
-        while (off < tmp.Length)
+        try
         {
-            try
-            {
-                // Race with Dispose closing the handle mid-write: ObjectDisposed
-                // means the session is gone, not an error worth crashing the UI for.
-                if (!Native.WriteFile(_ptyIn, ref tmp[off], tmp.Length - off, out var written, IntPtr.Zero) || written <= 0)
-                {
-                    Debug.WriteLine($"ConPTY WriteFile failed: {Marshal.GetLastWin32Error()}");
-                    break;
-                }
-                off += written;
-            }
-            catch (ObjectDisposedException) { return; }
+            if (!_writeQueue.TryAdd(data.ToArray()))
+                Debug.WriteLine("ConPTY input queue full — dropping write");
         }
+        catch (InvalidOperationException) { /* CompleteAdding raced */ }
+    }
+
+    private void WriteLoop()
+    {
+        try
+        {
+            foreach (var tmp in _writeQueue.GetConsumingEnumerable())
+            {
+                var ptyIn = _ptyIn;
+                if (ptyIn is null) return;
+                // Loop on short writes — a large paste can exceed the pipe's
+                // kernel buffer. Blocking here is the point of this task.
+                var off = 0;
+                while (off < tmp.Length)
+                {
+                    try
+                    {
+                        // Race with Dispose closing the handle mid-write: ObjectDisposed
+                        // means the session is gone, not an error worth crashing the UI for.
+                        if (!Native.WriteFile(ptyIn, ref tmp[off], tmp.Length - off, out var written, IntPtr.Zero) || written <= 0)
+                        {
+                            Debug.WriteLine($"ConPTY WriteFile failed: {Marshal.GetLastWin32Error()}");
+                            break;
+                        }
+                        off += written;
+                    }
+                    catch (ObjectDisposedException) { return; }
+                }
+            }
+        }
+        catch (InvalidOperationException) { /* queue completed */ }
     }
 
     public void Resize(int columns, int rows)
     {
-        if (_hpc == IntPtr.Zero) return;
-        var size = new COORD { X = (short)columns, Y = (short)rows };
-        Native.ResizePseudoConsole(_hpc, size);
+        lock (_hpcLock)
+        {
+            if (_hpc == IntPtr.Zero) return;
+            var size = new COORD { X = (short)columns, Y = (short)rows };
+            Native.ResizePseudoConsole(_hpc, size);
+        }
     }
 
     public void Kill()
@@ -249,10 +312,13 @@ public sealed class ConPtySession : IPtySession
         // ends, so closing our copies alone never unblocks the reader — the old
         // order burned the full 300ms wait and relied on ObjectDisposed inside
         // ReadFile to unwind the thread.
-        if (_hpc != IntPtr.Zero)
+        lock (_hpcLock)
         {
-            Native.ClosePseudoConsole(_hpc);
-            _hpc = IntPtr.Zero;
+            if (_hpc != IntPtr.Zero)
+            {
+                Native.ClosePseudoConsole(_hpc);
+                _hpc = IntPtr.Zero;
+            }
         }
         // Cache the exit code before releasing the Process object — IsRunning
         // and ExitCode keep answering correctly after the handle is gone.
@@ -276,6 +342,11 @@ public sealed class ConPtySession : IPtySession
         }
         _ptyIn?.Dispose();
         _ptyOut?.Dispose();
+        // Stop accepting writes, then let the writer drain/fail out on the
+        // dead pipe (Kill above already broke it).
+        _writeQueue.CompleteAdding();
+        try { _writeTask?.Wait(500); } catch { }
+        _writeQueue.Dispose();
         // ReadFile/WriteFile take SafeFileHandle, so an in-flight call keeps the
         // handle alive and a later call throws ObjectDisposedException, which the
         // read loop catches. The wait only lets that loop notice the closed console.

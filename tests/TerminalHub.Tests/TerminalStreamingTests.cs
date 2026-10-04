@@ -157,6 +157,98 @@ public class TerminalStreamingTests
         Assert.Equal("\x1b[200~safe\necho INJECTED\x1b[201~", pty.LastWrite);
     }
 
+    [Fact]
+    public void C1_Dcs_SwallowsPayloadUntilSt()
+    {
+        var buffer = new ScreenBuffer(20, 3);
+        var parser = new VtParser(buffer);
+        // Raw 8-bit DCS (0x90): the payload must be consumed by the string
+        // state, not printed as garbage text. (Feed(string) would UTF-8
+        // encode these — real PTY output carries the raw C1 byte.)
+        parser.Feed(new byte[] { 0x90 }.Concat(Encoding.ASCII.GetBytes("payload")).Concat(new byte[] { 0x9C }).ToArray());
+        Assert.Equal(new string(' ', 60), Text(buffer.CaptureFrame()));
+        // Same for 8-bit APC/SOS/PM.
+        parser.Feed(new byte[] { 0x9F }.Concat(Encoding.ASCII.GetBytes("more")).Concat(new byte[] { 0x9C, 0x9E })
+            .Concat(Encoding.ASCII.GetBytes("also")).Concat(new byte[] { 0x9C, 0x98 })
+            .Concat(Encoding.ASCII.GetBytes("hidden")).Concat(new byte[] { 0x9C }).ToArray());
+        Assert.Equal(new string(' ', 60), Text(buffer.CaptureFrame()));
+    }
+
+    [Fact]
+    public void C1_NelAndRi_KeepControlMeaning()
+    {
+        var buffer = new ScreenBuffer(10, 3);
+        var parser = new VtParser(buffer);
+        parser.Feed(Encoding.ASCII.GetBytes("ab").Concat(new byte[] { 0x85 }).Concat(Encoding.ASCII.GetBytes("cd")).ToArray());
+        Assert.StartsWith("ab", Text(buffer.CaptureFrame()));
+        Assert.Equal('c', buffer.CaptureFrame().Cells[10].Char);
+        // RI (0x8D) at the top scrolls the content down instead of printing U+FFFD.
+        parser.Feed(Encoding.ASCII.GetBytes("\u001b[H").Concat(new byte[] { 0x8D }).ToArray());
+        Assert.Equal('a', buffer.CaptureFrame().Cells[10].Char);
+    }
+
+    [Fact]
+    public void KittyFlagStack_CappedAt64()
+    {
+        var buffer = new ScreenBuffer();
+        // An app looping CSI >u must not grow the stack without bound: past 64
+        // the oldest saved entries are forgotten.
+        for (var i = 1; i <= 200; i++) buffer.KittyPush(i);
+        buffer.KittyPop(200);
+        // Entries 136..199 were retained (0..135 evicted): draining the stack
+        // leaves the oldest retained value, not the original 0.
+        Assert.Equal(136, buffer.KittyKeyboardFlags);
+    }
+
+    [Fact]
+    public void EraseInLine_StartOnContinuation_ClearsWholePair()
+    {
+        var buffer = new ScreenBuffer(4, 2);
+        var parser = new VtParser(buffer);
+        parser.Feed("中中");               // 4 cells: two wide pairs
+        // EL0 starting on the first pair's continuation: the torn lead must be
+        // cleared too (xterm erases the whole glyph), not left as a half-width ghost.
+        parser.Feed("\x1b[2G\x1b[K");
+        var frame = buffer.CaptureFrame();
+        for (var c = 0; c < 4; c++)
+        {
+            Assert.False(frame.Cells[c].IsWide);
+            Assert.False(frame.Cells[c].IsWideContinuation);
+            Assert.Equal(' ', frame.Cells[c].Char);
+        }
+    }
+
+    [Fact]
+    public void EraseChars_OnContinuation_ClearsDanglingLead()
+    {
+        var buffer = new ScreenBuffer(4, 2);
+        var parser = new VtParser(buffer);
+        parser.Feed("中A");
+        // Cursor onto the '中' continuation (col 1), ECH 1: the lead at col 0
+        // loses its partner and must not render as a half-width ghost.
+        parser.Feed("\x1b[2G\x1b[X");
+        var frame = buffer.CaptureFrame();
+        for (var c = 0; c < 8; c++)
+        {
+            Assert.False(frame.Cells[c].IsWideContinuation);
+        }
+        Assert.DoesNotContain(frame.Cells.Take(8), cell => cell.IsWide && cell.Char != ' ');
+    }
+
+    [Fact]
+    public void DeleteChars_PullingContinuationToStart_ClearsOrphan()
+    {
+        var buffer = new ScreenBuffer(4, 2);
+        var parser = new VtParser(buffer);
+        // 中@0-1, A@2, B@3 — DCH at col 0 pulls the continuation to col 0,
+        // an orphan that used to shift the rest of the row right by one cell.
+        parser.Feed("中AB\x1b[H\x1b[P");
+        var frame = buffer.CaptureFrame();
+        Assert.False(frame.Cells[0].IsWideContinuation);
+        Assert.Equal('A', frame.Cells[1].Char);
+        Assert.Equal('B', frame.Cells[2].Char);
+    }
+
     private sealed class RecordingPty : IPtySession
     {
         public string LastWrite = "";

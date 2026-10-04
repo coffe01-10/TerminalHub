@@ -11,9 +11,12 @@ public sealed record RecordingHeader(int Version, string Title, int Columns, int
 public sealed class TerminalRecorder : IAsyncDisposable
 {
     private readonly TerminalEmulator _emulator;
-    private readonly Channel<RecordingEvent> _queue = Channel.CreateUnbounded<RecordingEvent>(new() { SingleReader = true });
+    // Bounded: JSON+磁盘吞吐永远追不上洪水输出，无界队列会让内存随输入速率
+    // 线性涨。写不下就丢事件并标记溢出，回放端用 "gap" 事件标示缺口。
+    private readonly Channel<RecordingEvent> _queue = Channel.CreateBounded<RecordingEvent>(new BoundedChannelOptions(1024) { SingleReader = true });
     private readonly long _started = Stopwatch.GetTimestamp();
     private readonly Task _writer;
+    private int _overflow;
     private bool _stopped;
     public string Path { get; }
     public TerminalRecorder(TerminalEmulator emulator, string path, string title)
@@ -32,7 +35,13 @@ public sealed class TerminalRecorder : IAsyncDisposable
         _writer = Task.Run(() => WriteAsync(stream, header));
     }
     private double Time => Stopwatch.GetElapsedTime(_started).TotalMilliseconds;
-    private void OnData(ReadOnlyMemory<byte> data) => _queue.Writer.TryWrite(new(Time, "output", data.ToArray()));
+    private void OnData(ReadOnlyMemory<byte> data)
+    {
+        if (Interlocked.Exchange(ref _overflow, 0) == 1)
+            _queue.Writer.TryWrite(new(Time, "gap"));
+        if (!_queue.Writer.TryWrite(new(Time, "output", data.ToArray())))
+            Interlocked.Exchange(ref _overflow, 1);
+    }
     private void OnResize(int columns, int rows) => _queue.Writer.TryWrite(new(Time, "resize", null, columns, rows));
     private async Task WriteAsync(Stream stream, RecordingHeader header)
     {
