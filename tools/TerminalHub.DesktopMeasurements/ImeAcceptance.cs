@@ -33,9 +33,11 @@ public sealed partial class MeasurementApplication
 
     private sealed record CandidateRecord(string Class, string Rect);
     private sealed record ImeCase(string Name, string Status, bool NeedsVisualReview,
-        List<string> Facts, List<CandidateRecord> CandidateWindows, List<string> Screenshots);
+        bool? CandidatePositionAnchored, List<string> Facts, List<CandidateRecord> CandidateWindows,
+        List<string> Screenshots);
     private sealed record ImeContext(MainWindow Window, MainWindowViewModel Vm, IntPtr Hwnd,
-        string ReportDir, double SavedFont, TerminalSessionModel S1);
+        string ReportDir, double SavedFont, TerminalSessionModel S1, bool GpuMode,
+        List<(string Label, bool Anchored)> PositionChecks);
 
     private async Task AcceptImeAsync()
     {
@@ -47,9 +49,15 @@ public sealed partial class MeasurementApplication
         var cases = new List<ImeCase>(); var notes = new List<string>();
         IntPtr hwnd = IntPtr.Zero, oldLayout = IntPtr.Zero, activeHkl = IntPtr.Zero, loadedHkl = IntPtr.Zero;
         bool? oldOpen = null; double scaling = 0; var screens = 0; string? imeName = null;
+        var gpuMode = Environment.GetCommandLineArgs().Contains("--ime-acceptance-gpu");
+        List<string> adapters = [];
         try
         {
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("real IME acceptance is Windows-only");
+            adapters = ImeNative.DisplayAdapters();
+            notes.Add(gpuMode
+                ? "--ime-acceptance-gpu: platform-default rendering (GPU if the driver stack offers one); screen-pixel captures are skipped — candidate position is verified by window geometry instead."
+                : "software+RedirectionSurface rendering (forced); screenshots are BitBlt screen pixels.");
             Environment.SetEnvironmentVariable("TERMINALHUB_SETTINGS_DIR", directory);
             PtySessionFactory.UseMock = false;
             var store = new SettingsStore(Path.Combine(directory, "settings.json"));
@@ -84,17 +92,40 @@ public sealed partial class MeasurementApplication
             oldOpen = ImeNative.GetImeOpen(hwnd);
             activeHkl = ImeNative.ActivateChineseIme(hwnd, out var loaded);
             if (loaded) loadedHkl = activeHkl;
+            // Keyboard layouts alone (hkl=0x8040804) cannot compose — a TSF
+            // TIP must be selected instead. Win+Space is the supported
+            // thread-local switch; the TSF COM activation stays as a
+            // diagnostic fallback (it is unregistered on some systems).
+            if (ImeNative.ImeDescription(activeHkl) is null)
+            {
+                ImeNative.CycleInputLanguage(hwnd);
+                await Task.Delay(800); // let the profile switch settle
+                activeHkl = ImeNative.GetKeyboardLayout(0);
+                notes.Add($"no IMM-described IME on the layout list; sent Win+Space to cycle this thread's input profile → hkl=0x{(long)activeHkl:x}");
+                if (ImeNative.ImeDescription(activeHkl) is null)
+                {
+                    var tipHr = ImeNative.ActivateMsPinyinForProcess();
+                    notes.Add($"still no IMM description; TSF ActivateProfile(Microsoft Pinyin, process-scoped) hr=0x{tipHr:x8}");
+                    if (tipHr == 0)
+                    {
+                        await Task.Delay(500); // let the TIP attach to our input thread
+                        activeHkl = ImeNative.GetKeyboardLayout(0);
+                    }
+                }
+            }
             if (activeHkl == IntPtr.Zero || ((long)activeHkl & 0xFFFF) != 0x0804)
                 notes.Add($"no zh-CN input method active on the test thread (hkl=0x{(long)activeHkl:x}); composition cases may stay unverified.");
             imeName = ImeNative.ImeDescription(activeHkl);
             notes.Add($"active input method on test thread: hkl=0x{(long)activeHkl:x} immDescription={Q(imeName)} (HKL alone does not prove which TSF profile answered)");
             ImeNative.SetImeOpen(hwnd, true);
             scaling = window.RenderScaling; screens = window.Screens.All.Count;
-            var ctx = new ImeContext(window, vm, hwnd, reportDir, vm.FontSize, vm.SessionCards[0].Model);
+            var ctx = new ImeContext(window, vm, hwnd, reportDir, vm.FontSize, vm.SessionCards[0].Model,
+                gpuMode, new List<(string, bool)>());
             // Let activation + first frames settle, then take one window shot
             // as review material — pixels are judged by a human, not this tool.
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(static () => { }, Avalonia.Threading.DispatcherPriority.Render);
             await Task.Delay(400);
+            if (!gpuMode)
             {
                 var preflight = Path.Combine(reportDir, "ime-window.png");
                 if (ImeNative.GetForegroundWindow() != hwnd) throw new ForegroundAbort();
@@ -107,9 +138,11 @@ public sealed partial class MeasurementApplication
             async Task RunCase(string name, Func<List<string>, Task<(string Status, List<string> Shots)>> body)
             {
                 var facts = new List<string>();
-                try { var r = await body(facts); cases.Add(new ImeCase(name, r.Status, true, facts, Candidates(), r.Shots)); }
-                catch (ForegroundAbort ex) { facts.Add(ex.Message); cases.Add(new ImeCase(name, "aborted", true, facts, Candidates(), [])); }
-                catch (Exception ex) { facts.Add(ex.Message); cases.Add(new ImeCase(name, "fail", true, facts, Candidates(), [])); }
+                ctx.PositionChecks.Clear();
+                bool? Pos() => ctx.PositionChecks.Count == 0 ? null : ctx.PositionChecks.All(p => p.Anchored);
+                try { var r = await body(facts); cases.Add(new ImeCase(name, r.Status, !gpuMode, Pos(), facts, Candidates(), r.Shots)); }
+                catch (ForegroundAbort ex) { facts.Add(ex.Message); cases.Add(new ImeCase(name, "aborted", !gpuMode, Pos(), facts, Candidates(), [])); }
+                catch (Exception ex) { facts.Add(ex.Message); cases.Add(new ImeCase(name, "fail", !gpuMode, Pos(), facts, Candidates(), [])); }
             }
 
             await RunCase("empty-input", f => CaseEmptyInput(ctx, f));
@@ -132,7 +165,10 @@ public sealed partial class MeasurementApplication
             File.WriteAllText(Program.Report, JsonSerializer.Serialize(new
             {
                 CapturedUtc = DateTime.UtcNow,
-                Method = "Production MainWindow + two real pwsh ConPTY sessions (PSReadLine, fixed 'IME> ' prompt), rendered with Software+RedirectionSurface so BitBlt sees the window itself. Keystrokes via strictly foreground-guarded SendInput batches — any non-test foreground aborts the case; zh-CN layout activated on this thread only and restored afterwards (machine has two Chinese IMEs; the exact TSF profile is not verified by HKL alone). Composition observed via _preedit and real candidate windows; screenshots are BitBlt screen pixels clipped to the test HWND rect only. System candidate POSITION is not auto-judged — NeedsVisualReview stays true.",
+                Rendering = gpuMode ? "platform-default (GPU when offered by the driver stack)" : "Software+RedirectionSurface (forced)",
+                DisplayAdapters = adapters,
+                HardwareGpuPresent = adapters.Any(a => a.Contains("[hardware]", StringComparison.Ordinal)),
+                Method = "Production MainWindow + two real pwsh ConPTY sessions (PSReadLine, fixed 'IME> ' prompt). Keystrokes via strictly foreground-guarded SendInput batches — any non-test foreground aborts the case; zh-CN layout activated on this thread only and restored afterwards. Composition observed via _preedit and real candidate windows; screenshots are BitBlt screen pixels clipped to the test HWND rect only and only exist in software mode. Candidate POSITION is auto-judged by window geometry: the caret rect the app reports to the OS (CursorRectangle) is mapped via PointToScreen and each visible IME-class candidate HWND's GetWindowRect must anchor near it (caret column inside the candidate's horizontal reach ±clamp slack, candidate top just below — or bottom just above — the caret line). NeedsVisualReview stays true only where screenshots exist.",
                 Screens = screens, Scaling = scaling,
                 ActiveKeyboardLayout = $"0x{(long)activeHkl:x}", ActiveImeDescription = imeName,
                 Notes = notes, Cases = cases, Failure = failure
@@ -197,15 +233,48 @@ public sealed partial class MeasurementApplication
         if (!await Poll(cond, 25000)) throw new TimeoutException("the real pwsh 'IME> ' prompt did not arrive");
     }
     /// <summary>Screenshot the test HWND's own rect — nothing else. Requires
-    /// our window foreground at capture time, otherwise the case aborts.</summary>
+    /// our window foreground at capture time, otherwise the case aborts.
+    /// GPU/default-rendering runs skip pixels entirely: under real GPU
+    /// composition the framebuffer BitBlt reads may not contain this window.
+    /// </summary>
     private static void TakeShot(List<string> shots, ImeContext ctx, IntPtr owner, string file)
     {
+        if (ctx.GpuMode) return;
         if (ImeNative.GetForegroundWindow() != owner) throw new ForegroundAbort();
         ImeNative.DwmFlush();
         ImeNative.GetWindowRect(owner, out var r);
         var path = Path.Combine(ctx.ReportDir, file);
         ImeNative.Capture(r, path);
         shots.Add(path);
+    }
+    /// <summary>Auto-judge whether a system candidate window is anchored at the
+    /// composition caret — renderer-independent window geometry, valid under
+    /// GPU composition where pixel captures are not. The caret rect the app
+    /// reports to the OS (CursorRectangle, client coords) is mapped with
+    /// PointToScreen; a candidate HWND anchors when the caret column lands
+    /// inside its horizontal reach (right-edge clamping shifts the window left,
+    /// so slack extends leftward) and its top sits just below — or its bottom
+    /// just above — the caret line. Returns null when nothing to judge.</summary>
+    private static bool? JudgeCandidatePosition(ImeContext ctx, TerminalView view,
+        List<(string Class, ImeNative.Rect Bounds)> cands, string label, List<string> facts)
+    {
+        if (cands.Count == 0) { facts.Add($"{label}CandidateAnchor=none (no candidate window)"); return null; }
+        var r = ClientRect(view);
+        var tl = view.PointToScreen(r.TopLeft);
+        var bl = view.PointToScreen(r.BottomLeft);
+        var anchored = false;
+        foreach (var c in cands)
+        {
+            var b = c.Bounds;
+            var dBelow = b.Top - bl.Y;   // candidate top vs caret bottom (below-line anchoring)
+            var dAbove = tl.Y - b.Bottom; // caret top vs candidate bottom (above-line anchoring)
+            var horiz = b.Left - tl.X <= 32 && tl.X - b.Right <= 320; // caret column inside span, slack for screen-edge clamping
+            var vert = dBelow is >= -16 and <= 64 || dAbove is >= -16 and <= 48;
+            if (horiz && vert) anchored = true;
+            facts.Add($"{label}Candidate {c.Class} rect=({b.Left},{b.Top},{b.Width}x{b.Height}) caret=({tl.X},{tl.Y}-{bl.Y}) dBelow={dBelow} dAbove={dAbove} anchored={horiz && vert}");
+        }
+        ctx.PositionChecks.Add((label, anchored));
+        return anchored;
     }
     private static async Task FreshPrompt(ImeContext ctx, TerminalSessionModel s, List<string> facts)
     {

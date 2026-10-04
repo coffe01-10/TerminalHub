@@ -39,6 +39,7 @@ public sealed partial class MeasurementApplication
         var rect = ClientRect(view); var sp = view.PointToScreen(rect.TopLeft); var f = Frame(ctx.S1);
         facts.Add($"composingObserved={composing} preedit={Q(Preedit(view))} candidates={Describe(cands)}");
         facts.Add($"cursorRect=({rect.X:0.#},{rect.Y:0.#},{rect.Width:0.#}x{rect.Height:0.#}) screen=({sp.X},{sp.Y}) frame={f.Columns}x{f.Rows} cell=({f.CursorX},{f.CursorY})");
+        JudgeCandidatePosition(ctx, view, cands, "empty", facts);
         TakeShot(shots, ctx, ctx.Hwnd, "ime-empty-input.png");
         if (!composing && cands.Count == 0)
             return ("unverified: no composition or candidate UI after real n/i" +
@@ -62,6 +63,7 @@ public sealed partial class MeasurementApplication
         var composing = await Poll(() => Preedit(view) is { Length: > 0 }, 8000);
         facts.Add($"composingObserved={composing} preedit={Q(Preedit(view))}");
         if (!composing) return ("unverified: no composition; Enter behavior untested", shots);
+        JudgeCandidatePosition(ctx, view, ImeNative.CandidateWindows(), "enter", facts);
         ImeNative.Tap(ctx.Hwnd, 0x0D);
         await Poll(() => Preedit(view) is null, 6000);
         await Task.Delay(400);
@@ -95,6 +97,7 @@ public sealed partial class MeasurementApplication
         facts.Add($"cursorRect=({rect.X:0.#},{rect.Y:0.#}) cellW={cw:0.#} matchesFrameCell={rectOk}");
         LettersNi(ctx.Hwnd);
         var composing = await Poll(() => Preedit(view) is { Length: > 0 }, 8000);
+        JudgeCandidatePosition(ctx, view, ImeNative.CandidateWindows(), "midEdit", facts);
         TakeShot(shots, ctx, ctx.Hwnd, "ime-cjk-arrows.png");
         facts.Add($"midEditComposing={composing} preedit={Q(Preedit(view))}");
         await CancelComposition(view, ctx.Hwnd);
@@ -122,6 +125,7 @@ public sealed partial class MeasurementApplication
         var cands = ImeNative.CandidateWindows();
         var rect = ClientRect(view); var sp = view.PointToScreen(rect.TopLeft);
         facts.Add($"edgeComposing={composing} preedit={Q(Preedit(view))} cursorScreen=({sp.X},{sp.Y}) candidates={Describe(cands)}");
+        JudgeCandidatePosition(ctx, view, cands, "edge", facts);
         TakeShot(shots, ctx, ctx.Hwnd, "ime-right-edge.png");
         await CancelComposition(view, ctx.Hwnd);
         var submitted = PromptCount(ctx.S1) != prompts;
@@ -147,6 +151,7 @@ public sealed partial class MeasurementApplication
         facts.Add($"getPane1={Q(s2.Name)} active={Q(vm.ActiveSession?.Name)} focusedPane={vm.FocusedPane} paneSynced={paneSynced} viewFocused={viewFocused}");
         LettersNi(hwnd);
         var composing = await Poll(() => Preedit(view2) is { Length: > 0 }, 8000);
+        JudgeCandidatePosition(ctx, view2, ImeNative.CandidateWindows(), "split", facts);
         TakeShot(shots, ctx, hwnd, "ime-split.png");
         facts.Add($"splitComposing={composing} preedit={Q(Preedit(view2))} preeditHolders=[{string.Join(',', PreeditHolders(ctx, view2))}] focusedIsView2={FocusedOn(ctx, view2)}");
         // Blur onto pane 0's own view: the live composition on view2 must clear.
@@ -167,6 +172,7 @@ public sealed partial class MeasurementApplication
         await Task.Delay(400);
         LettersNi(hwnd);
         var composing18 = await Poll(() => Preedit(view2) is { Length: > 0 }, 8000);
+        JudgeCandidatePosition(ctx, view2, ImeNative.CandidateWindows(), "font18", facts);
         TakeShot(shots, ctx, hwnd, "ime-font18.png");
         facts.Add($"font18Composing={composing18} refocused={refocused} preeditHolders=[{string.Join(',', PreeditHolders(ctx, view2))}] focusedIsView2={FocusedOn(ctx, view2)}");
         await CancelComposition(view2, hwnd);
@@ -181,13 +187,36 @@ public sealed partial class MeasurementApplication
         var pop = vm.Popouts[0]; var popHwnd = Hwnd(pop);
         pop.Activate();
         ImeNative.EnsureForeground(popHwnd);
-        ImeNative.SetImeOpen(popHwnd, true);
+        var openResult = ImeNative.SetImeOpen(popHwnd, true);
         pop.Terminal.Focus();
         await Task.Delay(250);
+        facts.Add($"popoutFocusedElement={pop.FocusManager?.GetFocusedElement()?.GetType().Name} setImeOpen={openResult?.ToString() ?? "null"} fgIsPop={ImeNative.GetForegroundWindow() == popHwnd}");
+        // Windows keeps input profiles per window: a brand-new HWND starts on
+        // the default (en-US) profile even on the same UI thread. If this
+        // window is not on zh-CN, cycle its profile once — exactly what a
+        // user pressing Win+Space inside the popout would do.
+        var popLayout = ImeNative.GetKeyboardLayout(0);
+        if (((long)popLayout & 0xFFFF) != 0x0804)
+        {
+            ImeNative.CycleInputLanguage(popHwnd);
+            await Task.Delay(600);
+            facts.Add($"popoutProfileCycled 0x{(long)popLayout:x} -> 0x{(long)ImeNative.GetKeyboardLayout(0):x}");
+        }
         LettersNi(popHwnd);
         var composingPop = await Poll(() => Preedit(pop.Terminal) is { Length: > 0 }, 8000);
+        if (!composingPop)
+        {
+            // One bounded retry: refocus then retype — the first batch can land
+            // before the new HWND's text-input context finishes attaching.
+            pop.Terminal.Focus();
+            await Task.Delay(300);
+            LettersNi(popHwnd);
+            composingPop = await Poll(() => Preedit(pop.Terminal) is { Length: > 0 }, 5000);
+            facts.Add($"popoutRetryComposing={composingPop} focusedElement={pop.FocusManager?.GetFocusedElement()?.GetType().Name}");
+        }
+        JudgeCandidatePosition(ctx, pop.Terminal, ImeNative.CandidateWindows(), "popout", facts);
         TakeShot(shots, ctx, popHwnd, "ime-popout.png");
-        facts.Add($"popoutComposing={composingPop} preedit={Q(Preedit(pop.Terminal))}");
+        facts.Add($"popoutComposing={composingPop} preedit={Q(Preedit(pop.Terminal))} input={Q(InputLine(popped))}");
         await CancelComposition(pop.Terminal, popHwnd);
         pop.Close();
         await Poll(() => vm.Popouts.Count == 0, 6000);
@@ -200,9 +229,17 @@ public sealed partial class MeasurementApplication
         if (back is null) return ("fail: no visible view for the reattached session", shots);
         back.Focus();
         await Task.Delay(250);
+        facts.Add($"reattachFocused={FocusedOn(ctx, back)} fgIsMain={ImeNative.GetForegroundWindow() == hwnd}");
+        var backLayout = ImeNative.GetKeyboardLayout(0);
+        if (((long)backLayout & 0xFFFF) != 0x0804)
+        {
+            ImeNative.CycleInputLanguage(hwnd);
+            await Task.Delay(600);
+            facts.Add($"reattachProfileCycled 0x{(long)backLayout:x} -> 0x{(long)ImeNative.GetKeyboardLayout(0):x}");
+        }
         LettersNi(hwnd);
         var composingBack = await Poll(() => Preedit(back) is { Length: > 0 }, 8000);
-        facts.Add($"reattachComposing={composingBack}");
+        facts.Add($"reattachComposing={composingBack} preedit={Q(Preedit(back))} input={Q(InputLine(popped))}");
         await CancelComposition(back, hwnd);
         if (!alive) return ("fail: session/PTY did not survive the popout round trip", shots);
         if (!reattached) return ("fail: session did not reattach into the main list", shots);
