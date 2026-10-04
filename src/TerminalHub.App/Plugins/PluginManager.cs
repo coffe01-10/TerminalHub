@@ -99,9 +99,11 @@ public sealed class PluginManager : IDisposable
         if (string.IsNullOrWhiteSpace(manifest.Id) || manifest.Id.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || manifest.Id is "." or "..")
             throw new InvalidDataException("插件 id 必须是可用的目录名称");
         var target = Path.GetFullPath(Path.Combine(DirectoryPath, manifest.Id));
-        var origin = Path.GetFullPath(source);
+        var origin = Path.TrimEndingDirectorySeparator(Path.GetFullPath(source));
         if (origin.Equals(target, StringComparison.OrdinalIgnoreCase)) { Discover(); return; }
-        if (target.StartsWith(origin + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("请选择独立的插件构建目录");
+        if (target.StartsWith(origin + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || origin.StartsWith(target + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("请选择独立的插件构建目录");
         var existing = Plugins.FirstOrDefault(p => p.Manifest.Id == manifest.Id);
         if (existing is not null) { Disable(existing); Plugins.Remove(existing); }
         Directory.CreateDirectory(target);

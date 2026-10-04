@@ -72,6 +72,25 @@ public class TerminalVtParsingRegressions
         Assert.Equal("b", b.CellAt(0, 1).Text);
     }
 
+    [Theory]
+    [InlineData("abcd", 3, "d")]
+    [InlineData("ab\u4e2d", 2, "\u4e2d")]
+    public void CombiningMarkAfterRestoreAtRightMargin_JoinsLastGlyph(string text, int column, string glyph)
+    {
+        var (p, b) = Make(4, 3);
+        p.Feed(text);
+        b.SaveCursor();
+        p.Feed("\r\nother");
+        b.RestoreCursor();
+        p.Feed("\u0301");
+
+        Assert.Equal(glyph + "\u0301", b.CellAt(0, column).Text);
+        Assert.Equal("b", b.CellAt(0, 1).Text);
+        Assert.Equal(3, b.CursorX);
+        p.Feed("x");
+        Assert.Equal("x", b.CellAt(1, 0).Text);
+    }
+
     // ---- ED mode 2 erases with the current background ----
 
     [Fact]

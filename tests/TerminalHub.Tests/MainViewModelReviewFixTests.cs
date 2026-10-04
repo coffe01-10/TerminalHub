@@ -222,6 +222,22 @@ public class MainViewModelReviewFixTests
     // ---- L19: monitor disposal waits out callbacks; VM unsubscribes ----
 
     [Fact]
+    public async Task SystemMonitor_DisposeFromSampleCallback_DoesNotWaitOnItself()
+    {
+        var monitor = new SystemMonitor();
+        var disposed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        monitor.Sampled += sampled =>
+        {
+            sampled.Dispose();
+            disposed.TrySetResult();
+        };
+        monitor.Start(TimeSpan.FromMilliseconds(5));
+
+        await disposed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        monitor.Dispose();
+    }
+
+    [Fact]
     public void SystemMonitor_Dispose_WaitsForInFlightSampleCallback()
     {
         var monitor = new SystemMonitor();

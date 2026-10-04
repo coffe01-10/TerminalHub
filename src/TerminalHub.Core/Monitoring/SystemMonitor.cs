@@ -12,6 +12,7 @@ public sealed class SystemMonitor : ISystemMonitor
 {
     private readonly TimeSpan _processSampleFloor = TimeSpan.FromSeconds(1);
     private Timer? _timer;
+    private readonly object _sampleLock = new();
     private long _lastIdleTicks, _lastTotalTicks;
     private long _lastRxBytes, _lastTxBytes;
     private DateTime _lastNetSample = DateTime.MinValue;
@@ -38,10 +39,9 @@ public sealed class SystemMonitor : ISystemMonitor
         var timer = _timer;
         _timer = null;
         timer?.Dispose();
-        // Wait out an in-flight tick: its Sampled callbacks must not run after
-        // the subscriber's own Dispose has torn its sessions and UI down.
-        while (Volatile.Read(ref _ticking) != 0)
-            Thread.Sleep(1);
+        // Join an in-flight sample. The lock is reentrant so a Sampled
+        // subscriber can also dispose the monitor without waiting on itself.
+        lock (_sampleLock) { }
     }
 
     /// <summary>Timer callbacks are not serialized — a slow sample (process list on a
@@ -57,9 +57,12 @@ public sealed class SystemMonitor : ISystemMonitor
         if (Interlocked.Exchange(ref _ticking, 1) != 0) return;
         try
         {
-            // Dispose may have run between the first check and acquiring the latch.
-            if (Volatile.Read(ref _disposed) == 0)
-                TickCore();
+            lock (_sampleLock)
+            {
+                // Dispose may have run before this callback acquired the lock.
+                if (Volatile.Read(ref _disposed) == 0)
+                    TickCore();
+            }
         }
         finally
         {

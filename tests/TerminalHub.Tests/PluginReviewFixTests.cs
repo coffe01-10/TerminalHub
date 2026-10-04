@@ -48,6 +48,18 @@ public class PluginReviewFixTests
             Assert.True(File.Exists(Path.Combine(installed, "probe.dll")));
             var plugin = manager.Plugins.Single(p => p.Manifest.Id == "overwrite.probe");
             Assert.True(plugin.Enabled, plugin.Error); Assert.Empty(manager.LastError);
+
+            manager.Import(installed + Path.DirectorySeparatorChar);
+            Assert.True(File.Exists(Path.Combine(installed, "probe.dll")), "importing the installed directory with a trailing separator must preserve it");
+            Assert.Same(plugin, manager.Plugins.Single(p => p.Manifest.Id == "overwrite.probe"));
+
+            var nestedSource = Path.Combine(installed, "build");
+            Directory.CreateDirectory(nestedSource);
+            File.Copy(Path.Combine(installed, "plugin.json"), Path.Combine(nestedSource, "plugin.json"));
+            File.Copy(Path.Combine(installed, "probe.dll"), Path.Combine(nestedSource, "probe.dll"));
+            Assert.Throws<InvalidDataException>(() => manager.Import(nestedSource));
+            Assert.True(File.Exists(Path.Combine(nestedSource, "probe.dll")), "a rejected import must preserve its source");
+            Assert.True(plugin.Enabled, "a rejected import must leave the installed plugin running");
         }
         finally
         {

@@ -373,7 +373,9 @@ public sealed class ScreenBuffer
     /// </summary>
     private void ReanchorLastGlyph()
     {
-        var col = CursorX - 1;
+        // At the right margin a pending wrap leaves the cursor on the glyph,
+        // rather than in the cell after it (including after cursor restore).
+        var col = _pendingWrap ? CursorX : CursorX - 1;
         while (col >= 0 && CellAt(CursorY, col).IsWideContinuation) col--;
         if (col < 0) { _lastGlyphRow = -1; return; }
         _lastGlyphRow = CursorY;
