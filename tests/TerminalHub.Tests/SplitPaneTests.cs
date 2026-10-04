@@ -253,7 +253,12 @@ public class SplitPaneTests
         var right = vm.RightPane;
         var rightCard = vm.SessionCards.First(c => ReferenceEquals(c.Model, right));
         vm.CloseSessionCommand.Execute(rightCard);
-        await Until(() => !vm.IsSplit && vm.SessionCards.Count == 1, "closing the last focused side never exited split");
+        // ActiveSession/pane clears land in a dispatcher-posted SyncActive that
+        // can lag the split collapse — wait for them, not just IsSplit.
+        await Until(() => !vm.IsSplit && vm.SessionCards.Count == 1
+            && vm.LeftPane is null && vm.RightPane is null
+            && !ReferenceEquals(vm.ActiveSession, right),
+            "closing the last focused side never exited split");
 
         Assert.Null(vm.LeftPane);
         Assert.Null(vm.RightPane);
