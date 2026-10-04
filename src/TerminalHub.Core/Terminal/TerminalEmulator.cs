@@ -92,10 +92,15 @@ public sealed class TerminalEmulator : IDisposable
     {
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
         if (Buffer.BracketedPaste)
+        {
             // The payload must not contain the bracket terminator: pasted
             // "\x1b[201~" would close the bracket early and run the rest as
-            // typed input (clipboard paste injection).
-            SendText("\x1b[200~" + text.Replace("\x1b[201~", "") + "\x1b[201~");
+            // typed input. Removal can join surrounding text into another
+            // terminator (e.g. "\x1b[20\x1b[201~1~"), so repeat until none remain.
+            while (text.Contains("\x1b[201~", StringComparison.Ordinal))
+                text = text.Replace("\x1b[201~", "");
+            SendText("\x1b[200~" + text + "\x1b[201~");
+        }
         else
             SendText(text.Replace('\n', '\r'));
     }

@@ -143,15 +143,17 @@ public class TerminalStreamingTests
         Assert.Equal("first\rsecond", pty.LastWrite);
     }
 
-    [Fact]
-    public void BracketedPaste_StripsPayloadEndMarker()
+    [Theory]
+    [InlineData("\x1b[201~")]
+    [InlineData("\x1b[20\x1b[201~1~")]
+    public void BracketedPaste_StripsPayloadEndMarker(string marker)
     {
         using var pty = new RecordingPty();
         using var emulator = new TerminalEmulator(pty);
         emulator.Parser.Feed("\x1b[?2004h");
         // A pasted terminator must not break out of the bracket — it lands as
         // inert text instead of running as typed input (paste injection).
-        emulator.PasteText("safe\x1b[201~\necho INJECTED");
+        emulator.PasteText("safe" + marker + "\necho INJECTED");
         Assert.Equal("\x1b[200~safe\necho INJECTED\x1b[201~", pty.LastWrite);
     }
 
