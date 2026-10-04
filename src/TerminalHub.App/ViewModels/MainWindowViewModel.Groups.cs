@@ -42,6 +42,19 @@ public partial class MainWindowViewModel
     public void ActivateCard(SessionCardViewModel card)
     {
         ExpandGroupOf(card);
+        if (ReferenceEquals(ActiveCard, card))
+        {
+            // Clicking the already-active card is still an activation intent —
+            // in split mode it assigns the card to the focused pane. SetProperty
+            // skips a same-value set, so OnActiveCardChanged never fires; without
+            // this branch the click is silently lost. It also covers a queued
+            // SyncActive that has not caught up with _sessions.Active yet, where
+            // ActiveCard still points at this card.
+            if (IsSplit) AssignToPane(FocusedPane, card.Model);
+            if (!ReferenceEquals(card.Model, _sessions.Active))
+                _sessions.Activate(card.Model);
+            return;
+        }
         ActiveCard = card;
     }
 

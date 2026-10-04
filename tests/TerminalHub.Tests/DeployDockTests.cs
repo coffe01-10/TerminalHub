@@ -77,7 +77,12 @@ public class DeployDockTests
             Assert.Contains(vm.Dashboard.OutputLog, l =>
                 l.Source == "deploy" && l.Message.Contains("publish start") && l.Message.Contains("开始打包"));
             var script = OperatingSystem.IsWindows() ? "publish-windows.ps1" : "publish-linux.sh";
-            var shell = OperatingSystem.IsWindows() ? "pwsh" : "bash";
+            // The app prefers pwsh and falls back to Windows PowerShell — expect
+            // whichever this machine resolves.
+            var shell = OperatingSystem.IsWindows()
+                ? PublishPlanner.ResolveWindowsShell(name =>
+                    PublishPlanner.NameOnPath(name, Environment.GetEnvironmentVariable("PATH"), windows: true))
+                : "bash";
             Assert.Contains(vm.Dashboard.OutputLog, l =>
                 l.Source == "deploy" && l.Message.Contains(script));
             Assert.Contains(shell, card.Model.Emulator.Buffer.TailText(40));

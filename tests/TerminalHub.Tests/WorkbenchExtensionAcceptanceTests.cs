@@ -34,8 +34,10 @@ public class WorkbenchExtensionAcceptanceTests
         var sessions = f.Vm.PaneTree!.Leaves.Select(l => l.Session!).ToArray();
         var ptys = sessions.Select(s => s.Pty).ToArray(); var nativeViews = Views(f.Window).ToDictionary(v => v.Emulator!);
         f.Vm.FocusPane(5); await Task.Delay(50); f.Window.KeyTextInput("sixth-pane-input"); await Task.Delay(40);
-        Assert.Contains("sixth-pane-input", sessions[5].Emulator.Buffer.TailText(50));
-        Assert.DoesNotContain("sixth-pane-input", sessions[0].Emulator.Buffer.TailText(50));
+        // The sixth pane can be under ~21 columns on Linux headless font metrics —
+        // the echo wraps mid-token, so compare after joining wrapped lines.
+        Assert.Contains("sixth-pane-input", sessions[5].Emulator.Buffer.TailText(50).Replace("\n", ""));
+        Assert.DoesNotContain("sixth-pane-input", sessions[0].Emulator.Buffer.TailText(50).Replace("\n", ""));
         var branchId = f.Vm.PaneTree.Second!.Second!.Id;
         f.Vm.BeginLayoutGesture("调整分屏比例"); f.Vm.SetPaneRatio(f.Vm.PaneTree.Second.Second, .36); f.Vm.CompleteLayoutGesture();
         f.Vm.UndoLayout(); Assert.Equal(.5, f.Vm.PaneTree!.Second!.Second!.Ratio);

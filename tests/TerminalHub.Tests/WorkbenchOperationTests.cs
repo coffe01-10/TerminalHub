@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
@@ -136,6 +137,47 @@ public class WorkbenchOperationTests
         Assert.Contains("after-undo", f.Vm.ActiveSession!.Emulator.Buffer.TailText(30));
     }
 
+    [AvaloniaTheory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task ShelfClickOnAlreadySelectedCard_AssignsToFocusedPane(bool activationPending)
+    {
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
+        await f.Vm.SetSplitLayoutAsync("Horizontal"); await Task.Delay(120);
+        var left = f.Vm.LeftPane; var right = f.Vm.RightPane;
+        var card = f.Vm.SessionCards.Single(c => c.Model == left);
+        f.Vm.ActivateCard(card); await Task.Delay(50); // selected card, left pane
+        var point = CardPoint(f.Window, card);
+        EventHandler<PointerReleasedEventArgs> focusBeforeClick = (_, _) =>
+        {
+            f.Vm.FocusPane(1); // queue SyncActive before the shelf's bubbling click handler
+            Assert.Same(card, f.Vm.ActiveCard);
+        };
+        if (activationPending)
+            // Headless mouse helpers pump the dispatcher before each event, so
+            // arrange the pending activation within the release event itself.
+            f.Window.AddHandler(InputElement.PointerReleasedEvent, focusBeforeClick, RoutingStrategies.Tunnel);
+        else
+            f.Vm.FocusedPane = 1;
+        Assert.Same(card, f.Vm.ActiveCard);
+        f.Window.MouseDown(point, MouseButton.Left);
+        f.Window.MouseUp(point, MouseButton.Left);
+        f.Window.RemoveHandler(InputElement.PointerReleasedEvent, focusBeforeClick);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        Assert.Same(left, f.Vm.RightPane); Assert.Same(right, f.Vm.LeftPane);
+        Assert.Same(left, f.Vm.ActiveSession);
+
+        // A repeated click must not add an undo step or discard the pane swap.
+        point = CardPoint(f.Window, card);
+        f.Window.MouseDown(point, MouseButton.Left);
+        f.Window.MouseUp(point, MouseButton.Left);
+        f.Vm.UndoLayout();
+        Assert.Same(left, f.Vm.LeftPane); Assert.Same(right, f.Vm.RightPane);
+        Assert.True(f.Vm.IsSplit);
+        f.Vm.RedoLayout();
+        Assert.Same(left, f.Vm.RightPane); Assert.Same(right, f.Vm.LeftPane);
+        Assert.True(left!.IsRunning); Assert.True(right!.IsRunning);
+    }
+
     [AvaloniaFact]
     public async Task ConfiguredRecentShortcutReversesAndWorksFromPopout()
     {
@@ -250,7 +292,10 @@ public class WorkbenchOperationTests
         f.Vm.OpenInNewWindowCommand.Execute(detached); await Task.Delay(100);
         f.Vm.HandleRecentKeyDown(new KeyEventArgs { Key = Key.F6, KeyModifiers = KeyModifiers.Control });
         Assert.Contains(f.Vm.RecentCandidates, c => c.Session == closed.Model);
-        f.Vm.CloseSessionCommand.Execute(closed); await Task.Delay(100);
+        f.Vm.CloseSessionCommand.Execute(closed);
+        // SessionRemoved posts the candidate-list cleanup to the dispatcher —
+        // pump it rather than sleeping a fixed delay (flaky under load).
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
         Assert.DoesNotContain(f.Vm.RecentCandidates, c => c.Session == closed.Model);
         f.Vm.SelectedRecent = f.Vm.RecentCandidates.Single(c => c.Session == detached.Model);
         f.Vm.FinishRecentSwitcher(true);

@@ -263,6 +263,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void AssignToPane(int pane, TerminalSessionModel session)
     {
         if (!IsSplit || pane < 0 || pane >= PaneCount) return;
+        // Already in this pane — no layout change, so no undo step either.
+        if (ReferenceEquals(GetPane(pane), session)) return;
         var before = CaptureLayout();
         var previous = GetPane(pane);
         // Selecting a session already visible swaps panes, preserving all PTYs.

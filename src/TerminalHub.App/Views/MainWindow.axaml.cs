@@ -294,7 +294,11 @@ public partial class MainWindow : Window
         var card = FindShelfCard(active);
         if (card is null)
         {
-            SessionShelf.ScrollIntoView(active);
+            // Card churn (rapid add/remove) can leave the item mid-arrange here —
+            // ScrollIntoView throws InvalidOperationException on the UI thread.
+            // Swallow it: UpdateLayout below re-realizes the container anyway.
+            try { SessionShelf.ScrollIntoView(active); }
+            catch (InvalidOperationException) { }
             SessionShelf.UpdateLayout();
             card = FindShelfCard(active);
         }
@@ -577,8 +581,29 @@ public partial class MainWindow : Window
             _logsScroll?.ScrollToEnd();
         else if (e.PropertyName == nameof(LogsViewModel.SelectedIndex)
                  && Vm.Logs.SelectedEntry is { } entry)
-            LogsList.ScrollIntoView(entry);
+        {
+            // During an output flood the list is mid-arrange when the selection
+            // chases the tail — ScrollIntoView then throws InvalidOperationException
+            // ("Invalid Arrange rectangle"), which is fatal on the UI thread.
+            // Defer past the pending layout, coalesce bursts to the newest entry,
+            // and never let a best-effort scroll crash the app.
+            _logsPendingEntry = entry;
+            if (_logsEntryScrollQueued) return;
+            _logsEntryScrollQueued = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _logsEntryScrollQueued = false;
+                var target = _logsPendingEntry;
+                _logsPendingEntry = null;
+                if (target is null) return;
+                try { LogsList.ScrollIntoView(target); }
+                catch (InvalidOperationException) { /* container not realized yet */ }
+            }, DispatcherPriority.Background);
+        }
     }
+
+    private bool _logsEntryScrollQueued;
+    private object? _logsPendingEntry;
 
     /// <summary>Never open larger than the working area — the floating dock must stay on-screen.</summary>
     private void FitToScreen()
@@ -884,7 +909,9 @@ public partial class MainWindow : Window
         EndShelfDrag(commit: !detach && insideShelf);
         e.Pointer.Capture(null);
         if (detach) Vm.OpenInNewWindowCommand.Execute(dragged);
-        else if (clicked is not null) Vm.ActiveCard = clicked;
+        // Route clicks through ActivateCard: assigning the property directly
+        // skips its already-active-card handling (pane assignment + activation).
+        else if (clicked is not null) Vm.ActivateCard(clicked);
         e.Handled = true;
     }
 
