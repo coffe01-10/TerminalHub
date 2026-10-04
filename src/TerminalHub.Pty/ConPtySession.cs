@@ -133,6 +133,10 @@ public sealed class ConPtySession : IPtySession
             if (Interlocked.Exchange(ref _exitCodeCommitted, 1) != 0) return;
             _exitCode = code;
             _hasExitCode = true;
+            // Exited sessions can stay on the shelf without being disposed.
+            // Release their idle writer instead of keeping a dedicated thread alive.
+            try { _writeQueue.CompleteAdding(); }
+            catch (ObjectDisposedException) { /* Dispose already released the queue */ }
             // This runs on a Process.Exited threadpool callback — an escaping
             // subscriber exception crashes the process, and a throwing
             // subscriber would eat the notification for everyone behind it.
@@ -262,6 +266,7 @@ public sealed class ConPtySession : IPtySession
         {
             foreach (var tmp in _writeQueue.GetConsumingEnumerable())
             {
+                if (!IsRunning) return;
                 var ptyIn = _ptyIn;
                 if (ptyIn is null) return;
                 // Loop on short writes — a large paste can exceed the pipe's

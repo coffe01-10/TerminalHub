@@ -278,8 +278,9 @@ public class FilesOpenInTerminalTests
         Assert.Null(await pending);
     }
 
-    [AvaloniaFact]
-    public async Task FilesDrag_ReleaseOutsideList_CancelsPendingStorageLookup()
+    [AvaloniaTheory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task FilesDrag_ReleaseOutsideList_CancelsPendingStorageLookup(bool providerCancels)
     {
         var root = Path.Combine(Path.GetTempPath(), "th-drag-" + Guid.NewGuid());
         Directory.CreateDirectory(root);
@@ -312,9 +313,13 @@ public class FilesOpenInTerminalTests
             window.MouseMove(new Avalonia.Point(500, 100), Avalonia.Input.RawInputModifiers.LeftMouseButton);
             window.MouseUp(new Avalonia.Point(500, 100), MouseButton.Left);
             Assert.True(token.IsCancellationRequested);
-            var immediate = DispatchProxy.Create<IStorageProvider, FileResolveProxy>();
-            var data = await FilesDragData.CreateAsync(immediate, new FileEntry { Name = "sample.txt", FullPath = path });
-            proxy.Result.SetResult((IStorageFile)data!.GetFiles()!.Single());
+            if (providerCancels) proxy.Result.SetCanceled();
+            else
+            {
+                var immediate = DispatchProxy.Create<IStorageProvider, FileResolveProxy>();
+                var data = await FilesDragData.CreateAsync(immediate, new FileEntry { Name = "sample.txt", FullPath = path });
+                proxy.Result.SetResult((IStorageFile)data!.GetFiles()!.Single());
+            }
             await Task.Delay(50);
             Assert.Null(typeof(MainWindow).GetField("_filesDragPending",
                 BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window));

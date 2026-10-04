@@ -64,6 +64,25 @@ public sealed class ProcessWideCollection { }
 public class WindowsStreamingTests
 {
     [Fact]
+    public async Task NaturalExit_ReleasesWriterWithoutDisposingSession_AndNotifiesAfterThrowingSubscriber()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var pty = new ConPtySession();
+        var exited = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        pty.Exited += (_, _) => throw new InvalidOperationException("subscriber failure");
+        pty.Exited += (_, code) => exited.TrySetResult(code);
+        await pty.StartAsync(new PtyOptions
+        {
+            Shell = "cmd.exe", Arguments = "/c \"ping -n 2 127.0.0.1 >nul & exit 7\""
+        });
+        Assert.Equal(7, await exited.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        var writer = (Task)typeof(ConPtySession).GetField("_writeTask", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pty)!;
+        await writer.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(pty.IsRunning);
+        Assert.Equal(7, pty.ExitCode);
+    }
+
+    [Fact]
     public async Task RealConPty_StreamsBeforeExit_AndPassesColorEnvironment()
     {
         if (!OperatingSystem.IsWindows()) return;

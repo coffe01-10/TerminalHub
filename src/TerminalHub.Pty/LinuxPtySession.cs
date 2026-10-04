@@ -285,6 +285,9 @@ public sealed class LinuxPtySession : IPtySession
                 _exitCode = Native.WIFEXITED(status) ? Native.WEXITSTATUS(status) : -1;
                 _hasExitCode = true;
                 _isRunning = false;
+                // A retained exited session must not retain its dedicated writer.
+                try { _writeQueue.CompleteAdding(); }
+                catch (ObjectDisposedException) { /* Dispose already released the queue */ }
                 // After Dispose the owner is gone — a late Exited callback would
                 // touch already-torn-down views. The code itself stays queryable.
                 if (_disposed) return;
@@ -321,6 +324,7 @@ public sealed class LinuxPtySession : IPtySession
         {
             foreach (var tmp in _writeQueue.GetConsumingEnumerable())
             {
+                if (!IsRunning) return;
                 var master = _master;
                 if (master is null) return;
                 // Pin the fd for the whole write: Dispose can close the handle

@@ -117,6 +117,19 @@ public sealed class VtParser
 
     public void Feed(string text) => Feed(Encoding.UTF8.GetBytes(text));
 
+    /// <summary>A recording gap breaks any partial control or UTF-8 sequence.</summary>
+    internal void DiscardPendingInput()
+    {
+        lock (_buffer.SyncRoot)
+        {
+            _utf8Remaining = 0;
+            _stringUtf8Remaining = 0;
+            _pendingInput.Clear();
+            _osc.Clear();
+            Enter(State.Ground);
+        }
+    }
+
     private void FeedByte(byte b)
     {
         // Anywhere transitions. OSC/DCS/SOS handlers must see ESC themselves
@@ -213,7 +226,8 @@ public sealed class VtParser
             case 0x8D: _afterZwj = false; _buffer.ReverseIndex(); break; // 8-bit RI
             case 0x90: Enter(State.Dcs); break;                 // 8-bit DCS
             case 0x98: case 0x9E: case 0x9F: Enter(State.SosPmApc); break; // SOS/PM/APC
-            case >= 0x80 and < 0xC0: _afterZwj = false; break;  // other C1 (SS2/SS3/ST/...) — swallow
+            case >= 0x80 and <= 0x9F: _afterZwj = false; break; // other C1 (SS2/SS3/ST/...) — swallow
+            case >= 0xA0 and < 0xC0: _afterZwj = false; _buffer.PutChar('\uFFFD'); break;
             case >= 0xC0 and < 0xE0: _utf8Value = b & 0x1F; _utf8Remaining = 1; _utf8Min = 0x80; break;
             case >= 0xE0 and < 0xF0: _utf8Value = b & 0x0F; _utf8Remaining = 2; _utf8Min = 0x800; break;
             case >= 0xF0: _utf8Value = b & 0x07; _utf8Remaining = 3; _utf8Min = 0x10000; break;

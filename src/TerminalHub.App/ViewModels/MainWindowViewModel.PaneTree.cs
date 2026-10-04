@@ -77,6 +77,8 @@ public partial class MainWindowViewModel
             // around it plants a Session=null leaf that crashes the pane
             // renderer (leaf.Session!), or edits a detached orphan.
             if (!workspace.Cards.Any(c => c.Model == target.Session)) return;
+            // The newly posted card can also be closed before this continuation.
+            if (!workspace.Cards.Any(c => c.Model == session)) return;
             if (IsSplit && !PaneTree!.Leaves.Contains(target)) return;
             // Moving a visible leaf into a new split removes its old view, never its PTY.
             if (!IsSplit) PaneTree = target;

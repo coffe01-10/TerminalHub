@@ -23,9 +23,11 @@ public sealed class TerminalRecorder : IAsyncDisposable
     private bool _stopped;
     public string Path { get; }
     public TerminalRecorder(TerminalEmulator emulator, string path, string title)
+        : this(emulator, path, title, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 65536, true)) { }
+
+    private TerminalRecorder(TerminalEmulator emulator, string path, string title, Stream stream)
     {
         _emulator = emulator; Path = path;
-        var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 65536, true);
         RecordingHeader header;
         lock (emulator.Buffer.SyncRoot)
         {
@@ -82,13 +84,26 @@ public sealed class TerminalRecorder : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
+        bool stop = false;
+        RecordingEvent? resize = null, gap = null;
         lock (_emulator.Buffer.SyncRoot)
         {
             if (!_stopped)
             {
                 _stopped = true; _emulator.Parser.DataApplied -= OnData; _emulator.Resized -= OnResize;
-                _queue.Writer.TryWrite(new(Time, "end")); _queue.Writer.TryComplete();
+                stop = true;
+                if (_resizeCols >= 0) resize = new(Time, "resize", null, _resizeCols, _resizeRows);
+                if (_overflow != 0) gap = new(Time, "gap");
             }
+        }
+        if (stop)
+        {
+            // Once detached, waiting for disk capacity is safe outside SyncRoot.
+            // A full queue at stop must not lose its final size, gap, or end marker.
+            if (resize is not null) await _queue.Writer.WriteAsync(resize).ConfigureAwait(false);
+            if (gap is not null) await _queue.Writer.WriteAsync(gap).ConfigureAwait(false);
+            await _queue.Writer.WriteAsync(new(Time, "end")).ConfigureAwait(false);
+            _queue.Writer.TryComplete();
         }
         await _writer.ConfigureAwait(false);
     }
@@ -184,6 +199,7 @@ public sealed class TerminalPlayback : IDisposable
             var item = Events[_next++];
             if (item.Kind == "output" && item.Data is { } data) Emulator.Parser.Feed(data);
             else if (item.Kind == "resize") Emulator.Resize(item.Columns, item.Rows);
+            else if (item.Kind == "gap") Emulator.Parser.DiscardPendingInput();
         }
         PositionMs = timeMs;
     }

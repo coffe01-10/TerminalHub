@@ -1267,6 +1267,7 @@ public partial class MainWindow : Window
             EndFilesDrag();
             if (data is not null) await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
         }
+        catch (OperationCanceledException) { /* storage lookup or native drag was cancelled */ }
         // async void: any drag failure (platform OLE COMException, re-entrant
         // DoDragDrop, NotSupportedException on odd paths) must land in the
         // status line — escaping the filter here is an unhandled UI exception.

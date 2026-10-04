@@ -188,6 +188,14 @@ public class TerminalStreamingTests
     }
 
     [Fact]
+    public void StandaloneUtf8ContinuationOutsideC1_StillProducesReplacement()
+    {
+        var buffer = new ScreenBuffer(10, 3);
+        new VtParser(buffer).Feed(new byte[] { 0xa0, 0xbf });
+        Assert.StartsWith("\uFFFD\uFFFD", Text(buffer.CaptureFrame()));
+    }
+
+    [Fact]
     public void KittyFlagStack_CappedAt64()
     {
         var buffer = new ScreenBuffer();
