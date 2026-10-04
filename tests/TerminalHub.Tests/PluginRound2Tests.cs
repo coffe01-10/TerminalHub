@@ -70,7 +70,7 @@ public class PluginRound2Tests
             for (var i = 0; i < 50 && f.Vm.SessionCards.Count <= before; i++) await Task.Delay(100);
             Assert.True(f.Vm.SessionCards.Count > before, "command should spawn a session");
             var spawned = f.Vm.SessionCards.Last().Model;
-            Assert.Equal("cmd.exe", spawned.Shell);
+            Assert.Equal(OperatingSystem.IsWindows() ? "cmd.exe" : "sh", spawned.Shell);
             Assert.Contains("git status", spawned.ShellArguments);
             Assert.Contains(spawned.WorkingDirectory, spawned.ShellArguments); // {cwd} expanded
         }
