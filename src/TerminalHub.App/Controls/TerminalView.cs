@@ -91,6 +91,11 @@ public partial class TerminalView : Control
     private TerminalEmulator? _emulator;
     private int _dirty = 1;
     private long _lastBlink;
+    private long _lastPreviewDirty;
+    // Parser-thread copy of IsPreview — reading the styled property off the UI
+    // thread throws "Call from invalid thread", which would abort the whole
+    // emulator.Changed chain (no repaint, later PTY subscribers skipped).
+    private volatile bool _isPreviewSnapshot;
     private bool _attached;
     private Typeface _typeface = new("Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace");
     private Typeface _boldTypeface;
@@ -321,7 +326,19 @@ public partial class TerminalView : Control
         InvalidateVisual();
     }
 
-    private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
+    private void OnBufferChanged()
+    {
+        if (_isPreviewSnapshot)
+        {
+            // Thumbnails need freshness, not motion — a streaming producer used
+            // to repaint every card at vsync. ~4fps keeps previews live while
+            // turning the multi-session render cost into a fraction.
+            var now = Environment.TickCount64;
+            if (now - _lastPreviewDirty < 250) return;
+            _lastPreviewDirty = now;
+        }
+        Interlocked.Exchange(ref _dirty, 1);
+    }
 
     // Parser-thread hook: the refresh tick turns this deadline into the overlay.
     private void OnBell()
@@ -379,6 +396,7 @@ public partial class TerminalView : Control
     {
         base.OnAttachedToVisualTree(e);
         _attached = true;
+        _isPreviewSnapshot = IsPreview;
         OnThemeChanged(); // A detached pane may have missed a theme change.
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
@@ -470,6 +488,8 @@ public partial class TerminalView : Control
         base.OnPropertyChanged(change);
         if (change.Property == BoundsProperty || change.Property == IsVisibleProperty)
             TryResizeEmulator();
+        if (change.Property == IsPreviewProperty)
+            _isPreviewSnapshot = change.GetNewValue<bool>();
     }
 
     private void TryResizeEmulator()

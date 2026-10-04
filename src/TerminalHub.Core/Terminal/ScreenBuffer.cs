@@ -320,7 +320,7 @@ public sealed class ScreenBuffer
     {
         if (_decSpecial[_activeCharset] && ch is >= '`' and <= '~')
             ch = DecSpecialMap(ch);
-        PutCluster(ch.ToString(), Math.Max(1, GraphemeWidth.OfRune(ch)));
+        PutCluster(ch, null, Math.Max(1, GraphemeWidth.OfRune(ch)));
     }
 
     /// <summary>Write one full code point; runes above the BMP are stored as a
@@ -328,8 +328,13 @@ public sealed class ScreenBuffer
     public void PutRune(int rune)
     {
         if (!IsUnicodeScalar(rune)) rune = 0xFFFD;
-        var text = rune <= 0xFFFF ? ((char)rune).ToString() : char.ConvertFromUtf32(rune);
-        PutCluster(text, Math.Clamp(GraphemeWidth.OfRune(rune), 1, 2));
+        if (rune <= 0xFFFF)
+        {
+            PutCluster((char)rune, null, Math.Clamp(GraphemeWidth.OfRune(rune), 1, 2));
+            return;
+        }
+        var text = char.ConvertFromUtf32(rune);
+        PutCluster(text[0], text[1..], Math.Clamp(GraphemeWidth.OfRune(rune), 1, 2));
     }
 
     private static bool IsUnicodeScalar(int rune)
@@ -410,7 +415,10 @@ public sealed class ScreenBuffer
         }
     }
 
-    private void PutCluster(string text, int width)
+    /// <summary><paramref name="first"/> is the cluster's first UTF-16 unit;
+    /// <paramref name="tail"/> the rest — kept separate so the single-char fast
+    /// path (the bulk of terminal output) never allocates a string.</summary>
+    private void PutCluster(char first, string? tail, int width)
     {
         if (_pendingWrap)
         {
@@ -445,8 +453,8 @@ public sealed class ScreenBuffer
         // A wide glyph with no room for its continuation must not stay IsWide:
         // the renderer would walk one cell past this row.
         var wide = width == 2 && CursorX + 1 < Columns;
-        cell.Char = text[0];
-        cell.Tail = text.Length > 1 ? text[1..] : null;
+        cell.Char = first;
+        cell.Tail = tail;
         cell.Hyperlink = CurrentHyperlink;
         cell.Attrs = CurrentAttrs;
         cell.Fg = CurrentFg;
