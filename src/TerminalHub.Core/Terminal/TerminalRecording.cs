@@ -17,6 +17,9 @@ public sealed class TerminalRecorder : IAsyncDisposable
     private readonly long _started = Stopwatch.GetTimestamp();
     private readonly Task _writer;
     private int _overflow;
+    // Latest unwritten resize, kept so a congested queue can't silently drop
+    // it — playback would keep old dimensions and misplace every later cell.
+    private int _resizeCols = -1, _resizeRows;
     private bool _stopped;
     public string Path { get; }
     public TerminalRecorder(TerminalEmulator emulator, string path, string title)
@@ -37,12 +40,35 @@ public sealed class TerminalRecorder : IAsyncDisposable
     private double Time => Stopwatch.GetElapsedTime(_started).TotalMilliseconds;
     private void OnData(ReadOnlyMemory<byte> data)
     {
-        if (Interlocked.Exchange(ref _overflow, 0) == 1)
-            _queue.Writer.TryWrite(new(Time, "gap"));
+        // Ordering contract: a pending resize and the gap marker must land
+        // before any later output, otherwise the recording silently merges
+        // non-contiguous bytes / stale dimensions into a continuous stream.
+        if (!FlushResize()) { Interlocked.Exchange(ref _overflow, 1); return; }
+        if (_overflow == 1)
+        {
+            if (!_queue.Writer.TryWrite(new(Time, "gap"))) return;
+            Interlocked.Exchange(ref _overflow, 0);
+        }
         if (!_queue.Writer.TryWrite(new(Time, "output", data.ToArray())))
             Interlocked.Exchange(ref _overflow, 1);
     }
-    private void OnResize(int columns, int rows) => _queue.Writer.TryWrite(new(Time, "resize", null, columns, rows));
+    private bool FlushResize()
+    {
+        if (_resizeCols < 0) return true;
+        if (!_queue.Writer.TryWrite(new(Time, "resize", null, _resizeCols, _resizeRows))) return false;
+        _resizeCols = -1;
+        return true;
+    }
+    private void OnResize(int columns, int rows)
+    {
+        // Only the latest size matters; on failure keep it pending for OnData.
+        if (_queue.Writer.TryWrite(new(Time, "resize", null, columns, rows)))
+            _resizeCols = -1;
+        else
+        {
+            _resizeCols = columns; _resizeRows = rows;
+        }
+    }
     private async Task WriteAsync(Stream stream, RecordingHeader header)
     {
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));

@@ -33,6 +33,7 @@ public sealed class LinuxPtySession : IPtySession
     private volatile bool _isRunning;
     private volatile bool _hasExitCode;
     private volatile bool _disposed;
+    private int _disposeOnce;
     private int _exitCode;
 
     public Guid Id { get; } = Guid.NewGuid();
@@ -413,6 +414,9 @@ public sealed class LinuxPtySession : IPtySession
 
     public void Dispose()
     {
+        // Dispose can race with the exit path / a second explicit call;
+        // CompleteAdding on an already-disposed collection throws.
+        if (Interlocked.Exchange(ref _disposeOnce, 1) != 0) return;
         _disposed = true;
         Kill();
         _readLoopCts?.Cancel();
