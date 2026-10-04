@@ -92,6 +92,8 @@ public class RecordingCongestionTests
             await File.WriteAllBytesAsync(path, stream.ToArray());
             using var playback = await TerminalPlayback.LoadAsync(path);
             Assert.Equal(new[] { "resize", "gap", "end" }, playback.Events.TakeLast(3).Select(e => e.Kind));
+            // Flushing a paused disk writer must not extend the recording timeline.
+            Assert.Equal(playback.Events[^2].TimeMs, playback.Events[^1].TimeMs);
             playback.Seek(playback.DurationMs);
             Assert.Equal(10, playback.Emulator.Buffer.Columns);
             Assert.Equal(4, playback.Emulator.Buffer.Rows);

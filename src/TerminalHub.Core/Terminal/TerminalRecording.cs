@@ -85,15 +85,17 @@ public sealed class TerminalRecorder : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         bool stop = false;
-        RecordingEvent? resize = null, gap = null;
+        RecordingEvent? resize = null, gap = null, end = null;
         lock (_emulator.Buffer.SyncRoot)
         {
             if (!_stopped)
             {
                 _stopped = true; _emulator.Parser.DataApplied -= OnData; _emulator.Resized -= OnResize;
                 stop = true;
-                if (_resizeCols >= 0) resize = new(Time, "resize", null, _resizeCols, _resizeRows);
-                if (_overflow != 0) gap = new(Time, "gap");
+                var stoppedAt = Time;
+                if (_resizeCols >= 0) resize = new(stoppedAt, "resize", null, _resizeCols, _resizeRows);
+                if (_overflow != 0) gap = new(stoppedAt, "gap");
+                end = new(stoppedAt, "end");
             }
         }
         if (stop)
@@ -102,7 +104,7 @@ public sealed class TerminalRecorder : IAsyncDisposable
             // A full queue at stop must not lose its final size, gap, or end marker.
             if (resize is not null) await _queue.Writer.WriteAsync(resize).ConfigureAwait(false);
             if (gap is not null) await _queue.Writer.WriteAsync(gap).ConfigureAwait(false);
-            await _queue.Writer.WriteAsync(new(Time, "end")).ConfigureAwait(false);
+            await _queue.Writer.WriteAsync(end!).ConfigureAwait(false);
             _queue.Writer.TryComplete();
         }
         await _writer.ConfigureAwait(false);
