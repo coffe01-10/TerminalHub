@@ -3,7 +3,7 @@
 > 共享看板。认领 / 指派 / 完成都改这里，并在群 **TerminalHub Work** 同步一句。
 > 更新约定：谁动哪条谁改；合 PR 后勾掉；新缺口随时加。
 
-最后更新：2026-10-02 01:40 CST（PR #54 已合 main@fb8d9e5 · Devin 开 Inspector 默认展开刀） · 维护：Devin（PO）
+最后更新：2026-10-04 23:55 CST（本轮验收还账+功能刀五段一次做完，单 PR 待合） · 维护：Devin（PO）
 
 ## 分工
 
@@ -24,10 +24,15 @@
 ## 待认领 / 下一刀
 
 - [ ] Windows ConPTY 本机冒烟 — **等用户本机**
+- [ ] 脚本插件 Linux 端冒烟（manifest commands 走 sh -c；本轮只在 Windows 验过 cmd.exe）— GLM 可认领
+- [ ] Deploy 侧把官方插件 ZIP 清单更新到 5 个（新增 TerminalBroadcast/Snippets，build-official-plugins.ps1 已扩）— Grok 可认领
+- [ ] v0.4.1 GitHub Release 上传 + 安装包实装 — **等用户本机**
+- [ ] 真 GPU IME 候选窗、微信输入法、真 AI CLI 冒烟 — **等用户本机**
 
 
 ## 已完成（近期）
 
+- [x] 2026-10-04 一轮五段（A 验收还账：真 SFTP/性能基线/GPU-IME 自动验收 · B SSH 深化：SFTP mkdir/rename/remove/stat + UI 命令 · C AI 任务面板：AiCliCatalog+tag=AI 会话+状态聚合 · D 性能：PutCluster 零分配+预览节流，10sess -71% CPU · E 插件二轮：脚本插件/热重载+AutoReload/两个新官方插件） — Devin · 记录 `docs/round-2026-10-04.md`
 - [x] PR #54 会话缩略卡活动态霓虹（accent 光晕四主题 + 2px 边框修复 + 实机前后截图）— Devin · `feat/thumb-neon-active` · `main@fb8d9e5`
 - [x] PR #53 Output 底栏级别筛选（全部/info/warn/error + VisibleOutput + 持久化 · 实机截图两档）— Devin · `feat/output-level-filter-mockup` · `main@75cc0c7`
 - [x] PR #52 Linux 平台对齐（默认 Bash · 隐藏 cmd/WSL · Thunar 右键 · PTY 参数/整树关闭 · 剪贴板=X11 环境结论）— Codex/Devin · `codex/linux-windows-parity` · `main@cadefdd`
