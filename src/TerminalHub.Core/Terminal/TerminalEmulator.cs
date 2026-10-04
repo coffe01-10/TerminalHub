@@ -91,7 +91,13 @@ public sealed class TerminalEmulator : IDisposable
     public void PasteText(string text)
     {
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
-        SendText(Buffer.BracketedPaste ? "\x1b[200~" + text + "\x1b[201~" : text.Replace('\n', '\r'));
+        if (Buffer.BracketedPaste)
+            // The payload must not contain the bracket terminator: pasted
+            // "\x1b[201~" would close the bracket early and run the rest as
+            // typed input (clipboard paste injection).
+            SendText("\x1b[200~" + text.Replace("\x1b[201~", "") + "\x1b[201~");
+        else
+            SendText(text.Replace('\n', '\r'));
     }
 
     /// <summary>xterm mouse report; coordinates are zero-based terminal cells.</summary>

@@ -425,9 +425,11 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
         {
             var dir = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
             if (dir is null) return;
+            // ArgumentList, not string concat: a path containing '"' would
+            // otherwise split the argument mid-quote and open the wrong path.
             System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{dir}\"")
-                { UseShellExecute = false });
+                new System.Diagnostics.ProcessStartInfo("xdg-open")
+                { UseShellExecute = false, ArgumentList = { dir } });
         }
     }
 
@@ -460,8 +462,8 @@ public partial class FilesViewModel : ViewModelBase, IDisposable
                 new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
         else
             System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{path}\"")
-                { UseShellExecute = false });
+                new System.Diagnostics.ProcessStartInfo("xdg-open")
+                { UseShellExecute = false, ArgumentList = { path } });
     }
 
     private bool IsFileSelection(FileEntry? entry)

@@ -294,7 +294,11 @@ public partial class MainWindow : Window
         var card = FindShelfCard(active);
         if (card is null)
         {
-            SessionShelf.ScrollIntoView(active);
+            // Card churn (rapid add/remove) can leave the item mid-arrange here —
+            // ScrollIntoView throws InvalidOperationException on the UI thread.
+            // Swallow it: UpdateLayout below re-realizes the container anyway.
+            try { SessionShelf.ScrollIntoView(active); }
+            catch (InvalidOperationException) { }
             SessionShelf.UpdateLayout();
             card = FindShelfCard(active);
         }
