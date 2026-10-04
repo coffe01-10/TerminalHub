@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using TerminalHub.App.Controls;
 using TerminalHub.App.ViewModels;
@@ -137,6 +138,23 @@ public class WorkbenchOperationTests
     }
 
     [AvaloniaFact]
+    public async Task ShelfClickOnAlreadySelectedCard_AssignsToFocusedPane()
+    {
+        using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
+        await f.Vm.SetSplitLayoutAsync("Horizontal"); await Task.Delay(120);
+        var left = f.Vm.LeftPane; var right = f.Vm.RightPane;
+        var card = f.Vm.SessionCards.Single(c => c.Model == left);
+        f.Vm.ActivateCard(card); await Task.Delay(50); // selected card, left pane
+        // Pane focus moved without activation — the state a queued SyncActive
+        // leaves behind, and a same-card mouse click must still assign the pane.
+        f.Vm.FocusedPane = 1;
+        var point = CardPoint(f.Window, card);
+        f.Window.MouseDown(point, MouseButton.Left);
+        f.Window.MouseUp(point, MouseButton.Left); await Task.Delay(50);
+        Assert.Same(left, f.Vm.RightPane); Assert.Same(right, f.Vm.LeftPane);
+    }
+
+    [AvaloniaFact]
     public async Task ConfiguredRecentShortcutReversesAndWorksFromPopout()
     {
         using var f = new StageLayoutTests.StageFixture(); await f.ReadyAsync();
@@ -250,7 +268,10 @@ public class WorkbenchOperationTests
         f.Vm.OpenInNewWindowCommand.Execute(detached); await Task.Delay(100);
         f.Vm.HandleRecentKeyDown(new KeyEventArgs { Key = Key.F6, KeyModifiers = KeyModifiers.Control });
         Assert.Contains(f.Vm.RecentCandidates, c => c.Session == closed.Model);
-        f.Vm.CloseSessionCommand.Execute(closed); await Task.Delay(100);
+        f.Vm.CloseSessionCommand.Execute(closed);
+        // SessionRemoved posts the candidate-list cleanup to the dispatcher —
+        // pump it rather than sleeping a fixed delay (flaky under load).
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
         Assert.DoesNotContain(f.Vm.RecentCandidates, c => c.Session == closed.Model);
         f.Vm.SelectedRecent = f.Vm.RecentCandidates.Single(c => c.Session == detached.Model);
         f.Vm.FinishRecentSwitcher(true);

@@ -884,7 +884,9 @@ public partial class MainWindow : Window
         EndShelfDrag(commit: !detach && insideShelf);
         e.Pointer.Capture(null);
         if (detach) Vm.OpenInNewWindowCommand.Execute(dragged);
-        else if (clicked is not null) Vm.ActiveCard = clicked;
+        // Route clicks through ActivateCard: assigning the property directly
+        // skips its already-active-card handling (pane assignment + activation).
+        else if (clicked is not null) Vm.ActivateCard(clicked);
         e.Handled = true;
     }
 
