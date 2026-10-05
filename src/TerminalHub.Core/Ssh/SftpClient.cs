@@ -79,13 +79,13 @@ public sealed class SftpClient : IDisposable
     /// <summary>SSH_FXP_MKDIR (14): creates a remote directory with default attrs.</summary>
     public async Task MkdirAsync(string path, CancellationToken ct = default)
     { var p = new Packet(14); p.String(path); p.UInt(0); Expect(await RequestAsync(p, ct), 101); }
-    /// <summary>SSH_FXP_RENAME (18), or posix-rename@openssh.com (packet 200)
-    /// when the server advertised it — the extension form may overwrite an
-    /// existing target where v3 RENAME refuses.</summary>
-    public async Task RenameAsync(string source, string target, CancellationToken ct = default)
+    /// <summary>SSH_FXP_RENAME refuses an existing target. Replacement is
+    /// opt-in and uses posix-rename when the server advertises it.</summary>
+    public async Task RenameAsync(string source, string target, CancellationToken ct = default, bool replace = false)
     {
-        var p = new Packet(_posixRename ? (byte)200 : (byte)18);
-        if (_posixRename) p.String("posix-rename@openssh.com");
+        var usePosixRename = replace && _posixRename;
+        var p = new Packet(usePosixRename ? (byte)200 : (byte)18);
+        if (usePosixRename) p.String("posix-rename@openssh.com");
         p.String(source); p.String(target); Expect(await RequestAsync(p, ct), 101);
     }
     /// <summary>SSH_FXP_REMOVE (13) for files / SSH_FXP_RMDIR (15) for empty
@@ -152,7 +152,7 @@ public sealed class SftpClient : IDisposable
                 Expect(await RequestAsync(p, ct), 101); offset += (uint)count; progress?.Report((long)offset);
             }
             await CloseAsync(handle); closed = true;
-            await RenameAsync(temporary, remote, ct); complete = true; IncompleteRemotePath = null;
+            await RenameAsync(temporary, remote, ct, replace: true); complete = true; IncompleteRemotePath = null;
         }
         finally
         {

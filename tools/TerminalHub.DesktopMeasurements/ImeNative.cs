@@ -163,20 +163,20 @@ internal static class ImeNative
     // that only swaps the keyboard layout and letters reach the app literally.
     // ActivateProfile with TF_IPPMF_FORPROCESS turns the TIP on for this
     // process' input threads without touching the user's global profile.
-    [ComImport, Guid("71C6E74D-0F28-11D8-A82A-0060B0ECC45C"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    [ComImport, Guid("71C6E74C-0F28-11D8-A82A-00065B84435C"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface ITfInputProcessorProfileMgr
     {
-        int _RegisterProfile(); int _UnregisterProfile(); int _GetActiveProfile();
-        int _GetProfileList(); int _GetCurrentLanguage();
-        int ActivateProfile(uint flags, ushort langid, [In] in Guid clsid, [In] in Guid profile, IntPtr hkl);
+        [PreserveSig]
+        int ActivateProfile(uint profileType, ushort langid, [In] in Guid clsid,
+            [In] in Guid profile, IntPtr hkl, uint flags);
     }
-    [ComImport, Guid("33C53A50-F456-4884-B049-85FD643ECFED")]
-    private class TfInputProcessorProfiles { }
     [DllImport("ole32.dll")] private static extern int CoCreateInstance([In] in Guid clsid,
         [MarshalAs(UnmanagedType.IUnknown)] object? outer, uint clsctx, [In] in Guid iid,
         [MarshalAs(UnmanagedType.Interface)] out object obj);
-    private static readonly Guid IID_ITfInputProcessorProfileMgr = new("71C6E74D-0F28-11D8-A82A-0060B0ECC45C");
+    private static readonly Guid IID_ITfInputProcessorProfileMgr = typeof(ITfInputProcessorProfileMgr).GUID;
     private static readonly Guid CLSID_TF_InputProcessorProfiles = new("33C53A50-F456-4884-B049-85FD643ECFED");
+    private const uint TfProfileTypeInputProcessor = 1;
+    private const uint TfIppmfForProcess = 0x10000000;
     // Microsoft Pinyin TIP clsid + profile guid (the zh-CN IME installed with
     // the zh-CN language pack); constants of the OS, not secrets.
     private static readonly Guid MS_Pinyin_Clsid = new("81D4E9C9-1D3B-41BC-9E6C-4B40BF79E35E");
@@ -185,6 +185,7 @@ internal static class ImeNative
     /// <summary>Activate Microsoft Pinyin for this process' input threads
     /// (TF_IPPMF_FORPROCESS); the user's global profile is untouched. Returns
     /// the HRESULT of the last failed step or 0 — callers record it.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public static int ActivateMsPinyinForProcess()
     {
         try
@@ -193,9 +194,12 @@ internal static class ImeNative
                 in IID_ITfInputProcessorProfileMgr, out var obj);
             if (hr != 0) return hr;
             var mgr = (ITfInputProcessorProfileMgr)obj;
-            // FORPROCESS (1): activation applies to this process and selects the
-            // TIP as the current input language on our thread.
-            return mgr.ActivateProfile(1, 0x0804, in MS_Pinyin_Clsid, in MS_Pinyin_Profile, (IntPtr)0x08040804);
+            try
+            {
+                return mgr.ActivateProfile(TfProfileTypeInputProcessor, 0x0804,
+                    in MS_Pinyin_Clsid, in MS_Pinyin_Profile, IntPtr.Zero, TfIppmfForProcess);
+            }
+            finally { Marshal.ReleaseComObject(obj); }
         }
         catch (Exception ex) { return ex.HResult; }
     }

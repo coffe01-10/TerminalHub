@@ -7,6 +7,31 @@ namespace TerminalHub.Tests;
 
 public class SftpTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Rename_RejectsExistingTarget_WithoutReplacingEitherFile(bool advertisesPosixRename)
+    {
+        using var server = new FixtureServer { AdvertisesPosixRename = advertisesPosixRename };
+        using var client = new SftpClient(server, server);
+        await client.InitializeAsync();
+        const string source = "/项目 文件/中文 ' 文件.txt";
+        const string target = "/项目 文件/已有文件.txt";
+        var originalSource = server.Files[source];
+        var originalTarget = Encoding.UTF8.GetBytes("保留目标内容");
+        server.Files[target] = originalTarget;
+
+        await Assert.ThrowsAsync<IOException>(() => client.RenameAsync(source, target));
+        Assert.Equal(originalSource, server.Files[source]);
+        Assert.Equal(originalTarget, server.Files[target]);
+        Assert.Empty(server.Extensions);
+
+        const string available = "/项目 文件/新名称.txt";
+        await client.RenameAsync(source, available);
+        Assert.False(server.Files.ContainsKey(source));
+        Assert.Equal(originalSource, server.Files[available]);
+    }
+
     [Fact]
     public async Task BinaryProtocolListsAndTransfersChineseSpaceNames_WithProgressAndAtomicReplacement()
     {
@@ -66,6 +91,7 @@ public class SftpTests
         public Dictionary<string, byte[]> Files { get; } = new() { ["/项目 文件/中文 ' 文件.txt"] = Encoding.UTF8.GetBytes("fixture 中文") };
         public List<string> Extensions { get; } = [];
         public bool FailWrites;
+        public bool AdvertisesPosixRename = true;
         private readonly MemoryStream _request = new();
         private MemoryStream _response = new();
         private readonly Dictionary<string, string> _handles = [];
@@ -79,7 +105,10 @@ public class SftpTests
             void Handle(string path) { var handle = Guid.NewGuid().ToString("N"); _handles[handle] = path; reply.Byte(102); reply.UInt(id); reply.String(handle); }
             switch (type)
             {
-                case 1: Assert.Equal(3u, id); reply.Byte(2); reply.UInt(3); reply.String("posix-rename@openssh.com"); reply.String("1"); break;
+                case 1:
+                    Assert.Equal(3u, id); reply.Byte(2); reply.UInt(3);
+                    if (AdvertisesPosixRename) { reply.String("posix-rename@openssh.com"); reply.String("1"); }
+                    break;
                 case 16: r.String(); reply.Byte(104); reply.UInt(id); reply.UInt(1); reply.String("/项目 文件"); reply.String(""); reply.UInt(0); break;
                 case 11: Handle(r.String()); _listed = false; break;
                 case 12:
@@ -100,6 +129,10 @@ public class SftpTests
                     var current = Files[target]; Array.Resize(ref current, Math.Max(current.Length, start + content.Length)); content.CopyTo(current.AsSpan(start)); Files[target] = current; Status(0); break;
                 case 4: _handles.Remove(r.String()); Status(0); break;
                 case 13: Files.Remove(r.String()); Status(0); break;
+                case 18:
+                    var source = r.String(); var destination = r.String();
+                    if (Files.ContainsKey(destination)) { Status(4); break; }
+                    Files[destination] = Files[source]; Files.Remove(source); Status(0); break;
                 case 200:
                     Extensions.Add(r.String()); var from = r.String(); var to = r.String(); Files[to] = Files[from]; Files.Remove(from); Status(0); break;
                 default: throw new InvalidOperationException("Unexpected SFTP request " + type);

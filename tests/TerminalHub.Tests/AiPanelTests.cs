@@ -1,3 +1,5 @@
+using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Headless.XUnit;
 using TerminalHub.App.ViewModels;
 using TerminalHub.Core.Ai;
@@ -12,6 +14,37 @@ namespace TerminalHub.Tests;
 
 public class AiPanelTests
 {
+    [AvaloniaFact]
+    public async Task TaskButtons_UpdateAfterAsyncSpawnAndExit()
+    {
+        using var session = await MockSession();
+        var spawn = new TaskCompletionSource<TerminalSessionModel?>();
+        using var panel = new AiPanelViewModel(clis: [Claude], spawn: (_, _) => spawn.Task, autoScan: false);
+        panel.TaskDraft = "summarize";
+        var starting = panel.StartTaskCommand.ExecuteAsync(null);
+        var task = Assert.Single(panel.Tasks);
+        var show = new Button { DataContext = task };
+        var remove = new Button { DataContext = task };
+        using var showBinding = show.Bind(Control.IsVisibleProperty, new Binding("Active"));
+        using var removeBinding = remove.Bind(Control.IsVisibleProperty, new Binding("!Active"));
+        Assert.False(show.IsVisible);
+        Assert.True(remove.IsVisible);
+
+        spawn.SetResult(session);
+        await starting;
+        Assert.True(show.IsVisible);
+        Assert.False(remove.IsVisible);
+        panel.RemoveTaskCommand.Execute(task);
+        Assert.Single(panel.Tasks);
+
+        session.Emulator.SendText("exit\r");
+        panel.Scan();
+        Assert.False(show.IsVisible);
+        Assert.True(remove.IsVisible);
+        panel.RemoveTaskCommand.Execute(task);
+        Assert.Empty(panel.Tasks);
+    }
+
     private static readonly AiCli Codex = new(
         AiCliCatalog.Known.First(k => k.Id == "codex"), @"C:\tools\codex.cmd");
     private static readonly AiCli Claude = new(

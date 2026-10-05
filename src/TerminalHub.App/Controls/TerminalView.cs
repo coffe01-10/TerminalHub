@@ -91,11 +91,7 @@ public partial class TerminalView : Control
     private TerminalEmulator? _emulator;
     private int _dirty = 1;
     private long _lastBlink;
-    private long _lastPreviewDirty;
-    // Parser-thread copy of IsPreview — reading the styled property off the UI
-    // thread throws "Call from invalid thread", which would abort the whole
-    // emulator.Changed chain (no repaint, later PTY subscribers skipped).
-    private volatile bool _isPreviewSnapshot;
+    private long _lastPreviewRefresh;
     private bool _attached;
     private Typeface _typeface = new("Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace");
     private Typeface _boldTypeface;
@@ -200,7 +196,12 @@ public partial class TerminalView : Control
     {
         if (!IsEffectivelyVisible) return;
         var buf = _emulator?.Buffer;
-        var dirty = Interlocked.Exchange(ref _dirty, 0) != 0;
+        // Throttle consumption on the UI thread, keeping the final output dirty
+        // until the next preview refresh even when the producer has stopped.
+        var now = Environment.TickCount64;
+        var dirty = (!IsPreview || now - _lastPreviewRefresh >= 250)
+            && Interlocked.Exchange(ref _dirty, 0) != 0;
+        if (dirty && IsPreview) _lastPreviewRefresh = now;
         var drift = Interlocked.Exchange(ref _scrollDrift, 0);
         // Idle ticks do not need the buffer lock. Render and immediate selection
         // queries still synchronize from the current frame before using coordinates.
@@ -328,15 +329,7 @@ public partial class TerminalView : Control
 
     private void OnBufferChanged()
     {
-        if (_isPreviewSnapshot)
-        {
-            // Thumbnails need freshness, not motion — a streaming producer used
-            // to repaint every card at vsync. ~4fps keeps previews live while
-            // turning the multi-session render cost into a fraction.
-            var now = Environment.TickCount64;
-            if (now - _lastPreviewDirty < 250) return;
-            _lastPreviewDirty = now;
-        }
+        // PTY callbacks must not read Avalonia properties off the UI thread.
         Interlocked.Exchange(ref _dirty, 1);
     }
 
@@ -396,7 +389,6 @@ public partial class TerminalView : Control
     {
         base.OnAttachedToVisualTree(e);
         _attached = true;
-        _isPreviewSnapshot = IsPreview;
         OnThemeChanged(); // A detached pane may have missed a theme change.
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
@@ -488,8 +480,6 @@ public partial class TerminalView : Control
         base.OnPropertyChanged(change);
         if (change.Property == BoundsProperty || change.Property == IsVisibleProperty)
             TryResizeEmulator();
-        if (change.Property == IsPreviewProperty)
-            _isPreviewSnapshot = change.GetNewValue<bool>();
     }
 
     private void TryResizeEmulator()

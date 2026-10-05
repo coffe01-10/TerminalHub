@@ -13,9 +13,10 @@ public sealed partial class AiTaskViewModel : ObservableObject
 {
     public required string Title { get; init; }
     public required AiCli Cli { get; init; }
-    public TerminalSessionModel? Session { get; set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Active))]
+    private TerminalSessionModel? _session;
     public DateTimeOffset Started { get; init; } = DateTimeOffset.Now;
-    [ObservableProperty] private string _status = "启动中";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Active))] private string _status = "启动中";
     [ObservableProperty] private bool _awaitingInput;
     public bool Active => Session is { IsRunning: true };
 }
