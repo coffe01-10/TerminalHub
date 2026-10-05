@@ -26,6 +26,10 @@
 
 Claude Code、Codex CLI 和日常 Shell 可以各自运行。AI CLI 由你自行安装并登录，Terminal Hub 承载真实 Shell 进程并管理会话；认证、模型选择与 CLI 自身权限沿用各工具的设置。
 
+## 看看 Terminal Hub 如何工作
+
+https://github.com/user-attachments/assets/5c55badb-4a9a-4e93-874c-4f8be8a4e3d7
+
 ## 围绕 AI CLI 的日常工作
 
 **一个项目，容纳多种任务。** 把 AI 对话、开发服务、构建与测试放进同一个工作区；多个项目各自保留会话和布局，切换时后台进程继续运行。
