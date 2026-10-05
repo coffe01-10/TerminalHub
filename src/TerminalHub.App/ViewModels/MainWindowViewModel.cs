@@ -590,7 +590,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             cwd = OperatingSystem.IsWindows() ? "C:\\" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         if (ShellIntegration.IsPowerShell(shellCmd)
-            && (string.IsNullOrWhiteSpace(arguments) || arguments == ShellIntegration.LegacyPowerShellArguments))
+            && (string.IsNullOrWhiteSpace(arguments) || arguments == ShellIntegration.LegacyPowerShellArguments
+                || arguments == ShellIntegration.PreviousPowerShellArguments))
             arguments = ShellIntegration.PowerShellArguments;
         // Same idea on Linux: bash gets OSC 133 (command + exit code) and OSC 7
         // (cwd) via a session-only --rcfile. Custom arguments mean a

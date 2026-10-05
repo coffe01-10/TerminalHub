@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using TerminalHub.App.Views;
 using TerminalHub.App.ViewModels;
 using TerminalHub.Core.Settings;
+using TerminalHub.Core.Pty;
 using TerminalHub.Pty;
 using Xunit;
 
@@ -11,6 +12,36 @@ namespace TerminalHub.Tests;
 
 public class ShellStartupTests
 {
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RestoredPowerShell_UpgradesPreviousIntegrationAndPreservesCustomArguments(bool custom)
+    {
+        var directory = Directory.CreateTempSubdirectory("th-shell-integration-").FullName;
+        var previousMock = PtySessionFactory.UseMock;
+        PtySessionFactory.UseMock = true;
+        try
+        {
+            var arguments = custom ? "-NoProfile -NoExit -Command \"Write-Output 'custom startup'\""
+                : ShellIntegration.PreviousPowerShellArguments;
+            var store = new SettingsStore(Path.Combine(directory, "settings.json"));
+            store.Save(new AppSettings { Workspace = new WorkspaceState
+            {
+                Sessions = [new WorkspaceSession { Name = "restored PowerShell", Shell = "pwsh", Arguments = arguments }]
+            } });
+            using var vm = new MainWindowViewModel(settingsStore: store, shellAvailable: _ => true);
+            await vm.SpawnStartupSessionsAsync();
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { });
+            Assert.Equal(custom ? arguments : ShellIntegration.PowerShellArguments,
+                Assert.Single(vm.SessionCards).Model.ShellArguments);
+        }
+        finally
+        {
+            PtySessionFactory.UseMock = previousMock;
+            Directory.Delete(directory, true);
+        }
+    }
+
     /// <summary>The fake "installed" shell must be a candidate ShellDiscovery
     /// would offer on this OS — cmd.exe on Windows, bash on Linux.</summary>
     private static readonly string FakeShell = OperatingSystem.IsWindows() ? "cmd.exe" : "bash";
