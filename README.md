@@ -26,6 +26,10 @@ While AI writes code, you still need to run the project, watch builds, execute t
 
 Claude Code, Codex CLI, and everyday shells run in their own sessions. Install and sign in to your AI CLIs separately; Terminal Hub hosts real shell processes and manages sessions. Authentication, model selection, and CLI permissions follow each tool's own settings.
 
+## See Terminal Hub in action
+
+https://github.com/user-attachments/assets/5c55badb-4a9a-4e93-874c-4f8be8a4e3d7
+
 ## Built around everyday AI CLI work
 
 **One project, several kinds of work.** Keep AI conversations, development servers, builds, and tests in the same workspace. Each project retains its sessions and layout, while background processes keep running as you switch.
