@@ -157,12 +157,6 @@ public partial class MainWindow : Window
             RoutingStrategies.Bubble, handledEventsToo: true);
         InspectorResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnInspectorResizeReleased,
             RoutingStrategies.Bubble, handledEventsToo: true);
-        ShelfResizeHandle.AddHandler(InputElement.PointerPressedEvent, OnShelfResizePressed,
-            RoutingStrategies.Bubble, handledEventsToo: true);
-        ShelfResizeHandle.AddHandler(InputElement.PointerMovedEvent, OnShelfResizeMoved,
-            RoutingStrategies.Bubble, handledEventsToo: true);
-        ShelfResizeHandle.AddHandler(InputElement.PointerReleasedEvent, OnShelfResizeReleased,
-            RoutingStrategies.Bubble, handledEventsToo: true);
         Opened += async (_, _) =>
         {
             try
@@ -256,8 +250,9 @@ public partial class MainWindow : Window
         // End padding lets the first and last cards reach the wheel's center too.
         var centerPad = Math.Max(14, (SessionShelf.Bounds.Height - ThumbnailHeight) / 2);
         SessionShelf.Padding = Vm.ShelfAutoHide ? new Thickness(14, centerPad, 10, centerPad) : new Thickness(14, 14, 10, 16);
-        var shelfWidth = Vm.ShelfWidth > 0 ? Vm.ShelfWidth : (Bounds.Width < 1250 ? 232 : 280);
-        shelfWidth = Math.Clamp(shelfWidth, 180, Math.Max(280, Bounds.Width * 0.45));
+        // Session shelf is fixed-width: resizing it left the card layout math
+        // inconsistent, so it no longer reads the persisted drag value.
+        double shelfWidth = Bounds.Width < 1250 ? 232 : 280;
         // Clamp locally so a transient window shrink cannot overwrite the
         // user's persisted height — the panel regrows with the window.
         OutputPanel.Height = Math.Clamp(Vm.OutputHeight, 90, Math.Max(140, Bounds.Height * 0.6));
@@ -268,7 +263,6 @@ public partial class MainWindow : Window
         ShelfHost.Width = shelfWidth;
         StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Vm.ShelfAutoHide ? 0 : shelfWidth);
         StageLayout.ColumnDefinitions[1].Width = new GridLength(Vm.ShelfAutoHide ? 0 : 18);
-        ShelfResizeHandle.IsVisible = !Vm.ShelfAutoHide;
         StageLayout.ColumnDefinitions[InspectorColumn].Width = new GridLength(inspectorWidth);
         QueueShelfReveal();
     }
@@ -1421,34 +1415,6 @@ public partial class MainWindow : Window
     private void OnInspectorResizeReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (Equals(e.Pointer.Captured, InspectorResizeHandle)) e.Pointer.Capture(null);
-    }
-
-    // Session shelf right-edge drag — right grows the shelf. Same pin-on-drag
-    // convention as the inspector rail.
-    private double _shelfDragStartX, _shelfDragStartW;
-
-    private void OnShelfResizePressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(ShelfResizeHandle).Properties.IsLeftButtonPressed) return;
-        _shelfDragStartX = e.GetPosition(this).X;
-        _shelfDragStartW = StageLayout.ColumnDefinitions[ShelfColumn].ActualWidth;
-        e.Pointer.Capture(ShelfResizeHandle);
-        e.Handled = true;
-    }
-
-    private void OnShelfResizeMoved(object? sender, PointerEventArgs e)
-    {
-        if (!Equals(e.Pointer.Captured, ShelfResizeHandle)) return;
-        var delta = e.GetPosition(this).X - _shelfDragStartX;
-        var max = Math.Max(180, RailBudget - StageLayout.ColumnDefinitions[InspectorColumn].ActualWidth);
-        Vm.ShelfWidth = Math.Clamp(_shelfDragStartW + delta, 180, max);
-        StageLayout.ColumnDefinitions[ShelfColumn].Width = new GridLength(Vm.ShelfWidth);
-        e.Handled = true;
-    }
-
-    private void OnShelfResizeReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (Equals(e.Pointer.Captured, ShelfResizeHandle)) e.Pointer.Capture(null);
     }
 
 

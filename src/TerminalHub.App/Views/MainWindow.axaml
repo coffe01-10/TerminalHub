@@ -367,9 +367,7 @@
         </Grid>
         </ctl:ShelfDrawer>
 
-        <!-- right-edge drag handle for the session shelf (18px gutter column) -->
-        <Border x:Name="ShelfResizeHandle" Grid.Column="1" Background="Transparent"
-                Cursor="SizeWestEast" ToolTip.Tip="{loc:Text M0472}"/>
+        <!-- session shelf is fixed-width; keep the 18px gutter as spacing only -->
 
         <!-- ===== CENTER ===== -->
         <ctl:StageSurface x:Name="StageWindow" Grid.Column="2" CornerRadius="{DynamicResource SurfaceCorner}"

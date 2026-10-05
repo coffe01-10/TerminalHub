@@ -724,11 +724,10 @@ public class StageLayoutTests
     }
 
     [AvaloniaFact]
-    public async Task WideSavedRails_WindowShrink_PreservesStageChrome_AndSavedWidths()
+    public async Task FixedShelf_WindowShrink_PreservesStageChrome_AndInspectorWidth()
     {
         using var fixture = new StageFixture();
         await Task.Delay(600);
-        fixture.Vm.ShelfWidth = 648;
         fixture.Vm.InspectorWidth = 648;
         fixture.Window.Width = 1100;
         await Task.Delay(400);
@@ -737,7 +736,6 @@ public class StageLayoutTests
         var menu = fixture.Window.FindControl<Button>("SessionMenuButton")!;
         var stageRight = stage.TranslatePoint(new Point(stage.Bounds.Width, 0), fixture.Window)!.Value.X;
         Assert.True(menu.TranslatePoint(new Point(menu.Bounds.Width, 0), fixture.Window)!.Value.X <= stageRight + 1);
-        Assert.Equal(648, fixture.Vm.ShelfWidth);
         Assert.Equal(648, fixture.Vm.InspectorWidth);
     }
 
@@ -757,22 +755,32 @@ public class StageLayoutTests
             : fixture.Window.FindControl<TerminalView>("MainTerminal")!.IsFocused);
     }
 
-    [AvaloniaTheory]
-    [InlineData("ShelfResizeHandle")]
-    [InlineData("InspectorResizeHandle")]
-    public async Task RailDrag_KeepsRoomForStage_AlongsideOtherRail(string name)
+    [AvaloniaFact]
+    public async Task InspectorDrag_KeepsRoomForStage_AlongsideShelf()
     {
         using var fixture = new StageFixture(width: 1100);
         await Task.Delay(600);
-        var handle = fixture.Window.FindControl<Control>(name)!;
+        var handle = fixture.Window.FindControl<Control>("InspectorResizeHandle")!;
         var start = handle.TranslatePoint(new Point(handle.Bounds.Width / 2, 100), fixture.Window)!.Value;
-        var end = start + new Vector(name == "ShelfResizeHandle" ? 600 : -600, 0);
+        var end = start + new Vector(-600, 0);
         fixture.Window.MouseDown(start, MouseButton.Left);
         fixture.Window.MouseMove(end, RawInputModifiers.LeftMouseButton);
         fixture.Window.MouseUp(end, MouseButton.Left);
         await Task.Delay(100);
         var stage = fixture.Window.FindControl<StageSurface>("StageWindow")!;
         Assert.True(stage.Bounds.Width >= 459, $"Stage width: {stage.Bounds.Width}");
+    }
+
+    [AvaloniaFact]
+    public async Task SessionShelf_StaysFixed_IgnoresSavedWidth()
+    {
+        using var fixture = new StageFixture(width: 1440);
+        await Task.Delay(600);
+        var grid = fixture.Window.FindControl<Grid>("StageLayout")!;
+        Assert.Equal(280, grid.ColumnDefinitions[0].ActualWidth);
+        fixture.Vm.ShelfWidth = 648;
+        await Task.Delay(200);
+        Assert.Equal(280, grid.ColumnDefinitions[0].ActualWidth);
     }
 
     [AvaloniaFact]
