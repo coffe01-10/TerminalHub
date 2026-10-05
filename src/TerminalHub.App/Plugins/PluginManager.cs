@@ -52,6 +52,7 @@ public sealed class PluginManager : IDisposable
     private readonly DispatcherTimer _outputTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _watchTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     public string DirectoryPath { get; }
+    public string OfficialPackageRoot { get; }
     public ObservableCollection<PluginEntry> Plugins { get; } = [];
     public ObservableCollection<ModuleRegistration> Modules { get; } = [];
     public ObservableCollection<(string Owner, PluginCommand Command)> Commands { get; } = [];
@@ -60,10 +61,11 @@ public sealed class PluginManager : IDisposable
     internal event Action<WorkbenchEvent>? Event;
     private bool _disposed;
 
-    public PluginManager(MainWindowViewModel vm, string? directory = null, Styles? styles = null)
+    public PluginManager(MainWindowViewModel vm, string? directory = null, Styles? styles = null, string? officialPackageRoot = null)
     {
         _styleTarget = styles ?? Application.Current!.Styles;
         _vm = vm; DirectoryPath = directory ?? Path.Combine(Path.GetDirectoryName(SettingsStore.DefaultPath())!, "plugins");
+        OfficialPackageRoot = officialPackageRoot ?? Path.Combine(AppContext.BaseDirectory, "official-plugins");
         _vm.WorkbenchChanged += Publish;
         _vm.ProjectWorkspaces.CollectionChanged += WorkspacesChanged;
         _outputTimer.Tick += (_, _) => _vm.FlushPluginOutput(); _outputTimer.Start();
@@ -133,6 +135,8 @@ public sealed class PluginManager : IDisposable
         }
         Discover(); if (Plugins.FirstOrDefault(p => p.Manifest.Id == manifest.Id) is { } imported) Enable(imported);
     }
+    public void InstallOfficial(string id)
+        => Import(OfficialPluginCatalog.All.Single(p => p.Id == id).PackageDirectory(OfficialPackageRoot));
     // User files are excluded in both directions of an import: never copied from a build
     // directory, never deleted from an installed one.
     private static bool IsUserData(string root, string file)

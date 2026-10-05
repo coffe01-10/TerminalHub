@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="using:TerminalHub.App.Localization" x:Class="TerminalHub.App.Views.PluginManagerWindow"
         Width="940" Height="700" MinWidth="680" MinHeight="500" WindowStartupLocation="CenterOwner"
-        Title="{loc:Text Workbench3}" Background="{DynamicResource UiCanvas}" Foreground="{DynamicResource UiInk}"
+        Title="{loc:Text Market00}" Background="{DynamicResource UiCanvas}" Foreground="{DynamicResource UiInk}"
         FontFamily="Segoe UI, Microsoft YaHei UI, sans-serif" FontSize="13">
   <Window.Styles>
     <Style Selector="Button"><Setter Property="Padding" Value="14,9"/><Setter Property="CornerRadius" Value="7"/><Setter Property="FontSize" Value="12"/><Setter Property="Background" Value="{DynamicResource UiRaised}"/><Setter Property="Foreground" Value="{DynamicResource UiInk}"/><Setter Property="BorderBrush" Value="{DynamicResource UiBorder}"/></Style>
@@ -21,12 +21,12 @@
     <Style Selector="TabItem:selected"><Setter Property="Foreground" Value="{DynamicResource UiAccent}"/></Style>
     <Style Selector="TextBlock.caption"><Setter Property="Foreground" Value="{DynamicResource UiMuted}"/><Setter Property="FontSize" Value="12"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
   </Window.Styles>
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="24" RowSpacing="18">
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="24" RowSpacing="14">
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
       <StackPanel Spacing="7">
-        <TextBlock Text="WORKBENCH" FontSize="10" LetterSpacing="2" Foreground="{DynamicResource UiFaint}"/>
-        <TextBlock Text="{loc:Text Workbench3}" FontSize="24" FontWeight="SemiBold"/>
-        <TextBlock Text="{loc:Text UiPolish02}" Classes="caption"/>
+        <TextBlock Text="EXTENSIONS" FontSize="10" LetterSpacing="2" Foreground="{DynamicResource UiFaint}"/>
+        <TextBlock Text="{loc:Text Market00}" FontSize="24" FontWeight="SemiBold"/>
+        <TextBlock Text="{loc:Text Market01}" Classes="caption"/>
       </StackPanel>
       <Border Grid.Column="1" Background="{DynamicResource UiRaised}" CornerRadius="8" Padding="12,8" VerticalAlignment="Center">
         <TextBlock x:Name="PluginCount" FontSize="12" Foreground="{DynamicResource UiMuted}"/>
@@ -39,12 +39,16 @@
       <Button x:Name="PluginDevelopmentLink" Content="{loc:Text PluginDocs0}" Click="OnDevelopmentDocs" Margin="0,0,8,8"/>
       <Button x:Name="OfficialPluginsLink" Content="{loc:Text PluginDocs1}" Click="OnOfficialPlugins" Margin="0,0,8,8"/>
     </WrapPanel>
-    <TabControl x:Name="ManagerTabs" Grid.Row="2">
-      <TabItem Header="{loc:Text Workbench0}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="PluginCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
-      <TabItem Header="{loc:Text Workbench1}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="ModuleCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
-      <TabItem Header="{loc:Text Workbench2}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="SettingCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+      <TextBox x:Name="MarketSearch" Watermark="{loc:Text Market02}" TextChanged="OnSearch" MinHeight="36"/>
+      <ComboBox x:Name="MarketFilter" Grid.Column="1" MinWidth="150" SelectionChanged="OnFilter"/>
+    </Grid>
+    <TabControl x:Name="ManagerTabs" Grid.Row="3">
+      <TabItem Header="{loc:Text Market03}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="PluginCards" Spacing="10" Margin="0,12,0,4"/></ScrollViewer></TabItem>
+      <TabItem Header="{loc:Text Market31}"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="ModuleCards" Spacing="12" Margin="0,16,0,4"/></ScrollViewer></TabItem>
+      <TabItem Header="{loc:Text Workbench2}"><Grid RowDefinitions="Auto,*" RowSpacing="10"><WrapPanel><TextBlock x:Name="SettingsScopeTitle" VerticalAlignment="Center" Margin="0,0,12,0"/><Button Content="{loc:Text Market04}" Click="OnAllSettings"/></WrapPanel><ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="SettingCards" Spacing="12" Margin="0,6,0,4"/></ScrollViewer></Grid></TabItem>
     </TabControl>
-    <Border x:Name="ErrorNotice" Grid.Row="3" IsVisible="False" BorderBrush="{DynamicResource UiBad}" BorderThickness="1" CornerRadius="8" Padding="12">
+    <Border x:Name="ErrorNotice" Grid.Row="4" IsVisible="False" BorderBrush="{DynamicResource UiBad}" BorderThickness="1" CornerRadius="8" Padding="12">
       <TextBlock x:Name="ErrorText" TextWrapping="Wrap" Foreground="{DynamicResource UiBad}" MaxHeight="72"/>
     </Border>
   </Grid>

@@ -72,70 +72,11 @@ public partial class PluginManagerWindow : Window
         try
         {
             PluginCards.Children.Clear(); ModuleCards.Children.Clear(); ClearSettings();
-            PluginCount.Text = $"{_manager.Plugins.Count(p => p.Enabled)} / {_manager.Plugins.Count}";
-            ToolTip.SetTip(PluginCount, Localizer.Current.Translate("已启用 / 已安装"));
+            var filter = Math.Max(0, MarketFilter.SelectedIndex);
+            MarketFilter.ItemsSource = new[] { "全部", "已安装", "未安装", "内置基础工具", "官方扩展" }.Select(Translate).ToArray();
+            MarketFilter.SelectedIndex = filter;
             Notice(_manager.LastError);
-            if (_manager.Plugins.Count == 0) PluginCards.Children.Add(Empty("让工作台更合你的习惯", "导入本地插件，添加工具或调整工作台界面。"));
-            foreach (var plugin in _manager.Plugins)
-            {
-                var body = new Grid { RowDefinitions = new("Auto,Auto"), RowSpacing = 14 };
-                var top = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 16 };
-                var identity = new StackPanel { Spacing = 5 };
-                var title = Text(plugin.Manifest.Name, size: 15, localized: false); title.FontWeight = FontWeight.SemiBold;
-                identity.Children.Add(title); identity.Children.Add(Text(plugin.Manifest.Id + "  ·  v" + plugin.Manifest.Version, "UiMuted", 11, false));
-                top.Children.Add(identity);
-                var status = Text(plugin.Error.Length > 0 ? "加载失败" : plugin.Enabled ? "已启用" : "已停用", plugin.Error.Length > 0 ? "UiBad" : plugin.Enabled ? "UiGood" : "UiMuted", 11);
-                var badge = new Border { Background = Brushes.Transparent, CornerRadius = new(6), Padding = new(9,5), Child = status, VerticalAlignment = VerticalAlignment.Top };
-                badge.Bind(Border.BackgroundProperty, new DynamicResourceExtension("UiRaised")); Grid.SetColumn(badge,1); top.Children.Add(badge); body.Children.Add(top);
-                var bottom = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 16 };
-                if (plugin.Error.Length > 0) bottom.Children.Add(Text(plugin.Error, "UiBad", 12, false));
-                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                actions.Children.Add(Action(plugin.Enabled ? "禁用" : "启用", () => { if (plugin.Enabled) _manager.Disable(plugin); else _manager.Enable(plugin); }, plugin.Enabled ? null : "primary"));
-                if (plugin.Enabled && !plugin.IsScript) actions.Children.Add(Action("重载", () => _manager.Reload(plugin)));
-                actions.Children.Add(Action("移除", () => _manager.Remove(plugin), "danger"));
-                if (!plugin.IsScript)
-                {
-                    var auto = new CheckBox { [!ContentControl.ContentProperty] = UiText.Binding("改动自动重载"), IsChecked = _manager.Preferences(plugin).AutoReload, VerticalAlignment = VerticalAlignment.Center };
-                    auto.IsCheckedChanged += (_, _) => Save(() =>
-                    {
-                        var flag = auto.IsChecked == true; _manager.Preferences(plugin).AutoReload = flag;
-                        if (flag && plugin.Enabled) _manager.StartWatch(plugin); else _manager.StopWatch(plugin);
-                    });
-                    actions.Children.Add(auto);
-                }
-                Grid.SetColumn(actions,1); bottom.Children.Add(actions); Grid.SetRow(bottom,1); body.Children.Add(bottom); PluginCards.Children.Add(Card(body));
-            }
-            foreach (var module in _manager.Modules.OrderBy(m => _manager.Settings(m).Order ?? m.Definition.Order))
-            {
-                var state = _manager.Settings(module); var workspaceId = _vm.ActiveWorkspace.Id;
-                var body = new Grid { RowDefinitions = new("Auto,Auto"), RowSpacing = 12 };
-                var identity = new StackPanel { Spacing = 5 };
-                var title = Text(module.ToString(), size: 14, localized: false); title.FontWeight = FontWeight.SemiBold; identity.Children.Add(title);
-                var owner = module.Owner == "builtin" ? Localizer.Current.Translate("内置工具")
-                    : _manager.Plugins.First(p => p.Manifest.Id == module.Owner).Manifest.Name;
-                identity.Children.Add(Text(owner, "UiMuted", 11, false)); body.Children.Add(identity);
-                ToolTip.SetTip(title, module.Id);
-                var controls = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 20 };
-                var checks = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 24 };
-                var visible = new CheckBox { [!ContentControl.ContentProperty] = UiText.Binding("显示模块"), IsChecked = state.Visible };
-                visible.IsCheckedChanged += (_, _) => Save(() => state.Visible = visible.IsChecked == true); checks.Children.Add(visible);
-                var workspace = new CheckBox { [!ContentControl.ContentProperty] = UiText.Binding("当前工作区"), IsChecked = state.Workspaces.GetValueOrDefault(workspaceId,true) };
-                ToolTip.SetTip(workspace, _vm.ActiveWorkspace.Name);
-                workspace.IsCheckedChanged += (_, _) => Save(() => state.Workspaces[workspaceId] = workspace.IsChecked == true); checks.Children.Add(workspace); controls.Children.Add(checks);
-                var ordering = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
-                var caption = Text("排序", "UiMuted", 12); caption.VerticalAlignment = VerticalAlignment.Center; ordering.Children.Add(caption);
-                var order = new NumericUpDown { Value = state.Order ?? module.Definition.Order, Width = 112, Increment = 1, FormatString = "0" };
-                order.ValueChanged += (_, _) => Save(() => state.Order = (int)(order.Value ?? 0)); ordering.Children.Add(order);
-                Grid.SetColumn(ordering,1); controls.Children.Add(ordering); Grid.SetRow(controls,1); body.Children.Add(controls); ModuleCards.Children.Add(Card(body));
-            }
-            if (_manager.Modules.Count == 0) ModuleCards.Children.Add(Empty("暂无可用模块", "启用插件后，可在这里调整模块的显示范围和顺序。"));
-            foreach (var module in _manager.Visible(ExtensionSurface.Settings))
-            {
-                var body = new StackPanel { Spacing = 14 };
-                var title = Text(module.ToString(), size: 15, localized: false); title.FontWeight = FontWeight.SemiBold;
-                body.Children.Add(title); body.Children.Add(module.GetView()); SettingCards.Children.Add(Card(body));
-            }
-            if (SettingCards.Children.Count == 0) SettingCards.Children.Add(Empty("暂无插件设置", "支持设置的插件启用后，会在这里显示配置选项。"));
+            RenderMarket(); RenderModulePreferences(); RenderPluginPreferences();
         }
         finally { _rendering = false; }
     }

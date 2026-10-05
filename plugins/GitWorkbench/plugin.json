@@ -1,0 +1,8 @@
+{
+  "id": "official.git-workbench",
+  "name": "Git 工作台",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Official.GitWorkbench.dll",
+  "entryType": "TerminalHub.Official.GitWorkbench.GitWorkbenchPlugin",
+  "hostApi": 1
+}

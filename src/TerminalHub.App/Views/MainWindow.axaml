@@ -911,14 +911,15 @@
         <Border Grid.Column="4" CornerRadius="{DynamicResource SurfaceCorner}" IsVisible="{Binding InspectorVisible}"
                 Background="{DynamicResource UiSurface}" BorderBrush="{DynamicResource UiBorder}" BorderThickness="1"
                 BoxShadow="{DynamicResource SurfaceShadow}" KeyDown="OnPanelEscapeKeyDown">
-          <Grid RowDefinitions="42,*" Margin="9">
+          <Grid RowDefinitions="Auto,*" Margin="9">
 
-            <ListBox x:Name="InspectorTabs" Grid.Row="0" SelectedIndex="{Binding SelectedRightTab}"
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+            <ListBox x:Name="InspectorTabs" SelectedIndex="{Binding SelectedRightTab}"
                      Background="Transparent" BorderThickness="0"
-                     ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      ScrollViewer.VerticalScrollBarVisibility="Disabled">
               <ListBox.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
+                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate>
               </ListBox.ItemsPanel>
               <ListBox.Styles>
                 <Style Selector="ListBoxItem">
@@ -945,6 +946,11 @@
               <ListBoxItem Content="{loc:Text M0338}"/>
               <ListBoxItem>AI</ListBoxItem>
             </ListBox>
+            <StackPanel x:Name="WorkbenchInspectorActions" Grid.Column="1" Orientation="Horizontal" Spacing="2" IsVisible="False" VerticalAlignment="Top" Margin="0,3">
+              <Button Name="WorkbenchInspectorPopout" Content="↗" Padding="6,4" Classes="quiet" Click="OnWorkbenchInspectorPopout" ToolTip.Tip="{loc:Text Market29}"/>
+              <Button Name="WorkbenchInspectorClose" Content="×" Padding="6,4" Classes="quiet" Click="OnWorkbenchInspectorClose" ToolTip.Tip="{loc:Text Market30}"/>
+            </StackPanel>
+            </Grid>
 
             <Panel Grid.Row="1" Margin="0,4,0,0">
               <!-- ===== Processes + System Monitor ===== -->
@@ -1734,6 +1740,8 @@
                 </Panel>
               </Grid>
 
+              <ContentControl x:Name="InspectorWorkbenchContent" IsVisible="False"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
             </Panel>
           </Grid>
         </Border>
@@ -1819,7 +1827,8 @@
           <Setter Property="Foreground" Value="{DynamicResource UiOnAccent}"/>
         </Style>
       </ctl:DropletDock.Styles>
-      <StackPanel Orientation="Horizontal" Spacing="2">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+      <StackPanel x:Name="ActionDockItems" Orientation="Horizontal" Spacing="2">
         <Button x:Name="NewDockButton" Classes="dock dock-primary" Classes.dock-active="{Binding DockHighlight, Converter={x:Static vm:IntEqualConverter.Instance}, ConverterParameter=0}"
                 Command="{Binding DockSelectCommand}" CommandParameter="0"
                 ToolTip.Tip="{loc:Text M0471}" AutomationProperties.Name="{loc:Text M0471}">
@@ -1909,6 +1918,7 @@
         </Button>
 
       </StackPanel>
+      </ScrollViewer>
     </ctl:DropletDock>
 
     <Border x:Name="SessionTransferHint" IsVisible="False" IsHitTestVisible="False" ZIndex="220"

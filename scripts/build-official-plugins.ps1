@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $destinationRoot = if ($OutputDirectory) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $repo 'artifacts/official-plugins' }
 New-Item -ItemType Directory -Path $destinationRoot -Force | Out-Null
-foreach ($name in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch', 'TerminalBroadcast', 'Snippets')) {
+foreach ($name in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch', 'TerminalBroadcast', 'Snippets', 'ProjectNavigator', 'GitWorkbench')) {
     dotnet build (Join-Path $repo "plugins/$name/$name.csproj") -c $Configuration --disable-build-servers -m:1 -p:UseSharedCompilation=false -p:NuGetAudit=false
     if ($LASTEXITCODE -ne 0) { throw "$name build failed" }
     $source = Join-Path $repo "plugins/$name/bin/$Configuration/net8.0"
@@ -13,7 +13,7 @@ foreach ($name in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch', 'TerminalBr
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     $payload = @("TerminalHub.Official.$name.dll", "TerminalHub.Official.$name.deps.json", 'plugin.json')
     foreach ($file in $payload) { Copy-Item -LiteralPath (Join-Path $source $file) -Destination $destination -Force }
-    $usage = "Terminal Hub / $name / API 1`n`n请打开 index.html 阅读使用说明，或 development-tutorial.html 阅读开发教程。`nEnglish developer tutorial: development-tutorial.en.html`n在插件管理器导入本目录（ZIP 请先解压），再从独立工作区工具窗口选择模块。`n源码：https://github.com/coffe01-10/TerminalHub`n"
+    $usage = "Terminal Hub / $name / API 1`n`n请打开 index.html 阅读使用说明，或 development-tutorial.html 阅读开发教程。`nEnglish developer tutorial: development-tutorial.en.html`n在插件市场导入本目录（ZIP 请先解压），点击打开；位置与启动可选择独立窗口、现有底部工具栏入口或现有右侧面板标签。旧版从独立工作区工具窗口选择模块。`n源码：https://github.com/coffe01-10/TerminalHub`n"
     [System.IO.File]::WriteAllText((Join-Path $destination 'USAGE.txt'), $usage)
     Copy-Item -LiteralPath (Join-Path $repo 'docs/plugins/index.html') -Destination $destination -Force
     Copy-Item -LiteralPath (Join-Path $repo 'docs/plugins/development-tutorial.html') -Destination $destination -Force

@@ -6,7 +6,7 @@ using TerminalHub.Extensibility;
 
 namespace TerminalHub.App.ViewModels;
 
-public partial class MainWindowViewModel : IWorkbenchHost
+public partial class MainWindowViewModel : IWorkbenchHost, IProjectWorkbenchHost
 {
     public Dictionary<string, PluginSettings> PluginPreferences => _settings.Plugins;
     public Dictionary<string, ModuleSettings> ModulePreferences => _settings.Modules;
@@ -14,7 +14,8 @@ public partial class MainWindowViewModel : IWorkbenchHost
     private readonly ConcurrentDictionary<Guid, byte> _pluginDirtySessions = new();
     private IEnumerable<TerminalSessionModel> PluginSessions => _sessions.Snapshot.Concat(DetachedSessions).Distinct();
     IReadOnlyList<SessionInfo> IWorkbenchHost.Sessions => PluginSessions.Select(s => new SessionInfo(s.Id, s.Name,
-        s.WorkingDirectory, s.Shell, _sessionWorkspaces.GetValueOrDefault(s.Id)?.Id ?? "", s.IsRunning, s.Detached)).ToArray();
+        s.WorkingDirectory, s.Shell, _sessionWorkspaces.GetValueOrDefault(s.Id)?.Id ?? "", s.IsRunning, s.Detached)
+        { IsRemote = s.IsRemote, CanChangeDirectory = CanChangePluginDirectory(s) }).ToArray();
     IReadOnlyList<WorkspaceInfo> IWorkbenchHost.Workspaces => ProjectWorkspaces.Select(w => new WorkspaceInfo(w.Id,w.Name,w == ActiveWorkspace,w.Count)).ToArray();
     Guid? IWorkbenchHost.ActiveSessionId => _sessions.Active?.Id;
     string IWorkbenchHost.ActiveWorkspaceId => ActiveWorkspace.Id;
@@ -25,7 +26,11 @@ public partial class MainWindowViewModel : IWorkbenchHost
         return frame is null ? null : frame with { Cells = frame.Cells.ToArray() };
     }
     async Task<Guid?> IWorkbenchHost.CreateSessionAsync(NewSessionRequest request)
-        => (await CreateSessionAsync(request.Name, SessionTag.Dev, request.WorkingDirectory, shellCommand: request.Shell, arguments: request.Arguments))?.Id;
+    {
+        var session = await CreateSessionAsync(request.Name, SessionTag.Dev, request.WorkingDirectory, shellCommand: request.Shell, arguments: request.Arguments);
+        if (session is not null && request.Transient) { session.ExcludeFromWorkspace = true; SaveSettingsInternal(); }
+        return session?.Id;
+    }
     void IWorkbenchHost.ActivateSession(Guid id)
     {
         if (PluginSessions.FirstOrDefault(s => s.Id == id) is not { } session) return;
@@ -50,6 +55,30 @@ public partial class MainWindowViewModel : IWorkbenchHost
         session.Emulator.PasteText(text); if (submit) session.Emulator.SendText("\r");
     }
     public void SavePluginPreferences() => SaveSettingsInternal();
+    private readonly Dictionary<string, string> _selectedProjectDirectories = new();
+    string? IProjectWorkbenchHost.SelectedProjectDirectory => _selectedProjectDirectories.GetValueOrDefault(ActiveWorkspace.Id);
+    void IProjectWorkbenchHost.SelectProjectDirectory(string path)
+    {
+        path = Path.GetFullPath(path);
+        if (!Directory.Exists(path)) throw new DirectoryNotFoundException(path);
+        _selectedProjectDirectories[ActiveWorkspace.Id] = path;
+        NotifyWorkbench(WorkbenchEventKind.ProjectDirectoryChanged, data: path);
+    }
+    private static bool CanChangePluginDirectory(TerminalSessionModel session)
+        => session.IsRunning && !session.IsRemote && session.Tag is not (SessionTag.Ai or SessionTag.Codex)
+            && session.Emulator.CommandState?.Running != true
+            && !session.Emulator.Buffer.OnAlternateScreen
+            && (TerminalHub.Core.Pty.ShellIntegration.IsPowerShell(session.Shell) || TerminalHub.Core.Pty.ShellIntegration.IsBash(session.Shell))
+            && (session.Emulator.CommandState is not null || session.Emulator.Buffer.Cwd is not null);
+    bool IProjectWorkbenchHost.ChangeSessionDirectory(Guid sessionId, string path)
+    {
+        var session = PluginSessions.FirstOrDefault(s => s.Id == sessionId);
+        if (session is null || !CanChangePluginDirectory(session)) return false;
+        path = Path.GetFullPath(path);
+        if (!Directory.Exists(path)) throw new DirectoryNotFoundException(path);
+        session.Emulator.SendText(TerminalHub.Core.Pty.ShellDirectoryCommand.Build(path, session.Shell) + "\r");
+        return true;
+    }
     private void NotifyWorkbench(WorkbenchEventKind kind, TerminalSessionModel? session = null, object? data = null)
         => WorkbenchChanged?.Invoke(new(kind, session?.Id, session is null ? ActiveWorkspace.Id : _sessionWorkspaces.GetValueOrDefault(session.Id)?.Id, data));
     public void FlushPluginOutput()

@@ -19,6 +19,7 @@ public partial class ProjectToolsView : UserControl
     public static readonly FuncValueConverter<int, bool> IsEmpty = new(count => count == 0);
     private readonly MainWindow? _main;
     private readonly TabItem[] _builtinTabs;
+    private readonly Control[] _builtinPages;
     private readonly ListBoxItem[] _builtinNavigation;
     private readonly Dictionary<string, (ModuleRegistration Module, TabItem Tab, ListBoxItem Navigation)> _extraModules = [];
     private bool _updatingModules;
@@ -28,6 +29,7 @@ public partial class ProjectToolsView : UserControl
     {
         InitializeComponent();
         _builtinTabs = ToolsTabs.Items.Cast<TabItem>().ToArray();
+        _builtinPages = _builtinTabs.Select(t => (Control)t.Content!).ToArray();
         _builtinNavigation = ToolNavigation.Items.Cast<ListBoxItem>().ToArray();
         for (var i = 0; i < _builtinNavigation.Length; i++) _builtinNavigation[i].Tag = "builtin:tools-" + i;
         ToolNavigation.SelectionChanged += (_, _) =>
@@ -37,6 +39,7 @@ public partial class ProjectToolsView : UserControl
             ToolsSaveBar.IsVisible = _selectedModuleId?.StartsWith("builtin:", StringComparison.Ordinal) == true;
             if (_selectedModuleId is not null && _extraModules.TryGetValue(_selectedModuleId, out var extra))
                 extra.Tab.Content ??= extra.Module.GetView();
+            if (_selectedModuleId is not null) _main?.RememberWindowTool(_selectedModuleId);
         };
     }
     public ProjectToolsView(MainWindow main, MainWindowViewModel vm) : this()
@@ -45,15 +48,21 @@ public partial class ProjectToolsView : UserControl
         AddHandler(InputElement.KeyDownEvent, (_, e) => { if (vm.BroadcastEnabled && e.Key == Key.Escape) { vm.StopBroadcast(); e.Handled = true; } }, RoutingStrategies.Tunnel);
     }
     public void SelectModule(int index) => ToolsTabs.SelectedIndex = index;
-    public Control GetBuiltinPage(int index) => (Control)_builtinTabs[index].Content!;
+    public string? SelectedModuleId => _selectedModuleId;
+    public void SelectModule(string id)
+        => ToolNavigation.SelectedItem = ToolNavigation.Items.Cast<ListBoxItem>().FirstOrDefault(i => Equals(i.Tag, id));
+    public Control GetBuiltinPage(int index) => _builtinPages[index];
     public void UpdateModules(PluginManager manager)
     {
         if (_updatingModules) return;
-        var modules = manager.Visible(ExtensionSurface.WorkspaceTools).ToArray();
+        var modules = manager.Visible(ExtensionSurface.WorkspaceTools)
+            .Where(m => manager.Settings(m).Placement == TerminalHub.Core.Settings.ToolPlacement.Window).ToArray();
         _updatingModules = true;
         try
         {
             _selectedModuleId = (ToolNavigation.SelectedItem as ListBoxItem)?.Tag as string ?? _selectedModuleId;
+            for (var i = 0; i < _builtinTabs.Length; i++)
+                if (!modules.Any(m => m.Id == "builtin:tools-" + i)) _builtinTabs[i].Content = null;
             foreach (var id in _extraModules.Keys.Where(id => !modules.Any(m => m.Id == id)).ToArray())
             { _extraModules[id].Tab.Content = null; _extraModules.Remove(id); }
             ToolNavigation.Items.Clear(); ToolsTabs.Items.Clear();
@@ -61,6 +70,7 @@ public partial class ProjectToolsView : UserControl
             {
                 if (module.Owner == "builtin" && int.TryParse(module.Definition.Id.Replace("tools-", ""), out var index))
                 {
+                    _builtinTabs[index].Content ??= module.GetView();
                     ToolsTabs.Items.Add(_builtinTabs[index]); ToolNavigation.Items.Add(_builtinNavigation[index]);
                     continue;
                 }

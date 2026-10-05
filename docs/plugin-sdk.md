@@ -1,6 +1,6 @@
 # Terminal Hub 插件 SDK（宿主 API 1）
 
-[插件开发教程](plugins/development-tutorial.md) · [English tutorial](plugins/development-tutorial.en.md) · [安装与使用](plugins/README.md) · [官方插件](plugins/README.md#三个官方插件) · [清单与工程](#构建和导入) · [生命周期](#生命周期和配置) · [宿主 API](#命令事件和宿主操作)
+[插件开发教程](plugins/development-tutorial.md) · [English tutorial](plugins/development-tutorial.en.md) · [安装与使用](plugins/README.md) · [官方插件](plugins/README.md#官方插件) · [清单与工程](#构建和导入) · [生命周期](#生命周期和配置) · [宿主 API](#命令事件和宿主操作)
 
 ## 从零开发一个插件
 
@@ -12,7 +12,7 @@
 2. 增加 `plugin.json`，并复制到构建输出目录；`entryType` 填完整类名（含命名空间）。
 3. 实现 `IWorkbenchPlugin`，在 `Initialize` 注册视图和命令。
 4. `dotnet build -c Release` 后，导入包含清单的 `bin/Release/net8.0`。
-5. 工具模块在独立工作区工具窗口左侧显示；命令在命令面板显示。
+5. 工具模块默认在独立工作区工具窗口左侧显示，用户也可选择底部或右侧；命令在命令面板显示。
 6. 禁用、重新启用并检查注册清理与配置恢复，再分发构建目录。ZIP 解压后导入。
 
 ```csharp
@@ -51,7 +51,7 @@ dotnet build examples/plugins/CompactSidebar/CompactSidebar.csproj -c Release
 dotnet build examples/plugins/SessionPanel/SessionPanel.csproj -c Release
 ```
 
-在顶部“插件”或命令面板“管理插件和模块”中，点击“导入插件”，选择对应的 `bin/Release/net8.0` 目录。目录根部必须包含 `plugin.json` 和入口 DLL。导入复制整个构建目录并立即启用；“打开插件目录”可查看本地安装位置。默认安装位置为用户配置目录下的 `plugins`，与工作区配置一样按用户保存。也可以直接放入目录，再点击“刷新”和“启用”。
+在顶部“插件”打开市场（旧版为“管理插件和模块”），点击“导入插件”，选择对应的 `bin/Release/net8.0` 目录。目录根部必须包含 `plugin.json` 和入口 DLL。导入复制整个构建目录并立即启用；“打开插件目录”可查看本地安装位置。默认安装位置为用户配置目录下的 `plugins`，与工作区配置一样按用户保存。也可以直接放入目录，再点击“刷新”和“启用”。
 
 已启用插件会在下次启动时重新加载。禁用移除此次启用注册的界面、命令、快捷键、订阅、定时器和资源；移除再删除该插件的安装目录。以上操作均不结束宿主终端。
 
@@ -133,7 +133,7 @@ Toolbar / WorkspaceTabs / Sidebar / StatusBar 可通过 `Replace: true` 替换�
 
 SDK 的 `SvgIcon` 可读取单色 path SVG，继承动态前景色；`ModuleDefinition.IconSvg` 接受 SVG 原文或插件目录中的文件路径，用于工作区工具导航。首版图标约定使用 `viewBox` 和已展开变换的 `<path d="…">`；渐变、文本、外部引用等完整 SVG 绘图功能不在这个轻量图标控件的支持范围。
 
-“模块”页统一管理内置五个工具和插件组件：全局显隐、当前工作区启用状态、排序数字。隐藏工具视图不会停止任务、传输或录制；需要完全停止插件活动时使用“禁用”。
+“位置与启动”页统一管理内置五个工具和插件组件：全局显隐、当前工作区启用状态、排序数字、工具位置、启动方式和快捷入口。旧版界面为“模块”页。隐藏工具视图不会停止任务、传输或录制；需要完全停止插件活动时使用“禁用”。
 
 ## 命令、事件和宿主操作
 
@@ -150,7 +150,17 @@ SDK 的 `SvgIcon` 可读取单色 path SVG，继承动态前景色；`ModuleDefi
 
 宿主操作及 UI 注册从 UI 线程调用。后台任务需要通过 Avalonia Dispatcher 回到 UI 线程；长任务使用自己的异步流程和 `Lifetime`。
 
+2026-10-05 市场与停靠：`WorkspaceTools` 模块由用户选择独立窗口、原有浮动底部工具栏入口、原有右侧面板标签，以及手动、启动时打开或恢复上次打开。底部入口沿用宿主监控／SSH／日志按钮的行为，在原有右侧内容区域显示工具；右侧位置将标签加入进程／文件／日志／SSH／命令／AI 导航。宿主移动并复用缓存视图，插件不需要为每个位置创建一套页面。使用自适应布局与滚动，避免固定最小宽度挤出侧栏。配置选项通过 `Settings` 模块提供；配置输入应在 Text 属性变化时同步保存，避免排队的 TextChanged 在页面切换后漏存。市场中的官方资源来自主程序附带的 `official-plugins`，用户点击安装后才启用。
+
 `Subscribe` 接收 SessionCreated / SessionClosed / ActiveSessionChanged / WorkspaceChanged / CommandStarted / CommandCompleted / OutputBatch / LanguageChanged。Shell 命令事件来自现有 Shell 集成标记，不从输出文本猜测命令完成。弹出、迁移和移除视图不冒充进程关闭。
+
+2026-10-05 增量接口：`SessionInfo.IsRemote` 标识远程会话，`CanChangeDirectory` 表示宿主当前是否允许发送目录切换命令。`SessionCwdChanged` 的 Data 是 Shell 报告的目录字符串；`ProjectDirectoryChanged` 的 Data 是项目导航选择的本地目录。项目选择按工作区隔离，仅驻留内存。
+
+目录操作通过可选能力 `context.Host as IProjectWorkbenchHost` 使用：`SelectProjectDirectory(path)` 发布项目选择，`SelectedProjectDirectory` 查询当前工作区选择，`ChangeSessionDirectory(id, path)` 向指定本地会话发送目录命令并返回是否发送。使用原有 Shell 路径转义；PowerShell 使用 `Set-Location -LiteralPath`，避免中括号目录被当作通配符。目录元数据、历史和面包屑等待真实 Shell 报告再更新。运行中的命令、AI 会话、备用屏幕以及未知提示符不会发送；插件可提供只粘贴命令或新建终端的入口。
+
+`NewSessionRequest.Transient = true` 创建一次性会话，宿主不把它保存为重启后需要恢复的会话，适用于 `gh auth login` 等登录入口。上述改动保留 API 1 原有构造函数与 `IWorkbenchHost` 契约，旧插件可继续使用；使用新增能力的插件需要本轮更新后的主程序和 SDK。
+
+Git 工作台在插件内启动可取消的 Git／gh 子进程，用参数列表传递文件名，读取退出码和输出。命令结果显示在插件的「操作输出」页，停用只取消插件自己的进程；宿主终端继续运行。Git 的认证问题显示原始错误，交互式 GitHub 登录使用宿主提供的一次性终端。
 
 OutputBatch 的 `Data` 是发生输出变化的 `Guid[]`，每 100 ms 合并消费；按需调用 `ReadFrame`，避免逐字符重建 UI。命令完成事件的 Data 是 `ShellCommandState`。
 

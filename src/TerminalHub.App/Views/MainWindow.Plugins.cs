@@ -29,12 +29,13 @@ public partial class MainWindow
     private void InitializePlugins()
     {
         _plugins = new(Vm, styles: Styles);
+        InitializeWorkbenchDock();
         InstallExtensionSlot(TerminalChrome,ExtensionSurface.Toolbar);
         InstallExtensionSlot(WorkspaceTabs,ExtensionSurface.WorkspaceTabs);
         InstallExtensionSlot(SessionShelf,ExtensionSurface.Sidebar,true);
         InstallExtensionSlot(StatusContents,ExtensionSurface.StatusBar);
         _plugins.Changed += RefreshExtensionUi;
-        Opened += (_, _) => { _plugins.Discover(); RefreshExtensionUi(); };
+        Opened += (_, _) => { _plugins.Discover(); RefreshExtensionUi(); RestoreWorkbenchTools(); };
         RefreshExtensionUi();
     }
     private void InstallExtensionSlot(Control original, ExtensionSurface surface, bool vertical = false)
@@ -93,7 +94,7 @@ public partial class MainWindow
                 {
                     var item = new MenuItem { Header = module.GetView() }; menu.Items.Add(item); _pluginMenuItems.Add(item);
                 }
-                var manage = new MenuItem { Header = Localizer.Current.Translate("管理插件和模块") };
+                var manage = new MenuItem { Header = Localizer.Current.Translate("插件市场") };
                 manage.Click += (_, _) => OpenPluginManager(); menu.Items.Add(manage); _pluginMenuItems.Add(manage);
             }
             var tools = _plugins.Visible(ExtensionSurface.ToolWindow).ToArray();
@@ -113,7 +114,11 @@ public partial class MainWindow
                 };
                 _pluginWindows[module.Id] = window; window.Show(this);
             }
-            RefreshToolModules();
+            // Clear old parents before a cached page is attached at its new placement.
+            InspectorWorkbenchContent.Content = null;
+            // Avalonia 11.3 keeps pending layout entries in the previous window's queue.
+            // Drain that queue while the page is detached, before attaching it to another root.
+            UpdateLayout(); RefreshToolModules(); _projectToolsWindow?.UpdateLayout(); RefreshWorkbenchDock();
         }
         finally { _refreshingExtensions = false; }
     }

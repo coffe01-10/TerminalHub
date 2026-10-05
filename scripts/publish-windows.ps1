@@ -52,6 +52,12 @@ try {
       [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($portableArchive, $portablePath, "app/$portableName") | Out-Null
     }
   }
+  foreach ($pluginName in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch', 'TerminalBroadcast', 'Snippets', 'ProjectNavigator', 'GitWorkbench')) {
+    foreach ($payloadName in @("TerminalHub.Official.$pluginName.dll", "TerminalHub.Official.$pluginName.deps.json", 'plugin.json')) {
+      $pluginPayload = "official-plugins/$pluginName/$payloadName"
+      [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($portableArchive, (Join-Path $out $pluginPayload), "app/$pluginPayload") | Out-Null
+    }
+  }
 } finally { $portableArchive.Dispose(); $portableStream.Dispose() }
 Write-Host "==> Portable preview: $previewZip" -ForegroundColor Green
 

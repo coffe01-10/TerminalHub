@@ -37,4 +37,19 @@
     <ProjectReference Include="..\TerminalHub.Extensibility\TerminalHub.Extensibility.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <BundledPlugin Include="WorkspaceNotes;ScreenClips;CommandWatch;TerminalBroadcast;Snippets;ProjectNavigator;GitWorkbench" />
+    <!-- Build plugin resources separately: transitive content would publish seven plugin.json files to the same path. -->
+    <ProjectReference Include="@(BundledPlugin->'..\..\plugins\%(Identity)\%(Identity).csproj')" ReferenceOutputAssembly="false" Private="false" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained;PublishSingleFile;IncludeNativeLibrariesForSelfExtract" />
+  </ItemGroup>
+  <Target Name="BundleOfficialPlugins" AfterTargets="Build">
+    <Copy SourceFiles="@(BundledPlugin->'..\..\plugins\%(Identity)\bin\$(Configuration)\net8.0\TerminalHub.Official.%(Identity).dll')" DestinationFiles="@(BundledPlugin->'$(TargetDir)official-plugins\%(Identity)\TerminalHub.Official.%(Identity).dll')" />
+    <Copy SourceFiles="@(BundledPlugin->'..\..\plugins\%(Identity)\bin\$(Configuration)\net8.0\TerminalHub.Official.%(Identity).deps.json')" DestinationFiles="@(BundledPlugin->'$(TargetDir)official-plugins\%(Identity)\TerminalHub.Official.%(Identity).deps.json')" />
+    <Copy SourceFiles="@(BundledPlugin->'..\..\plugins\%(Identity)\plugin.json')" DestinationFiles="@(BundledPlugin->'$(TargetDir)official-plugins\%(Identity)\plugin.json')" />
+  </Target>
+  <Target Name="PublishOfficialPlugins" AfterTargets="Publish">
+    <ItemGroup><OfficialPublishPayload Include="$(TargetDir)official-plugins\**\*" /></ItemGroup>
+    <Copy SourceFiles="@(OfficialPublishPayload)" DestinationFolder="$(PublishDir)official-plugins\%(RecursiveDir)" />
+  </Target>
+
 </Project>

@@ -32,6 +32,8 @@
     <ProjectReference Include="..\..\plugins\CommandWatch\CommandWatch.csproj" />
     <ProjectReference Include="..\..\plugins\TerminalBroadcast\TerminalBroadcast.csproj" />
     <ProjectReference Include="..\..\plugins\Snippets\Snippets.csproj" />
+    <ProjectReference Include="..\..\plugins\ProjectNavigator\ProjectNavigator.csproj" />
+    <ProjectReference Include="..\..\plugins\GitWorkbench\GitWorkbench.csproj" />
   </ItemGroup>
 
   <Target Name="CopyAcceptancePlugins" AfterTargets="Build">
@@ -41,6 +43,8 @@
     </ItemGroup>
     <Copy SourceFiles="@(AcceptancePlugin)" DestinationFolder="$(OutDir)AcceptancePlugins\%(AcceptancePlugin.RecursiveDir)" />
     <Copy SourceFiles="@(OfficialPlugin)" DestinationFolder="$(OutDir)OfficialPlugins\%(OfficialPlugin.RecursiveDir)" />
+    <ItemGroup><MarketPlugin Include="..\..\src\TerminalHub.App\bin\$(Configuration)\net8.0\official-plugins\**\*" /></ItemGroup>
+    <Copy SourceFiles="@(MarketPlugin)" DestinationFolder="$(OutDir)official-plugins\%(RecursiveDir)" />
   </Target>
 
 </Project>

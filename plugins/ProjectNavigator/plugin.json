@@ -1,0 +1,8 @@
+{
+  "id": "official.project-navigator",
+  "name": "项目导航",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Official.ProjectNavigator.dll",
+  "entryType": "TerminalHub.Official.ProjectNavigator.ProjectNavigatorPlugin",
+  "hostApi": 1
+}

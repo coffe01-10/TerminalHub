@@ -13,17 +13,27 @@
 <nav aria-label="章节导航"><a href="#install">01 / 安装与管理</a><a href="#official">02 / 官方插件</a><a href="#develop">03 / 开发第一个插件</a><a href="#api">04 / API 与生命周期</a><a href="#faq">05 / 常见问题</a></nav>
 <div class="rule"></div><p class="tiny">.NET 8 · Avalonia 11.3.2<br>Windows / Linux<br>本页可离线阅读</p>
 <a class="tiny" href="https://github.com/coffe01-10/TerminalHub">项目主页 ↗</a></aside>
-<main><header><div class="eyebrow">WORKBENCH / EXTENSIONS</div><h1>把工作台，<br>扩展成你的习惯。</h1><p class="lead">安装实用工具，或用公开 SDK 开发自己的原生插件。这里从导入目录开始，直到一个可用、可停用、可分发的插件。</p><p class="tiny">兼容 Terminal Hub v0.4.0+ · 宿主 API 1</p></header>
+<main><header><div class="eyebrow">WORKBENCH / EXTENSIONS</div><h1>把工作台，<br>扩展成你的习惯。</h1><p class="lead">从插件市场选择实用工具，安排位置与启动方式，或用公开 SDK 开发自己的原生插件。</p><p class="tiny">宿主 API 1 · 插件市场、项目导航与 Git 工作台需本轮更新后的主程序</p></header>
 <section id="install"><span class="number">01 / GET STARTED</span><h2>安装与管理</h2>
-<p>官方插件源码在仓库 <code>plugins/</code> 下，运行以下脚本生成三个可导入目录和各自的 ZIP：</p>
+<p>新版主窗口顶部「插件」打开插件市场。市场展示五个内置基础工具、七个可选官方扩展及已导入的自定义插件，可以搜索并筛选已安装／未安装。找到需要的扩展，点击「安装」，再点击「打开」。七个安装资源随主程序附带，可以离线安装；目前没有社区远程目录或上传服务。</p>
+<p>插件卡片的「设置」可调整位置、启动方式、快捷入口和工作区范围。项目导航与 Git 工作台还提供专用设置页。停用保留配置，卸载清除对应配置。</p>
+<table><thead><tr><th>设置</th><th>可选项</th></tr></thead><tbody><tr><td>工具位置</td><td>独立窗口（默认）、原有监控／SSH／日志／Deploy 底部工具栏入口、原有右侧面板标签</td></tr><tr><td>启动方式</td><td>手动打开、启动时打开、恢复上次打开</td></tr><tr><td>快捷入口</td><td>显示或隐藏底部图标或右侧标签；隐藏后仍可从市场打开</td></tr></tbody></table>
+<p>底部工具栏入口沿用监控／SSH／日志按钮的行为，在原有右侧面板打开插件。侧栏位置把插件标签加入进程／文件／日志／SSH／命令／AI 导航。工具迁移复用原页面，「↗」移到独立窗口，「×」返回之前的内置页面。退出应用保留上次打开状态，切换到内置页面或主动关闭侧栏则取消该插件的恢复；内置工具可停用或调整位置，无需安装。右侧标签较多时换行，底部工具栏可横向滚动。</p>
+<p>源码开发或手动更新时，官方插件源码在仓库 <code>plugins/</code> 下，运行以下脚本生成七个可导入目录和各自的 ZIP：</p>
 <pre>pwsh -File scripts/build-official-plugins.ps1</pre>
-<ol class="steps"><li>打开主窗口「插件」→「导入插件」。</li><li>选择 <code>artifacts/official-plugins/WorkspaceNotes</code>、<code>ScreenClips</code> 或 <code>CommandWatch</code>。所选目录必须直接包含 <code>plugin.json</code> 和 DLL。ZIP 请先解压。</li><li>导入会立即启用。打开独立「工作区工具」窗口，在左侧导航选择插件。</li><li>在「模块管理」调整排序、显隐与当前工作区的显示范围。</li></ol>
+<ol class="steps"><li>打开主窗口「插件」→「导入插件」。</li><li>选择 <code>artifacts/official-plugins</code> 中对应的插件目录。所选目录必须直接包含 <code>plugin.json</code> 和 DLL。ZIP 请先解压。</li><li>导入会立即启用。点击卡片「打开」，或从独立「工作区工具」窗口选择插件。</li><li>在「位置与启动」调整位置、启动、排序与工作区范围；旧版为「模块管理」。</li></ol>
 <p>更新时重新导入同 ID 的新构建目录。禁用会清理插件界面、计时器和订阅，不关闭终端进程。重新启用笔记恢复内容，摘录与看板从空状态开始。</p>
-<p class="note">移除插件会删除安装目录与该插件保存的配置，工作区笔记也会被删除。本轮插件为源码和本地包，尚未上传到原有 v0.4.0 Release。旧版可以导入插件，但没有新文档入口按钮。</p></section>
-<section id="official"><span class="number">02 / OFFICIAL COLLECTION</span><h2>三个官方插件</h2>
+<p class="note">移除插件会删除安装目录与该插件保存的配置，工作区笔记也会被删除。市场和插件目前以源码及本地包交付，尚未上传到发行页。旧版支持原有 API 1 插件；使用市场、项目导航和 Git 工作台请先更新主程序。</p></section>
+<section id="official"><span class="number">02 / OFFICIAL COLLECTION</span><h2>七个官方插件</h2>
 <article class="plugin" id="notes"><div class="symbol">01</div><div><h3>工作区笔记</h3><div class="tag">official.workspace-notes</div><p>把交接信息、待办和排查结论留在当前工作区。切换工作区时切换笔记，关闭工具窗口保留编辑。</p><p>每秒保存待保存内容，点击「保存笔记」、切换工作区或停用时也会保存。写入本机用户配置，语言切换保留笔记原文。没有同步、上传或 Markdown 渲染。</p></div></article>
 <article class="plugin" id="clips"><div class="symbol">02</div><div><h3>屏幕摘录</h3><div class="tag">official.screen-clips</div><p>先激活目标终端，再点「摘录当前屏幕」；也可通过命令面板执行。保存会话名、时间和纯文本，选择摘录后复制或导出 UTF-8 文本。</p><p>保留最近 20 份，停用或退出后清空。只抓当前屏幕缓冲整页，不包含历史浏览位置、选区或颜色。中文和 emoji 保留；物理行保留换行，去除行末空格和末尾空行。API 1 没有软换行元数据，不能重建逻辑行。</p><p class="note">复制与导出由你主动点击，文本可能含项目私密信息，分享前请检查。</p></div></article>
 <article class="plugin" id="watch"><div class="symbol">03</div><div><h3>命令看板</h3><div class="tag">official.command-watch</div><p>集中看各终端最近一次命令的状态、耗时和退出码。默认只看当前工作区，取消筛选可看全部会话，点击卡片回到相应终端。</p><p>只使用 Shell 集成标记。无标记显示「尚未收到命令标记」，缺少退出码显示未知。0 为完成，非 0 为失败。启用前不补录，不推断 AI 完成状态，不发送命令，不保存输出；某些 Shell 或 TUI 没有标记时无状态可显示。</p></div></article>
+</section>
+<section id="projects"><h2>更多官方插件</h2>
+<article class="plugin" id="broadcast"><div class="symbol">04</div><div><h3>输入广播</h3><div class="tag">official.terminal-broadcast</div><p>向当前工作区的运行中会话发送输入，发送前显示目标范围。支持只粘贴或发送回车；停用不结束终端。</p></div></article>
+<article class="plugin" id="snippets"><div class="symbol">05</div><div><h3>命令片段</h3><div class="tag">official.snippets</div><p>保存常用命令，点击粘贴进活动终端，检查后手动回车。片段保存在本机插件配置中。</p></div></article>
+<article class="plugin" id="navigator"><div class="symbol">06</div><div><h3>项目导航</h3><div class="tag">official.project-navigator</div><p>图形化浏览目录、面包屑与历史；收藏支持名称、分组、排序、搜索和 JSON 导入导出。浏览不会发送终端输入，点击「终端切到此处」或「在此新建终端」才操作指定会话。未知 Shell 状态可只粘贴目录命令。SSH 会话不会误打开同名本地目录。</p><p>收藏在本机共享，浏览位置和项目选择按工作区隔离；关闭工具窗口保留页面，停用后收藏仍保存。</p><p>设置页可选跟随终端、默认目录、显示隐藏目录、显示完整路径、最近访问数量（默认 12，1–50）和紧凑布局。文本设置立即保存。</p></div></article>
+<article class="plugin" id="git"><div class="symbol">07</div><div><h3>Git 工作台与 GitHub</h3><div class="tag">official.git-workbench</div><p>查看改动与差异，逐文件／全部暂存和取消暂存，提交、推送、获取、拉取、分支创建与切换、提交历史。远端和目标分支在「分支」页选择；失败保留原始输出。提交成功而推送失败时，可以单独重试推送。冲突文件可打开处理。</p><p>GitHub 页提供仓库主页、当前分支 PR、PR／Issue 列表和详情、检查状态、创建 PR 草稿、从 Issue 创建分支。需要系统 Git 和 gh；「GitHub 登录」打开一次性终端。PR 草稿请先推送当前分支；没有 gh 登录时本地 Git 继续可用。</p><p>「操作输出」记录命令、目录和退出码；取消只结束插件启动的进程。设置页可调整跟随、默认远端与基础分支、历史数量（默认 20，1–200）、输出数量（默认 30，1–100）、命令完成自动刷新、差异换行和紧凑布局。窄侧栏中改动与差异上下排列。</p></div></article>
 </section>
 <section id="develop"><span class="number">03 / BUILD YOUR FIRST PLUGIN</span><h2>开发第一个插件</h2>
 <p><a href="development-tutorial.en.html#start" lang="en">English plugin development tutorial →</a></p>
@@ -72,7 +82,7 @@ public sealed class Plugin : IWorkbenchPlugin
 <h3>4. 构建、导入、分发</h3><pre>dotnet build -c Release</pre><p>导入 <code>bin/Release/net8.0</code>，确认模块显示和命令可用。禁用再启用，检查配置恢复与订阅清理。分发包含清单、插件 DLL、额外依赖和资源的目录，用户解压后导入。不要带入本地 settings 或 SSH 记录。</p>
 </section>
 <section id="api"><span class="number">04 / REFERENCE</span><h2>API 与生命周期</h2><table><thead><tr><th>接口</th><th>用途</th></tr></thead><tbody>
-<tr><td><code>RegisterView</code></td><td>延迟创建并缓存模块。WorkspaceTools 在独立工具窗口显示，Settings 在插件管理器显示。</td></tr>
+<tr><td><code>RegisterView</code></td><td>延迟创建并缓存模块。WorkspaceTools 由用户选择独立窗口、底部或右侧位置；Settings 在市场的插件设置页显示。</td></tr>
 <tr><td><code>RegisterCommand</code></td><td>命令面板、终端菜单与可选快捷键。</td></tr>
 <tr><td><code>ReadConfiguration / SaveConfiguration</code></td><td>按插件 ID 保存本机 JSON 配置。</td></tr>
 <tr><td><code>Subscribe / Schedule / Track</code></td><td>事件、计时器与资源，停用自动清理。</td></tr>
@@ -84,7 +94,7 @@ public sealed class Plugin : IWorkbenchPlugin
 </section>
 <section id="faq"><span class="number">05 / TROUBLESHOOTING</span><h2>常见问题</h2>
 <details><summary>导入时找不到清单或加载失败</summary><p>选择直接包含 plugin.json 的目录，核对 entry DLL、完整 entryType、hostApi: 1 和 .NET 8 目标。插件卡片显示具体错误；额外依赖 DLL 也需要随包提供。</p></details>
-<details><summary>插件已启用，但看不到工具</summary><p>打开独立工作区工具窗口，在左侧导航选择模块。在模块管理中确认「显示模块」「当前工作区」均开启。Settings 模块在插件管理的设置页，不在工具窗口。</p></details>
+<details><summary>插件已启用，但看不到工具</summary><p>默认打开位置是「独立窗口」，不会自动增加底部图标或右侧标签。在已安装插件卡片的「打开位置」中选择「底部工具栏」或「右侧边栏」，对应入口立即出现；也可直接点击「打开」。若仍没有入口，检查设置中的显示模块、当前工作区和显示快捷入口。Settings 模块在市场的插件设置页。</p></details>
 <details><summary>命令看板一直没有标记</summary><p>Shell 或运行中的程序可能没有发送宿主支持的集成标记。启用后新命令才会被观察，不会猜测或补录之前的命令。</p></details>
 <details><summary>修改代码后没有变化</summary><p>重建插件后重新导入。宿主单实例，新编译不会替换正在运行的旧应用；正常退出旧实例再启动新版本。</p></details>
 </section><footer>Terminal Hub · MIT · 本地说明页，无外部字体、脚本或遥测。源码外链需联网。</footer></main></div></body></html>

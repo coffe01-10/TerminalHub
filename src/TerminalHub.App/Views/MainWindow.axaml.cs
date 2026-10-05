@@ -1711,6 +1711,9 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+        _closingWorkbench = true;
+        Vm.PropertyChanged -= OnWorkbenchInspectorStateChanged;
+        InspectorWorkbenchContent.Content = null;
         EndWorkspaceTabDrag(commit: false);
         _pluginManagerWindow?.Close();
         _projectToolsWindow?.Close();

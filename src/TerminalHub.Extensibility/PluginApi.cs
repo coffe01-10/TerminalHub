@@ -45,10 +45,17 @@ public sealed record ModuleDefinition(string Id, string Title, ExtensionSurface 
     int Order = 100, bool Replace = false, string? IconSvg = null);
 public sealed record PluginCommand(string Id, string Title, Func<Task> Execute, string? Gesture = null, string? Description = null,
     bool ShowInMenu = true);
-public sealed record SessionInfo(Guid Id, string Name, string WorkingDirectory, string Shell, string WorkspaceId, bool Running, bool Detached);
+public sealed record SessionInfo(Guid Id, string Name, string WorkingDirectory, string Shell, string WorkspaceId, bool Running, bool Detached)
+{
+    public bool IsRemote { get; init; }
+    public bool CanChangeDirectory { get; init; }
+}
 public sealed record WorkspaceInfo(string Id, string Name, bool Active, int Sessions);
-public sealed record NewSessionRequest(string? Name = null, string WorkingDirectory = "", string? Shell = null, string? Arguments = null);
-public enum WorkbenchEventKind { SessionCreated, SessionClosed, ActiveSessionChanged, WorkspaceChanged, CommandStarted, CommandCompleted, OutputBatch, LanguageChanged, WorkspaceRemoved }
+public sealed record NewSessionRequest(string? Name = null, string WorkingDirectory = "", string? Shell = null, string? Arguments = null)
+{
+    public bool Transient { get; init; }
+}
+public enum WorkbenchEventKind { SessionCreated, SessionClosed, ActiveSessionChanged, WorkspaceChanged, CommandStarted, CommandCompleted, OutputBatch, LanguageChanged, WorkspaceRemoved, SessionCwdChanged, ProjectDirectoryChanged }
 public sealed record WorkbenchEvent(WorkbenchEventKind Kind, Guid? SessionId = null, string? WorkspaceId = null, object? Data = null);
 
 /// <summary>All operations run on the UI thread. The host retains ownership of terminal processes.</summary>
@@ -67,6 +74,14 @@ public interface IWorkbenchHost
     Task SplitAsync(bool vertical, Guid? sessionId = null, bool before = false);
     void RemoveFocusedPane();
     void SendInput(Guid sessionId, string text, bool submit = false);
+}
+
+/// <summary>Optional project navigation capability; existing API 1 hosts and plugins retain their original contract.</summary>
+public interface IProjectWorkbenchHost
+{
+    string? SelectedProjectDirectory { get; }
+    void SelectProjectDirectory(string path);
+    bool ChangeSessionDirectory(Guid sessionId, string path);
 }
 
 /// <summary>Registrations are scoped to this activation and removed on disable.</summary>

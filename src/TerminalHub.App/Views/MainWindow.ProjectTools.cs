@@ -22,9 +22,19 @@ public partial class MainWindow
         EnsureToolModules();
         if (_projectToolsWindow is not null) { _projectToolsWindow.Activate(); return; }
         var window = new ProjectToolsWindow(this, Vm, _projectToolsView!);
-        window.Closed += (_, _) => _projectToolsWindow = null;
+        window.Closed += (_, _) =>
+        {
+            _projectToolsWindow = null;
+            if (!_closingWorkbench)
+            {
+                foreach (var module in _plugins.Modules.Where(m => m.Definition.Surface == TerminalHub.Extensibility.ExtensionSurface.WorkspaceTools
+                    && _plugins.Settings(m).Placement == TerminalHub.Core.Settings.ToolPlacement.Window)) _plugins.Settings(module).WasOpen = false;
+                Vm.SavePluginPreferences();
+            }
+        };
         _projectToolsWindow = window;
         window.Show(this);
+        if (_projectToolsView!.SelectedModuleId is { } selected) RememberWindowTool(selected);
     }
     private void OnSwitchWorkspace(object? sender, RoutedEventArgs e)
     {

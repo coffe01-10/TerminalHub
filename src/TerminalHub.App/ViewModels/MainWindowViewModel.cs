@@ -2020,6 +2020,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            NotifyWorkbench(TerminalHub.Extensibility.WorkbenchEventKind.SessionCwdChanged, s, path);
             SessionCards.FirstOrDefault(c => ReferenceEquals(c.Model, s))?.Refresh();
             if (!ReferenceEquals(ActiveSession, s)) return;
             UpdateBreadcrumbFrom(path);

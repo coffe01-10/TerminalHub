@@ -60,7 +60,7 @@ public class WorkbenchUiRefinementTests
             }
             Capture(window, $"modules-{theme}");
             tabs.SelectedIndex = 2; await Task.Delay(60);
-            var option = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.IsEffectivelyVisible);
+            var option = window.GetVisualDescendants().OfType<CheckBox>().Single(c => Equals(c.Content, "Show directories"));
             option.IsChecked = false; manager.SaveModules(); await Task.Delay(30);
             Assert.Contains(window.GetVisualDescendants().OfType<CheckBox>(), c => ReferenceEquals(c, option)); Assert.False(option.IsChecked);
             Capture(window, $"plugin-settings-{theme}");

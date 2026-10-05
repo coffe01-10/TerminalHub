@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using Avalonia.LogicalTree;
 using TerminalHub.Extensibility;
 
 namespace TerminalHub.Official;
@@ -61,4 +62,44 @@ internal sealed class PluginUi(IPluginContext context)
     public Border Card(Control content) => new() { Child = content, Padding = new(14), CornerRadius = new(8),
         BorderThickness = new(1), [!Border.BackgroundProperty] = new DynamicResourceExtension("UiSurface"),
         [!Border.BorderBrushProperty] = new DynamicResourceExtension("UiBorder") };
+    public CheckBox Toggle(string name, string key, string text, bool value, Action<bool> update)
+    {
+        var check = new CheckBox { Name = name, IsChecked = value, Margin = new(0,4), MinHeight = 30 };
+        void TranslateCheck() => check.Content = T(key, text);
+        _translations.Add(TranslateCheck); TranslateCheck();
+        check.IsCheckedChanged += (_, _) => update(check.IsChecked == true); return check;
+    }
+    public Control Field(string key, string text, Control editor)
+    {
+        var panel = new StackPanel { Spacing = 6, Margin = new(0,4,0,8) };
+        panel.Children.Add(LocalLabel(key, text, "UiMuted", 12)); panel.Children.Add(editor); return panel;
+    }
+    public NumericUpDown Number(string name, int value, int minimum, int maximum, Action<int> update)
+    {
+        var editor = new NumericUpDown { Name = name, Value = value, Minimum = minimum, Maximum = maximum,
+            Increment = 1, FormatString = "0", Width = 120, HorizontalAlignment = HorizontalAlignment.Left };
+        editor.ValueChanged += (_, _) => update((int)(editor.Value ?? minimum)); return editor;
+    }
+    public TextBox PreferenceText(string name, string value, Action<string> update)
+    {
+        var editor = Editor(name); editor.Text = value; editor.AcceptsReturn = false; editor.TextWrapping = TextWrapping.NoWrap;
+        // Save before a settings page is switched or detached; TextChanged is queued.
+        editor.PropertyChanged += (_, e) => { if (e.Property == TextBox.TextProperty) update(editor.Text ?? ""); }; return editor;
+    }
+    public void StyleList(ListBox list)
+    {
+        list.Bind(ListBox.BackgroundProperty, new DynamicResourceExtension("UiInset"));
+        list.Bind(ListBox.ForegroundProperty, new DynamicResourceExtension("UiInk"));
+        list.Bind(ListBox.BorderBrushProperty, new DynamicResourceExtension("UiBorder"));
+        list.BorderThickness = new(1); list.CornerRadius = new(7); list.Padding = new(4);
+    }
+    public void Compact(Control page, bool compact)
+    {
+        if (page is not Grid grid || grid.Children[0] is not StackPanel heading) return;
+        grid.Margin = new(compact ? 10 : 18); grid.RowSpacing = compact ? 8 : 14;
+        ((TextBlock)heading.Children[0]).FontSize = compact ? 18 : 23;
+        heading.Children[1].IsVisible = !compact;
+        foreach (var button in page.GetLogicalDescendants().OfType<Button>())
+        { button.Padding = compact ? new(10,6) : new(14,9); button.Margin = compact ? new(0,0,5,5) : new(0,0,8,8); }
+    }
 }

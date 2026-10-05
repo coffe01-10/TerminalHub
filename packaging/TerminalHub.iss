@@ -57,6 +57,9 @@ Source: "{#SourceDir}\PERFORMANCE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\plugins\index.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\plugins\development-tutorial.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\plugins\development-tutorial.en.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
+Source: "{#SourceDir}\official-plugins\*.dll"; DestDir: "{app}\official-plugins"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\official-plugins\*.deps.json"; DestDir: "{app}\official-plugins"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\official-plugins\plugin.json"; DestDir: "{app}\official-plugins"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}";      Filename: "{app}\{#AppExe}"
