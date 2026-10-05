@@ -143,7 +143,9 @@ public class ProjectFeaturesTests
         Assert.Contains("echo hello\r", ((MockPtySession)session.Pty).RawInput.ToString());
         session.Emulator.Parser.Feed("\x1b]133;C\x07"); vm.StopProjectTask(task); Assert.True(task.Running);
         Assert.EndsWith("\x03", ((MockPtySession)session.Pty).RawInput.ToString());
-        session.Emulator.Parser.Feed("\x1b]133;D;7\x07"); await Task.Delay(80);
+        session.Emulator.Parser.Feed("\x1b]133;D;7\x07");
+        // Completion is posted to the UI dispatcher; a fixed delay races a busy CI runner.
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { });
         Assert.False(task.Running); Assert.Contains("7", task.Status);
     }
 
