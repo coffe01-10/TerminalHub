@@ -421,3 +421,13 @@ Windows 继续保留本轮恢复的会话卡片样式、工具栏、底部坞入
 - [x] 更新仓库常用 `app/TerminalHub.exe`、位置修正版目录和便携包，核对发布 EXE 包含原侧栏接入与卡片位置选择代码；说明更新，未改用户配置或结束用户终端。
 
 本次跟进待办已完成。常用入口为 `app/TerminalHub.exe`；已安装插件默认位置仍沿用用户保存的独立窗口偏好，需在市场卡片选择底部或右侧。原生 Headless 验证通过，用户当前窗口的人工点击未代替执行。
+
+### 2026-10-05 新增官方插件：端口看板与任务面板
+
+- [x] `PortGuard`（端口看板，`official.port-guard`）：列 TCP LISTENING 与 UDP `*:*` 绑定，按端口/进程/PID 过滤、查占用、确认框结束进程（X/取消/Esc 均取消）、新终端诊断。Windows `netstat -ano`+`tasklist`（OEM 936 解码、按列位置解析），Linux `ss`/`lsof`（`ss -o` 省略队列列仍识别）。自带确认对话框，父窗口取 `TopLevel.GetTopLevel`。
+- [x] `TaskRunner`（任务面板，`official.task-runner`）：解析 `package.json`/`Makefile`/`justfile`/`.vscode/tasks.json`，粘贴到活动会话（不按回车）或新建一次性会话执行（`cmd /d /s /c`/`sh -c`，不包外层引号）。「跟随项目／活动终端」开关默认开，`WorkspaceChanged` 时重解目录，关掉后按工作区固定 `PinnedDirectories`。
+- [x] 接入官方目录（`OfficialPluginCatalog`）、App `BundledPlugin`、测试 `ProjectReference`、`build-official-plugins.ps1` 与两个发布脚本、`README.md`/`marketplace.md`/`index.html`。
+- [x] 工作流开发 + 独立终审抓出 5 项真实缺陷已修复：`ss -o` 漏解析、确认框标题栏 X 绕过、缺列表头、`cmd /s` 剥引号、切工作区目录不刷新。
+- [x] 回归 `PortGuardPluginTests`、`TaskRunnerPluginTests` 共新增；插件相关 44 项测试全绿（含市场、二轮、官方）。
+
+本轮为本地交付：主程序编译 0 警告 0 错误、相关测试 44/44 通过。未做真实 ConPTY/系统 GUI 验收，Linux/macOS `ss`/`lsof` 仅有单测夹具未实机运行；未替换当前运行实例，未执行发行上传。

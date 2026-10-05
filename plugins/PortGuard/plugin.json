@@ -1,0 +1,8 @@
+{
+  "id": "official.port-guard",
+  "name": "PortGuard · 端口看板",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Official.PortGuard.dll",
+  "entryType": "TerminalHub.Official.PortGuard.PortGuardPlugin",
+  "hostApi": 1
+}

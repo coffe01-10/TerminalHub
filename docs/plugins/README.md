@@ -10,7 +10,7 @@ Terminal Hub 插件是运行在原生应用内的 .NET 8 / Avalonia 11 类库。
 
 ## 安装官方插件
 
-新版主程序顶部打开「插件」进入市场，找到需要的官方扩展，点击「安装」，再点击「打开」。七个安装资源随程序附带，无需联网。内置基础工具已经可用，可以调整显示范围。详细说明见[插件市场、位置与启动设置](marketplace.md)。
+新版主程序顶部打开「插件」进入市场，找到需要的官方扩展，点击「安装」，再点击「打开」。九个安装资源随程序附带，无需联网。内置基础工具已经可用，可以调整显示范围。详细说明见[插件市场、位置与启动设置](marketplace.md)。
 
 源码开发、手动更新或使用旧版导入功能时，在仓库根目录执行：
 
@@ -18,7 +18,7 @@ Terminal Hub 插件是运行在原生应用内的 .NET 8 / Avalonia 11 类库。
 pwsh -File scripts/build-official-plugins.ps1
 ```
 
-生成 `artifacts/official-plugins` 下七个可导入目录和各自的 ZIP：WorkspaceNotes、ScreenClips、CommandWatch、TerminalBroadcast、Snippets、ProjectNavigator、GitWorkbench。ZIP 需先解压，插件管理器当前接受目录，不直接接受 ZIP。
+生成 `artifacts/official-plugins` 下九个可导入目录和各自的 ZIP：WorkspaceNotes、ScreenClips、CommandWatch、TerminalBroadcast、Snippets、ProjectNavigator、GitWorkbench、PortGuard、TaskRunner。ZIP 需先解压，插件管理器当前接受目录，不直接接受 ZIP。
 
 项目导航和 Git 工作台需要本轮更新后的 Terminal Hub 主程序；此前的 API 1 主程序需要更新。现有五个插件继续兼容新版宿主。
 
@@ -83,6 +83,22 @@ ID：`official.git-workbench` · [源码](../../plugins/GitWorkbench/GitWorkbenc
 
 GitHub 页使用系统 `gh` 及其已有登录，提供仓库主页、当前分支 PR、PR／Issue 列表与详情、检查状态、创建 PR 草稿、从 Issue 创建关联分支。登录按钮打开一次性终端。没有 GitHub 登录时，本地 Git 功能可继续使用。详见[使用与验证说明](project-git-workbench.md)。
 
+### 端口看板
+
+ID：`official.port-guard` · [源码](../../plugins/PortGuard/PortGuardPlugin.cs)
+
+查看本机正在监听的 TCP 端口和 UDP 绑定。TCP 只保留状态为 `LISTENING`/`LISTEN` 的行，UDP 只保留对端为 `*:*` 的绑定（临时 UDP 会话不算监听，避免误杀）。IPv6 按方括号取端口。Windows 读取 `netstat -ano`，再用 `tasklist` 补进程名；Linux 依次尝试 `ss -tulnp` 和 `lsof -i -P -n`。解析按列位置而不是表头文本：`netstat`/`tasklist` 在中文 Windows 上的表头是中文，输出按 OEM 代码页（本机 936）解码而非 UTF-8；`ss` 的状态列是按 token 找的，`ss -o` 省略 Recv-Q/Send-Q 后仍能识别 LISTEN。可按端口、进程名或 PID 过滤，也可输入端口号查看占用。
+
+结束进程前弹出确认框，只有点「结束」才算确认 —— 标题栏 X、取消、Esc 都视为取消，不会启动 `taskkill`/`kill`。只接受快照里出现的整数 PID，拒绝 0、4、当前进程和手填的其他值；`taskkill /F`/`kill` 结束的是整个进程，而不只是这一个端口，确认文案里写明这一点以及快照到点击之间 PID 可能被复用。诊断只在新终端里跑 `netstat`/`ss`/`lsof`/`tasklist` 展示输出，不修改系统。
+
+### 任务面板
+
+ID：`official.task-runner` · [源码](../../plugins/TaskRunner/TaskRunnerPlugin.cs)
+
+从项目目录读取 `package.json` 的 scripts、`Makefile` 目标、`justfile` 配方和 `.vscode/tasks.json`。「跟随项目／活动终端」开关默认开启：依次取 `IProjectWorkbenchHost.SelectedProjectDirectory`（项目导航所选）和活动终端的工作目录，切换工作区时重新解析，空工作区会清空目录而不是保留上一个项目。关掉开关后「选择目录」把所选目录按工作区固定保存，切回该工作区仍用它。目录、粘贴方式和跟随开关都保存在本机插件配置。
+
+点击「运行」时，勾选「粘贴到活动会话」则把命令写入活动会话且不按回车；取消勾选则新建一次性会话执行（Windows `cmd /d /s /c`、其他 `sh -c`），命令原样下发、不包外层引号 —— `cmd /s` 会剥掉整串首尾引号，若再包一层会让 `npm run "test app"` 这类带引号的命令失衡。`package.json` 的 scripts 生成 `npm run <名称>`，Makefile 生成 `make <目标>`，justfile 生成 `just <配方>`，不执行脚本正文；tasks.json 只收 `type=shell` 且 `command` 为字符串的任务，展开 `${workspaceFolder}` 并把相对 `options.cwd` 拼到项目目录。没有这四个文件或没有可运行任务时，页面说明原因。
+
 ## 开发自己的插件
 
 从[完整插件开发教程](development-tutorial.md)开始，配套可运行工程是[命令草稿示例](../../examples/plugins/CommandDraft)。[SDK 参考](../plugin-sdk.md)提供 API 说明。官方项目只引用 `TerminalHub.Extensibility`，共享的[界面辅助代码](../../plugins/Shared/PluginUi.cs)编入各自 DLL，无额外共享 DLL 安装要求。
@@ -93,7 +109,7 @@ GitHub 页使用系统 `gh` 及其已有登录，提供仓库主页、当前分�
 
 ## 构建与分发
 
-打包脚本只复制插件 DLL、依赖描述、清单和说明，不扫描用户配置目录。七个官方插件无需另装第三方 DLL，宿主提供 SDK、Core 和 Avalonia；Git 工作台另需系统 Git，GitHub 功能另需 gh。新插件如有额外依赖，把相关 DLL 与资源放入插件目录，并测试在干净目录导入。
+打包脚本只复制插件 DLL、依赖描述、清单和说明，不扫描用户配置目录。九个官方插件无需另装第三方 DLL，宿主提供 SDK、Core 和 Avalonia；Git 工作台另需系统 Git，GitHub 功能另需 gh。端口看板使用系统自带的 netstat、ss 或 lsof。新插件如有额外依赖，把相关 DLL 与资源放入插件目录，并测试在干净目录导入。
 
 本轮以源码与本地构建包交付，尚未上传发行附件。项目导航和 Git 工作台的验收记录见[使用与验证说明](project-git-workbench.md)。
 

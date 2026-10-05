@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $destinationRoot = if ($OutputDirectory) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $repo 'artifacts/official-plugins' }
 New-Item -ItemType Directory -Path $destinationRoot -Force | Out-Null
-foreach ($name in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch', 'TerminalBroadcast', 'Snippets', 'ProjectNavigator', 'GitWorkbench')) {
+foreach ($name in @('WorkspaceNotes', 'ScreenClips', 'CommandWatch', 'TerminalBroadcast', 'Snippets', 'ProjectNavigator', 'GitWorkbench', 'PortGuard', 'TaskRunner')) {
     dotnet build (Join-Path $repo "plugins/$name/$name.csproj") -c $Configuration --disable-build-servers -m:1 -p:UseSharedCompilation=false -p:NuGetAudit=false
     if ($LASTEXITCODE -ne 0) { throw "$name build failed" }
     $source = Join-Path $repo "plugins/$name/bin/$Configuration/net8.0"

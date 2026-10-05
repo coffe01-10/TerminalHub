@@ -147,12 +147,16 @@ v0.4.0 七项功能源码已实现，发行上传与人工验收另见 `docs/TOD
 
 插件公开契约位于 `src/TerminalHub.Extensibility`，加载/生命周期在 `App/Plugins/PluginManager.cs`，宿主操作在 `MainWindowViewModel.PluginHost.cs`，主窗口扩展展示在 `MainWindow.Plugins.cs`。用户于 2026-10-03 要求恢复原来的独立工具窗口。五个工具和插件仍从 `ProjectToolsView` 复用并共用模块管理：窗口可关闭重开，页面缓存保留，不要重新改成主窗口底部区域。界面精修记录见 `docs/ui-refinement-2026-10-03.md`。停用插件只清理它的注册，不能结束宿主会话。用户随后要求补做验收，相关回归与真实 Windows 原生窗口/ConPTY 验收已执行，结果见 `docs/acceptance-v0.4.0-2026-10-03.md`。系统 IME 实际候选窗、多显示器与 Linux 实机仍未执行，不能把格坐标回归当成系统候选窗验收。
 
-官方插件位于 `plugins/WorkspaceNotes`、`ScreenClips`、`CommandWatch`，共享 UI 代码通过源码链接编入各自 DLL。构建 `scripts/build-official-plugins.ps1`，导入目录位于 `artifacts/official-plugins`。安装与开发见 `docs/plugins/README.md`、`docs/plugin-sdk.md`，离线跳转页 `docs/plugins/index.html` 随 App 输出与发行包携带。工作区笔记监听同步 Text 属性变化，不能改成排队的 TextChanged 后再保存，快速切换会漏存。ScreenClips 的 API 1 帧缺少软换行元数据，只能摘录物理屏幕行；跳过宽字符续格和隐藏字符。命令看板只认 Shell 集成事件，不猜终端输出。相关回归 `OfficialPluginTests`，Windows 实机模式 `--official-plugin-acceptance`，验收边界见 `docs/plugins/acceptance-2026-10-03.md`。
+官方插件位于 `plugins/` 下九个目录：WorkspaceNotes、ScreenClips、CommandWatch、TerminalBroadcast、Snippets、ProjectNavigator、GitWorkbench、PortGuard、TaskRunner，共享 UI 代码（`plugins/Shared/PluginUi.cs`，项目工具另加 `ProjectPluginUi.cs`）通过源码链接编入各自 DLL。构建 `scripts/build-official-plugins.ps1`，导入目录位于 `artifacts/official-plugins`。安装与开发见 `docs/plugins/README.md`、`docs/plugin-sdk.md`，离线跳转页 `docs/plugins/index.html` 随 App 输出与发行包携带。工作区笔记监听同步 Text 属性变化，不能改成排队的 TextChanged 后再保存，快速切换会漏存。ScreenClips 的 API 1 帧缺少软换行元数据，只能摘录物理屏幕行；跳过宽字符续格和隐藏字符。命令看板只认 Shell 集成事件，不猜终端输出。相关回归 `OfficialPluginTests`，Windows 实机模式 `--official-plugin-acceptance`，验收边界见 `docs/plugins/acceptance-2026-10-03.md`。
 
 ## 2026-10-05 插件市场与停靠接续
 
 用户本轮用截图明确了位置：底部是现有 `ActionDock` 的监控／SSH／日志／Deploy 浮动工具栏，右侧是现有 `InspectorTabs` 的进程／文件／日志／SSH／命令／AI 面板。底部位置添加图标入口，沿用原工具栏在右侧打开页面的交互；右侧位置添加原面板标签。不要再创建一条新的底部栏或第二块右侧面板。独立窗口仍是默认选项。各位置复用缓存页面，不重建或关闭终端。入口与页面接续在 `MainWindow.WorkbenchDock.cs`，位置、启动和快捷入口配置在 `PluginSettings.cs`。页面跨窗口移动时，先脱离旧容器并排空旧窗口布局，再接到新容器，避免 Avalonia 待布局队列仍引用旧 TopLevel（本轮已复现并修复）。
 
-市场在 `PluginManagerWindow.Market.cs`，目录在 `OfficialPluginCatalog.cs`。五个内置基础工具和七个按需安装的官方扩展统一展示；官方资源随构建和发布放在 `official-plugins`，不在启动时自动安装。官方插件新增 `TerminalBroadcast`、`Snippets`、`ProjectNavigator`、`GitWorkbench`。两个项目工具提供原生设置页；文本设置监听同步属性变化。可选项目接口在 `IProjectWorkbenchHost`；切换目录等待 Shell 报告实际路径，Git 由插件子进程执行。
+市场在 `PluginManagerWindow.Market.cs`，目录在 `OfficialPluginCatalog.cs`。五个内置基础工具和九个按需安装的官方扩展统一展示；官方资源随构建和发布放在 `official-plugins`，不在启动时自动安装。官方插件新增 `PortGuard`、`TaskRunner`（本轮），此前新增 `TerminalBroadcast`、`Snippets`、`ProjectNavigator`、`GitWorkbench`。两个项目工具提供原生设置页；文本设置监听同步属性变化。可选项目接口在 `IProjectWorkbenchHost`；切换目录等待 Shell 报告实际路径，Git 由插件子进程执行。
 
-使用及验证边界见 `docs/plugins/marketplace.md` 和 `docs/plugins/project-git-workbench.md`。相关回归为 `PluginMarketplaceTests`、`ProjectGitPluginTests`、`OfficialPluginTests`、`PluginRound2Tests`。本地构建、发布包和 Headless 验证不代表用户当前实例或安装版已更新；本轮未执行发行上传。
+使用及验证边界见 `docs/plugins/marketplace.md` 和 `docs/plugins/project-git-workbench.md`。相关回归为 `PluginMarketplaceTests`、`ProjectGitPluginTests`、`OfficialPluginTests`、`PluginRound2Tests`、`PortGuardPluginTests`、`TaskRunnerPluginTests`。本地构建、发布包和 Headless 验证不代表用户当前实例或安装版已更新；本轮未执行发行上传。
+
+### 2026-10-05 端口看板与任务面板
+
+新增 `PortGuard`（端口看板，`official.port-guard`）与 `TaskRunner`（任务面板，`official.task-runner`），目录为 `plugins/PortGuard`、`plugins/TaskRunner`，回归测试 `PortGuardPluginTests`、`TaskRunnerPluginTests`。PortGuard 的 `netstat`/`tasklist`/`taskkill` 用自有 `OemProcess` 按 OEM 代码页解码（中文 Windows 936 表头是中文），不复用固定 UTF-8 的 `PluginProcess`；解析按列位置，TCP 只留 LISTENING、UDP 只留对端 `*:*`，`ss -o` 省略队列列时按 token 找 State。结束进程只有"结束"按钮才算确认，标题栏 X/取消/Esc 均视为取消。TaskRunner 新建一次性会话不包外层引号（`cmd /s` 会剥首尾引号）；项目目录跟随照 GitWorkbench 模式：Follow 开关默认开，`WorkspaceChanged` 重解，`PinnedDirectories` 按工作区锁定，空工作区清空。

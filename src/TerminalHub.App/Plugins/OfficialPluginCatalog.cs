@@ -29,6 +29,10 @@ public static class OfficialPluginCatalog
         new("official.terminal-broadcast", "TerminalBroadcast", "终端广播", "Terminal broadcast",
             "选择目标会话，将输入广播给多个终端。", "Choose target sessions and broadcast input to multiple terminals.", "终端", "Terminal"),
         new("official.snippets", "Snippets", "命令片段", "Command snippets",
-            "保存常用命令，搜索后粘贴到指定会话。", "Save reusable commands, search and paste into a selected session.", "终端", "Terminal")
+            "保存常用命令，搜索后粘贴到指定会话。", "Save reusable commands, search and paste into a selected session.", "终端", "Terminal"),
+        new("official.port-guard", "PortGuard", "端口看板", "Port board",
+            "查看本机正在监听的 TCP 端口和 UDP 绑定，确认后结束占用进程。", "See local TCP listeners and UDP binds, then end a process after confirmation.", "终端", "Terminal"),
+        new("official.task-runner", "TaskRunner", "任务面板", "Task runner",
+            "读取 package.json、Makefile、justfile 与 tasks.json，粘贴或新建会话执行。", "Read package.json, Makefile, justfile and tasks.json, then paste or run in a new session.", "开发", "Development")
     };
 }

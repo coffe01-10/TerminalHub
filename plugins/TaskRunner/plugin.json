@@ -1,0 +1,8 @@
+{
+  "id": "official.task-runner",
+  "name": "Task Runner · 任务面板",
+  "version": "1.0.0",
+  "entry": "TerminalHub.Official.TaskRunner.dll",
+  "entryType": "TerminalHub.Official.TaskRunner.TaskRunnerPlugin",
+  "hostApi": 1
+}

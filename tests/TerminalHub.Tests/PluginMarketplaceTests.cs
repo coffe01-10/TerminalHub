@@ -114,10 +114,10 @@ public class PluginMarketplaceTests
             Assert.All(OfficialPluginCatalog.All, p => Assert.True(File.Exists(Path.Combine(p.PackageDirectory(manager.OfficialPackageRoot), "plugin.json"))));
             Call(f.Window, "OpenPluginManager"); var market = Field<PluginManagerWindow>(f.Window, "_pluginManagerWindow");
             var cards = market.FindControl<StackPanel>("PluginCards")!; var filter = market.FindControl<ComboBox>("MarketFilter")!;
-            Assert.Equal(12, cards.Children.Count); filter.SelectedIndex = 2; Assert.Equal(7, cards.Children.Count);
+            Assert.Equal(14, cards.Children.Count); filter.SelectedIndex = 2; Assert.Equal(9, cards.Children.Count);
             var sessionIds = f.Vm.SessionCards.Select(c => c.Model.Id).ToArray();
             Click(market, "Install-official.project-navigator");
-            Assert.True(manager.Plugins.Single().Enabled); Assert.Equal(6, cards.Children.Count);
+            Assert.True(manager.Plugins.Single().Enabled); Assert.Equal(8, cards.Children.Count);
             filter.SelectedIndex = 1; Assert.Equal(6, cards.Children.Count);
             var module = Tool(manager, "official.project-navigator");
             Assert.Equal(ToolPlacement.Window, manager.Settings(module).Placement);
@@ -130,7 +130,7 @@ public class PluginMarketplaceTests
             Assert.True(Workbench(f.Window).IsVisible); Assert.True(f.Vm.InspectorVisible);
             manager.Disable(manager.Plugins.Single()); Assert.Equal(6, cards.Children.Count);
             Assert.False(Workbench(f.Window).IsVisible);
-            manager.Remove(manager.Plugins.Single()); filter.SelectedIndex = 2; Assert.Equal(7, cards.Children.Count);
+            manager.Remove(manager.Plugins.Single()); filter.SelectedIndex = 2; Assert.Equal(9, cards.Children.Count);
             f.Vm.LanguageIndex = 2; market.FindControl<TextBox>("MarketSearch")!.Text = "git";
             await Until(() => cards.Children.Count == 1 && cards.Children[0].Name == "Market-official.git-workbench", "Market search did not find the uninstalled Git extension");
             Assert.Equal(sessionIds, f.Vm.SessionCards.Select(c => c.Model.Id)); Assert.All(f.Vm.SessionCards, c => Assert.True(c.Model.IsRunning));

@@ -38,8 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <BundledPlugin Include="WorkspaceNotes;ScreenClips;CommandWatch;TerminalBroadcast;Snippets;ProjectNavigator;GitWorkbench" />
-    <!-- Build plugin resources separately: transitive content would publish seven plugin.json files to the same path. -->
+    <BundledPlugin Include="WorkspaceNotes;ScreenClips;CommandWatch;TerminalBroadcast;Snippets;ProjectNavigator;GitWorkbench;PortGuard;TaskRunner" />
+    <!-- Build plugin resources separately: transitive content would publish every plugin.json to the same path. -->
     <ProjectReference Include="@(BundledPlugin->'..\..\plugins\%(Identity)\%(Identity).csproj')" ReferenceOutputAssembly="false" Private="false" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained;PublishSingleFile;IncludeNativeLibrariesForSelfExtract" />
   </ItemGroup>
   <Target Name="BundleOfficialPlugins" AfterTargets="Build">

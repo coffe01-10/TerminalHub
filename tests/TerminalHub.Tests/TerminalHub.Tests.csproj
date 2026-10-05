@@ -34,6 +34,8 @@
     <ProjectReference Include="..\..\plugins\Snippets\Snippets.csproj" />
     <ProjectReference Include="..\..\plugins\ProjectNavigator\ProjectNavigator.csproj" />
     <ProjectReference Include="..\..\plugins\GitWorkbench\GitWorkbench.csproj" />
+    <ProjectReference Include="..\..\plugins\PortGuard\PortGuard.csproj" />
+    <ProjectReference Include="..\..\plugins\TaskRunner\TaskRunner.csproj" />
   </ItemGroup>
 
   <Target Name="CopyAcceptancePlugins" AfterTargets="Build">
