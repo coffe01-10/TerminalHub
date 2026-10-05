@@ -4,6 +4,9 @@ public sealed class PluginSettings
 {
     public bool Enabled { get; set; }
     public string Configuration { get; set; } = "";
+    /// <summary>Re-enable a DLL plugin when its entry assembly changes on disk
+    /// (opt-in — plugin authors tick it while iterating).</summary>
+    public bool AutoReload { get; set; }
 }
 public sealed class ModuleSettings
 {

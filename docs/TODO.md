@@ -332,6 +332,15 @@ Windows 继续保留本轮恢复的会话卡片样式、工具栏、底部坞入
 - [x] 维护版本号 0.4.1（App csproj、Inno 脚本、QUICKSTART），发行说明 [v0.4.1](releases/v0.4.1.md)。
 - [x] 中文输入/光标实测：真实 ConPTY 上 Claude Code、PSReadLine 与 Codex 0.158.0 中文编辑通过（Codex 提示词检测改为按帧判定并补回放回归）；新增 `--ime-acceptance` 以真实 SendInput + 系统中文输入法验证组合、提交、Enter 不提交、右边界、分屏与弹出窗口，5/5 通过；候选窗位置经逐张人工视觉审核确认（`acceptance/ime-visual-review.json`），边界为单屏 125% + 工具 Software 渲染。首轮分屏组合错配为验收时序干扰，非产品 bug。
 - [x] 本地包：`artifacts/v0.4.1`（便携 ZIP、`installer/TerminalHub-Setup-0.4.1.exe`、三个官方插件 ZIP、README、验收证据）。
-- [ ] 默认 GPU 渲染候选位置、具体 IME profile、微信输入法、多显示器/DPI、安装包实装、GitHub 发行上传未执行。
+- [ ] 具体 IME profile、微信输入法、多显示器/DPI、安装包实装、GitHub 发行上传未执行。默认/GPU 渲染路径候选位置已于 2026-10-04 自动验收（详见下节），但本 VM 为间接显示适配器无硬件 GPU，真 GPU 留待本机复测。
 
 实现并验证某项后再勾选，补充对应版本及具体结果；未完成的部分继续保留为待办。验证围绕上面的实际使用场景进行，记录未验证范围。
+
+### 2026-10-04 下一轮（验收还账 + 功能刀，一次做完）
+
+- [x] 验收还账（本 VM 可做）：本机 OpenSSH Server 真实 SFTP 端到端；v0.4.1 九场景桌面性能基线（`artifacts/performance/desktop-2026-10-04.json`）；默认/GPU 渲染路径 IME 候选窗自动几何验收（间接显示适配器，无硬件 GPU）。
+- [x] SSH 远程深化：SFTP mkdir/rename/remove/stat（FXP 14/18/15/13/7 + posix-rename）+ RemoteFiles 页新建/重命名/删除命令；真 sshd 终端 + SFTP + UI 命令回归（LocalSshRealTests）。
+- [x] AI 会话任务面板：AiCliCatalog 探测 claude/codex/grok/gemini/aider；任务以 CLI 初始提示词参数开 tag=AI 会话；面板聚合 运行中/等待输入(Codex)/已退出 + 通知。本 VM 未装真 CLI，全部 mock/回放验证。
+- [x] 性能第二轮：PutCluster 零分配 + 预览重绘节流 250ms；同机对照 10 会话全输出 CPU -71%、分配 -76%；顺带修掉 PTY 线程读 styled 属性导致订阅链断裂的回归（新增 OutputSubscriberChainTests 守住）。
+- [x] 插件二轮：声明式脚本插件（manifest commands → 工作台命令 → 开终端）、DLL 热重载 + AutoReload 文件监视（默认关）、官方插件 TerminalBroadcast 与 Snippets；设计见 [plugin-round2](plugin-round2.md)，总记录见 [round-2026-10-04](round-2026-10-04.md)。
+- [ ] 遗留：v0.4.1 GitHub Release 上传与安装包实装、多显示器/DPI、微信输入法、Codex 登录后编辑、真 GPU IME、真 AI CLI 冒烟——均需用户本机。

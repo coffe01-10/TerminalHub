@@ -91,6 +91,7 @@ public partial class TerminalView : Control
     private TerminalEmulator? _emulator;
     private int _dirty = 1;
     private long _lastBlink;
+    private long _lastPreviewRefresh;
     private bool _attached;
     private Typeface _typeface = new("Cascadia Code, Consolas, Menlo, DejaVu Sans Mono, monospace");
     private Typeface _boldTypeface;
@@ -195,7 +196,12 @@ public partial class TerminalView : Control
     {
         if (!IsEffectivelyVisible) return;
         var buf = _emulator?.Buffer;
-        var dirty = Interlocked.Exchange(ref _dirty, 0) != 0;
+        // Throttle consumption on the UI thread, keeping the final output dirty
+        // until the next preview refresh even when the producer has stopped.
+        var now = Environment.TickCount64;
+        var dirty = (!IsPreview || now - _lastPreviewRefresh >= 250)
+            && Interlocked.Exchange(ref _dirty, 0) != 0;
+        if (dirty && IsPreview) _lastPreviewRefresh = now;
         var drift = Interlocked.Exchange(ref _scrollDrift, 0);
         // Idle ticks do not need the buffer lock. Render and immediate selection
         // queries still synchronize from the current frame before using coordinates.
@@ -321,7 +327,11 @@ public partial class TerminalView : Control
         InvalidateVisual();
     }
 
-    private void OnBufferChanged() => Interlocked.Exchange(ref _dirty, 1);
+    private void OnBufferChanged()
+    {
+        // PTY callbacks must not read Avalonia properties off the UI thread.
+        Interlocked.Exchange(ref _dirty, 1);
+    }
 
     // Parser-thread hook: the refresh tick turns this deadline into the overlay.
     private void OnBell()

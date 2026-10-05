@@ -209,6 +209,7 @@ public partial class MainWindowViewModel
     {
         foreach (var result in OutputRuleResults) lock (result.Result.Buffer.SyncRoot) result.Result.Buffer.Anchors.Remove(result.Result.Anchor);
         RemoteFiles?.Dispose();
+        AiPanel.Dispose();
         StopAllRecordings();
     }
 }

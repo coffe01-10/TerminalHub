@@ -76,6 +76,34 @@ public sealed class SftpClient : IDisposable
         return files.OrderByDescending(f => f.IsDirectory).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     }
     public static string Join(string path, string name) => path.TrimEnd('/') + "/" + name;
+    /// <summary>SSH_FXP_MKDIR (14): creates a remote directory with default attrs.</summary>
+    public async Task MkdirAsync(string path, CancellationToken ct = default)
+    { var p = new Packet(14); p.String(path); p.UInt(0); Expect(await RequestAsync(p, ct), 101); }
+    /// <summary>SSH_FXP_RENAME refuses an existing target. Replacement is
+    /// opt-in and uses posix-rename when the server advertises it.</summary>
+    public async Task RenameAsync(string source, string target, CancellationToken ct = default, bool replace = false)
+    {
+        var usePosixRename = replace && _posixRename;
+        var p = new Packet(usePosixRename ? (byte)200 : (byte)18);
+        if (usePosixRename) p.String("posix-rename@openssh.com");
+        p.String(source); p.String(target); Expect(await RequestAsync(p, ct), 101);
+    }
+    /// <summary>SSH_FXP_REMOVE (13) for files / SSH_FXP_RMDIR (15) for empty
+    /// directories, dispatched on <see cref="RemoteFile.IsDirectory"/>.</summary>
+    public async Task RemoveAsync(RemoteFile file, CancellationToken ct = default)
+    { var p = new Packet(file.IsDirectory ? (byte)15 : (byte)13); p.String(file.Path); Expect(await RequestAsync(p, ct), 101); }
+    /// <summary>SSH_FXP_STAT (7): remote attrs reduced to (isDirectory, size).</summary>
+    public async Task<(bool IsDirectory, long Size)> StatAsync(string path, CancellationToken ct = default)
+    {
+        var p = new Packet(7); p.String(path); var r = await RequestAsync(p, ct); Expect(r, 105);
+        var flags = r.UInt(); long size = 0; uint mode = 0;
+        if ((flags & 1) != 0) size = checked((long)r.ULong());
+        if ((flags & 2) != 0) { r.UInt(); r.UInt(); }
+        if ((flags & 4) != 0) mode = r.UInt();
+        if ((flags & 8) != 0) { r.UInt(); r.UInt(); }
+        if ((flags & 0x80000000) != 0) { var n = r.UInt(); for (var j = 0; j < n; j++) { r.String(); r.String(); } }
+        return ((mode & 0xF000) == 0x4000, size);
+    }
     private async Task<byte[]> OpenAsync(string path, uint flags, CancellationToken ct)
     { var p = new Packet(3); p.String(path); p.UInt(flags); p.UInt(0); var r = await RequestAsync(p, ct); Expect(r, 102); return r.Bytes(); }
     private async Task CloseAsync(byte[] handle)
@@ -124,9 +152,7 @@ public sealed class SftpClient : IDisposable
                 Expect(await RequestAsync(p, ct), 101); offset += (uint)count; progress?.Report((long)offset);
             }
             await CloseAsync(handle); closed = true;
-            var rename = new Packet(_posixRename ? (byte)200 : (byte)18);
-            if (_posixRename) rename.String("posix-rename@openssh.com");
-            rename.String(temporary); rename.String(remote); Expect(await RequestAsync(rename, ct), 101); complete = true; IncompleteRemotePath = null;
+            await RenameAsync(temporary, remote, ct, replace: true); complete = true; IncompleteRemotePath = null;
         }
         finally
         {

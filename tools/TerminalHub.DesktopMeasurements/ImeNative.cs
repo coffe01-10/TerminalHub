@@ -118,6 +118,12 @@ internal static class ImeNative
     /// leave the modifier latched.</summary>
     public static void CtrlC(IntPtr owner) => SendBatch(owner,
         [Key(0xA2, 0, 0), Key((ushort)'C', 0, 0), Key((ushort)'C', 0, KeyUp), Key(0xA2, 0, KeyUp)]);
+    /// <summary>Win+Space cycles the focused thread's input profile — the
+    /// supported way to select a TSF IME (e.g. Microsoft Pinyin) when the
+    /// keyboard-layout list only holds a plain zh-CN layout. Per-thread,
+    /// not a machine-global change.</summary>
+    public static void CycleInputLanguage(IntPtr owner) => SendBatch(owner,
+        [Key(0x5B, 0, 0), Key(0x20, 0, 0), Key(0x20, 0, KeyUp), Key(0x5B, 0, KeyUp)]);
 
     /// <summary>Activate a zh-CN input method on this thread only, preferring a
     /// loaded HKL whose IMM description names Microsoft Pinyin; otherwise the
@@ -150,6 +156,52 @@ internal static class ImeNative
         ActivateKeyboardLayout(target, 0);
         SendMessage(hwnd, WmInputLangChangeRequest, IntPtr.Zero, target);
         return GetKeyboardLayout(0);
+    }
+
+    // Text Services Framework: per-process TIP profile activation. A TSF IME
+    // (e.g. Microsoft Pinyin) does NOT engage through ActivateKeyboardLayout —
+    // that only swaps the keyboard layout and letters reach the app literally.
+    // ActivateProfile with TF_IPPMF_FORPROCESS turns the TIP on for this
+    // process' input threads without touching the user's global profile.
+    [ComImport, Guid("71C6E74C-0F28-11D8-A82A-00065B84435C"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ITfInputProcessorProfileMgr
+    {
+        [PreserveSig]
+        int ActivateProfile(uint profileType, ushort langid, [In] in Guid clsid,
+            [In] in Guid profile, IntPtr hkl, uint flags);
+    }
+    [DllImport("ole32.dll")] private static extern int CoCreateInstance([In] in Guid clsid,
+        [MarshalAs(UnmanagedType.IUnknown)] object? outer, uint clsctx, [In] in Guid iid,
+        [MarshalAs(UnmanagedType.Interface)] out object obj);
+    private static readonly Guid IID_ITfInputProcessorProfileMgr = typeof(ITfInputProcessorProfileMgr).GUID;
+    private static readonly Guid CLSID_TF_InputProcessorProfiles = new("33C53A50-F456-4884-B049-85FD643ECFED");
+    private const uint TfProfileTypeInputProcessor = 1;
+    private const uint TfIppmfForProcess = 0x10000000;
+    // Microsoft Pinyin TIP clsid + profile guid (the zh-CN IME installed with
+    // the zh-CN language pack); constants of the OS, not secrets.
+    private static readonly Guid MS_Pinyin_Clsid = new("81D4E9C9-1D3B-41BC-9E6C-4B40BF79E35E");
+    private static readonly Guid MS_Pinyin_Profile = new("FA550B04-5AD7-411F-A5AC-CA038EC515D7");
+
+    /// <summary>Activate Microsoft Pinyin for this process' input threads
+    /// (TF_IPPMF_FORPROCESS); the user's global profile is untouched. Returns
+    /// the HRESULT of the last failed step or 0 — callers record it.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static int ActivateMsPinyinForProcess()
+    {
+        try
+        {
+            var hr = CoCreateInstance(in CLSID_TF_InputProcessorProfiles, null, 0x17,
+                in IID_ITfInputProcessorProfileMgr, out var obj);
+            if (hr != 0) return hr;
+            var mgr = (ITfInputProcessorProfileMgr)obj;
+            try
+            {
+                return mgr.ActivateProfile(TfProfileTypeInputProcessor, 0x0804,
+                    in MS_Pinyin_Clsid, in MS_Pinyin_Profile, IntPtr.Zero, TfIppmfForProcess);
+            }
+            finally { Marshal.ReleaseComObject(obj); }
+        }
+        catch (Exception ex) { return ex.HResult; }
     }
 
     /// <summary>Read-only: the IMM description for an HKL, when the OS exposes
@@ -196,6 +248,46 @@ internal static class ImeNative
             return true;
         }, IntPtr.Zero);
         return found;
+    }
+
+    // Display-adapter evidence for whether a hardware GPU existed (deciding
+    // if "default rendering" actually engaged a GPU path). EnumDisplayDevices
+    // is COM-free and reliable even on indirect-display VMs where DXGI itself
+    // may not be queryable.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DisplayDevice
+    {
+        public int Cb;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+        public int StateFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceId;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+    }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool EnumDisplayDevices(string? device, uint devNum, ref DisplayDevice dd, uint flags);
+
+    /// <summary>Active display adapters as "DeviceString (DeviceId)". On a VM
+    /// with only a virtual/indirect display driver the absence of any real
+    /// GPU name is itself the finding — callers flag non-hardware entries.
+    /// </summary>
+    public static List<string> DisplayAdapters()
+    {
+        var result = new List<string>();
+        var dd = new DisplayDevice { Cb = Marshal.SizeOf<DisplayDevice>() };
+        for (uint i = 0; EnumDisplayDevices(null, i, ref dd, 0); i++)
+        {
+            if ((dd.StateFlags & 1) == 0) continue; // DISPLAY_DEVICE_ACTIVE
+            var s = dd.DeviceString?.TrimEnd('\0') ?? "";
+            var id = dd.DeviceId?.TrimEnd('\0') ?? "";
+            var softwareish = s.Contains("Basic Render", StringComparison.OrdinalIgnoreCase)
+                || s.Contains("IddSample", StringComparison.OrdinalIgnoreCase)
+                || s.Contains("Indirect", StringComparison.OrdinalIgnoreCase)
+                || s.Contains("Remote", StringComparison.OrdinalIgnoreCase)
+                || s.Contains("Virtual", StringComparison.OrdinalIgnoreCase);
+            result.Add($"{s} [{id}]{(softwareish ? " [non-hardware]" : " [hardware]")}");
+        }
+        return result;
     }
 
     /// <summary>Real screen pixels of exactly <paramref name="area"/> (BitBlt +

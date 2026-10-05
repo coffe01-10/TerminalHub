@@ -20,6 +20,24 @@ public sealed record PluginManifest
     public string Entry { get; init; } = "";
     public string EntryType { get; init; } = "";
     public int HostApi { get; init; } = 1;
+    /// <summary>Declarative script-plugin commands. A manifest without
+    /// <see cref="Entry"/> but with commands is enabled by the built-in
+    /// manifest plugin — no assembly is loaded.</summary>
+    public List<ManifestCommand> Commands { get; init; } = [];
+}
+
+/// <summary>One click-runnable command a declarative plugin contributes.
+/// <see cref="Run"/> expands placeholders at execution time: {cwd} the active
+/// session's directory, {session} its name, {workspace} the active workspace,
+/// {dir} the plugin directory. The expanded line runs inside a new terminal
+/// session (cmd /d /s /c on Windows, sh -c elsewhere) so output stays visible.</summary>
+public sealed record ManifestCommand
+{
+    public string Id { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Run { get; init; } = "";
+    public string? Description { get; init; }
+    public string? Gesture { get; init; }
 }
 
 public enum ExtensionSurface { Toolbar, WorkspaceTabs, Sidebar, StatusBar, Menu, SidePanel, BottomPanel, WorkspaceTools, Settings, ToolWindow }

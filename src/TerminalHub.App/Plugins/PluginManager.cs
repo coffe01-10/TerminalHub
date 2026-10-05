@@ -33,10 +33,15 @@ public sealed class PluginEntry(PluginManifest manifest, string directory)
     public string Directory { get; } = directory;
     public string Error { get; internal set; } = "";
     public bool Enabled => Context is not null;
+    /// <summary>Declarative commands-only plugin — the built-in ManifestPlugin
+    /// runs it, so no assembly load context exists to reload on disk changes.</summary>
+    public bool IsScript => string.IsNullOrWhiteSpace(Manifest.Entry);
     internal PluginContext? Context;
     internal IWorkbenchPlugin? Instance;
     internal AssemblyLoadContext? Loader;
     internal bool Stopping;
+    internal FileSystemWatcher? Watcher;
+    internal long WatchRequested; // TickCount64 of the newest file event, 0 = none
 }
 
 public sealed class PluginManager : IDisposable
@@ -45,6 +50,7 @@ public sealed class PluginManager : IDisposable
     private readonly MainWindowViewModel _vm;
     private readonly Styles _styleTarget;
     private readonly DispatcherTimer _outputTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer _watchTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     public string DirectoryPath { get; }
     public ObservableCollection<PluginEntry> Plugins { get; } = [];
     public ObservableCollection<ModuleRegistration> Modules { get; } = [];
@@ -61,6 +67,7 @@ public sealed class PluginManager : IDisposable
         _vm.WorkbenchChanged += Publish;
         _vm.ProjectWorkspaces.CollectionChanged += WorkspacesChanged;
         _outputTimer.Tick += (_, _) => _vm.FlushPluginOutput(); _outputTimer.Start();
+        _watchTimer.Tick += (_, _) => WatchTick();
         Localizer.Current.LanguageChanged += LanguageChanged;
         Dispatcher.UIThread.UnhandledException += OnPluginException;
     }
@@ -79,6 +86,11 @@ public sealed class PluginManager : IDisposable
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? throw new InvalidDataException("plugin.json 为空");
                 if (string.IsNullOrWhiteSpace(manifest.Id)) throw new InvalidDataException("plugin.json 缺少 id");
                 if (Plugins.Any(p => p.Manifest.Id == manifest.Id)) throw new InvalidDataException("插件标识重复：" + manifest.Id);
+                if (string.IsNullOrWhiteSpace(manifest.Entry) == (manifest.Commands.Count == 0))
+                    throw new InvalidDataException("plugin.json 需要 entry 或 commands 之一，不能都填或都不填");
+                foreach (var command in manifest.Commands)
+                    if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Run))
+                        throw new InvalidDataException("commands 里的每项都要有 id 和 run");
                 var plugin = new PluginEntry(manifest, directory); Plugins.Add(plugin);
                 if (_vm.PluginPreferences.GetValueOrDefault(manifest.Id)?.Enabled == true) Enable(plugin);
             }
@@ -136,21 +148,30 @@ public sealed class PluginManager : IDisposable
         try
         {
             if (plugin.Manifest.HostApi != ApiVersion) throw new NotSupportedException($"宿主 API {plugin.Manifest.HostApi} 不受支持；当前为 {ApiVersion}");
-            var entry = Path.GetFullPath(Path.Combine(plugin.Directory,plugin.Manifest.Entry));
-            if (!entry.StartsWith(Path.GetFullPath(plugin.Directory) + Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("插件入口必须位于插件目录中");
-            var loader = new PluginLoadContext(entry);
-            plugin.Loader = loader;
-            var assembly = loader.ReadAssembly(entry);
-            var type = string.IsNullOrWhiteSpace(plugin.Manifest.EntryType)
-                ? assembly.GetTypes().First(t => typeof(IWorkbenchPlugin).IsAssignableFrom(t) && !t.IsAbstract)
-                : assembly.GetType(plugin.Manifest.EntryType, true)!;
-            plugin.Instance = (IWorkbenchPlugin)Activator.CreateInstance(type)!;
+            if (plugin.IsScript)
+            {
+                plugin.Instance = new ManifestPlugin(plugin.Manifest, plugin.Directory);
+            }
+            else
+            {
+                var entry = Path.GetFullPath(Path.Combine(plugin.Directory,plugin.Manifest.Entry));
+                if (!entry.StartsWith(Path.GetFullPath(plugin.Directory) + Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("插件入口必须位于插件目录中");
+                var loader = new PluginLoadContext(entry);
+                plugin.Loader = loader;
+                var assembly = loader.ReadAssembly(entry);
+                var type = string.IsNullOrWhiteSpace(plugin.Manifest.EntryType)
+                    ? assembly.GetTypes().First(t => typeof(IWorkbenchPlugin).IsAssignableFrom(t) && !t.IsAbstract)
+                    : assembly.GetType(plugin.Manifest.EntryType, true)!;
+                plugin.Instance = (IWorkbenchPlugin)Activator.CreateInstance(type)!;
+            }
             plugin.Context = new(this,plugin,_vm);
             plugin.Instance.Initialize(plugin.Context);
             plugin.Error = "";
             if (LastError.StartsWith(plugin.Manifest.Name + ": ",StringComparison.Ordinal)) LastError = "";
-            Preferences(plugin).Enabled = true; _vm.SavePluginPreferences(); Refresh();
+            Preferences(plugin).Enabled = true; _vm.SavePluginPreferences();
+            if (Preferences(plugin).AutoReload) StartWatch(plugin);
+            Refresh();
         }
         catch (Exception ex) { Fail(plugin,ex); }
     }
@@ -164,6 +185,7 @@ public sealed class PluginManager : IDisposable
             try { plugin.Instance?.Deactivate(); } catch (Exception ex) { plugin.Error = ex.GetBaseException().Message; }
             plugin.Context?.Dispose(); plugin.Context = null; plugin.Instance = null;
             plugin.Loader?.Unload(); plugin.Loader = null;
+            StopWatch(plugin);
             Preferences(plugin).Enabled = false; _vm.SavePluginPreferences(); Refresh();
         }
         finally { plugin.Stopping = false; }
@@ -176,7 +198,39 @@ public sealed class PluginManager : IDisposable
         if (!target.StartsWith(root,StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("插件目录不在安装目录中");
         Directory.Delete(target,true); Plugins.Remove(plugin); _vm.PluginPreferences.Remove(plugin.Manifest.Id); _vm.SavePluginPreferences(); Refresh();
     }
-    private PluginSettings Preferences(PluginEntry plugin)
+    /// <summary>Re-load an enabled plugin in place: disable (unloading its
+    /// collectible assembly context) and enable from current files, keeping
+    /// the enabled preference so a watcher loop can call this repeatedly.</summary>
+    public void Reload(PluginEntry plugin)
+    {
+        if (!plugin.Enabled || _disposed || plugin.IsScript) return;
+        Disable(plugin); Enable(plugin);
+    }
+    internal void StartWatch(PluginEntry plugin)
+    {
+        StopWatch(plugin);
+        var watcher = new FileSystemWatcher(plugin.Directory, "*.dll")
+        { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size, EnableRaisingEvents = true };
+        void Mark(object? s, FileSystemEventArgs e) => plugin.WatchRequested = Environment.TickCount64;
+        watcher.Changed += Mark; watcher.Created += Mark; watcher.Renamed += Mark;
+        plugin.Watcher = watcher; _watchTimer.Start();
+    }
+    internal void StopWatch(PluginEntry plugin)
+    {
+        plugin.Watcher?.Dispose(); plugin.Watcher = null; plugin.WatchRequested = 0;
+    }
+    private void WatchTick()
+    {
+        var now = Environment.TickCount64;
+        foreach (var plugin in Plugins)
+        {
+            if (plugin.Watcher is null || plugin.WatchRequested == 0) continue;
+            if (now - plugin.WatchRequested < 400) continue;
+            plugin.WatchRequested = 0;
+            try { if (plugin.Enabled) Reload(plugin); } catch (Exception ex) { Fail(plugin, ex); }
+        }
+    }
+    internal PluginSettings Preferences(PluginEntry plugin)
     {
         if (!_vm.PluginPreferences.TryGetValue(plugin.Manifest.Id,out var state)) _vm.PluginPreferences[plugin.Manifest.Id] = state = new();
         return state;
@@ -238,7 +292,9 @@ public sealed class PluginManager : IDisposable
     public void Dispose()
     {
         if (_disposed) return; _disposed = true;
-        _outputTimer.Stop(); _vm.WorkbenchChanged -= Publish; _vm.ProjectWorkspaces.CollectionChanged -= WorkspacesChanged; Localizer.Current.LanguageChanged -= LanguageChanged;
+        _outputTimer.Stop(); _watchTimer.Stop();
+        foreach (var plugin in Plugins) StopWatch(plugin);
+        _vm.WorkbenchChanged -= Publish; _vm.ProjectWorkspaces.CollectionChanged -= WorkspacesChanged; Localizer.Current.LanguageChanged -= LanguageChanged;
         Dispatcher.UIThread.UnhandledException -= OnPluginException;
         // Shutdown clears registrations without changing the saved enabled preference.
         foreach (var plugin in Plugins.Where(p => p.Enabled).ToArray())
