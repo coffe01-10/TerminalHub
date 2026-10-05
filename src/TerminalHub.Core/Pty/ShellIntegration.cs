@@ -8,7 +8,12 @@ public static class ShellIntegration
     public const string LegacyPowerShellArguments = "-NoExit -Command \"$global:TerminalHubOriginalPrompt = ${function:prompt}; function global:prompt { [Console]::Write([char]27 + ']9;9;' + $executionContext.SessionState.Path.CurrentFileSystemLocation.Path + [char]7); & $global:TerminalHubOriginalPrompt }\"";
     public static bool IsPowerShell(string shell) => Path.GetFileNameWithoutExtension(shell).ToLowerInvariant() is "pwsh" or "powershell";
     public const string PowerShellArguments = "-NoExit -Command \"" + PowerShellScript + "\"";
-    public const string PowerShellScript = "$global:TerminalHubOriginalPrompt = ${function:prompt}; " +
+    public const string PreviousPowerShellArguments = "-NoExit -Command \"" + PowerShellPromptScript + "\"";
+    // Console.Write emits OSC directory/command marks. Western Windows code pages
+    // replace Chinese with '?' before ConPTY can translate the output to UTF-8.
+    public const string PowerShellScript = "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); " +
+        PowerShellPromptScript;
+    private const string PowerShellPromptScript = "$global:TerminalHubOriginalPrompt = ${function:prompt}; " +
         "function global:prompt { $thSuccess = $?; " +
         "if ($global:TerminalHubCommandActive) { $thCode = if ($null -ne $global:LASTEXITCODE) { $global:LASTEXITCODE } elseif ($thSuccess) { 0 } else { 1 }; " +
         "[Console]::Write([char]27 + ']133;D;' + $thCode + [char]7); $global:TerminalHubCommandActive = $false }; " +

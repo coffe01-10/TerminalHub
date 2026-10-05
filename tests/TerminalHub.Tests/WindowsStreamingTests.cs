@@ -250,6 +250,42 @@ public class WindowsStreamingTests
         finally { File.Delete(path); }
     }
 
+    [Theory]
+    [InlineDataIfShellInstalled("pwsh")]
+    [InlineDataIfShellInstalled("powershell.exe")]
+    public async Task RealPowerShell_CwdReportPreservesChineseWithWesternConsoleEncoding(string shell)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var root = Directory.CreateTempSubdirectory("terminalhub-cwd-").FullName;
+        var directory = Path.Combine(root, "中文 [目录] 'quote");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            using var pty = new ConPtySession();
+            using var terminal = new TerminalEmulator(pty);
+            var reported = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            terminal.CwdChanged += path => reported.TrySetResult(path);
+            var handles = new[] { -10, -11, -12 }.Select(GetStdHandle).ToArray();
+            try
+            {
+                foreach (var id in new[] { -10, -11, -12 }) SetStdHandle(id, IntPtr.Zero);
+                // CI uses a western code page: Console.Write previously replaced Chinese in OSC paths with '?'.
+                await terminal.StartAsync(new PtyOptions
+                {
+                    Shell = shell,
+                    Arguments = "-NoLogo -NoProfile -NoExit -Command \"" +
+                        "[Console]::OutputEncoding = [Text.Encoding]::GetEncoding(1252); " +
+                        ShellDirectoryCommand.Build(directory, shell) + "; " +
+                        ShellIntegration.PowerShellScript + "\"",
+                    WorkingDirectory = root
+                });
+            }
+            finally { for (var i = 0; i < handles.Length; i++) SetStdHandle(-10 - i, handles[i]); }
+            Assert.Equal(directory, await reported.Task.WaitAsync(TimeSpan.FromSeconds(15)));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     [DllImport("kernel32.dll")] private static extern IntPtr GetStdHandle(int id);
     [DllImport("kernel32.dll")] private static extern bool SetStdHandle(int id, IntPtr handle);
 }

@@ -408,20 +408,25 @@ public class ProjectPluginNativeTests
             for (var i = 0; i < ids.Length; i++) SetStdHandle(ids[i], handles[i]);
         }
         Assert.NotNull(id); host.ActivateSession(id.Value);
-        async Task Until(Func<bool> condition)
+        async Task Until(Func<bool> condition, string stage)
         {
             var deadline = Environment.TickCount64 + 20000;
             while (!condition() && Environment.TickCount64 < deadline) await Task.Delay(30);
-            Assert.True(condition(), "Real ConPTY did not report the expected state");
+            var session = fixture.Vm.ActiveSession!;
+            Assert.True(condition(), $"Real ConPTY did not report {stage}. " +
+                $"Running={session.IsRunning}, Cwd={session.Emulator.Buffer.Cwd ?? "<none>"}, " +
+                $"CommandRunning={session.Emulator.CommandState?.Running}, " +
+                $"AlternateScreen={session.Emulator.Buffer.OnAlternateScreen}.\n" +
+                session.Emulator.Buffer.TailText(15));
         }
-        await Until(() => host.Sessions.Single(s => s.Id == id).CanChangeDirectory);
+        await Until(() => host.Sessions.Single(s => s.Id == id).CanChangeDirectory, "initial shell prompt");
         Assert.True(((IProjectWorkbenchHost)fixture.Vm).ChangeSessionDirectory(id.Value, target));
-        await Until(() => host.Sessions.Single(s => s.Id == id).WorkingDirectory == target);
+        await Until(() => host.Sessions.Single(s => s.Id == id).WorkingDirectory == target, "target working directory");
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.Vm.ActiveSession!.Emulator.CommandCompleted += _ => completed.TrySetResult();
         host.SendInput(id.Value, "git add -- .; git commit -m 'native ConPTY'; git push --set-upstream origin main; Write-Host 'native-git-complete'", true);
         await completed.Task.WaitAsync(TimeSpan.FromSeconds(20));
-        await Until(() => host.Sessions.Single(s => s.Id == id).CanChangeDirectory);
+        await Until(() => host.Sessions.Single(s => s.Id == id).CanChangeDirectory, "prompt after Git push");
         Assert.Equal("native ConPTY", (await repo.Client.Git(bare, default, "log", "-1", "--format=%s")).RequireSuccess().Output.Trim());
         Assert.True(fixture.Vm.ActiveSession!.ExcludeFromWorkspace);
     }
