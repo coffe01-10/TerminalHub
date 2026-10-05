@@ -1,12 +1,12 @@
 <p align="center">
   <picture>
     <source media="(max-width: 600px)" srcset="docs/readme/hero-zh-compact.svg">
-    <img src="docs/readme/hero-zh.svg" width="1200" alt="Terminal Hub：专为 AI CLI 打造的终端管理工作台。把 Claude Code、Codex CLI 和日常 Shell 会话放在同一个工作空间。">
+    <img src="docs/readme/hero-zh.svg" width="1200" alt="Terminal Hub：让 AI 写代码，你掌控全局。专为 AI CLI 打造的原生终端工作台。">
   </picture>
 </p>
 
 <p align="center"><a href="README.md">English</a> / <strong>简体中文</strong></p>
-<p align="center"><strong>专为 AI CLI 打造的终端管理工作台。</strong></p>
+<p align="center"><strong>AI 会话、开发服务和测试，同在一个工作空间。</strong></p>
 
 <p align="center">
   <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt=".NET 8"></a>
@@ -16,35 +16,43 @@
 </p>
 
 <p align="center">
+  <a href="#demo">观看宣传片</a> &nbsp; · &nbsp;
   <a href="#quick-start">开始使用</a> &nbsp; · &nbsp;
-  <a href="https://github.com/coffe01-10/TerminalHub/releases">下载发布包</a> &nbsp; · &nbsp;
-  <a href="#themes">主题风格</a> &nbsp; · &nbsp;
-  <a href="#docs">深入了解</a>
+  <a href="#plugins">官方扩展</a> &nbsp; · &nbsp;
+  <a href="https://github.com/coffe01-10/TerminalHub/releases">下载</a>
 </p>
 
-让 AI 写代码的同时，你还需要运行项目、观察构建、执行测试，以及偶尔接管命令行。Terminal Hub 把这些终端会话组织在一个原生工作台里，让你按项目安排工作，随时找到需要关注的任务。
+Claude Code 正在改代码，Codex 在处理另一个任务，开发服务和测试还在后台运行。窗口越来越多，你真正需要的是看清进展，并在需要时接手。
 
-Claude Code、Codex CLI 和日常 Shell 可以各自运行。AI CLI 由你自行安装并登录，Terminal Hub 承载真实 Shell 进程并管理会话；认证、模型选择与 CLI 自身权限沿用各工具的设置。
+**Terminal Hub 把这些独立终端收进一个按项目组织的原生工作台。** 从会话预览找到目标，分屏对照输出，把常用工具留在手边，让注意力回到正在做的事。
 
-## 看看 Terminal Hub 如何工作
+<a id="demo"></a>
+
+## 66 秒，看看你的工作台
 
 https://github.com/user-attachments/assets/5c55badb-4a9a-4e93-874c-4f8be8a4e3d7
 
-## 围绕 AI CLI 的日常工作
+<p align="center"><sub>v0.4.1 宣传片 · 从多窗口到同一工作台 · 动画展示产品功能与交互。</sub></p>
 
-**一个项目，容纳多种任务。** 把 AI 对话、开发服务、构建与测试放进同一个工作区；多个项目各自保留会话和布局，切换时后台进程继续运行。
+<a id="features"></a>
 
-**看见进度，再决定介入。** 实时会话预览与后台输出提示帮助你关注正在发生的事。需要时切换、分屏或独立打开终端，历史与搜索让重要输出可以重新找到。
+## 后台的进展，一眼可见
 
-**认真对待终端输入。** 中文输入法、光标定位、多行粘贴、文本选择与键盘协议，都是 AI 命令行体验的一部分。具体工具的验证范围见 [CLI 交互适配](docs/cli-compatibility.md)。
+左侧会话栏持续显示终端内容的缩略预览，新输出提示和退出码帮助你发现变化。AI 会话、开发服务、测试与 SSH 各有自己的位置，点击预览即可回到对应终端，接着操作。
 
-**把重复工作留下来。** 保存常用项目命令，用输出规则关注关键内容，也可以录制终端操作、处理 SSH 会话与远程文件。字体、主题和快捷键按你的习惯调整。
+按项目建立工作区，给会话命名、分组或置顶。切换工作区时，后台进程继续运行；重要输出可以通过历史、搜索和日志重新找到。
 
-<p align="center">
-  <img src="docs/readme/workflow.svg" width="1200" alt="使用流程示意：从项目和 Shell 开始，在多个独立会话中并行工作，下次启动恢复保存的布局。">
-</p>
+## 任意嵌套分屏，进程保持运行
 
-<p align="center"><sub>工作方式的概念图，不依赖具体页面布局。</sub></p>
+一边让 AI 修改代码，一边观察服务日志和测试结果。左右、上下和嵌套分屏可以继续拆分，拖动边缘调整比例，也能把会话弹到独立窗口，再收回工作台。
+
+分屏、弹出和跨工作区移动沿用同一个会话，布局变化不会重启 Shell。下次启动时恢复保存的布局，并创建新的 Shell 进程。
+
+## 光标在哪，中文输入就跟到哪
+
+在 `ab中文cd` 中移动光标，再继续输入，输入法组合文字与候选窗跟随实际编辑位置。Terminal Hub 处理中文宽字符与 AI CLI 的反色光标，让混排文字、选区和输入位置对应起来。
+
+拖选复制、历史搜索、多行粘贴和字号快捷调整也在终端里完成。Claude Code、Codex CLI 等工具的具体适配与验证范围见 [CLI 交互适配](docs/cli-compatibility.md)。
 
 <a id="themes"></a>
 
@@ -64,6 +72,32 @@ https://github.com/user-attachments/assets/5c55badb-4a9a-4e93-874c-4f8be8a4e3d7
 </table>
 
 <p align="center"><sub>SVG 主题配色示意。</sub></p>
+
+<a id="plugins"></a>
+
+## 九个官方扩展，一个开放 SDK
+
+项目目录、Git、任务和终端记录，都可以成为工作台的一部分。顶部「插件」打开市场，按需安装附带的官方扩展；页面可以放在独立窗口、现有底部工具栏或右侧面板。
+
+| 扩展 | 用它做什么 |
+| --- | --- |
+| 项目导航 | 浏览、收藏项目目录，在指定目录打开终端 |
+| Git 工作台 | 查看差异、提交与推送，管理分支、PR 和 Issue |
+| 任务面板 | 从 `package.json`、Makefile、justfile 和 `tasks.json` 运行任务 |
+| 终端广播 | 选择多个目标会话，同时发送输入 |
+| 命令看板 | 从 Shell 集成查看命令、耗时和退出码 |
+| 端口看板 | 查看监听端口和占用进程，确认后结束进程 |
+| 命令片段 | 保存、搜索常用命令，粘贴到指定会话 |
+| 工作区笔记 | 为每个工作区保留独立笔记，切换时自动保存 |
+| 屏幕摘录 | 收藏终端屏幕片段，随时查看和复制 |
+
+九个扩展已随当前源码构建携带，发布包内容以对应发行说明为准。安装与位置设置见 [插件市场](docs/plugins/marketplace.md)。你也可以用 .NET / Avalonia 开发自己的工具页，或用声明式脚本注册命令；开发时支持热重载，见 [插件 SDK](docs/plugin-sdk.md)与 [从零开发教程](docs/plugins/development-tutorial.md)。
+
+## 原生终端，承载真实任务
+
+**Avalonia 11 + .NET 8，Windows ConPTY / Linux PTY。** Claude Code、Codex CLI 和日常 Shell 在各自的真实进程中运行。AI CLI 由你自行安装并登录，认证、模型选择和权限沿用各工具的设置。
+
+宣传片中的 **CPU 占用下降 71%、内存分配下降 76%**，来自 v0.4.1 优化前后、同机 10 个会话持续输出场景的对照，表示该负载下的测量结果。数据与其他负载结果见 [性能记录](docs/round-2026-10-04.md)。
 
 <a id="quick-start"></a>
 
@@ -144,8 +178,3 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 欢迎在 [Issues](https://github.com/coffe01-10/TerminalHub/issues) 提交建议。输入和显示问题请附系统、Shell / CLI 版本及复现步骤。
 
 [MIT License](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
-
-
-## v0.4.0 工作台扩展
-
-支持任意嵌套分屏、跨工作区拖动、最近使用切换、中英文切换、布局撤销/重做及保留状态的独立工作区工具窗口。新增本地 .NET/Avalonia 插件机制，开发与导入见 [插件 SDK](docs/plugin-sdk.md)，交付边界见 [本轮记录](docs/workbench-2026-10-03.md)。工具窗口和新增模块已精修界面，见 [当前界面与验收](docs/ui-refinement-2026-10-03.md)。[v0.4.0 已发布](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0)。

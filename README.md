@@ -1,12 +1,12 @@
 <p align="center">
   <picture>
     <source media="(max-width: 600px)" srcset="docs/readme/hero-en-compact.svg">
-    <img src="docs/readme/hero-en.svg" width="1200" alt="Terminal Hub: a terminal management workbench built for AI CLIs. Bring Claude Code, Codex CLI, and everyday shell sessions into one workspace.">
+    <img src="docs/readme/hero-en.svg" width="1200" alt="Terminal Hub: Let AI code. Stay in control. A native terminal workbench for AI CLIs.">
   </picture>
 </p>
 
 <p align="center"><strong>English</strong> / <a href="README.zh-CN.md">简体中文</a></p>
-<p align="center"><strong>A terminal management workbench built for AI CLIs.</strong></p>
+<p align="center"><strong>AI sessions, development servers, and tests. One workspace.</strong></p>
 
 <p align="center">
   <a href="src/TerminalHub.App/TerminalHub.App.csproj"><img src="docs/readme/runtime.svg" height="24" alt=".NET 8"></a>
@@ -16,35 +16,43 @@
 </p>
 
 <p align="center">
+  <a href="#demo">Watch the film</a> &nbsp; · &nbsp;
   <a href="#quick-start">Get started</a> &nbsp; · &nbsp;
-  <a href="https://github.com/coffe01-10/TerminalHub/releases">Downloads</a> &nbsp; · &nbsp;
-  <a href="#themes">Themes</a> &nbsp; · &nbsp;
-  <a href="#docs">Documentation</a>
+  <a href="#plugins">Plugins</a> &nbsp; · &nbsp;
+  <a href="https://github.com/coffe01-10/TerminalHub/releases">Downloads</a>
 </p>
 
-While AI writes code, you still need to run the project, watch builds, execute tests, and take over the command line. Terminal Hub brings these terminal sessions into a native workbench, so you can organize work by project and find the task that needs your attention.
+Claude Code is editing code. Codex is working on another task. Your development server and tests are still running. As the windows pile up, you need to see what is happening and step in when it matters.
 
-Claude Code, Codex CLI, and everyday shells run in their own sessions. Install and sign in to your AI CLIs separately; Terminal Hub hosts real shell processes and manages sessions. Authentication, model selection, and CLI permissions follow each tool's own settings.
+**Terminal Hub brings those independent terminals into a native workbench organized by project.** Find a session in its live preview, split terminals to compare output, and keep useful tools nearby. Keep your attention on the work.
 
-## See Terminal Hub in action
+<a id="demo"></a>
+
+## Your workbench, in 66 seconds
 
 https://github.com/user-attachments/assets/5c55badb-4a9a-4e93-874c-4f8be8a4e3d7
 
-## Built around everyday AI CLI work
+<p align="center"><sub>v0.4.1 launch film · From scattered windows to one workbench · Animated feature and interaction showcase.</sub></p>
 
-**One project, several kinds of work.** Keep AI conversations, development servers, builds, and tests in the same workspace. Each project retains its sessions and layout, while background processes keep running as you switch.
+<a id="features"></a>
 
-**See progress, then step in.** Live session previews and background output indicators help you notice what is happening. Switch, split, or open a terminal in its own window when needed; history and search help you find important output again.
+## See progress in the background
 
-**Treat terminal input as part of the experience.** IME input, cursor placement, multiline paste, text selection, and keyboard protocols all matter when working with AI CLIs. See [CLI interaction compatibility](docs/cli-compatibility.md) for the verified scope of individual tools.
+The session shelf shows live terminal previews. New output indicators and exit codes help you notice changes. Give AI sessions, services, tests, and SSH connections their own place, then click a preview to pick up where you left off.
 
-**Keep repeatable work close.** Save common project commands, highlight important output, record terminal activity, or work with SSH sessions and remote files. Adjust fonts, themes, and shortcuts to suit your habits.
+Organize projects into workspaces and name, group, or pin sessions. Background processes keep running as you switch projects. History, search, and logs help you find important output again.
 
-<p align="center">
-  <img src="docs/readme/workflow.svg" width="1200" alt="Conceptual workflow: start with a project and shell, work across independent sessions, and restore the saved layout on the next launch.">
-</p>
+## Split anywhere. Keep processes running.
 
-<p align="center"><sub>A workflow illustration, independent of the application's page layout.</sub></p>
+Let AI edit code while you watch server logs and test results. Split horizontally, vertically, or inside an existing pane; drag the borders to adjust proportions. Open a session in its own window and bring it back when you are done.
+
+Splitting, popping out, and moving between workspaces reuse the same session without restarting its shell. On the next launch, the saved layout returns with fresh shell processes.
+
+## Chinese input follows the editing cursor
+
+Move through `ab中文cd` and keep typing: composition text and the IME candidate window follow the actual insertion point. Terminal Hub handles wide characters and inverse cursors used by AI CLIs, keeping mixed text, selection, and input aligned.
+
+Select and copy text, search history, paste multiple lines, and adjust the font size from the terminal. See [CLI interaction compatibility](docs/cli-compatibility.md) for the verified scope of Claude Code, Codex CLI, and other tools.
 
 <a id="themes"></a>
 
@@ -64,6 +72,32 @@ Dark Glass, Black, White, and Paper: four distinct palettes and textures.
 </table>
 
 <p align="center"><sub>SVG theme palette illustrations.</sub></p>
+
+<a id="plugins"></a>
+
+## Nine official plugins. One open SDK.
+
+Bring project folders, Git, tasks, and terminal notes into the workbench. Open the plugin marketplace from the toolbar and install bundled extensions as needed. Place their pages in an independent window, the existing bottom toolbar, or the right sidebar.
+
+| Plugin | What it does |
+| --- | --- |
+| Project navigator | Browse and bookmark folders; open terminals in a selected directory |
+| Git workbench | Review diffs, commit and push; manage branches, PRs, and issues |
+| Task runner | Run tasks from `package.json`, Makefile, justfile, and `tasks.json` |
+| Terminal broadcast | Choose target sessions and send input to them together |
+| Command watch | Track commands, duration, and exit codes through shell integration |
+| Port board | Inspect listening ports and their processes; end a process after confirmation |
+| Command snippets | Save and search commands; paste them into a selected session |
+| Workspace notes | Keep separate notes per workspace, saved as you switch |
+| Screen clips | Capture terminal screen snippets to review and copy later |
+
+The current source build bundles all nine extensions; see each release's notes for its package contents. See the [marketplace guide](docs/plugins/marketplace.md) for installation and placement. Build your own .NET / Avalonia tool pages or register commands with a script manifest, with hot reload during development. Start with the [plugin SDK](docs/plugin-sdk.md) or [step-by-step tutorial](docs/plugins/development-tutorial.en.md).
+
+## Native terminals. Real work.
+
+**Avalonia 11 + .NET 8, with Windows ConPTY and Linux PTY.** Claude Code, Codex CLI, and everyday shells run in their own real processes. Install and sign in to AI CLIs separately; authentication, model selection, and permissions follow each tool's settings.
+
+The film's **71% lower CPU use and 76% fewer memory allocations** come from a v0.4.1 before-and-after comparison on the same machine with 10 sessions continuously producing output. These figures describe that measured workload. See the [performance record](docs/round-2026-10-04.md) for the data and other workloads.
 
 <a id="quick-start"></a>
 
@@ -146,8 +180,3 @@ dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 Suggestions are welcome in [Issues](https://github.com/coffe01-10/TerminalHub/issues). For input or rendering problems, include your OS, shell / CLI version, and reproduction steps.
 
 [MIT License](LICENSE) · Copyright © 2026 Jinhong Chen (coffe01-10)
-
-
-## v0.4.0 workbench extensions
-
-Adds nested splits, cross-workspace session moves, recent-session switching, Chinese/English UI, layout undo/redo and workspace tools in a reusable independent window. Native .NET/Avalonia plugins have a public SDK and independently built examples; see [plugin development](docs/plugin-sdk.md) and [delivery notes](docs/workbench-2026-10-03.md). The tools window and new modules have received a UI refinement; see [current UI and acceptance](docs/ui-refinement-2026-10-03.md). [v0.4.0 is available](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0).
