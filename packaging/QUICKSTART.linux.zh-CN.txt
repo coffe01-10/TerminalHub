@@ -1,10 +1,11 @@
-Terminal Hub v0.3.4 — Linux x64（2026-10-02）
+Terminal Hub — Linux x64
+English: QUICKSTART.linux.en.txt
 
 适用于使用 glibc 的 Linux x86_64 桌面环境，不适用于 ARM64 或 Alpine/musl。
 发布包包含 .NET 运行时，无需安装 .NET SDK。
 仍需图形和系统库；Avalonia 需要 libX11、libICE、libSM、fontconfig。
 Debian/Ubuntu 可安装：
-  sudo apt install libx11-6 libice6 libsm6 libfontconfig1
+  sudo apt install libx11-6 libxcb1 libice6 libsm6 libfontconfig1 fonts-noto-cjk
 .NET 8 系统依赖随发行版不同，参见：
   https://learn.microsoft.com/dotnet/core/install/linux
 Avalonia 的 Linux 部署说明：
@@ -31,6 +32,10 @@ Ctrl+滚轮调整字号；Ctrl+Shift+F 打开历史搜索。
 分屏和弹出窗口使用同一会话，布局切换无需重启进程。
 文件单击预览，Enter／双击使用系统默认应用打开。
 Thunar 文件夹右键集成可在设置中启用；其他文件管理器可用 --cwd 启动目录。
+
+顶部「插件」打开市场，九个官方扩展随当前构建携带，可按需离线安装。
+工具可以使用独立窗口或原有底部工具栏／右侧面板。
+离线手册：docs/plugins/index.html（中文）、index.en.html（English）。
 
 如果 CLI 变成无彩色，检查启动环境中的 NO_COLOR；程序保留用户显式环境选择。
 反馈请附 Linux 发行版、桌面环境、Shell/CLI 版本及复现步骤：

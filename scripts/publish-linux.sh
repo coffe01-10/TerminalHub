@@ -23,7 +23,7 @@ echo "==> artifacts/publish/linux-x64/TerminalHub"
 ls -lh artifacts/publish/linux-x64/TerminalHub
 
 # Package only the executable and distribution documents, never local settings.
-cp LICENSE packaging/QUICKSTART.linux.zh-CN.txt artifacts/publish/linux-x64/
+cp LICENSE packaging/QUICKSTART.linux.zh-CN.txt packaging/QUICKSTART.linux.en.txt artifacts/publish/linux-x64/
 chmod +x artifacts/publish/linux-x64/TerminalHub
 # Explicit modes also work when cross-publishing under Git Bash on NTFS.
 archive="artifacts/TerminalHub-linux-x64.tar"
@@ -32,7 +32,7 @@ trap 'rm -f "$archive"' EXIT
 TAR=${TAR:-tar}
 if [[ "$OSTYPE" == msys* && "$TAR" == tar ]]; then TAR=/usr/bin/tar; fi
 "$TAR" -cf "$archive" --mode=0755 -C artifacts/publish/linux-x64 TerminalHub
-"$TAR" -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 LICENSE QUICKSTART.linux.zh-CN.txt docs/plugins/index.html docs/plugins/development-tutorial.html docs/plugins/development-tutorial.en.html
+"$TAR" -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 LICENSE QUICKSTART.linux.zh-CN.txt QUICKSTART.linux.en.txt docs/plugins/index.html docs/plugins/index.en.html docs/plugins/development-tutorial.html docs/plugins/development-tutorial.en.html
 for plugin in WorkspaceNotes ScreenClips CommandWatch TerminalBroadcast Snippets ProjectNavigator GitWorkbench PortGuard TaskRunner; do
   "$TAR" -rf "$archive" --mode=0644 -C artifacts/publish/linux-x64 \
     "official-plugins/$plugin/TerminalHub.Official.$plugin.dll" \

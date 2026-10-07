@@ -18,6 +18,7 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <Content Include="..\..\docs\plugins\index.html" Link="docs\plugins\index.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\plugins\index.en.html" Link="docs\plugins\index.en.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\docs\plugins\development-tutorial.html" Link="docs\plugins\development-tutorial.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\docs\plugins\development-tutorial.en.html" Link="docs\plugins\development-tutorial.en.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

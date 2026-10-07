@@ -1,5 +1,7 @@
 # 插件开发与使用
 
+[English](README.en.md) · **简体中文**
+
 [安装](#安装官方插件) · [官方插件](#官方插件) · [插件开发教程](development-tutorial.md) · [API 参考](../plugin-sdk.md#命令事件和宿主操作) · [源码](../../plugins) · [离线页面](index.html)
 
 开发教程提供[中文](development-tutorial.md)和[English](development-tutorial.en.md)，离线页面也可切换；「开发文档」入口随应用当前中英文界面打开对应版本。
@@ -114,3 +116,14 @@ ID：`official.task-runner` · [源码](../../plugins/TaskRunner/TaskRunnerPlugi
 本轮以源码与本地构建包交付，尚未上传发行附件。项目导航和 Git 工作台的验收记录见[使用与验证说明](project-git-workbench.md)。
 
 最初三个官方插件的具体场景和未执行范围见 [2026-10-03 验收记录](acceptance-2026-10-03.md)。
+
+## 维护英文离线手册
+
+英文离线手册从 `README.en.md` 生成，复用本页对应中文 HTML 的样式。修改英文 Markdown 后，在仓库根目录运行：
+
+```powershell
+python -m pip install -r docs/plugins/requirements.txt
+python -B docs/plugins/generate_manual.py
+```
+
+该 Python 依赖只用于生成文档，应用构建和阅读手册不需要它。现有开发教程仍同步维护 Markdown 与 HTML。

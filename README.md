@@ -52,7 +52,7 @@ Splitting, popping out, and moving between workspaces reuse the same session wit
 
 Move through `ab中文cd` and keep typing: composition text and the IME candidate window follow the actual insertion point. Terminal Hub handles wide characters and inverse cursors used by AI CLIs, keeping mixed text, selection, and input aligned.
 
-Select and copy text, search history, paste multiple lines, and adjust the font size from the terminal. See [CLI interaction compatibility](docs/cli-compatibility.md) for the verified scope of Claude Code, Codex CLI, and other tools.
+Select and copy text, search history, paste multiple lines, and adjust the font size from the terminal. See [CLI interaction compatibility](docs/cli-compatibility.en.md) for the verified scope of Claude Code, Codex CLI, and other tools.
 
 <a id="themes"></a>
 
@@ -91,13 +91,13 @@ Bring project folders, Git, tasks, and terminal notes into the workbench. Open t
 | Workspace notes | Keep separate notes per workspace, saved as you switch |
 | Screen clips | Capture terminal screen snippets to review and copy later |
 
-The current source build bundles all nine extensions; see each release's notes for its package contents. See the [marketplace guide](docs/plugins/marketplace.md) for installation and placement. Build your own .NET / Avalonia tool pages or register commands with a script manifest, with hot reload during development. Start with the [plugin SDK](docs/plugin-sdk.md) or [step-by-step tutorial](docs/plugins/development-tutorial.en.md).
+The current source build bundles all nine extensions; see each release's notes for its package contents. See the [marketplace guide](docs/plugins/marketplace.en.md) for installation and placement. Build your own .NET / Avalonia tool pages or register commands with a script manifest, with hot reload during development. Start with the [plugin SDK](docs/plugin-sdk.en.md) or [step-by-step tutorial](docs/plugins/development-tutorial.en.md).
 
 ## Native terminals. Real work.
 
 **Avalonia 11 + .NET 8, with Windows ConPTY and Linux PTY.** Claude Code, Codex CLI, and everyday shells run in their own real processes. Install and sign in to AI CLIs separately; authentication, model selection, and permissions follow each tool's settings.
 
-The film's **71% lower CPU use and 76% fewer memory allocations** come from a v0.4.1 before-and-after comparison on the same machine with 10 sessions continuously producing output. These figures describe that measured workload. See the [performance record](docs/round-2026-10-04.md) for the data and other workloads.
+The film's **71% lower CPU use and 76% fewer memory allocations** come from a v0.4.1 before-and-after comparison on the same machine with 10 sessions continuously producing output. These figures describe that measured workload. See the [performance record](docs/performance.en.md) for the data and other workloads.
 
 <a id="quick-start"></a>
 
@@ -105,7 +105,7 @@ The film's **71% lower CPU use and 76% fewer memory allocations** come from a v0
 
 ### Download a release
 
-Visit [v0.4.0](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0) for the Windows portable package, Linux x64 archive, and plugin SDK. This release does not include a Windows installer. Release packages include the .NET runtime; see each release's notes for platform dependencies and changes.
+Visit [Releases](https://github.com/coffe01-10/TerminalHub/releases) and choose the package for your platform. Available archives, installers, and plugin SDKs vary by release. Application packages include the .NET runtime; see the corresponding notes for dependencies, included plugins, and changes.
 
 ### Run from source
 
@@ -169,13 +169,14 @@ dotnet build TerminalHub.sln -c Debug
 dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 ```
 
-- [Development guide](AGENTS.md): code entry points, known pitfalls, and relevant checks.
-- [CLI interaction compatibility](docs/cli-compatibility.md): tools, protocols, and real CLI verification.
-- [Workspace tools](docs/project-features-2026-10-02.md): usage details for tasks, output rules, broadcast, remote files, and recording.
+- [Documentation index](docs/README.md): English/Chinese usage, plugin, and development guides.
+- [Development guide](docs/development.en.md): code entry points, known pitfalls, and relevant checks.
+- [CLI interaction compatibility](docs/cli-compatibility.en.md): tools, protocols, and real CLI verification.
+- [Workspace tools](docs/project-features-2026-10-02.en.md): usage details for tasks, output rules, broadcast, remote files, and recording.
 - [Plugin development tutorial](docs/plugins/development-tutorial.en.md) ([中文](docs/plugins/development-tutorial.md)): build a complete Command Draft plugin from scratch, with a runnable sample, configuration, events and UI extensions.
-- [Plugin guide and official plugins](docs/plugins/README.md): install Workspace Notes, Screen Clips and Command Watch; see the [SDK reference](docs/plugin-sdk.md) for API details.
-- [Roadmap](docs/TODO.md): upcoming development.
-- [README assets](docs/readme/README.md): SVG sources and generation.
+- [Plugin guide and official plugins](docs/plugins/README.en.md): install and use all nine official extensions; see the [SDK reference](docs/plugin-sdk.en.md) for API details.
+- [Planning record (Chinese)](docs/TODO.md): historical status and upcoming development.
+- [README assets](docs/readme/README.en.md): SVG sources and generation.
 
 Suggestions are welcome in [Issues](https://github.com/coffe01-10/TerminalHub/issues). For input or rendering problems, include your OS, shell / CLI version, and reproduction steps.
 

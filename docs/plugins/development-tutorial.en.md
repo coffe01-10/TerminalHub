@@ -6,7 +6,7 @@ This tutorial is for plugin developers. You will build a .NET plugin that loads 
 
 [Requirements](#prepare) · [Project](#project) · [Manifest](#manifest) · [Implementation](#implementation) · [Code walkthrough](#explain) · [Build and import](#run) · [Extensions](#extend) · [Packaging and debugging](#distribute) · [Troubleshooting](#troubleshooting)
 
-[Complete sample project](../../examples/plugins/CommandDraft) · [SDK reference, Chinese](../plugin-sdk.md) · [Official plugin source](../../plugins)
+[Complete sample project](../../examples/plugins/CommandDraft) · [SDK reference](../plugin-sdk.en.md) · [Official plugin source](../../plugins)
 
 <a id="prepare"></a>
 
@@ -416,6 +416,6 @@ In Visual Studio or Rider, attach to the running `TerminalHub` process and place
 | An old version still appears | Rebuild and reimport. After modifying the host itself, exit the previous single instance normally before launching the new build. |
 | Plugin reports an error and disables itself | Read the error on its plugin card and attach a debugger to inspect the plugin code. |
 
-For further examples, see [Workspace Notes](../../plugins/WorkspaceNotes/WorkspaceNotesPlugin.cs) for workspace-scoped configuration, [Screen Clips](../../plugins/ScreenClips/ScreenClipsPlugin.cs) for stable frames and export, and [Command Watch](../../plugins/CommandWatch/CommandWatchPlugin.cs) for shell events. Full signatures are in the [public interfaces](../../src/TerminalHub.Extensibility/PluginApi.cs). The [SDK reference, Chinese](../plugin-sdk.md) describes extension surfaces and lifecycle details.
+For further examples, see [Workspace Notes](../../plugins/WorkspaceNotes/WorkspaceNotesPlugin.cs) for workspace-scoped configuration, [Screen Clips](../../plugins/ScreenClips/ScreenClipsPlugin.cs) for stable frames and export, and [Command Watch](../../plugins/CommandWatch/CommandWatchPlugin.cs) for shell events. Full signatures are in the [public interfaces](../../src/TerminalHub.Extensibility/PluginApi.cs). The [SDK reference](../plugin-sdk.en.md) describes extension surfaces and lifecycle details.
 
 The accompanying sample has been built against the repository SDK and the released v0.4.0 API 1 DLLs. Its DLL import, single-line paste without an appended Enter, session targeting, and saved draft restoration have passed Headless verification in `PluginTutorialTests`. This English page translates its display strings; the complete English implementation above has also been compiled against the released SDK with no warnings or errors. The tutorial and sample are in the repository; they have not been added to the existing Release attachments.

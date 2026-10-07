@@ -1,5 +1,7 @@
 # CLI 交互适配
 
+[English](cli-compatibility.en.md) · **简体中文**
+
 重点对象：Claude Code、Grok Build、Codex CLI。工具栏中的本地 Codex 助手面板已移除，终端内运行 `codex` 不受影响。
 
 ## 操作

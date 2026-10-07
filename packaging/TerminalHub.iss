@@ -52,9 +52,11 @@ Source: "{#SourceDir}\TerminalHub.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\TerminalHub*.pdb"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\QUICKSTART.zh-CN.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\QUICKSTART.en.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\CHANGES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\PERFORMANCE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\plugins\index.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
+Source: "{#SourceDir}\docs\plugins\index.en.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\plugins\development-tutorial.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\plugins\development-tutorial.en.html"; DestDir: "{app}\docs\plugins"; Flags: ignoreversion
 Source: "{#SourceDir}\official-plugins\*.dll"; DestDir: "{app}\official-plugins"; Flags: ignoreversion recursesubdirs createallsubdirs

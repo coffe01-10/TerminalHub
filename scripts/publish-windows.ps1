@@ -34,6 +34,7 @@ Write-Host "==> Published to $out" -ForegroundColor Green
 
 # A portable preview is useful even without Inno Setup installed.
 Copy-Item -LiteralPath (Join-Path $repo 'packaging\QUICKSTART.zh-CN.txt') -Destination $out
+Copy-Item -LiteralPath (Join-Path $repo 'packaging\QUICKSTART.en.txt') -Destination $out
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $out
 $version = ([xml](Get-Content -LiteralPath (Join-Path $repo 'src\TerminalHub.App\TerminalHub.App.csproj') -Raw)).Project.PropertyGroup.Version
 Copy-Item -LiteralPath (Join-Path $repo "docs\releases\v$version.md") -Destination (Join-Path $out 'CHANGES.md')
@@ -42,7 +43,7 @@ $previewZip = Join-Path $artifactRoot 'TerminalHub-windows-x64-preview.zip'
 # Package the program payload explicitly; personal settings and SSH records
 # placed beside a portable executable must never enter a release archive.
 $portableNames = @('TerminalHub.exe', 'TerminalHub.Core.pdb', 'TerminalHub.Pty.pdb',
-  'TerminalHub.pdb', 'TerminalHub.Extensibility.pdb', 'LICENSE', 'QUICKSTART.zh-CN.txt', 'CHANGES.md', 'PERFORMANCE.md', 'docs/plugins/index.html', 'docs/plugins/development-tutorial.html', 'docs/plugins/development-tutorial.en.html')
+  'TerminalHub.pdb', 'TerminalHub.Extensibility.pdb', 'LICENSE', 'QUICKSTART.zh-CN.txt', 'QUICKSTART.en.txt', 'CHANGES.md', 'PERFORMANCE.md', 'docs/plugins/index.html', 'docs/plugins/index.en.html', 'docs/plugins/development-tutorial.html', 'docs/plugins/development-tutorial.en.html')
 $portableStream = [System.IO.File]::Open($previewZip, [System.IO.FileMode]::Create)
 $portableArchive = [System.IO.Compression.ZipArchive]::new($portableStream, [System.IO.Compression.ZipArchiveMode]::Create)
 try {

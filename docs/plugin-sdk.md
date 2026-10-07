@@ -1,5 +1,7 @@
 # Terminal Hub 插件 SDK（宿主 API 1）
 
+[English](plugin-sdk.en.md) · **简体中文**
+
 [插件开发教程](plugins/development-tutorial.md) · [English tutorial](plugins/development-tutorial.en.md) · [安装与使用](plugins/README.md) · [官方插件](plugins/README.md#官方插件) · [清单与工程](#构建和导入) · [生命周期](#生命周期和配置) · [宿主 API](#命令事件和宿主操作)
 
 ## 从零开发一个插件

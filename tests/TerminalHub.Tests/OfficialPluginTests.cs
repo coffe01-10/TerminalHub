@@ -165,6 +165,7 @@ public class OfficialPluginTests
             window.Width = window.MinWidth; window.Height = window.MinHeight; await Task.Delay(80);
             Assert.Equal("Developer guide ↗", window.FindControl<Button>("PluginDevelopmentLink")!.Content);
             Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "docs/plugins/index.html")));
+            Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "docs/plugins/index.en.html")));
             window.Close(); Assert.Empty(manager.LastError);
         }
         finally { foreach (var plugin in manager.Plugins.ToArray()) manager.Remove(plugin); f.Vm.LanguageIndex = 0; f.Window.Close(); await Task.Delay(100); }

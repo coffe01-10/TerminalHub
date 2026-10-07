@@ -1,5 +1,7 @@
 # 命令草稿：插件开发教程配套工程
 
+[English](README.en.md) · **简体中文**
+
 照着[完整教程](../../../docs/plugins/development-tutorial.md)从零创建同样的插件。
 
 仓库内构建：

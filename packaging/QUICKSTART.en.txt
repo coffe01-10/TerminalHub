@@ -1,0 +1,68 @@
+Terminal Hub — Windows x64
+
+Extract the entire folder and double-click TerminalHub.exe.
+The package includes the .NET runtime; the .NET SDK is not required.
+Requires Windows 10 1809 or later / Windows 11, x64.
+
+If PowerShell 7 is missing, startup lets you choose an installed shell:
+Windows PowerShell, Command Prompt, or a custom executable.
+WSL requires an installed and configured Linux distribution.
+
+Ctrl+Shift+N: new session. Ctrl+Tab: switch sessions.
+Click workspace tabs to switch, drag horizontally to reorder, and use the
+context menu to rename. Order is saved in configuration.
+When the sidebar auto-hides, approach the left edge to reveal it.
+Alt+1…9 selects terminals in sidebar order.
+Settings → Shortcuts records bindings for previous/next and terminals 1–9.
+Backspace/Delete clears a binding; Done saves it. Defaults can be restored.
+These shortcuts work within the main window, not system-wide.
+
+Ctrl+Shift+P opens the command palette to find terminals by name/directory
+and run common operations. Use arrows to select, Enter to run, Esc to return.
+Its shortcut is configurable.
+Settings → Workspace saves named templates with directories, shells,
+arguments, and startup commands. Opening a template creates new sessions
+while existing ones continue. Startup commands run only when the template
+is manually opened with execution enabled.
+Launching the app again activates the existing window rather than duplicating sessions.
+
+Ctrl+click URLs or local paths to open them. Use Ctrl+Shift+click when a CLI
+captures mouse input. Files open in Notepad by default; configure Code.exe
+in Settings → About for navigation to reported line numbers.
+Dragging a local file pastes a shell-quoted path without execution.
+SSH sessions do not accept local dragged paths.
+Shells supporting OSC 133 report command results/duration; PowerShell
+integration needs PSReadLine. Settings → About includes background completion
+notifications, version information, and manual update checks.
+
+Ctrl+Shift+C: copy selection. Ctrl+V: paste. Ctrl+C: interrupt.
+Drag to select; hold Shift for local selection when the CLI reports mouse events.
+Select a split pane before typing to choose the input target.
+Claude composition text wraps by terminal cells; long composition shows
+the region around the composing cursor. Font/pane changes update the IME
+anchor; loss of focus or view removal clears stale composition.
+Main views/previews reuse unchanged row drawings to reduce repeated layout.
+Session cards show new output, process exit, and nonzero exit codes.
+Hover lifts/tilts previews; clicking transitions into the main terminal.
+Terminal toolbar → … → Terminal colors offers Auto, Follow interface,
+Dark, and Light. Auto can retain Grok Build's dark terminal with a Paper UI.
+
+Plugins opens the marketplace. The current build bundles nine official
+extensions for opt-in offline installation. Project Navigator browses
+folders/changes terminal directories; Git Workbench supports commits,
+pushes, and GitHub operations.
+Installed cards' Open location selects Independent window (default),
+Bottom toolbar, or Right sidebar. Bottom entries join the existing
+Monitor / SSH / Logs / Deploy toolbar and open pages on the right.
+Sidebar tabs join Processes / Files / Logs / SSH / Commands / AI.
+Settings controls startup and plugin options.
+The full English offline manual is docs/plugins/index.en.html.
+
+Closing the app ends this run's terminal processes.
+Restart restores layouts with fresh shells, not previous running processes.
+Settings: %APPDATA%\TerminalHub\settings.json.
+Quit before replacing program files during an upgrade; retain personal settings.
+
+Unsigned builds may show an unknown-publisher prompt.
+Report Windows version, shell/CLI version, and reproduction steps:
+https://github.com/coffe01-10/TerminalHub/issues

@@ -1,0 +1,46 @@
+Terminal Hub — Linux x64
+
+For glibc-based Linux x86_64 desktop environments, not ARM64 or Alpine/musl.
+The package includes .NET; the .NET SDK is not required.
+An X11 display and graphical/system libraries are still required.
+Debian/Ubuntu:
+  sudo apt install libx11-6 libxcb1 libice6 libsm6 libfontconfig1 fonts-noto-cjk
+Distribution-specific .NET dependencies:
+  https://learn.microsoft.com/dotnet/core/install/linux
+Avalonia Linux deployment:
+  https://docs.avaloniaui.net/docs/deployment/linux
+
+Extract and run:
+  mkdir -p TerminalHub
+  tar -xzf TerminalHub-linux-x64.tar.gz -C TerminalHub
+  cd TerminalHub
+  chmod +x TerminalHub
+  ./TerminalHub
+
+The default is local Bash with a real PTY. Choose another installed shell
+if the default is unavailable.
+Click workspace tabs to switch, drag to reorder, and use the context menu
+to rename; order is saved. Approach the left edge to reveal an auto-hidden sidebar.
+Settings: ${XDG_CONFIG_HOME:-$HOME/.config}/terminalhub/settings.json.
+Quit before replacing the executable during upgrade; retain personal settings.
+Closing the app ends terminal processes. Layout restoration creates fresh
+shells rather than restoring old processes.
+
+Ctrl+Shift+N: new session. Ctrl+Tab: switch sessions.
+Ctrl+Shift+C: copy. Ctrl+V: paste. Ctrl+C: interrupt the shell/CLI.
+Ctrl+wheel: adjust font size. Ctrl+Shift+F: open history search.
+Hold Shift for local selection/history scrolling when an application captures the mouse.
+Splits and popped-out windows share the same session without restarting it.
+Single-click a file to preview; Enter/double-click opens its default application.
+Enable Thunar folder-context integration in settings; other file managers
+can pass --cwd to choose a startup directory.
+
+Plugins opens the marketplace. The current build includes nine official
+extensions that you install as needed. They can open in an independent
+window or dock through the existing toolbar/sidebar.
+English offline manual: docs/plugins/index.en.html.
+
+If a CLI loses colors, check NO_COLOR in its startup environment.
+Explicit user environment choices are preserved.
+Report distribution, desktop environment, shell/CLI version, and reproduction:
+  https://github.com/coffe01-10/TerminalHub/issues

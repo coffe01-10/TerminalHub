@@ -1,5 +1,7 @@
 # 最小插件
 
+[English](README.en.md) · **简体中文**
+
 从仓库根目录构建：
 
 ```powershell

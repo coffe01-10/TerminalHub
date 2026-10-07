@@ -105,7 +105,7 @@ https://github.com/user-attachments/assets/5c55badb-4a9a-4e93-874c-4f8be8a4e3d7
 
 ### 下载发布包
 
-到 [v0.4.0](https://github.com/coffe01-10/TerminalHub/releases/tag/v0.4.0) 下载 Windows 便携包、Linux x64 包或插件 SDK。本版未提供 Windows 安装包。发布包包含 .NET 运行时；平台依赖与版本变更见对应发行说明。
+到 [Releases](https://github.com/coffe01-10/TerminalHub/releases) 选择适合你平台的包。便携包、安装包及插件 SDK 的提供情况因版本而异。程序包包含 .NET 运行时，平台依赖、携带插件和变更见对应发行说明。
 
 ### 从源码启动
 
@@ -169,6 +169,9 @@ dotnet build TerminalHub.sln -c Debug
 dotnet test tests/TerminalHub.Tests/TerminalHub.Tests.csproj
 ```
 
+- [文档目录](docs/README.zh-CN.md)：使用、插件和开发文档的中英文入口。
+- [插件使用](docs/plugins/README.md)与[市场设置](docs/plugins/marketplace.md)：安装九个官方扩展、调整位置和启动方式。
+- [插件 SDK](docs/plugin-sdk.md)与[开发教程](docs/plugins/development-tutorial.md)：公开 API 和完整示例。
 - [开发指引](AGENTS.md)：代码入口、已踩过的坑和对应验证方式。
 - [CLI 交互适配](docs/cli-compatibility.md)：工具、协议和实机验证范围。
 - [工作区工具说明](docs/project-features-2026-10-02.md)：任务、输出规则、广播、远程文件与录制的具体用法。
