@@ -57,6 +57,7 @@ public sealed class VtParser
     // under SyncRoot and written back AFTER the lock is released — ConPtySession.Write
     // blocks on WriteFile and must never stall the render lock.
     private readonly List<byte[]> _responses = new();
+    private readonly List<string> _clipboardCopies = new();
     private readonly List<(char Marker, int? ExitCode, string? Text, int Line, int Column, long Removed)> _commandMarkers = new();
     public event Action<char, int?>? CommandMarker;
     /// <summary>Invoked as each marker arrives, inside the buffer lock.
@@ -74,6 +75,11 @@ public sealed class VtParser
     /// visual notification instead of a sound.</summary>
     public event Action? Bell;
 
+    /// <summary>OSC 52 copy: the app asks the terminal to put decoded text on
+    /// the system clipboard. Raised outside the buffer lock. The payload is
+    /// already base64-decoded; an empty string clears the clipboard.</summary>
+    public event Action<string>? ClipboardCopyRequested;
+
     public ScreenBuffer Buffer => _buffer;
 
     public VtParser(ScreenBuffer buffer, Action<byte[]>? responder = null)
@@ -86,6 +92,7 @@ public sealed class VtParser
     {
         byte[][] responses;
         (char Marker, int? ExitCode, string? Text, int Line, int Column, long Removed)[] commandMarkers;
+        var clipboardCopies = new List<string>();
         lock (_buffer.SyncRoot)
         {
             if (data.Length > 0) _buffer.BumpVersion();
@@ -100,6 +107,7 @@ public sealed class VtParser
             _responses.Clear();
             commandMarkers = _commandMarkers.ToArray();
             _commandMarkers.Clear();
+            if (_clipboardCopies.Count > 0) { clipboardCopies.AddRange(_clipboardCopies); _clipboardCopies.Clear(); }
             if (DataApplied is { } applied && data.Length > 0) applied(data.ToArray());
         }
         // Replies (DA, DECRPM, OSC queries, kitty flags) go out AFTER releasing
@@ -109,6 +117,7 @@ public sealed class VtParser
             _responder?.Invoke(r);
         foreach (var marker in commandMarkers) CommandMarker?.Invoke(marker.Marker, marker.ExitCode);
         if (commandMarkers.Length > 0) CommandsObserved?.Invoke();
+        foreach (var copy in clipboardCopies) ClipboardCopyRequested?.Invoke(copy);
         BufferChanged?.Invoke();
     }
 
@@ -787,6 +796,9 @@ public sealed class VtParser
                 var separator = text.IndexOf(';');
                 if (separator >= 0) _buffer.CurrentHyperlink = text[(separator + 1)..] is { Length: > 0 } url ? url : null;
                 break;
+            case 52:
+                if (TryDecodeOsc52(text, out var copied)) _clipboardCopies.Add(copied);
+                break;
             case 133:
                 var markSplit = text.IndexOf(';');
                 var head = markSplit < 0 ? text : text[..markSplit];
@@ -808,6 +820,18 @@ public sealed class VtParser
                 break;
             case 777: break; // notifications
             case 4: break;   // palette query/set
+            // ConEmu progress (OSC 9;4;state;value) and the Windows Terminal
+            // notification (OSC 9;1;text). The cwd report (OSC 9;9;path) is the
+            // "9;" case below and must keep winning when both could match.
+            case 9 when text.StartsWith("4;"):
+                var parts = text[2..].Split(';');
+                var progressState = int.TryParse(parts[0], out var ps) ? ps : 0;
+                var progressValue = parts.Length > 1 && int.TryParse(parts[1], out var pv) ? pv : 0;
+                _buffer.SetProgress(progressState, progressValue);
+                break;
+            case 9 when text.StartsWith("1;"):
+                _buffer.SetTitle(text[2..]);
+                break;
             case 10: case 11:
                 if (text == "?")
                 {
@@ -825,6 +849,27 @@ public sealed class VtParser
                 break;
             default: break;
         }
+    }
+
+    /// <summary>OSC 52 payload: <c>c;base64</c> (or a selection list ending in c).
+    /// <c>?</c> is a paste query — ignored, the terminal never hands clipboard
+    /// contents back to an app unprompted.</summary>
+    public static bool TryDecodeOsc52(string text, out string decoded)
+    {
+        decoded = "";
+        var separator = text.IndexOf(';');
+        if (separator < 0) return false;
+        var selection = text[..separator];
+        if (!selection.Contains('c')) return false;
+        var payload = text[(separator + 1)..].Trim();
+        if (payload.Length == 0) return true;
+        if (payload == "?") return false;
+        try
+        {
+            decoded = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+            return true;
+        }
+        catch (FormatException) { return false; }
     }
 
     /// <summary>Parse OSC 7 payload: <c>file://host/path</c>, <c>file:///path</c>, or a bare absolute path.</summary>

@@ -415,6 +415,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Ssh = new SshViewModel(_settings.SshHosts, ConnectSsh, SaveSettingsInternal, sshAvailable);
         InitializeProjectTools();
         AiPanel = new AiPanelViewModel(
+            sessions: () => _sessions.Snapshot,
+            sessionsChanged: () => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshCounts),
             spawn: SpawnAiTaskSessionAsync,
             activate: s => ActivateSearchSession(s),
             notify: (s, text) => ShowNotification(s, text),

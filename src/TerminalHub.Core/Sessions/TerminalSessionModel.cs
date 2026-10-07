@@ -1,3 +1,4 @@
+using TerminalHub.Core.Ai;
 using TerminalHub.Core.Pty;
 using TerminalHub.Core.Terminal;
 
@@ -32,6 +33,10 @@ public sealed class TerminalSessionModel : IDisposable
     /// <summary>One-shot task sessions (a publish run) are left out of the saved
     /// workspace — restoring them would re-run the script on every launch.</summary>
     public bool ExcludeFromWorkspace { get; set; }
+
+    /// <summary>What an AI CLI in this session is doing, refreshed from the
+    /// screen and progress sequences. Ordinary shells stay <see cref="AiAttention.Unknown"/>.</summary>
+    public AiAttention Attention { get; set; } = AiAttention.Unknown;
 
     public void Dispose() => Emulator.Dispose();
 }

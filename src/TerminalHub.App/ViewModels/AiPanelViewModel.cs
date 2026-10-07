@@ -28,6 +28,8 @@ public sealed partial class AiTaskViewModel : ObservableObject
 public sealed partial class AiPanelViewModel : ObservableObject, IDisposable
 {
     private readonly Func<AiCli, string, Task<TerminalSessionModel?>> _spawn;
+    private readonly Func<IReadOnlyList<TerminalSessionModel>>? _sessions;
+    private readonly Action? _sessionsChanged;
     private readonly Action<TerminalSessionModel>? _activate;
     private readonly Action<TerminalSessionModel, string>? _notify;
     private readonly Func<TerminalSessionModel, bool>? _isVisible;
@@ -46,12 +48,16 @@ public sealed partial class AiPanelViewModel : ObservableObject, IDisposable
     public AiPanelViewModel(
         IEnumerable<AiCli>? clis = null,
         Func<AiCli, string, Task<TerminalSessionModel?>>? spawn = null,
+        Func<IReadOnlyList<TerminalSessionModel>>? sessions = null,
+        Action? sessionsChanged = null,
         Action<TerminalSessionModel>? activate = null,
         Action<TerminalSessionModel, string>? notify = null,
         Func<TerminalSessionModel, bool>? isVisible = null,
         bool autoScan = true)
     {
         _spawn = spawn ?? ((_, _) => Task.FromResult<TerminalSessionModel?>(null));
+        _sessions = sessions;
+        _sessionsChanged = sessionsChanged;
         _activate = activate;
         _notify = notify;
         _isVisible = isVisible;
@@ -97,10 +103,12 @@ public sealed partial class AiPanelViewModel : ObservableObject, IDisposable
     /// <summary>One pass over live tasks: exited sessions get their code, and
     /// CLIs with a frame detector flip between 运行中 and 等待输入. State
     /// transitions notify only when the session isn't on screen — a banner for
-    /// the pane the user is already watching is noise.</summary>
+    /// the pane the user is already watching is noise. The same pass updates
+    /// every session's "needs you" attention, panel-spawned or not.</summary>
     public void Scan()
     {
         if (_disposed) return;
+        if (_sessions is not null && ScanAttention(_sessions())) _sessionsChanged?.Invoke();
         foreach (var task in Tasks.ToArray())
         {
             var session = task.Session;
@@ -133,6 +141,37 @@ public sealed partial class AiPanelViewModel : ObservableObject, IDisposable
                     _notify?.Invoke(session, $"{session.Name} · 等待输入");
             }
         }
+    }
+
+    /// <summary>Recompute every AI session's attention. Returns whether any
+    /// session changed, so the caller can repaint cards that show the badge.</summary>
+    private bool ScanAttention(IReadOnlyList<TerminalSessionModel> sessions)
+    {
+        var changed = false;
+        foreach (var session in sessions)
+            if (RefreshAttention(session)) changed = true;
+        return changed;
+    }
+
+    /// <summary>Recompute whether an AI CLI in this session is blocked on the
+    /// user. Only AI-tagged sessions are scanned, and only a transition into
+    /// "needs you" notifies — a session the user is already looking at stays quiet.</summary>
+    private bool RefreshAttention(TerminalSessionModel session)
+    {
+        if (session.Tag != SessionTag.Ai || !session.IsRunning) return false;
+        TerminalFrame frame;
+        int progress;
+        lock (session.Emulator.Buffer.SyncRoot)
+        {
+            frame = session.Emulator.Buffer.CaptureFrame();
+            progress = session.Emulator.Buffer.ProgressState;
+        }
+        var attention = AiAttentionDetector.Detect(frame, progress);
+        if (attention == session.Attention) return false;
+        session.Attention = attention;
+        if (attention == AiAttention.NeedsYou && _isVisible?.Invoke(session) != true)
+            _notify?.Invoke(session, $"{session.Name} · 需要你确认");
+        return true;
     }
 
     public void Dispose()

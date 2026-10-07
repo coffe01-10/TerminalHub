@@ -28,6 +28,17 @@ public static class CodexPrompt
         return tail.Length == 0 || tail == "Ask Codex to do anything";
     }
 
+    /// <summary>The CLI is blocked on something only the user can answer: the
+    /// sign-in page or the directory trust prompt. Distinct from
+    /// <see cref="IsEditing"/>, which is the idle composer.</summary>
+    public static bool IsBlocked(TerminalFrame frame)
+    {
+        var screen = ScreenText(frame);
+        if (!screen.Contains("OpenAI Codex", StringComparison.Ordinal)) return false;
+        return screen.Contains("Sign in with ChatGPT", StringComparison.OrdinalIgnoreCase)
+            || screen.Contains("trust this", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ScreenText(TerminalFrame frame)
     {
         var all = new StringBuilder();

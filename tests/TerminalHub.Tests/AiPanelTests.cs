@@ -45,6 +45,34 @@ public class AiPanelTests
         Assert.Empty(panel.Tasks);
     }
 
+    [Fact]
+    public async Task AttentionScan_FlagsBlockedAiSession_AndNotifiesOnce()
+    {
+        using var session = await MockSession();
+        session.Tag = SessionTag.Ai;
+        var notices = new List<string>();
+        using var panel = new AiPanelViewModel(
+            sessions: () => [session],
+            notify: (_, text) => notices.Add(text),
+            isVisible: _ => false,
+            autoScan: false);
+        panel.Scan();
+        Assert.Equal(AiAttention.Unknown, session.Attention);
+
+        session.Emulator.Parser.Feed("\x1b[2J\x1b[H\x1b[4;1HDo you want to proceed?");
+        panel.Scan();
+        Assert.Equal(AiAttention.NeedsYou, session.Attention);
+        Assert.Equal(["ai-task · 需要你确认"], notices);
+
+        panel.Scan(); // unchanged — no second notice
+        Assert.Single(notices);
+
+        session.Tag = SessionTag.None; // a plain shell mentioning the same words stays quiet
+        session.Attention = AiAttention.Unknown;
+        panel.Scan();
+        Assert.Equal(AiAttention.Unknown, session.Attention);
+    }
+
     private static readonly AiCli Codex = new(
         AiCliCatalog.Known.First(k => k.Id == "codex"), @"C:\tools\codex.cmd");
     private static readonly AiCli Claude = new(

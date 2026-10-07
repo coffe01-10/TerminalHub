@@ -461,6 +461,7 @@
                     <Separator/>
                     <MenuItem Header="{loc:Text M0488}" Command="{Binding CopyActiveCwdCommand}"/>
                     <Separator/>
+                    <MenuItem x:Name="SendSelectionToAiItem" Header="{loc:Text M0407}" Click="OnSendSelectionToAi" ToolTip.Tip="{loc:Text M0408}"/>
                     <MenuItem Header="{loc:Text M0356}" Click="OnCopyScreen" ToolTip.Tip="{loc:Text M0489}"/>
                     <MenuItem Header="{loc:Text M0358}" Click="OnCopyAllOutput" ToolTip.Tip="{loc:Text M0359}"/>
                     <MenuItem x:Name="SaveSelectionItem" Header="{loc:Text M0333}" Click="OnSaveSelection"/>

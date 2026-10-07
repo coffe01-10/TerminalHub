@@ -261,6 +261,24 @@ public sealed class ScreenBuffer
     public string? Cwd { get; private set; }
     public event Action<string>? CwdChanged;
 
+    /// <summary>ConEmu/Windows Terminal progress state (OSC 9;4). 0 = none,
+    /// 1 = determinate, 2 = error, 3 = indeterminate, 4 = warning. AI CLIs use
+    /// this to say "working" vs "needs you" without the terminal guessing.</summary>
+    public int ProgressState { get; private set; }
+    /// <summary>0–100 while <see cref="ProgressState"/> is determinate.</summary>
+    public int ProgressValue { get; private set; }
+    public event Action? ProgressChanged;
+
+    public void SetProgress(int state, int value)
+    {
+        state = state is >= 0 and <= 4 ? state : 0;
+        value = Math.Clamp(value, 0, 100);
+        if (ProgressState == state && ProgressValue == value) return;
+        ProgressState = state;
+        ProgressValue = value;
+        ProgressChanged?.Invoke();
+    }
+
     public ScreenBuffer(int columns = 80, int rows = 24)
     {
         Columns = columns;

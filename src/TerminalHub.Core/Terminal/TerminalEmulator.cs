@@ -34,6 +34,8 @@ public sealed class TerminalEmulator : IDisposable
     public event Action? Changed;
     /// <summary>PTY rang the bell (BEL in ground state).</summary>
     public event Action? Bell;
+    /// <summary>The app asked to copy text to the system clipboard (OSC 52).</summary>
+    public event Action<string>? ClipboardCopyRequested;
     private long _commandStarted;
     public ShellCommandState? CommandState { get; private set; }
     public CommandJournal Commands { get; } = new();
@@ -60,6 +62,7 @@ public sealed class TerminalEmulator : IDisposable
         _pty.OutputReceived += OnPtyOutput;
         Parser.BufferChanged += () => Changed?.Invoke();
         Parser.Bell += () => Bell?.Invoke();
+        Parser.ClipboardCopyRequested += text => ClipboardCopyRequested?.Invoke(text);
         Parser.ObserveCommands = markers => Commands.Apply(markers, Buffer);
         Parser.CommandsObserved += () => CommandsChanged?.Invoke();
         Parser.CommandMarker += (marker, code) =>

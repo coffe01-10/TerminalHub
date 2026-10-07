@@ -284,6 +284,7 @@ public partial class TerminalView : Control
             old.Changed -= OnBufferChanged;
             old.Buffer.ScrollbackChanged -= OnScrollbackChanged;
             old.Bell -= OnBell;
+            old.ClipboardCopyRequested -= OnClipboardCopyRequested;
         }
         _applicationPointer?.Capture(null);
         _selectionPointer?.Capture(null);
@@ -310,7 +311,8 @@ public partial class TerminalView : Control
         _wordSelection = false;
         _hits = null;
         _hitLine = -1;
-        if (next is not null && _attached) { next.Changed += OnBufferChanged; next.Bell += OnBell; }
+        if (next is not null && _attached)
+        { next.Changed += OnBufferChanged; next.Bell += OnBell; next.ClipboardCopyRequested += OnClipboardCopyRequested; }
         if (next is not null)
         {
             // The PTY belongs to the session, so previews and split/popout views
@@ -331,6 +333,20 @@ public partial class TerminalView : Control
     {
         // PTY callbacks must not read Avalonia properties off the UI thread.
         Interlocked.Exchange(ref _dirty, 1);
+    }
+
+    // Parser-thread hook: an OSC 52 copy request from the app. Only the visible
+    // view acts — a thumbnail sharing the emulator must not race it for the
+    // clipboard — and the write happens on the UI thread.
+    private void OnClipboardCopyRequested(string text)
+    {
+        if (IsPreview) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clip is null) return;
+            _ = clip.SetTextAsync(text);
+        });
     }
 
     // Parser-thread hook: the refresh tick turns this deadline into the overlay.
@@ -393,6 +409,7 @@ public partial class TerminalView : Control
         if (_emulator is not null) _emulator.Changed += OnBufferChanged;
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged += OnScrollbackChanged;
         if (_emulator is not null) _emulator.Bell += OnBell;
+        if (_emulator is not null) _emulator.ClipboardCopyRequested += OnClipboardCopyRequested;
         ThemeManager.Changed += OnThemeChanged;
         // A hidden ancestor flip (single↔split, pop-out dock) arranges us again
         // without touching Bounds/IsVisible — recheck the emulator size on every
@@ -417,6 +434,7 @@ public partial class TerminalView : Control
         // reattach accumulates dead visual subtrees (and their text caches).
         if (_emulator is not null) _emulator.Buffer.ScrollbackChanged -= OnScrollbackChanged;
         if (_emulator is not null) _emulator.Bell -= OnBell;
+        if (_emulator is not null) _emulator.ClipboardCopyRequested -= OnClipboardCopyRequested;
         ThemeManager.Changed -= OnThemeChanged;
         base.OnDetachedFromVisualTree(e);
     }
@@ -1302,12 +1320,17 @@ public partial class TerminalView : Control
                 break;
         }
         var app = _emulator.Buffer.ApplicationCursorKeys;
+        var kitty = _emulator.Buffer.KittyKeyboardFlags;
         var modifiers = 1 + (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 1 : 0)
             + (e.KeyModifiers.HasFlag(KeyModifiers.Alt) ? 2 : 0)
             + (e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 4 : 0);
-        if (e.Key == Key.Enter && modifiers > 1 && (_emulator.Buffer.KittyKeyboardFlags & 1) != 0)
+        // Enter, Tab and Backspace with a modifier: once the app negotiated the
+        // kitty disambiguate flag these become CSI u, so Shift+Enter reaches an
+        // AI CLI as a newline instead of submitting. Unmodified keys stay legacy.
+        var kittyCode = e.Key switch { Key.Enter or Key.Return => 13, Key.Tab => 9, Key.Back => 127, _ => 0 };
+        if (kittyCode != 0 && KittyKeyEncoding.Functional(kitty, kittyCode, modifiers) is { } kittyKey)
         {
-            SendUserText($"\x1b[13;{modifiers}u");
+            SendUserText(kittyKey);
             e.Handled = true;
             return;
         }
@@ -1376,11 +1399,21 @@ public partial class TerminalView : Control
 
         if (send is null)
         {
-            if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z)
+            if (e.Key is >= Key.A and <= Key.Z
+                && (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Alt)))
             {
-                SendUserText("\x1b" + (char)('a' + e.Key - Key.A));
-                e.Handled = true;
-                return;
+                var letter = (char)('a' + e.Key - Key.A);
+                // Negotiated kitty mode keeps Ctrl and Alt apart (legacy Ctrl+Alt
+                // collapses to a plain control byte). AltGr layouts never reach
+                // here: they produce text through TextInput, not KeyDown letters.
+                var encoded = KittyKeyEncoding.TextKey(kitty, letter, modifiers)
+                    ?? (e.KeyModifiers == KeyModifiers.Alt ? "\x1b" + letter : null);
+                if (encoded is not null)
+                {
+                    SendUserText(encoded);
+                    e.Handled = true;
+                    return;
+                }
             }
             // Shift doesn't change these control bytes (Ctrl+Shift+[ is still
             // ESC). Alt is excluded — Ctrl+Alt is AltGr on many layouts and
@@ -1787,6 +1820,23 @@ public partial class TerminalView : Control
             el = Math.Min(el, buf.TotalLines - 1);
             return sl > el ? null : buf.ExtractText(sl, sc, el, ec);
         }
+    }
+
+    /// <summary>Select one absolute line. Used by tests to set up a selection
+    /// without synthesizing pointer drags.</summary>
+    public void SelectLine(int line)
+    {
+        var buf = _emulator?.Buffer;
+        if (buf is null) return;
+        lock (buf.SyncRoot)
+        {
+            SynchronizeCoordinates();
+            if (line < 0 || line >= buf.TotalLines) return;
+            _selAnchor = (line, 0);
+            _selEnd = (line, buf.Columns - 1);
+            _wordSelection = false;
+        }
+        InvalidateVisual();
     }
 
     /// <summary>Select the whole buffer — scrollback + screen (Ctrl+Shift+A).</summary>

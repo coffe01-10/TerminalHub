@@ -1775,6 +1775,16 @@
     "en": "Locate recent command output in the current terminal"
   },
   {
+    "id": "M0407",
+    "zh": "发送选区到 AI 会话",
+    "en": "Send selection to AI session"
+  },
+  {
+    "id": "M0408",
+    "zh": "把选中的文字粘贴进一个 AI 会话，不执行",
+    "en": "Paste the selected text into an AI session without running it"
+  },
+  {
     "id": "M0356",
     "zh": "复制当前屏幕",
     "en": "Copy current screen"

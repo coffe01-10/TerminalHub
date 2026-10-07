@@ -133,6 +133,26 @@ public partial class MainWindow
         return cleaned.Length > 40 ? cleaned[..40] : cleaned;
     }
 
+    /// <summary>「发送选区到 AI 会话」: paste the selection into a running AI
+    /// session as context. It is pasted, never executed — the user reviews it
+    /// and presses Enter themselves.</summary>
+    private void OnSendSelectionToAi(object? sender, RoutedEventArgs e)
+    {
+        var text = ActiveTerminal()?.GetSelectedText();
+        if (string.IsNullOrEmpty(text)) { ShowToast("先在终端里选中要发送的文字。"); return; }
+        var targets = Vm.SessionCards
+            .Select(c => c.Model)
+            .Where(s => s.Tag == TerminalHub.Core.Sessions.SessionTag.Ai && s.IsRunning
+                && !ReferenceEquals(s, Vm.ActiveSession))
+            .ToList();
+        if (targets.Count == 0) { ShowToast("没有正在运行的 AI 会话。"); return; }
+        var target = targets.Count == 1 ? targets[0]
+            : targets.FirstOrDefault(s => s.Attention == TerminalHub.Core.Ai.AiAttention.NeedsYou) ?? targets[0];
+        target.Emulator.PasteText(text);
+        Vm.ActivateSearchSession(target);
+        ShowToast($"已粘贴到 {target.Name}（{CountLines(text)} 行），未执行。");
+    }
+
     private void OnCopyScreen(object? sender, RoutedEventArgs e) => _ = CopyVisibleScreenAsync();
     private void OnCopyAllOutput(object? sender, RoutedEventArgs e) => _ = CopyAllOutputAsync();
 
